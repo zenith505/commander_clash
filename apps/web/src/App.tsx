@@ -145,6 +145,7 @@ import {
   planForetell,
   foretellProblem,
   foretellCostOf,
+  foretellActionCost,
   foretoldCast,
   plotProblem,
   discardAnyTimeProblem,
@@ -4962,7 +4963,7 @@ function AbilityMenu({
       )}
       {foretell && (
         <button disabled={!planForetell(s, HUMAN, objectId)} title={foretellProblem(s, HUMAN, objectId) ?? `Exile it face down now (only you can see it). On a later turn you may cast it for ${foretell}.`} onClick={onForetell}>
-          Foretell <ManaCost cost="{2}" size="sm" />
+          Foretell <ManaCost cost={foretellActionCost(s, HUMAN)} size="sm" />
         </button>
       )}
       {discardAnyTime && (

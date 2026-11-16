@@ -2284,7 +2284,7 @@ export interface GameState {
    * Pale Moon, Deep Water: "Until end of turn, if a player taps a nonbasic land for mana, it produces colorless mana instead
    * of any other type" (CR 614.1a): `player` made it; `yours`, only lands that player controls. In timestamp order.
    */
-  landManaRules?: { turn: number; player: PlayerId; /** "any": a color of the player's choice (Harvest Mage, round B224). */ mana: ManaType | "any"; /** "... and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon: only lands with this subtype (a Mountain). */ subtype?: string }[];
+  landManaRules?: { turn: number; player: PlayerId; /** "any": a color of the player's choice (Harvest Mage, round B224). */ mana: ManaType | "any"; /** Hall of Gemstone (round B226): only colored mana becomes `mana`, colorless mana stays. */ colored?: true; /** "... and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon: only lands with this subtype (a Mountain). */ subtype?: string }[];
   /**
    * "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect from a
    * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins

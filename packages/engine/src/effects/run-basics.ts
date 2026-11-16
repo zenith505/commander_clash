@@ -415,6 +415,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "landManaUntilEndOfTurn":
       // Pale Moon, Deep Water: a replacement effect until the turn ends (CR 514.2), applied in manaabilities.ts tappedForMana.
       // Harvest Mage (round B224): "one mana of a color of your choice instead of any other type and amount" (mana "any", `one`).
+      // Hall of Gemstone (round B226): "mana of the chosen color instead of any other color", the color chosen before it as
+      // this resolves (none chosen, nothing changes), only colored mana (`colored`).
+      if (e.mana === "chosen") {
+        const color = s.resolving?.chosen?.color;
+        if (!color) return;
+        (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: color, ...(e.colored ? { colored: true as const } : {}) });
+        log(s, `Until end of turn, lands tapped for mana produce ${COLOR_NAMES[color].toLowerCase()} mana instead of any other color (${src}).`);
+        return;
+      }
       (s.landManaRules ??= []).push({ turn: s.turn, player: ctx.controller, mana: e.mana, ...(e.one ? { one: true as const } : {}), ...(e.nonbasic ? { nonbasic: true as const } : {}), ...(e.yours ? { yours: true as const } : {}), ...(e.subtype ? { subtype: e.subtype } : {}) });
       log(s, `Until end of turn, ${e.subtype ? `${e.subtype}s` : e.nonbasic ? "nonbasic lands" : `lands ${player(s, ctx.controller).name} controls`} tapped for mana produce ${e.mana === "any" ? `${e.one ? "one mana" : "mana"} of a color of ${player(s, ctx.controller).name}'s choice` : e.mana === "C" ? "colorless mana" : `{${e.mana}}`} instead.`);
       return;

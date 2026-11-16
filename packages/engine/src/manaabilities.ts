@@ -259,7 +259,7 @@ export const timesAsMuch = (mana: ManaType[], n: number): ManaType[] => (n === 1
  * amount"; "as", Infernal Darkness's "it produces {B} instead of any other type" (`one`: "... and amount", Contamination;
  * `only`: Quarum Trench Gnomes's "colorless mana instead of white mana", only mana of that type changes).
  */
-type ManaReplacement = { kind: "times"; n: number } | { kind: "damp" } | { kind: "as"; mana: ManaType; one?: true; only?: ManaType } | ChooseReplacement;
+type ManaReplacement = { kind: "times"; n: number } | { kind: "damp" } | { kind: "as"; mana: ManaType; one?: true; only?: ManaType; /** Hall of Gemstone (round B226): "of the chosen color instead of any other color": each colored mana, not colorless (rulings). */ colored?: true } | ChooseReplacement;
 
 /**
  * A change of type whose new type the player tapping the land chooses (round B224): Pulse of Llanowar's and Harvest Mage's
@@ -307,15 +307,15 @@ function manaReplacements(s: GameState, pid: PlayerId, tapped: GameObject | unde
   if (land) {
     for (const r of s.landManaRules ?? [])
       if (r.turn === s.turn && (!r.nonbasic || !basic) && (!r.yours || controllerOf(s, tapped!) === r.player) && (!r.subtype || characteristics(s, tapped!).subtypes.includes(r.subtype)))
-        out.push(r.mana === "any" ? { kind: "choose", colors: [...COLORS], ...(r.one ? { one: true as const } : {}) } : { kind: "as", mana: r.mana });
+        out.push(r.mana === "any" ? { kind: "choose", colors: [...COLORS], ...(r.one ? { one: true as const } : {}) } : { kind: "as", mana: r.mana, ...(r.colored ? { colored: true as const } : {}) });
     for (const r of tapped!.manaReplaced ?? []) out.push({ kind: "as", mana: r.to, only: r.from });
   }
   return out;
 }
 
-const applicable = (r: ManaReplacement, made: ManaType[]): boolean => made.length > 0 && (r.kind === "damp" ? made.length >= 2 : r.kind === "as" && r.only ? made.includes(r.only) : true);
+const applicable = (r: ManaReplacement, made: ManaType[]): boolean => made.length > 0 && (r.kind === "damp" ? made.length >= 2 : r.kind === "as" && r.only ? made.includes(r.only) : r.kind === "as" && r.colored ? made.some((m) => m !== "C") : true);
 const applyReplacement = (r: Exclude<ManaReplacement, ChooseReplacement>, made: ManaType[]): ManaType[] =>
-  r.kind === "times" ? timesAsMuch(made, r.n) : r.kind === "damp" ? ["C"] : r.one ? [r.mana] : made.map((m) => (!r.only || m === r.only ? r.mana : m));
+  r.kind === "times" ? timesAsMuch(made, r.n) : r.kind === "damp" ? ["C"] : r.one ? [r.mana] : made.map((m) => ((r.only ? m === r.only : !r.colored || m !== "C") ? r.mana : m));
 
 /**
  * Every result of applying these replacement effects in an order the player could choose (CR 616.1): each time one that

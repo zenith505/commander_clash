@@ -15229,9 +15229,25 @@ export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): stri
   const d = defOf(s, o);
   if (!compileCard(d).foretell && grantedForetell(s, pid, o) === undefined) return `${d.name} doesn't have foretell`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
-  if (s.activePlayer !== pid) return "you can only foretell during your own turn";
-  if (!canPayFromPool(s, pid, parseManaCost("{2}"), { ability: o, foretell: true })) return `not enough mana to foretell ${d.name} ({2})`;
+  const cosmos = cosmosChargers(s, pid);
+  if (s.activePlayer !== pid && !cosmos.length) return "you can only foretell during your own turn";
+  const cost = foretellActionCost(s, pid);
+  if (!canPayFromPool(s, pid, parseManaCost(cost), { ability: o, foretell: true })) return `not enough mana to foretell ${d.name} (${cost})`;
   return null;
+}
+
+/** Cosmos Charger (round B226): the permanents `pid` controls whose ability makes foretelling cheaper and possible on any player's turn. */
+function cosmosChargers(s: GameState, pid: PlayerId): GameObject[] {
+  return s.battlefield.map((id) => obj(s, id)).filter((p) => controllerOf(s, p) === pid && (abilitiesOf(s, p).foretellActionLess ?? 0) > 0);
+}
+
+/**
+ * What foretelling a card costs `pid` now (CR 702.143a): {2}, less {1} for each Cosmos Charger they control ("costs {1}
+ * less", CR 601.2f applied to the special action), never less than {0} (rulings).
+ */
+export function foretellActionCost(s: GameState, pid: PlayerId): string {
+  const less = cosmosChargers(s, pid).reduce((n, p) => n + (abilitiesOf(s, p).foretellActionLess ?? 0), 0);
+  return `{${Math.max(0, 2 - less)}}`;
 }
 
 /**
@@ -15266,7 +15282,7 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   const d = defOf(s, o);
   // Dream Devourer's foretell: the card keeps the foretell cost it was given, not the ability (rulings).
   const reduce = compileCard(d).foretell ? undefined : grantedForetell(s, p.id, o);
-  spendFromPool(s, p.id, parseManaCost("{2}"), { ability: o, foretell: true });
+  spendFromPool(s, p.id, parseManaCost(foretellActionCost(s, p.id)), { ability: o, foretell: true });
   moveObject(s, id, "exile");
   o.foretold = true;
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn, ...(reduce !== undefined ? { foretellReduce: reduce } : {}) };

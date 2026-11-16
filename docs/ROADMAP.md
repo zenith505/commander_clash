@@ -1,7 +1,7 @@
 # Roadmap
 
-31,498 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,903 of
+31,539 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,904 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -183,7 +183,7 @@ line blocks.
    Boone, Novac Guard (a reflexive damage trigger with "unless that creature's controller"), Spelltwine (casting copies
    of exiled cards), Ultimate Magic: Meteor ("if ~ was cast from exile" with a choice for each opponent), Spectral
    Searchlight (another player adds the mana), Rat King, Verminister ("all other cards with the same name"),
-   Valentin, Dean of the Vein (a reflexive trigger from a replacement), Spider-Verse ("from anywhere other than your
+   Valentin, Dean of the Vein (a reflexive trigger from a replacement), Spider-Verse (done in round 388) ("from anywhere other than your
    hand"), Captain America, First Avenger (unattaching an Equipment as a cost), Desert Warfare, Soulfire Eruption,
    Círdan the Shipwright (secret council for players), Dragonlord
    Kolaghan, Back for Seconds (done in round 295) (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
@@ -2732,7 +2732,7 @@ line blocks.
    Out after round 363 (looked at, not done): Ziatora's Envoy (playing a land from the top while the trigger resolves);
    Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit (done in round B212) ("unless its controller has
    you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
-   Choreographed Sparks ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
+   Choreographed Sparks (done in round 388) ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
    Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (in Lane B's range).
    Round 364 went on down the "Out after round N" lists and `npm run popular`, most played first, to blocking requirements,
    a copied exhaust ability, next-time damage effects for a chosen source and a permission from the top of the library:
@@ -2941,7 +2941,7 @@ line blocks.
    Out after round 371 (looked at, not done): Jailbreak ("When that permanent enters, return up to one target permanent
    card with equal or lesser mana value": a reflexive target bounded by its subject's mana value); Lukka, Coppercoat
    Outcast (cards exiled this way gaining a cast permission that lasts while you control a Lukka planeswalker); Mizzix,
-   Replica Rider and Choreographed Sparks (still out: a copy of a permanent spell that gains haste and an end step
+   Replica Rider and Choreographed Sparks (both done in round 388) (still out then: a copy of a permanent spell that gains haste and an end step
    sacrifice; "this spell can't be copied").
    Round 372 went on down the "Out after round N" lists, most played first, to a time counter taken from a suspended card,
    a target count set by another target, a land put in from among the cards cascade exiled and colorless mana for another
@@ -3372,6 +3372,28 @@ line blocks.
    round after the chain merges); Kraven the Hunter (still out: the greatest power among a player's creatures immediately
    before several die at once, CR 603.10a); Helm of Kaldra and the rest above rank 10,000 (still out, for the reasons in
    their earlier lists).
+   Round 388 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of spells
+   that gain abilities, which go on applying to the token a copy of a permanent spell becomes (CR 400.7a, 608.3f,
+   707.10f): Spider-Verse's "Whenever you cast a spell from anywhere other than your hand, you may copy it. If you do, you
+   may choose new targets for the copy. If the copy is a permanent spell, it gains haste. Do this only once each turn."
+   (choosing to copy is what counts, CR 603.2h, so a "no" lets it trigger again; an instance already on the stack when
+   you choose to copy does nothing, rulings; a commander cast from the command zone is copied too, its copy a legendary
+   token that isn't a commander); Mizzix, Replica Rider's "you may pay {1}{U/R}. If you do, copy that spell ... If the
+   copy is a permanent spell, it gains haste and "At the beginning of your end step, sacrifice this permanent."" (paid
+   once, as it resolves, rulings); Choreographed Sparks's "Copy target creature spell you control. The copy gains haste
+   and "At the beginning of the end step, sacrifice this token."" (a creature spell's copy is a permanent spell, CR
+   111.13; "This spell can't be copied." as See Double's); and The Brothers' War's chapter II, "Choose two target
+   players. Until your next turn, each creature they control attacks the other chosen player each combat if able." (two
+   different players, CR 115.3, you among them if you like; the creatures each controls as it resolves, CR 611.2c, each
+   made to attack the other, CR 508.1d, until its controller's next turn begins, CR 611.2b; with one of them an illegal
+   target, neither is made to, as Dulcet Sirens', rulings). Browser tests click through Spider-Verse's copy of Firebolt
+   cast with flashback (yes, then the copy's new target) and chapter II's two player targets; no new prompts. +4, 31,539
+   of 31,936 with main's rounds B223 to B231 merged into the Lane A chain. The compiled text of every other card is
+   unchanged. Bots copy with Spider-Verse, pay for Mizzix's copy when they can, and obey chapter II's attack requirement.
+   Out after round 388 (looked at, not done): Invisible Woman, Sue Storm (still out: no batched "one or more counters on
+   one or more creatures" event); Ziatora's Envoy and Pulmonic Sliver (still out, as in their earlier lists); Guff
+   Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest above rank 13,000 (still out,
+   for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4691,7 +4713,7 @@ line blocks.
    Prowl, Stoic Strategist and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
-   The Brothers' War (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
+   The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
    life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
    Treasure Hunter (mana spent as any color for spells you don't own); Invasion Plans (done in round 378) (the attacking player declares
@@ -4884,7 +4906,7 @@ line blocks.
    attached to it); Imodane, the Pyrohammer (done in round 337) ("an instant or sorcery spell you control that targets only a single creature
    deals damage to that creature": no damage event tells a spell's single target yet); Ziatora's Envoy ("You may play a
    land from the top of your library" as the trigger resolves, a land play of its own, or a free spell with mana value up
-   to the damage dealt); Mizzix, Replica Rider (a copy of a permanent spell that gains haste and an end-step sacrifice);
+   to the damage dealt); Mizzix, Replica Rider (done in round 388) (a copy of a permanent spell that gains haste and an end-step sacrifice);
    Donal, Herald of Wings (done in round 337) (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci (done in round 358)
    (a token copy of the discarded card "except it's a 0/2 Thopter artifact creature with flying"); Optimus Prime, Hero //
    Autobot Leader ("The chosen creature" after bolster, and a delayed convert when it deals combat damage).
@@ -5283,7 +5305,7 @@ line blocks.
    pay {X}. When you do" cards (Isareth (done in round B146), Rose Room Treasurer, Tester of the Tangential (done in round B146)); "can't attack
    unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom! (done in round B210),
    Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
-   Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother (done in round 274), Spider-Verse and Mirror
+   Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother (done in round 274), Spider-Verse (done in round 388) and Mirror
    Box (Mirror Gallery and Council of Reeds play: the legend rule doesn't apply); the other tiered cards (Cloud, Ice,
    Tifa, Vincent); Archetypes; "can't attack you" limits by count (Crawlspace, Judoon). With Silent Arbiter's "no more
    than one creature can block" the requirement check only compares blocks that keep to the limit; bots trim attacks
@@ -5407,7 +5429,7 @@ line blocks.
    - Airbend still out: Aang, Airbending Master ("another target creature"), Airbender Ascension and Avatar's Wrath
      (other lines). Suspend Aggression (done in round B205) and Elite Spellbinder ("its owner may play it until the end of their next turn",
      "look at target opponent's hand. You may exile a nonland card from it"), Extraordinary Journey (done in round 338).
-   - Choreographed Sparks ("this spell can't be copied").
+   - Choreographed Sparks (done in round 388) ("this spell can't be copied").
    Left from the round after tempting offers (Show and Tell's hidden picks, "each player may search / scry / draw",
    "any player may activate this ability", "any player may ... If a player does / If no one does", Scion of Halaster's
    replacement order, Adeline with a token doubler):

@@ -167,6 +167,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "eventAmount":
       return ctx.event?.amount ?? 0;
+    case "eventSpent":
+      // Balduvian Fallen (round B232): "for each {B} or {R} spent this way" (one mana of either counts once).
+      return c.types.reduce((n, m) => n + (ctx.event?.spent?.[m] ?? 0), 0);
     case "castShortfall": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       return item ? Math.max(0, spellManaValue(s, item) - (ctx.event?.amount ?? 0)) : 0;

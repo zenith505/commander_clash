@@ -2,6 +2,7 @@
 // whole spells (after round B230's).
 import type { AbilityBody, CompiledCard } from "../abilities";
 import { parseActivated } from "./activated";
+import { roundB232Spell } from "./laneb232";
 import { parseTrigger } from "./triggers";
 
 const KHERU_TRIGGER = "Whenever ~ deals combat damage to a player, that player exiles a card from their hand face down.";
@@ -71,6 +72,5 @@ export function roundB231Line(line: string, raw: string, out: CompiledCard, isSp
 
 /** Round B231's whole spells: the body, null when it's one of these but can't be read, undefined when it isn't. */
 export function roundB231Spell(text: string): AbilityBody | null | undefined {
-  void text;
-  return undefined;
+  return roundB232Spell(text);
 }

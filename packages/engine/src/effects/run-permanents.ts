@@ -515,7 +515,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "cumulativeUpkeepPaid": {
       // Hibernation's End: its cumulative upkeep was paid (CR 702.24a), while it's still on the battlefield.
       const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
-      if (o?.zone === "battlefield") fireEvent(s, { type: "cumulativeUpkeepPaid", id: o.id });
+      // Balduvian Fallen (round B232): with the mana spent on it (the may's payment), for "for each {B} or {R} spent this way".
+      const spent = s.resolving?.scratch?.upkeepSpent;
+      if (o?.zone === "battlefield") fireEvent(s, { type: "cumulativeUpkeepPaid", id: o.id, ...(spent ? { spent } : {}) });
       return;
     }
     case "gaveGift":

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,489 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,493 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -5590,8 +5590,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it blocked or was blocked by something this turn); Lifelace and Purelace (a color change on a spell); Ronom Hulk
   (protection from snow); Wandering Mage, Samite Censer-Bearer, Pearl Shard, Elvish Healer, Orim's Touch (prevention
   forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (done in round B104) (prevent damage
-  from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (done in round B144) (an attack requirement
-  that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
+  from Deserts); Balduvian Fallen (done in round B232) (mana spent on a cumulative upkeep payment); Viashino Bey (done in round B144) (an attack requirement
+  that depends on the declaration itself); Heroism (done in round B232) (per-attacker pay-or-prevent); Ogre Enforcer (done in round B232) (lethal damage from a
   single source); Groffskithur (done in round B129) ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
   Panther (a cost that sacrifices creatures by name); Sworn Defender (done in round B135) and Lesser Werewolf (done in round B225) (power-dependent combat
   tricks).
@@ -6331,7 +6331,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Known limits there: Paroxysm with an empty library takes the "Otherwise" branch (nothing is revealed).
 - Out after round B32: Ceaseless Searblades (activating a mana ability of an Elemental must trigger it; mana
   activations don't report their source), Yare (done in round B145) ("target creature defending player controls" on a spell, with several
-  defending players), Mercenaries ("Any player may activate this ability"), Heroism (a pay-or-prevent per creature).
+  defending players), Mercenaries ("Any player may activate this ability"), Heroism (done in round B232) (a pay-or-prevent per creature).
 - Round B33 (harder skipped cards, least played first): a card's own name in an ability it grants is a name, not the
   object with the ability (CR 201.4b: Sound the Call, Deathpact Angel, Rekindling Phoenix, Food Fight), "If the exiled
   card is a snow land" after an exile-the-top-card cost (Storm Elemental), "tap two untapped artifacts, creatures,
@@ -9702,6 +9702,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rulings, so activationCost now takes the cost choices; a token copy of that card; a bot copies the costliest creature card
   it can pay for). Browser tests for Back from the Brink's activation, Cyclopean Tomb's land choice and casting the card
   Kheru Mind-Eater made Ana exile. +4, 31,489 of 31,936. The compiled text of every other card is unchanged.
+- Round B232 (least played first, from the Lane B skip lists): Balduvian Fallen ("Whenever ~'s cumulative upkeep is paid",
+  Hibernation's End's event, now with the mana spent on that payment, TriggerEventInfo.spent; +1/+0 for each {B} or {R} of
+  it, Amount "eventSpent", counted as the trigger resolves). Heroism (the attacking red creatures as it resolves, anyone's,
+  each controller asked in turn order whether to pay {2}{R} for each, rulings; those not paid for have all the combat damage
+  they'd deal this turn prevented, as the creatures they are; Effect attackersPayOrPrevent; a bot activates it after blockers
+  are declared against red attackers that would deal it 4 or more, giving up only a white token worth little). Butcher Orgg
+  (asked as its combat damage is assigned in each damage step, while it's attacking: all of it divided among the defending
+  player, CR 508.5, and any creatures they control, at least 1 each, or assigned the usual way; blocked or not; blocked by no
+  creature any more it deals none and isn't asked, rulings; PendingDecision divideDamage `combat`, GameState.creatureDamageChoice
+  `divide`; a bot kills the most valuable creatures it can, the rest to the player, all to the player when that's lethal).
+  Ogre Enforcer (lethal damage destroys it only when one source's damage marked on it is lethal by itself, rulings;
+  GameObject.damageFrom, the damage marked by each source as the object it was, cleared with the damage; deathtouch and 0
+  toughness still kill it). Browser tests for Butcher Orgg's division with Ana among the choices, its "Assign it the usual
+  way" and Heroism's {2}{R} question for your attacking Hill Giant. +4, 31,493 of 31,936. The compiled text of every other
+  card is unchanged.
+- Out after round B232 (looked at, not done): the lists after round B231 stay out. Known gaps: a blocking Butcher Orgg
+  isn't offered the division ("defending player" is defined for an attacking creature, CR 508.5); a blocked Orgg with
+  trample whose blockers are all gone assigns its damage to the player the usual way (CR 702.19e) and isn't asked either;
+  the engine picks which mana in the pool pays a cumulative upkeep's generic cost, so a player who wants Balduvian Fallen's
+  bonus should add only {B} or {R} for it; bots' combat predictions don't know Ogre Enforcer survives damage from several
+  sources.
 - Out after round B231 (looked at, not done): Torrent of Lava (an activated ability creatures have while it's on the stack,
   and a shield against damage from that spell only), Guardian Beast ("other players can't gain control of them" while it's
   untapped, and "can't be enchanted" that doesn't remove Auras already attached), Spy Kit (all names of nonlegendary creature
@@ -9971,7 +9992,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by creatures of that color"), Blood Spatter Analysis (a reflexive "when you do" after "sacrifice it if it has five or
   more bloodstain counters"), Triton Tactics (tapping each creature that was blocked by those creatures this turn: block
   history).
-- Out after round B147 (looked at, not done): Ogre Enforcer ("can't be destroyed by lethal damage unless lethal damage
+- Out after round B147 (looked at, not done): Ogre Enforcer (done in round B232) ("can't be destroyed by lethal damage unless lethal damage
   dealt by a single source is marked on it": damage marked per source, which removing damage has to clear too), Sea Troll
   ("if ~ blocked or was blocked by a blue creature this turn": the colors of its blocks this turn, as they were),
   Hostility (done in round B166) (a prevention replacement that creates a token for each 1 damage prevented this way).
@@ -10202,7 +10223,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   your choice instead: a choice as the land is tapped; both done in round B224), Escaped Shapeshifter (keywords and protection read from opponents'
   creatures, a layer 6 dependency), Spoils of War (done in round B164) (X set by an opponent's graveyard as you cast it), Drain Life (done in round B179), Soul Burn
   and Consume Spirit (done in round B179) ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
-  color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg and
+  color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg (done in round B232) and
   Cunning Giant (done in round B144) (combat damage assigned to other creatures).
 - Out after round B91 (looked at, not done): Goblin Test Pilot (done in round B136) (a target chosen at random as an activated ability is
   activated: the activation, the bots and the UI would all need to leave the target to chance), Flying Drone (a colored

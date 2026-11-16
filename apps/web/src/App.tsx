@@ -2899,7 +2899,7 @@ function ColorsPick({ pending, dispatch }: { pending: Extract<NonNullable<GameSt
 }
 
 /** Cards from your graveyard to collect evidence N with (CR 701.59a): Done once their mana values add up to N or more. */
-/** Master of the Wild Hunt: your creature's damage divided among the creatures offered, − and + for each, until all of it is given out. */
+/** Master of the Wild Hunt: your creature's damage divided among the creatures offered, − and + for each, until all of it is given out. Butcher Orgg: its combat damage, the defending player among the choices. */
 function DivideDamageChoice({
   s,
   pending,
@@ -2915,11 +2915,27 @@ function DivideDamageChoice({
   const given = Object.values(parts).reduce((a, n) => a + n, 0);
   const left = pending.total - given;
   const set = (id: string, n: number) => setParts({ ...parts, [id]: Math.max(0, n) });
+  // Butcher Orgg (round B232): the defending player is one of the choices too ("p<player>"), and the damage can be assigned
+  // the usual way instead.
+  const toPlayer = pending.toPlayer !== undefined ? `p${pending.toPlayer}` : undefined;
+  const playerPart = toPlayer ? (parts[toPlayer] ?? 0) : 0;
   return (
     <div className="controls">
       <span>
-        <strong>{pending.source}:</strong> divide {cardOf(s, pending.by).name}'s {pending.total} damage among any number of these {pending.what} ({left} left)
+        <strong>{pending.source}:</strong> divide {cardOf(s, pending.by).name}'s {pending.total} {pending.combat ? "combat " : ""}damage among any number of {toPlayer ? `${s.players[pending.toPlayer!]!.name} and ` : ""}these {pending.what} ({left} left)
       </span>
+      {toPlayer && (
+        <span className="divide" data-divide-damage={toPlayer}>
+          {s.players[pending.toPlayer!]!.name}{" "}
+          <button className="ghost" disabled={playerPart <= 0} onClick={() => set(toPlayer, playerPart - 1)}>
+            −
+          </button>
+          <strong>{playerPart}</strong>
+          <button className="ghost" disabled={left <= 0} onClick={() => set(toPlayer, playerPart + 1)}>
+            +
+          </button>
+        </span>
+      )}
       {pending.options.map((id) => {
         const n = parts[id] ?? 0;
         const d = cardOf(s, id);
@@ -2939,6 +2955,11 @@ function DivideDamageChoice({
       <button disabled={left !== 0} onClick={() => dispatch([{ type: "divideDamage", player: HUMAN, parts }])}>
         Done
       </button>
+      {pending.combat && (
+        <button className="ghost" onClick={() => dispatch([{ type: "divideDamage", player: HUMAN, parts: {} }])}>
+          Assign it the usual way
+        </button>
+      )}
     </div>
   );
 }

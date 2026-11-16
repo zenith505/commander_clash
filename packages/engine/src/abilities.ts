@@ -521,6 +521,8 @@ export type Count =
   | { kind: "spentPairs"; color: Color }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
   | { kind: "eventAmount" }
+  /** Balduvian Fallen (round B232): "for each {B} or {R} spent this way": the mana of these types its event spent (TriggerEventInfo.spent). */
+  | { kind: "eventSpent"; types: ManaType[] }
   /** Ancient Cellarspawn's "the difference": the cast spell's mana value (X included) less the mana spent to cast it. */
   | { kind: "castShortfall" }
   /** "Where X is that excess damage" after "if that creature was dealt excess damage this turn" (CR 120.10). */
@@ -4558,6 +4560,12 @@ export type Effect =
    */
   | { type: "attackersPayOrBlockersGain"; filter: TargetSpec; cost: string; keyword: string }
   /**
+   * Heroism (round B232): "For each attacking red creature, prevent all combat damage that would be dealt by that creature
+   * this turn unless its controller pays {2}{R}.": the creatures as it resolves, each payment made then (rulings), each
+   * attacker's controller in turn order (CR 101.4).
+   */
+  | { type: "attackersPayOrPrevent"; filter: TargetSpec; cost: string }
+  /**
    * Storm Herald (round B208): "return any number of Aura cards from your graveyard to the battlefield attached to creatures
    * you control": only Auras that could be attached to a creature you control (rulings), chosen as it resolves, each
    * one's creature chosen as they enter together (CR 303.4f); the Auras that entered are ResolvingInfo.created.
@@ -8546,6 +8554,10 @@ export interface CompiledCard {
   attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */
   keepsDamage?: true;
+  /** Butcher Orgg (round B232): "You may assign ~'s combat damage divided as you choose among defending player and/or any number of creatures they control" (game.ts askDivideCombatDamage). */
+  divideCombatDamage?: true;
+  /** Ogre Enforcer (round B232): "~ can't be destroyed by lethal damage unless lethal damage dealt by a single source is marked on it" (CR 704.5g; GameObject.damageFrom). */
+  lethalFromOneSource?: true;
   /**
    * Wolverine, Fierce Fighter: "If damage would be dealt to ~, instead that damage is dealt, but all other damage already
    * dealt to ~ is healed" (CR 614.1a): the damage marked on it before the event is removed as the new damage is dealt;

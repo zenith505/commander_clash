@@ -4786,7 +4786,7 @@ function ModeMenu({
  * also be tapped removing no counters, to start storing them (Bottomless Vault).
  */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead) !== null);
+  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0 || x.mills) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead) !== null);
 }
 
 function AbilityMenu({
@@ -5155,7 +5155,7 @@ function AbilityMenu({
           const button = (
             <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}-${x.instead ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
-              {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
+              {x.mills ? "add one mana for each colored mana symbol in the milled card's mana cost" : x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>
           );
@@ -5977,6 +5977,20 @@ function Controls({
       </div>
     );
   }
+  // Charmed Pendant (round B239): the mana its milled card's hybrid symbols add, one button for each result.
+  if (pending?.kind === "chooseOption" && pending.what === "pendantMana" && pending.player === HUMAN)
+    return (
+      <div className="controls pendant-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" data-mana={o} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            add <ManaCost cost={[...o].map((m) => `{${m}}`).join("")} size="sm" />
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "endure" && pending.player === HUMAN)
     return (
       <div className="controls">

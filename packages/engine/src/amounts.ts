@@ -158,6 +158,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return o?.chosen?.number ?? 0;
     }
+    case "selfNotedExiledMv": {
+      // Bell Borca: only what it noted this turn as the object it is; none noted, or off the battlefield, is 0 (rulings).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const n = o?.zone === "battlefield" ? o.exiledMvNoted : undefined;
+      return n && n.turn === s.turn && n.zc === (o!.zoneChanges ?? 0) ? n.max : 0;
+    }
     case "crewedSource": {
       // The source as the object it is now or, gone, as it last was (CR 400.7, 608.2h); each creature counted once.
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1471,6 +1477,8 @@ function describeCount(c: Count): string {
       return "the chosen number";
     case "selfChosenNumber":
       return "the last chosen number";
+    case "selfNotedExiledMv":
+      return "the greatest number noted for it this turn";
     case "permanents":
       return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.counterKinds ? "kinds of counters among " : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":

@@ -1,6 +1,7 @@
 // Lane B round B238's lines, read by compileCard before its triggers and activated abilities (after round B237's), and its
 // whole spells (after round B236's).
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
+import { roundB239Spell } from "./laneb239";
 import { parseTrigger } from "./triggers";
 
 const CONSULATE = "Whenever an opponent casts a spell, if it has a single target, change the target to enchanted creature if able.";
@@ -54,5 +55,5 @@ export function roundB238Spell(text: string): AbilityBody | null | undefined {
   // Piracy: for the rest of the turn its controller may activate the mana abilities with {T} in their costs of lands
   // other players control (CR 106.12, 605.3a); that mana can only be spent to cast spells (CR 106.6).
   if (text === PIRACY) return { targets: [], effects: [{ type: "piracy" }], text };
-  return undefined;
+  return roundB239Spell(text);
 }

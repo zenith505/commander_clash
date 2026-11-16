@@ -1,6 +1,6 @@
 # Roadmap
 
-31,514 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,517 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4324,7 +4324,7 @@ line blocks.
    from the cards its collect evidence exiled); Reversal of Fortune (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
-   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
+   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
    Sanar, Innovative First-Year; Mairsil, the Pretender (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
@@ -5083,7 +5083,7 @@ line blocks.
      exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
    - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
      what it would do.
-   - Mill costs: Charmed Pendant ("the milled card's mana cost") and The Warring Triad ("target player adds") are
+   - Mill costs: Charmed Pendant (done in round B239) ("the milled card's mana cost") and The Warring Triad ("target player adds") are
      still out.
    - Bots don't use "target creature can't block ~ this turn" (Duct Crawler, Spin Engine) or the Intimidators'
      "becomes a Coward" on purpose: they value them by the usual rough check.
@@ -6419,7 +6419,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   source (Volatile Rig), X/X plus one with "the colors" (Fractalize), "becomes all colors" (Scrapbasket), "are the
   chosen color" (Shifting Sky), "if you cast it during your main phase" (Sentinel's Mark, addendum, CR 207.2c).
   +26 (27,547 of 31,936 with B35 and rounds 202 to 206).
-- Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
+- Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (done in round B239) (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
   opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent (done in round B128) ("for each {U}{U}
   spent"), Wall of Shadows (done in round B199) ("spells that can target only Walls"), Fickle Efreet (done in round B153) (a delayed flip at end of combat, then
@@ -9803,6 +9803,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   for your Lightning Bolt turned onto your own creature by Ana's Captured by the Consulate, Ana's Forests paying for your
   creature after Piracy, and Infernal Denizen's choice of opponent and the opponent's choice of creature. +3, 31,514 of 31,936.
   The compiled text of every other card is unchanged.
+- Round B239 (least played first, from the Lane B skip lists): Silhouette (damage to the target creature this turn is prevented,
+  CR 615.1, when a spell or ability that has it among its targets causes a source to deal it, whatever the source: a fight, the
+  other half of Arc Trail aimed elsewhere still dealt; not combat damage or an untargeted spell's, DamageRule.by.targetingCause).
+  Bell Borca, Spectral Sergeant (each card put into exile from anywhere while it's on the battlefield has its mana value
+  noted for it as the card is in exile, X being 0 and a face-down card's 0, rulings; not tokens or copies of spells; its power
+  the greatest noted this turn for it as this object, 0 before any and off the battlefield, a characteristic-defining ability,
+  CR 604.3: GameObject.exiledMvNoted). Charmed Pendant (a mana ability, rulings, activated only while its controller could cast
+  an instant and with a card to mill, CR 701.17b; one mana for each colored mana symbol in the milled card's mana cost, read
+  where it went, CR 701.17c: {W/P} and {2/W} add {W}, a split card's two halves count, an adventurer's or double-faced card's
+  main face only; a hybrid symbol's color is chosen after the mill, rulings, with a picker; Mana Reflection's doubling applies,
+  CR 106.12b; never used by automatic payment). Browser tests for Charmed Pendant's menu and its hybrid picker, and Silhouette
+  against your own Lightning Bolt. +3, 31,517 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B239 (looked at, not done): the lists after round B238 stay out, and Ghostly Flame (still out: its rulings
+  make black and red sources colorless only "when something looks at the damage", not for triggers on a red spell's damage,
+  which every damage-color check would have to tell apart). Known gaps: Charmed Pendant isn't activated while a replacement
+  would ask for a color for its mana or a triggered mana ability would add to it (Kinnan); bots don't activate it; bots
+  predicting damage don't see Silhouette's prevention.
 - Out after round B238 (looked at, not done): the lists after round B237 stay out. Known gaps: Piracy doesn't offer another
   player's land whose mana ability already restricts its mana, a land a triggered mana ability would add to (Mana Flare, Wild
   Growth: whose mana it is and whether it's restricted aren't modeled), or a land's mana abilities that are activated abilities
@@ -9831,7 +9848,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   time.
 - Out after round B233 (looked at, not done): the lists after round B232 stay out, and Peace Talks ("can't be the targets
   of spells or activated abilities" still needs targets checked by whether the ability was activated or triggered),
-  Charmed Pendant (mana from a mana ability whose amount and colors depend on the card its cost milled, with a color chosen
+  Charmed Pendant (done in round B239) (mana from a mana ability whose amount and colors depend on the card its cost milled, with a color chosen
   for each hybrid symbol), Eye for an Eye (a replacement that keeps the damage and adds the same amount from another source
   to another player in one event), Benthic Explorers ("Untap a tapped land an opponent controls" as a cost) and Grime Gorger
   (still out: "one card of each card type" for cards with two types). Known gaps: bots never activate A Killer Among Us and,
@@ -9851,7 +9868,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
-  target whose legality depends on another target), Runesword, Mangara's Equity, Silhouette, Ghostly Flame, Torrent of Lava
+  target whose legality depends on another target), Runesword, Mangara's Equity, Silhouette (done in round B239), Ghostly Flame, Torrent of Lava
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
   effects) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
@@ -9919,7 +9936,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B217 (looked at, not done): Lich and Nefarious Lich (life gained becomes cards drawn, and those draws
   can happen in the middle of lifelink damage, where a draw replacement can't pause yet, see Swans of Bryn Argoll; Nefarious
   Lich's and Dralnu, Lich Lord's choices of what to exile or sacrifice for each damage are in the middle of damage too),
-  Battlefield Thaumaturge (still out: whether a creature targeted twice counts twice), Charmed Pendant (a mana ability whose
+  Battlefield Thaumaturge (still out: whether a creature targeted twice counts twice), Charmed Pendant (done in round B239) (a mana ability whose
   colors come from the card its cost mills, a hybrid symbol giving either color: the mana can't be known before paying, so
   autopay can't plan it), Cemetery Desecrator (a reflexive modal trigger after exiling a card from any graveyard, X its mana
   value) stays out for now.
@@ -9931,7 +9948,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Sacred Ground (what caused a land to go to the graveyard) and Over the Top (every player's permanent cards entering at
   once, Auras among them) stay out.
 - Out after round B214 (looked at, not done): Decaying Soil (done in round B234) (a threshold-granted dies trigger that looks back, CR 603.10a),
-  Silhouette (damage from a source whose spell or ability targets the creature), Essence of the Wild (a copy replacement
+  Silhouette (done in round B239) (damage from a source whose spell or ability targets the creature), Essence of the Wild (a copy replacement
   applied before other enters replacements) stay out for the reasons in the earlier lists. Known gap: the engine still
   orders each player's own simultaneous triggers itself (CR 603.3b) rather than asking.
 - Out after round B213 (looked at, not done): a bot picking the land for Desolation's sacrifice isn't told that a Plains
@@ -10046,7 +10063,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a trigger granted to each one cast) stay out.
 - Out after round B166 (looked at, not done): Sutured Ghoul and Living Lore (done in round B171) (an "As ~ enters, exile ... from your
   graveyard" choice: the enters choices pick permanents, and graveyard cards aren't offered there yet), Elemental Resonance
-  (what a {2/W} symbol adds isn't settled by its rulings), Charmed Pendant (a hybrid symbol's color chosen inside a mana
+  (what a {2/W} symbol adds isn't settled by its rulings), Charmed Pendant (done in round B239) (a hybrid symbol's color chosen inside a mana
   ability after the mill), Cleansing (done in round B215) (a punisher for each land in turn, any player paying for any land) stay out.
 - Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
   Decaying Soil (done in round B234), Nature's Wrath (done in round B207), Graceful Takedown (done in round B187), Alpine Moon (done in round B214), Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
@@ -10076,7 +10093,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   card too), Grimoire Thief (done in round B189) (face-down exiles you may look at, then spells countered by their names).
 - Out after round B159 (looked at, not done): Kaboom! (done in round B210) (a card revealed per target, each target's own
   loop, the order among them a choice), Ulamog's Despoiler, Sutured Ghoul (done in round B171), Frankenstein's Monster (done in round B171) and Living Lore (done in round B171) (a choice
-  made as they enter, new), Charmed Pendant (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra
+  made as they enter, new), Charmed Pendant (done in round B239) (mana of the milled card's colors), Nafs Asp, Glass Asp and Sabertooth Cobra
   ("unless that player pays {1} before their next draw step": a payment window), Spoils of War (done in round B164).
 - Out after round B157 (looked at, not done): Musician (a granted upkeep ability it checks for by its text),
   Makeshift Mannequin (a granted trigger "for as long as it has a mannequin counter"), Flameskull (done in round B192) (rejuvenation's "play one
@@ -10131,7 +10148,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "sacrifice ~ and pay {2}{G}{G}" question, a look with no prompt yet, and that sacrifice-and-pay "you may" isn't parsed).
 - Out after round B142 (looked at, not done): Decaying Soil (done in round B234) (a dies trigger granted by threshold needs a look-back,
   CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
-  opponent's land as a mana ability's cost), Charmed Pendant (mana by the milled card's mana symbols, instant-speed
+  opponent's land as a mana ability's cost), Charmed Pendant (done in round B239) (mana by the milled card's mana symbols, instant-speed
   only), Grime Gorger (exiling cards that share a type is ambiguous for multi-type cards).
 - Out after round B141 (looked at, not done): Misfortune (done in round B142) and Fatal Lore (done in round B142) ("an opponent chooses one": the mode chosen by an
   opponent as it's cast, then Fatal Lore's targets; the same wait could carry it).

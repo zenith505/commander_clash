@@ -11,7 +11,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, PIRACY_SPEND, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, PIRACY_SPEND, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
@@ -1450,6 +1450,9 @@ export function moveObject(
   if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o))) noteDescended(s, o.owner);
   // Ennis, Debate Moderator: a card put into exile from anywhere, so not a token or a copy of a spell (rulings).
   if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) (s.turnLog ??= {}).cardExiled = true;
+  // Bell Borca, Spectral Sergeant (round B239): each Bell Borca on the battlefield now notes the mana value of the card as it
+  // is in exile (rulings: X is 0, CR 107.3; a face-down card's is 0, CR 708.2), a card only (not a token or a copy of a spell).
+  if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) noteExiledMv(s, o);
   // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
   if (to === "graveyard" && !o.isToken && !o.spellCopy) {
     const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
@@ -5997,6 +6000,20 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }
 
+/** Bell Borca: the greatest mana value each one on the battlefield noted for it this turn, as the object it is. */
+function noteExiledMv(s: GameState, card: GameObject) {
+  const borcas = s.battlefield.filter((b) => b !== card.id && abilitiesOf(s, obj(s, b)).notesExiledMv);
+  if (!borcas.length) return;
+  const mv = characteristics(s, card).manaValue;
+  for (const b of borcas) {
+    const o = obj(s, b);
+    const zc = o.zoneChanges ?? 0;
+    const was = o.exiledMvNoted && o.exiledMvNoted.turn === s.turn && o.exiledMvNoted.zc === zc ? o.exiledMvNoted.max : -1;
+    o.exiledMvNoted = { turn: s.turn, zc, max: Math.max(was, mv) };
+  }
+  invalidateCharacteristics(s);
+}
+
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
 function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
   if (rc.n <= 0) return;
@@ -6045,7 +6062,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // A color chosen for a replacement that lets the player tapping it choose (round B224): one it offers.
   if (instead !== undefined && !(ab.tap && insteadChoices(s, p.id, o).includes(instead))) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
-  const adds = manaProduced(s, o, ab, mana, combo, instead);
+  let adds = manaProduced(s, o, ab, mana, combo, instead);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -6071,6 +6088,16 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.lifeCost) payLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
+  // Charmed Pendant (round B239): "Mill a card" (CR 701.17a), then what it adds is read from that card where it went, a public
+  // zone (CR 701.17c); with a hybrid symbol, its controller chooses the colors below, once the rest is done.
+  let milledCombos: ManaType[][] | undefined;
+  if (ab.millCost) {
+    const top = p.library.slice(0, millCount(s, p.id, 1));
+    for (const c of top) moveObject(s, c, "graveyard", { milled: true });
+    const card = top[0] ? obj(s, top[0]) : undefined;
+    log(s, `${p.name} mills ${card ? nameOf(s, card.id) : "no card"} for ${name}.`);
+    if (ab.produces.kind === "milledSymbols") milledCombos = card && (card.zone === "graveyard" || (card.zone === "exile" && !card.faceDown)) ? milledSymbolCombos(s, card) : [[]];
+  }
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.produces.kind === "removeX") {
     const n = combos![combo!]!.length - (ab.produces.base ?? 0);
@@ -6111,7 +6138,16 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Spectral Searchlight: another player chooses the color of the mana they add (CR 605.3b, 608.2d): asked below, once the
   // rest of the ability is done; the activator's pick only says how much (Mana Reflection's doubling, CR 106.12b).
   const theyChoose = ab.getterChooses && getter !== p.id;
-  if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  if (milledCombos) {
+    // One result: added now, with what replaces tapping it for mana (Mana Reflection's doubling, CR 106.12b).
+    if (milledCombos.length === 1) {
+      adds = tappedForMana(s, p.id, o, milledCombos[0]!);
+      if (adds.length) addMana(s, getter, adds, { from });
+      log(s, adds.length ? `${p.name} adds ${adds.map((m) => `{${m}}`).join("")} (${name}).` : `${name} adds no mana.`);
+    } else adds = milledCombos[0]!;
+    if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+  }
+  else if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
   if (o.zone === "battlefield") fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -6145,6 +6181,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (theyChoose && adds.length && !player(s, getter).lost) {
     s.manaColorFor = { player: getter, n: adds.length, from, source: name };
     s.pending = { kind: "chooseOption", player: getter, source: name, what: "manaColorFor", options: COLORS.map((c) => COLOR_NAMES[c]), prompt: `${p.name} tapped ${name}: choose the color of the ${adds.length === 1 ? "mana" : `${adds.length} mana`} you add` };
+  }
+  // Charmed Pendant: the colors of its hybrid symbols, chosen once the card is milled (rulings), as the ability resolves (CR 605.3b).
+  if (milledCombos && milledCombos.length > 1) {
+    s.pendantMana = { player: p.id, combos: milledCombos, from, source: name, id: o.id };
+    s.pending = { kind: "chooseOption", player: p.id, source: name, what: "pendantMana", options: milledCombos.map((c) => c.join("")), labels: milledCombos.map((c) => `Add ${c.map((m) => `{${m}}`).join("")}`), prompt: `${name}: choose the mana its milled card's hybrid symbols add` };
   }
 }
 
@@ -11446,6 +11487,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "loseReplacement") {
     // Kept for the game loss about to happen as the state-based actions are performed (playerLoses).
     s.loseChoice = { player: p.id, choice };
+    return;
+  }
+  if (pend.what === "pendantMana") {
+    // Charmed Pendant: the mana chosen for the milled card's hybrid symbols, with what replaces tapping it for mana.
+    const m = s.pendantMana;
+    const combo = m?.combos.find((c) => c.join("") === choice);
+    if (!m || m.player !== p.id || !combo) throw new RulesError("no mana is waiting for its colors");
+    s.pendantMana = undefined;
+    const adds = tappedForMana(s, p.id, s.objects[m.id], combo);
+    addMana(s, p.id, adds, { from: m.from });
+    log(s, `${p.name} adds ${adds.map((x) => `{${x}}`).join("")} (${m.source}).`);
     return;
   }
   if (pend.what === "manaColorFor") {

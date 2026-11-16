@@ -716,6 +716,11 @@ function ruleTakes(s: GameState, r: DamageRule, e: DamageEvent): boolean {
   if (r.sourceYours && e.src.controller !== r.controller) return false;
   if (r.srcController !== undefined && e.src.controller !== r.srcController) return false;
   if (r.by?.spellOnly && !e.src.spell) return false;
+  // Silhouette (round B239): "If a spell or ability that targets that creature would cause a source to deal damage to that
+  // creature": the damage is dealt as a spell or ability resolves (CR 608.2) that has that creature, as the object it is,
+  // among its targets (CR 115.1), whatever source it has deal the damage (a fight, Fling); combat damage, a static
+  // ability's or an untargeted spell's isn't.
+  if (r.by?.targetingCause && !targetedByCause(s, r.to?.object)) return false;
   const c = r.by?.chosen;
   if (c) {
     const ref = e.src.ref;
@@ -725,6 +730,12 @@ function ruleTakes(s: GameState, r: DamageRule, e: DamageEvent): boolean {
   const not = r.by?.not;
   if (not && e.src.ref?.object === not.id && e.src.ref.zc === not.zc) return false;
   return !r.by?.filter || sourceMatches(s, r.by.filter, e.src, r.controller);
+}
+
+/** Silhouette: is the spell or ability resolving now targeting this permanent, as the object it is (CR 400.7)? */
+function targetedByCause(s: GameState, o: { id: ObjectId; zc: number } | undefined): boolean {
+  const item = s.resolving?.item;
+  return !!o && !!item && (item.targets ?? []).some((t) => t.kind === "object" && t.id === o.id && (t.zc === undefined || t.zc === o.zc));
 }
 
 /**

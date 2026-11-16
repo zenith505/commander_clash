@@ -137,6 +137,8 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   if (p.kind === "devotion") return [...COLORS];
   if (p.kind === "doublePool") return [...COLORS, "C"];
   if (p.kind === "noted") return [o.notedMana ?? "C"];
+  // Charmed Pendant: nothing to choose as it's activated (what it adds is known after the mill); "C" names the activation.
+  if (p.kind === "milledSymbols") return ["C"];
   return commanderIdentity(s, controllerOf(s, o));
 }
 
@@ -404,6 +406,7 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   // Jeweled Amulet: no mana if no type was noted (rulings).
   if (p.kind === "noted") return o.notedMana ? [o.notedMana] : [];
+  if (p.kind === "milledSymbols") return []; // known only after the mill (activateMana)
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
   if (p.kind === "revealX") return revealXCombos(s, o, p)[combo ?? -1] ?? [];
   if (p.kind === "doublePool") {
@@ -457,6 +460,40 @@ export interface ManaOption {
   extra?: ManaType[];
   /** The part of `adds` that's snow mana (CR 107.4h): its own if the source is snow, a triggered ability's if that one's is. */
   snow?: ManaType[];
+  /** Charmed Pendant (round B239): what it adds depends on the card its cost mills (`adds` is empty until then). */
+  mills?: true;
+}
+
+/**
+ * Charmed Pendant: the mana "for each colored mana symbol in the milled card's mana cost" (CR 107.4, 202.1): {W} for {W},
+ * {W/P} and {2/W}; one of the two colors for {W/U} or {W/U/P} (rulings: "one of either color mana, not both"). A split card's
+ * cost is both halves' (CR 709.4); an adventurer card's or a double-faced card's is its main face's (CR 715.4, 712.8a). Each
+ * different result once, its mana in WUBRG order.
+ */
+export function milledSymbolCombos(s: GameState, card: GameObject): ManaType[][] {
+  const d = defOf(s, card);
+  const cost = d.layout === "split" ? d.manaCost : (d.faces?.[0]?.manaCost ?? d.manaCost.split(" // ")[0] ?? "");
+  let combos: ManaType[][] = [[]];
+  for (const [, sym] of cost.matchAll(/\{([^}]+)\}/g)) {
+    const colors = [...new Set(sym!.split("/").filter((x): x is Color => (COLORS as readonly string[]).includes(x)))];
+    if (!colors.length) continue;
+    combos = combos.flatMap((c) => colors.map((k) => [...c, k]));
+  }
+  const order = (m: ManaType) => COLORS.indexOf(m as Color);
+  const seen = new Set<string>();
+  return combos.map((c) => [...c].sort((a, b) => order(a) - order(b))).filter((c) => !seen.has(c.join("")) && !!seen.add(c.join("")));
+}
+
+/**
+ * Charmed Pendant: what isn't modeled about tapping it for mana it learns only after the mill, so it isn't activated then:
+ * a replacement asking for a color, or a triggered mana ability that would add to its mana (Kinnan, CR 605.1b).
+ */
+function milledManaProblem(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility): string | null {
+  const name = characteristics(s, o).name;
+  if (!player(s, pid).library.length) return `you have no card to mill for ${name}`; // CR 701.17b
+  if (manaReplacements(s, pid, o).some((r) => r.kind === "choose")) return `${name}'s mana can't be made another color here`;
+  if (manaTriggerResults(s, pid, o, ab, [...COLORS]).some((r) => r.adds.length || r.extra.length)) return `${name}'s mana can't have more added by a triggered mana ability here`;
+  return null;
 }
 
 /** The part of the mana a source and the triggered mana abilities make that's snow mana (CR 106.3, 107.4h). */
@@ -590,7 +627,7 @@ function allManaOptions(s: GameState, o: GameObject, abs: ManaAbility[]): ManaOp
       const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length - (ab.produces.base ?? 0) } : {};
       const pays = ab.produces.kind === "doublePool" ? { pays: combos![combo!]! } : {};
       return insteadWays(s, o, ab.tap, (instead) => manaProduced(s, o, ab, mana, combo, instead)).flatMap(({ instead, adds }) =>
-        manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) })),
+        manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r), ...(ab.produces.kind === "milledSymbols" ? { mills: true as const } : {}) })),
       );
     });
   });
@@ -654,6 +691,10 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
+  if (ab.millCost || ab.produces.kind === "milledSymbols") {
+    const why = milledManaProblem(s, pid, o, ab);
+    if (why) return why;
+  }
   const payCost = manaAbilityCostOf(s, pid, o, ab);
   if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
@@ -687,7 +728,7 @@ export function manaAbilityCostOf(s: GameState, pid: PlayerId, o: GameObject, ab
 export function manaPenalty(ab: ManaAbility): number {
   // A storage land's counters are saved-up mana: spent only when nothing else will do.
   const stored = ab.produces.kind === "removeX" ? 6 : 0;
-  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.returnSelf || ab.onceEver ? 8 : 0) + (ab.returnAtNextUntap ? 3 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter || ab.becomesManaColor ? 1 : 0);
+  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.returnSelf || ab.onceEver ? 8 : 0) + (ab.returnAtNextUntap ? 3 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost || ab.millCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter || ab.becomesManaColor ? 1 : 0);
 }
 
 /**

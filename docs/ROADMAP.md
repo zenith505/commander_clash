@@ -1,6 +1,6 @@
 # Roadmap
 
-31,491 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,494 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,902 of
 9,979 (99%).
 
@@ -3322,6 +3322,34 @@ line blocks.
    permanent enters, CR 614.12, isn't settled by its rulings); Blood Scrivener and Breathstealer's Crypt (still out: a
    draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing, Supper for Spiders, Immortal Coil,
    Nefarious Lich and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 386 went on down `npm run popular` and the "Out after round N" lists, most played first, to the pieces rounds 241
+   to 385 had left them waiting for: Parallel Thoughts' "When ~ enters, search your library for seven cards, exile them in a
+   face-down pile, and shuffle that pile. Then shuffle your library." (as Mangara's Tome's, seven cards) and "If you would
+   draw a card, you may instead put the top card of the pile you exiled into your hand." (each of its controller's draws,
+   their choice among the other replacements, CR 616.1; the pile of that object, CR 607.2a; with the pile empty it still
+   replaces the draw and nothing happens, rulings: CompiledCard.drawFromPile, game.ts drawReplacementChoices
+   `pthoughts:<id>`); Fabrication Foundry's "{2}{W}, {T}, Exile one or more other artifacts you control with total mana
+   value X: Return target artifact card with mana value X or less from your graveyard to the battlefield." (no ruling, so
+   by the rules: X isn't defined by the text, so it's announced as it's activated, CR 107.3a, 601.2b, before the target is
+   chosen, 601.2c, and the artifacts are chosen as the cost is paid, 601.2h, at least one, their mana values adding up to
+   X: AdditionalCost sacrifice `totalMvX`); Memory Vessel's "{T}, Exile ~: Each player exiles the top seven cards of their
+   library. Until your next turn, players may play cards they exiled this way, and they can't play cards from their hand.
+   Activate only as a sorcery." (each player's own cards, with the usual timing and costs, rulings; nobody plays from their
+   hand, its controller included, until its controller's next turn begins, CR 611.2b, 800.4m: Effect impulse `ownersPlay`
+   until "yourNextTurn" with `untilOf`, Effect noHandPlaysUntilYourNextTurn, GameState.handPlayBansUntil). Fixed on the
+   way: an "until your next turn, you may play" permission (Three Wishes, Nivix, Aerie of the Firemind) came back once
+   that next turn was over; it now ends as the turn begins. Browser tests click through Parallel Thoughts' search and
+   "Put the top card of the exiled pile into your hand instead" button, the Foundry's X, target and total-mana-value pick,
+   and Memory Vessel's activation. New prompts: the Thoughts' draw button and the Foundry's pick (with its running total).
+   +3, 31,494 of 31,936. The compiled text of every other card is unchanged. Bots take the pile's card while it has one
+   (its empty pile only to skip a draw from an empty library), activate the Foundry in their second main phase for their
+   most expensive artifact card (mana value 2 or more) with one to three cheaper artifacts, and activate Memory Vessel in
+   their first main phase only with at most one card in hand.
+   Out after round 386 (looked at, not done): Battlefield Thaumaturge (still out: "{1} less for each creature it
+   targets" over every target of a spell with several target words, CR 115.3, and its ruling's "even if the spell targets
+   a creature more than once" isn't settled for one creature in two target slots); Lara Croft, Tomb Raider and
+   Regenerations Restored (still out, as in their earlier lists); Guff Rewrites History, Sunken Palace, Ulalek, Filigree
+   Vector, Possibility Storm and the rest above rank 10,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

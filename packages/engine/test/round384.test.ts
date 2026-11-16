@@ -320,7 +320,7 @@ describe("The Toymaker's Trap: a secret number, an opponent's guess", () => {
     s = act(s, { type: "chooseOption", player: ap, choice: "3" });
     s = act(s, { type: "chooseOption", player: ap, choice: String(others(s, ap)[0]) });
     s = settle(act(s, { type: "chooseOption", player: others(s, ap)[0]!, choice: "1" }));
-    expect(s.numbersChosenFor[`${t}@0`]).toEqual([1, 2, 4, 5, 3]);
+    expect(s.numbersChosenFor?.[`${t}@0`]).toEqual([1, 2, 4, 5, 3]);
     // Around the table again: no number left, so no choice and no guess.
     const turn = s.turn;
     for (let i = 0; i < 4000 && !(s.turn > turn && s.activePlayer === ap && s.step === "draw"); i++) {

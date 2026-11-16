@@ -485,7 +485,7 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost t
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[]; /** "Kicker—Sacrifice two lands": the cost in words. */ text?: string };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[]; instead?: ManaType }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
   kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
@@ -523,7 +523,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
 /** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
 type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[] };
 type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; pick?: ManaPick };
-type ManaPick = { mana?: ManaType; extra?: ManaType[] };
+type ManaPick = { mana?: ManaType; extra?: ManaType[]; instead?: ManaType };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
@@ -1014,7 +1014,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (pick.mana) {
       // A mana ability that taps other permanents too (Springleaf Drum).
-      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen, pick.mana.extra);
+      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen, pick.mana.extra, undefined, pick.mana.instead);
       if (plan) dispatch(plan);
       return;
     }
@@ -1525,7 +1525,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       // A Room with a locked door to unlock (CR 709.5e) has a menu too.
       if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0 || !!abs[x.ability]!.toChosenPlayer) || [0, 1].some((door) => unlockCost(s, o, door) !== undefined)) return setMenu(o.id);
-      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo);
+      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo, mana[0].instead);
       if (plan) dispatch(plan);
     }
   }
@@ -1837,9 +1837,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 const tapCost = manaAbilitiesOn(s, s.objects[menu]!)[x.ability]?.tapCost;
                 if (tapCost) {
                   const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
-                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
+                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
                 }
-                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra, x.combo);
+                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra, x.combo, x.instead);
                 // Victory Chimes: "a player of your choice adds {C}".
                 if (plan) dispatch(to === undefined ? plan : plan.map((a) => (a.type === "activateMana" && a.objectId === menu ? { ...a, to } : a)));
               }}
@@ -4725,7 +4725,7 @@ function ModeMenu({
  * also be tapped removing no counters, to start storing them (Bottomless Vault).
  */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo) !== null);
+  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead) !== null);
 }
 
 function AbilityMenu({
@@ -5092,7 +5092,7 @@ function AbilityMenu({
             .replace(/~/g, "it")
             .replace(/Remove (?:any number of|X) (\S+) counters/, (_, k: string) => (x.removes === 1 ? `Remove a ${k} counter` : `Remove ${x.removes === 0 ? "no" : x.removes} ${k} counters`));
           const button = (
-            <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
+            <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}-${x.instead ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
               {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
@@ -5142,7 +5142,7 @@ function AbilityMenu({
         if (picks.length > 1) {
           const cost = ab.text.slice(0, ab.text.indexOf(": ")).replace(/~/g, "it");
           return picks.map((x) => (
-            <button key={`${i}-${x.mana}-${x.extra?.join("") ?? ""}`} disabled={!ok} title={problem ?? ""} onClick={() => onUse(objectId, i, undefined, undefined, { mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) })}>
+            <button key={`${i}-${x.mana}-${x.extra?.join("") ?? ""}-${x.instead ?? ""}`} disabled={!ok} title={problem ?? ""} onClick={() => onUse(objectId, i, undefined, undefined, { mana: x.mana, ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) })}>
               <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
             </button>
           ));

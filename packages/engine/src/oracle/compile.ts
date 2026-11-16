@@ -66,6 +66,7 @@ import { roundB220Line } from "./laneb220";
 import { roundB221Line } from "./laneb221";
 import { roundB222Line } from "./laneb222";
 import { roundB223Line } from "./laneb223";
+import { roundB224Line } from "./laneb224";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2190,6 +2191,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB222Line(line, raw, out, isSpell)) continue;
     // Chaos Moon, Maddening Imp, Goblin Artisans, Disciple of Caelus Nin (round B223).
     if (roundB223Line(line, raw, out, isSpell, d.name)) continue;
+    // Naked Singularity, Reality Twist, Pulse of Llanowar, Harvest Mage (round B224).
+    if (roundB224Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

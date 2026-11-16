@@ -1197,7 +1197,7 @@ export interface StackItem {
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
    */
-  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** What its source was as it was activated: a snow permanent, a Treasure, a creature, an artifact (CR 106.3). */ from?: ManaOrigin[] };
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** The color chosen for a replacement on the mana it's tapped for (round B224). */ instead?: ManaType; /** What its source was as it was activated: a snow permanent, a Treasure, a creature, an artifact (CR 106.3). */ from?: ManaOrigin[] };
   /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
   treasureSpent?: number;
   /** For an activated ability: the mana spent to pay its cost, one entry for each mana (Jeweled Amulet's note). */
@@ -2284,7 +2284,7 @@ export interface GameState {
    * Pale Moon, Deep Water: "Until end of turn, if a player taps a nonbasic land for mana, it produces colorless mana instead
    * of any other type" (CR 614.1a): `player` made it; `yours`, only lands that player controls. In timestamp order.
    */
-  landManaRules?: { turn: number; player: PlayerId; mana: ManaType; nonbasic?: true; yours?: true; /** Chaos Moon: only lands with this subtype (a Mountain). */ subtype?: string }[];
+  landManaRules?: { turn: number; player: PlayerId; /** "any": a color of the player's choice (Harvest Mage, round B224). */ mana: ManaType | "any"; /** "... and amount": one mana. */ one?: true; nonbasic?: true; yours?: true; /** Chaos Moon: only lands with this subtype (a Mountain). */ subtype?: string }[];
   /**
    * "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect from a
    * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins
@@ -3389,7 +3389,7 @@ export type Action =
   /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
   /** `extra`: the mana picked for the triggered mana abilities tapping it triggers ("one mana of any color", CR 605.4a). */
   /** `combo`: for "Add {W}{W}, {W}{U}, or {U}{U}", which of them (ManaOption.combo). */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** The color chosen for a replacement that lets the player tapping it choose (ManaOption.instead, round B224). */ instead?: ManaType; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */
@@ -3398,7 +3398,7 @@ export type Action =
    * For a mana ability (CR 605.1a), which resolves right away: `mana`, the color for its "one mana of any color" (chosen
    * as it resolves, CR 605.3b; without it, it's asked); `extra`, as for activateMana.
    */
-  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices; mana?: ManaType; extra?: ManaType[]; /** A mana ability activated to pay for the ability activated next (TurnLog.artifactAbility). */ forNext?: true }
+  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices; mana?: ManaType; extra?: ManaType[]; /** As for activateMana (ManaOption.instead, round B224). */ instead?: ManaType; /** A mana ability activated to pay for the ability activated next (TurnLog.artifactAbility). */ forNext?: true }
   | { type: "chooseModes"; player: PlayerId; modes: number[] }
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */

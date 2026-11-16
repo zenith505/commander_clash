@@ -21,6 +21,8 @@ interface Option {
   adds: ManaType[];
   /** The mana picked for the triggered mana abilities it triggers. */
   extra?: ManaType[];
+  /** ManaOption.instead (round B224). */
+  instead?: ManaType;
   /** The mana part of its cost, if any (a Signet's {1}). */
   cost: ParsedCost | null;
   penalty: number;
@@ -99,8 +101,8 @@ function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): (Option &
 
 const toAction = (pid: PlayerId, x: Option): Action =>
   x.activated
-    ? { type: "activateAbility", player: pid, objectId: x.id, index: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }
-    : { type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}) };
+    ? { type: "activateAbility", player: pid, objectId: x.id, index: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) }
+    : { type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) };
 
 /**
  * What to tap for "Tap an untapped creature you control", best first: what makes no mana itself, then what's
@@ -581,7 +583,7 @@ function sacrificedTargets(s: GameState, targets: TargetChoice[] | undefined): O
  * Like planCast, for an activated ability. A crew ability needs the creatures to tap (`tapCreatures`). `pick`: for a
  * mana ability, the color and the triggered abilities' mana, as for activateMana.
  */
-export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, pick?: { mana?: ManaType; extra?: ManaType[] }): Action[] | null {
+export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, pick?: { mana?: ManaType; extra?: ManaType[]; instead?: ManaType }): Action[] | null {
   // "Untap a tapped creature you control" with a creature that's untapped: it's tapped for mana first (Halo Fountain).
   const ab0 = abilitiesOf(s, obj(s, objectId)).activated[index];
   // Prototype Portal: an X the ability sets (CR 107.3c).
@@ -625,7 +627,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
     if (wb) [taps, tapCreatures] = [wb.taps, wb.tapped];
   }
   if (!taps) return null;
-  return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}), ...(pick?.mana ? { mana: pick.mana } : {}), ...(pick?.extra?.length ? { extra: pick.extra } : {}) }];
+  return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}), ...(pick?.mana ? { mana: pick.mana } : {}), ...(pick?.extra?.length ? { extra: pick.extra } : {}), ...(pick?.instead ? { instead: pick.instead } : {}) }];
 }
 
 /** The ways to make mana by tapping `id` with nothing else to pay ("{T}: Add {G}"). */
@@ -813,7 +815,7 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
 }
 
 /** The actions to activate one mana ability, paying any mana it costs first. */
-export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[], combo?: number): Action[] | null {
+export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[], combo?: number, instead?: ManaType): Action[] | null {
   const o = obj(s, objectId);
   if (manaAbilityProblem(s, pid, o, ability, true, tap)) return null;
   const ab = manaAbilitiesOn(s, o)[ability]!;
@@ -823,7 +825,7 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   if (ab.produces.kind === "doublePool") return manaAbilityProblem(s, pid, o, ability) || !manaCombos(s, o, ab)?.[combo ?? -1] ? null : [{ type: "activateMana", player: pid, objectId, mana, ability, combo: combo! }];
   const payCost = manaAbilityCostOf(s, pid, o, ab);
   const taps = payCost ? planMana(s, pid, payCost, 0, objectId, tapped, { ability: o }) : [];
-  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
+  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}), ...(instead ? { instead } : {}) }] : null;
 }
 
 /** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */

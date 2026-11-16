@@ -17804,6 +17804,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6f82b01d-8975-42a1-87e2-99782272bbea",
+  "name": "Harvest Mage",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Spellshaper",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Spellshaper"
+  ],
+  "oracleText": "{G}, {T}, Discard a card: Until end of turn, if you tap a land for mana, it produces one mana of a color of your choice instead of any other type and amount.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nem",
+  "releasedAt": "2000-02-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "860affd6-8f48-4630-b613-d147299b0355",
   "name": "Hatchet Bully",
   "manaCost": "{3}{R}",
@@ -26650,6 +26681,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fb5ec55d-4a35-432a-be6e-c295f1b2e603",
+  "name": "Naked Singularity",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {3} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nIf tapped for mana, Plains produce {R}, Islands produce {G}, Swamps produce {W}, Mountains produce {U}, and Forests produce {B} instead of any other type.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ffa6c14e-3d8e-47a2-b102-d37538d60ef6",
   "name": "Nashi, Moon's Legacy",
   "manaCost": "{B}{G}{U}",
@@ -30538,6 +30599,32 @@
   "commanderLegal": "legal",
   "set": "tsp",
   "releasedAt": "2006-10-06",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dd1ef824-4e61-4dee-a8f0-9cf459008f2c",
+  "name": "Pulse of Llanowar",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a basic land you control is tapped for mana, it produces mana of a color of your choice instead of any other type.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

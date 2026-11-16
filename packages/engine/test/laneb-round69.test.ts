@@ -312,8 +312,8 @@ const named = (s: GameState, pid: PlayerId, name: string) => s.battlefield.filte
 
 describe("Lane B round 69: cards", () => {
   it("compile", () => supported(fantastic(), donraph(), lecturer(), zhao(), toxicrene(), cult(), slime(), hydro(), cadence(), retribution()));
-  it("Day of the Moon stays unsupported (a name chosen for the Saga each chapter, then goad by those names)", () => {
-    expect(isFullySupported({ ...cadence(), oracleId: "day-of-the-moon", name: "Day of the Moon", typeLine: "Enchantment — Saga", subtypes: ["Saga"], oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI, II, III — Choose a creature card name, then goad all creatures with a name chosen for this enchantment. (Until your next turn, they attack each combat if able and attack a player other than you if able.)" } as CardDef)).toBe(false);
+  it("Day of the Moon is supported since round 382 (a name chosen for the Saga each chapter, then goad by those names)", () => {
+    expect(isFullySupported({ ...cadence(), oracleId: "day-of-the-moon", name: "Day of the Moon", typeLine: "Enchantment — Saga", subtypes: ["Saga"], oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI, II, III — Choose a creature card name, then goad all creatures with a name chosen for this enchantment. (Until your next turn, they attack each combat if able and attack a player other than you if able.)" } as CardDef)).toBe(true);
   });
 });
 

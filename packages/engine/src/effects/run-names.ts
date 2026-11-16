@@ -192,6 +192,19 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, hits[0]!)).name} onto the battlefield`, otherwise: e.mayStay ? "If you don't, it stays in your library." : e.mayElseBottom ? "If you don't, it goes on the bottom of your library with the other revealed cards." : "If you don't, it goes into your hand.", source: src, card: hits[0]! };
         return "paused";
       }
+      // Aurora Awakener (round 392): "Put any number of those permanent cards onto the battlefield": its controller picks
+      // which of them, none too, asked before anything moves (so resuming reveals the same cards); those not picked go with
+      // the rest of the revealed cards.
+      if (e.anyNumber && hits.length && !sc.revealPicked) {
+        sc.revealPicked = true;
+        delete sc.found;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `any number of ${filter.text}s`, cards: [...hits], min: 0, max: hits.length, dig: { looked: seen, to: "onto the battlefield", rest: "on the bottom of your library in a random order" } };
+        return "paused";
+      }
+      if (e.anyNumber) {
+        const picked = sc.found ?? [];
+        for (const id of hits.filter((h) => !picked.includes(h))) hits.splice(hits.indexOf(id), 1);
+      }
       const declined = (e.mayStay || e.mayElseBottom) && !sc.may ? hits.splice(0) : [];
       // Part in Friendship: onto the battlefield only with a mana value (X as 0, rulings) at most the amount, else the hand.
       const found = (e.mayElseHand && !sc.may) || (e.ontoIfMvAtMost && hits[0] && defMv(defOf(s, obj(s, hits[0]))) > Math.max(0, amountNow(s, e.ontoIfMvAtMost, ctx))) ? "hand" : e.found;
@@ -200,10 +213,11 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const hosts = found === "battlefield" ? chooseAuraHosts(s, hits.map((id) => ({ o: obj(s, id), under: e.yours ? ctx.controller : p.id })), src) : new Map<ObjectId, AuraHost>();
       if (hosts === "paused") return "paused";
       const unattached = hits.filter((id) => found === "battlefield" && defOf(s, obj(s, id)).subtypes.includes("Aura") && !hosts.has(id));
-      const stays = e.mayElseHand || e.mayElseBottom ? [] : unattached;
+      const stays = e.mayElseHand || e.mayElseBottom || e.anyNumber ? [] : unattached;
       const toHand = e.mayElseHand ? unattached : [];
       // Genesis Storm: an Aura with nothing to enchant isn't put onto the battlefield, so it goes to the bottom (CR 303.4g).
-      const bottomed = e.mayElseBottom ? unattached : [];
+      // Aurora Awakener: the same, it goes with the rest of the revealed cards.
+      const bottomed = e.mayElseBottom || e.anyNumber ? unattached : [];
       for (const id of [...stays, ...toHand, ...bottomed]) hits.splice(hits.indexOf(id), 1);
       // "Tapped and attacking" (Raph & Mikey, CR 508.4): during combat, attacking a player, planeswalker or battle its
       // controller chooses as it enters (rulings), never declared as an attacker; outside combat only tapped (CR 506.3d).

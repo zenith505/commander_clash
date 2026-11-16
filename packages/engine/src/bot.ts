@@ -477,6 +477,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
     // Primal Surge: every permanent is worth having, and saying no ends it.
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "surge") return [{ type: "chooseMay", player: pid, yes: true }];
+    // Ziatora's Envoy (round 392): a land card on top is played; a modal double-faced card's land face isn't, so its spell
+    // may be cast or it goes into the hand.
+    if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "playTopOrHand" && s.resolving.scratch?.topPlay?.asked === "land") return [{ type: "chooseMay", player: pid, yes: isType(defOf(s, obj(s, pend.card)), "Land") }];
     // Dina's Guidance: the creature card found goes into the hand, not the graveyard (bots don't plan reanimation).
     const searching = s.resolving?.body.effects[s.resolving.next];
     if (pend.kind === "chooseMay" && searching?.type === "search" && searching.mayInstead?.dest.zone === "graveyard") return [{ type: "chooseMay", player: pid, yes: false }];
@@ -6629,6 +6632,12 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "bite":
         v += 7;
         break;
+      // Lukka, Coppercoat Outcast's −7 (round 392): each creature's power, to each opponent.
+      case "powerToPlayers": {
+        const foes = opponents(s, pid).filter((q) => !player(s, q).lost).length;
+        for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")) v += Math.max(0, power(s, obj(s, id))) * foes;
+        break;
+      }
       case "continuous":
         v += e.what.ref === "target" && harm[e.what.index] ? 5 : 2;
         break;

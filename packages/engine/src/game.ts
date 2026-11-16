@@ -5847,7 +5847,10 @@ export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): st
 }
 
 /** Plays a land as an effect resolves (see canPlayLandNow): it counts as the turn's land play (CR 305.2). */
-export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, untapped?: boolean): void {
+export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, untapped?: boolean, face?: number): void {
+  // Ziatora's Envoy (round 392): a modal double-faced card played as its land face (CR 712.12).
+  const o = obj(s, id);
+  if (face !== undefined && o.face !== face) return asFace(s, o, face, () => putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id), face));
   putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id));
 }
 

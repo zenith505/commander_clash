@@ -3047,6 +3047,10 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect revealUntil `anyNumber` (Aurora Awakener, round 392): the cards to put onto the battlefield have been asked for (their answer is in `found`). */
+    revealPicked?: true;
+    /** Effect "playTopOrHand" (Ziatora's Envoy, round 392): which question has been asked about the top card, and that card. */
+    topPlay?: { id: ObjectId; asked: "land" | "untapped" | "cast"; /** A modal double-faced card's land face, played as that. */ face?: number };
     /** Effect "exileRandomTokenCopy" (Sin, Spira's Punishment): the card exiled this time, and whether it was a land card, until its token copy is made. */
     randomCopy?: { id: ObjectId; zc: number; land: boolean };
     /** Effect "othersChooseDestroyRest" (Fortunate Few): the players still to choose, in order, and the permanents chosen so far. */

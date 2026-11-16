@@ -3989,6 +3989,8 @@ export type Effect =
       atMost?: Amount;
       /** Thought Dissector: "If an artifact card is revealed this way, put it onto the battlefield under your control and sacrifice ~": ~ is sacrificed once one is found, if it's still that object. */
       sacrificeSelfIfFound?: true;
+      /** Aurora Awakener (round 392): "Put any number of those permanent cards onto the battlefield": with `found` "battlefield", its controller picks which of the cards found go there, none too, as it resolves; those not picked (and an Aura with nothing to enchant, CR 303.4g) go with the rest of the revealed cards (`rest`). */
+      anyNumber?: true;
     }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
@@ -5539,6 +5541,18 @@ export type Effect =
    * effects/run-round391.ts.
    */
   | { type: "faceDownPile"; yardOf?: PlayerRef; what?: ObjRef; top?: number; chooseDisguised?: true; into: "manifest" | "cloak"; tapped?: true }
+  /**
+   * Ziatora's Envoy (round 392): "look at the top card of your library. You may play a land from the top of your library or
+   * cast a spell with mana value less than or equal to the damage dealt from the top of your library without paying its
+   * mana cost. If you don't, put that card into your hand." (effects/run-round392.ts): `mvMax` is the damage dealt.
+   */
+  | { type: "playTopOrHand"; mvMax: Amount }
+  /**
+   * Lukka, Coppercoat Outcast's −7 (round 392): "Each creature you control deals damage equal to its power to each
+   * opponent.": each of `a` that's still a creature deals damage equal to its power as this resolves to each `to` player,
+   * all at once, each creature the source of its own damage (effects/run-round392.ts).
+   */
+  | { type: "powerToPlayers"; a: ObjRef; to: PlayerRef }
   /**
    * Sphinx Ambassador (round 377): "search that player's library for a card, then that player chooses a card name. If you
    * searched for a creature card that doesn't have that name, you may put it onto the battlefield under your control. Then

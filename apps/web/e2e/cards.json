@@ -2824,6 +2824,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cf9d13e2-bdcc-4c66-95ad-654ef795dbd3",
+  "name": "Aurora Awakener",
+  "manaCost": "{6}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Giant Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Druid"
+  ],
+  "oracleText": "Trample\nVivid — When this creature enters, reveal cards from the top of your library until you reveal X permanent cards, where X is the number of colors among permanents you control. Put any number of those permanent cards onto the battlefield, then put the rest of the revealed cards on the bottom of your library in a random order.",
+  "power": "7",
+  "toughness": "7",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample",
+   "Vivid"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8bad4e43-4375-4e7f-897e-d28be72308d7",
   "name": "Author of Shadows",
   "manaCost": "{4}{B}",
@@ -25070,6 +25104,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1ca97394-4e8c-4698-bea1-554f9b10927b",
+  "name": "Lukka, Coppercoat Outcast",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Lukka",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Lukka"
+  ],
+  "oracleText": "+1: Exile the top three cards of your library. Creature cards exiled this way gain \"You may cast this card from exile as long as you control a Lukka planeswalker.\"\n−2: Exile target creature you control, then reveal cards from the top of your library until you reveal a creature card with greater mana value. Put that card onto the battlefield and the rest on the bottom of your library in a random order.\n−7: Each creature you control deals damage equal to its power to each opponent.",
+  "loyalty": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dcf7d099-a726-4388-9744-70d37c5ea860",
   "name": "Lumbering Battlement",
   "manaCost": "{4}{W}",
@@ -39234,6 +39299,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "16052b52-ade1-406f-a06b-ce7ea607fb63",
+  "name": "Stomping Ground",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Mountain Forest",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Mountain",
+   "Forest"
+  ],
+  "oracleText": "({T}: Add {R} or {G}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "trk",
+  "releasedAt": "2026-11-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9fbab5bc-c651-46dc-89b6-0bcfeadb3891",
   "name": "Stonerise Spirit",
   "manaCost": "{1}{W}",
@@ -48364,6 +48461,44 @@
   "commanderLegal": "legal",
   "set": "clb",
   "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "93fe1d5b-3ab3-431a-9d78-175550ba9d43",
+  "name": "Ziatora's Envoy",
+  "manaCost": "{1}{B}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Lizard Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lizard",
+   "Warrior"
+  ],
+  "oracleText": "Trample\nWhenever this creature deals combat damage to a player, look at the top card of your library. You may play a land from the top of your library or cast a spell with mana value less than or equal to the damage dealt from the top of your library without paying its mana cost. If you don't, put that card into your hand.\nBlitz {2}{B}{R}{G}",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Blitz",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

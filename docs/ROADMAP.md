@@ -2729,7 +2729,7 @@ line blocks.
    exiled. Bots copy a revealed creature only when it beats what they have, bottom a land when they have six or more and
    a card they can't cast soon, and value Trial's guilty vote by the exiled cards. +5, 31,310 of 31,936 with round 362 and Lane B's B201-B203. The compiled
    text of every other card is unchanged.
-   Out after round 363 (looked at, not done): Ziatora's Envoy (playing a land from the top while the trigger resolves);
+   Out after round 363 (looked at, not done): Ziatora's Envoy (done in round 392) (playing a land from the top while the trigger resolves);
    Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit (done in round B212) ("unless its controller has
    you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
    Choreographed Sparks (done in round 388) ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
@@ -2940,7 +2940,7 @@ line blocks.
    unchanged.
    Out after round 371 (looked at, not done): Jailbreak ("When that permanent enters, return up to one target permanent
    card with equal or lesser mana value": a reflexive target bounded by its subject's mana value); Lukka, Coppercoat
-   Outcast (cards exiled this way gaining a cast permission that lasts while you control a Lukka planeswalker); Mizzix,
+   Outcast (done in round 392) (cards exiled this way gaining a cast permission that lasts while you control a Lukka planeswalker); Mizzix,
    Replica Rider and Choreographed Sparks (both done in round 388) (still out then: a copy of a permanent spell that gains haste and an end step
    sacrifice; "this spell can't be copied").
    Round 372 went on down the "Out after round N" lists, most played first, to a time counter taken from a suspended card,
@@ -3464,6 +3464,33 @@ line blocks.
    creature); Mastermind's Acquisition and Spawnsire of Ulamog (cards from outside the game); Swans of Bryn Argoll
    (draws in the middle of damage); Sala, Deck Boss (exhaust creatures given haste); The Enigma Jewel (craft with four or
    more nonlands with activated abilities); Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
+   their earlier lists).
+   Round 392 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards revealed until
+   X permanent cards, a land played or a spell cast from the top of your library as a trigger resolves, and Lukka:
+   Aurora Awakener's "reveal cards from the top of your library until you reveal X permanent cards, where X is the number
+   of colors among permanents you control. Put any number of those permanent cards onto the battlefield, then put the rest
+   of the revealed cards on the bottom of your library in a random order." (revealUntil `n` and `anyNumber`: X counted
+   once as it resolves, the whole library revealed if it has fewer, CR 701.20a; the cards picked enter at once, an Aura
+   enchanting something already there, not one entering with it, else it goes to the bottom with the rest, CR 303.4f-g,
+   rulings); Ziatora's Envoy's "look at the top card of your library. You may play a land from the top of your library or
+   cast a spell with mana value less than or equal to the damage dealt from the top of your library without paying its
+   mana cost. If you don't, put that card into your hand." (Effect playTopOrHand, effects/run-round392.ts: a land only on
+   your turn with a land play left, as that play, CR 305.2-305.3, a modal double-faced card as its land face, CR 712.12,
+   "enters tapped unless" chosen as it enters, CR 614.12; a spell cast as it resolves, timing ignored, CR 608.2g, mana
+   value at most the damage dealt after prevention; else into your hand); Lukka, Coppercoat Outcast's +1 (impulse
+   `castFilter` creature cards, `ifControl` a Lukka planeswalker, checked as you begin to cast it, an Adventure too,
+   rulings), −2 (revealUntil a creature card with mana value greater than the exiled creature's as it last existed, {X} as
+   0, CR 608.2h, 202.3e; with none, the whole library put back in a random order) and −7 (Effect powerToPlayers: all the
+   damage at once, from each creature, so its lifelink and the like apply, CR 120.3; none with 0 or less power, CR 120.8;
+   bots value it by their creatures' power times their opponents). Browser tests click through Aurora's pick, the
+   Envoy's land, life payment and free cast, and a creature cast from exile after Lukka's +1. +3, 31,561 of 31,936. The
+   compiled text of every other card is unchanged. Known limit: a token creature exiled by Lukka's −2 is gone, so its
+   mana value reads as 0.
+   Out after round 392 (looked at, not done): Jasmine Boreal of the Seven (every effect that gives spells abilities);
+   Filigree Vector (two "any number of target" slots in one ability); Kraven the Hunter (the greatest power among
+   creatures that died at once); Battlefield Thaumaturge (a creature targeted twice by one spell, rulings unclear for the
+   discount); Celestial Reunion (a creature type chosen as it's cast and behold two as an optional cost); Capricopian,
+   Wayta, Archelos, Metamorphic Alteration, Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
    their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
@@ -4975,7 +5002,7 @@ line blocks.
    Out after round 253 (looked at, not done): Altaïr Ibn-La'Ahad (tokens entering attacking that copy each exiled card with
    a memory counter); Arna Kennerüd, Skycaptain (token copies of the Auras and Equipment attached to a creature, entering
    attached to it); Imodane, the Pyrohammer (done in round 337) ("an instant or sorcery spell you control that targets only a single creature
-   deals damage to that creature": no damage event tells a spell's single target yet); Ziatora's Envoy ("You may play a
+   deals damage to that creature": no damage event tells a spell's single target yet); Ziatora's Envoy (done in round 392) ("You may play a
    land from the top of your library" as the trigger resolves, a land play of its own, or a free spell with mana value up
    to the damage dealt); Mizzix, Replica Rider (done in round 388) (a copy of a permanent spell that gains haste and an end-step sacrifice);
    Donal, Herald of Wings (done in round 337) (a copy of a creature spell "except the copy is a 1/1 Spirit", once each turn); Leonardo da Vinci (done in round 358)
@@ -5001,7 +5028,7 @@ line blocks.
    this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
    and "one of each of those kinds of counters"); Fervent Mastery ("If the {2}{R}{R} cost was paid": which alternative
    cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness (done in round 362) ("Pay any amount of
-   life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (cards exiled this way gaining
+   life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (done in round 392) (cards exiled this way gaining
    "You may cast ~ from exile as long as you control a Lukka planeswalker").
    Out after round 248 (looked at, not done): Unidentified Hovership (done in round 273; "the exiled card's owner manifests dread": each
    owner of the linked exiled cards, rulings, and manifest dread for a player who isn't its controller); Plague Reaver (done in round 295)
@@ -5879,7 +5906,7 @@ line blocks.
    - Lists of targets under one verb work for destroy, exile, tap, untap and return to hand; still out: lists returning
      to the battlefield (they enter at the same time), and "it" or
      "its controller" after a list (Acolyte Hybrid-style "its controller draws").
-   - Vivid still out: Aurora Awakener, Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
+   - Vivid still out: Aurora Awakener (done in round 392), Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
      target"), Prismatic Undercurrents ("up to X basic land cards"), First Family ("and spells you've cast this turn"),
      General Tazri (done in round B106) ("colors among those creatures"), Happily Ever After (done in round B201).
    - "Cards drawn this turn" still out: Fists of Flame, Proft's Eidetic Memory ("minus one"), Molten Psyche, Niko Aris (done in round B130),

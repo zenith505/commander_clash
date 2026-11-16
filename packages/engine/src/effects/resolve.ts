@@ -34,6 +34,7 @@ import { runChooseSourceNowEffect } from "./run-round364";
 import { runMillUntilEffect } from "./run-round373";
 import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
 import { runFaceDownPileEffect } from "./run-round391";
+import { runPlayTopOrHandEffect, runPowerToPlayersEffect } from "./run-round392";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
 import { runNoteCreatureTypeEffect } from "./run-round380";
@@ -1910,6 +1911,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runGlimpseOfTomorrowEffect(s, ctx, src);
     case "faceDownPile":
       return runFaceDownPileEffect(s, e, ctx, src);
+    case "playTopOrHand":
+      return runPlayTopOrHandEffect(s, e, ctx, src);
+    case "powerToPlayers":
+      return runPowerToPlayersEffect(s, e, ctx, src);
     case "phaseInSubject":
       return runPhaseInSubjectEffect(s, ctx, src);
     case "overTheTop":

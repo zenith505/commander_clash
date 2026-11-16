@@ -367,6 +367,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
       return taps && player(s, pid).hand.length === 0 ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
+    // Stardew Valley (round 393): another player's permanent offered to us: taken, while it's still there.
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider?.ref === "chosenPlayer" && s.resolving!.item.controller !== pid && theirMay.effects.length === 1) {
+      const gift = theirMay.effects[0]!;
+      if (gift.type === "continuous" && gift.giveTo?.ref === "chosenPlayer" && gift.what.ref === "target" && gift.mods.some((m) => m.kind === "control")) {
+        const t = s.resolving!.item.targets?.[gift.what.index];
+        return [{ type: "chooseMay", player: pid, yes: t?.kind === "object" && s.objects[t.id]?.zone === "battlefield" }];
+      }
+    }
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
       return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
     // Trench Gorger: searching makes its base P/T the number of lands exiled (0/0 with none); the bot keeps its lands and
@@ -3264,6 +3272,14 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const rest = pickTargets(s, pid, { ...printed, targets: printed.targets.map((t) => (t.chosenBy === "opponent" ? (({ chosenBy: _, ...r }) => ({ ...r, skip: true as const }))(t) : t)) }, forced, sourceId, x);
     if (!rest && chosenBy.length < printed.targets.length) return null;
     return printed.targets.map((t, i): TargetChoice => (t.chosenBy === "opponent" ? { kind: "none" } : (rest?.[i] ?? { kind: "none" })));
+  }
+  // Stardew Valley (round 393): "Choose target permanent you control. Draw a card, then another player of your choice may
+  // gain control of that permanent": only a noncreature token of ours (a Food, a Treasure), the least worth, for the card.
+  const offered = printed.targets.length === 1 ? printed.effects.find((e) => e.type === "may" && e.decider?.ref === "chosenPlayer" && e.effects.some((x) => x.type === "continuous" && x.giveTo?.ref === "chosenPlayer" && x.what.ref === "target" && x.what.index === 0)) : undefined;
+  if (offered) {
+    const mine = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid ? [obj(s, t.id)] : [])).sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+    const pick = mine.find((o) => o.isToken && !objIsType(s, o, "Creature")) ?? (forced ? mine[0] : undefined);
+    return pick ? [{ kind: "object", id: pick.id }] : null;
   }
   // Yare, Blaze of Glory: "target creature defending player controls": only one of ours, while we're attacked, untapped
   // before blockers are declared (to block more) or blocking after; never an opponent's (the effects help the creature).

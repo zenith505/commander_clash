@@ -1,7 +1,7 @@
 # Roadmap
 
-31,558 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,904 of
+31,575 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,905 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3293,7 +3293,7 @@ line blocks.
    random among the numbers not chosen before, and choose a Fountain target like any target of another player's ability.
    Out after round 384 (looked at, not done): Whims of the Fates (still out: each player separates all their permanents
    into three piles, a choice the browser has no prompt for yet); Stardew Valley ("another player of your choice may gain
-   control of that permanent"); Daring Thief and Lagrella, the Magpie (still out, as in their earlier lists); Hero of
+   control of that permanent"); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Hero of
    Bretagard, Rinoa, Angel Wing, Supper for Spiders, Immortal Coil, Nefarious Lich and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Polish: the Trap's log reads "You reveals" and "You guesses" (the "You plays" grammar of the log).
@@ -3414,7 +3414,7 @@ line blocks.
    Brawl's targets (Ben's creature refused) and Over the Top's Aura host pick; no new prompts. +3, 31,542 of 31,936. The
    compiled text of every other card is unchanged.
    Out after round 389 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with
-   no target); Daring Thief and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
+   no target); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
    Coil, Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame, Wizard's Spellbook and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Round 390 went on down `npm run popular` and the "Out after round N" lists, most played first: Glimpse of Tomorrow's
@@ -3492,6 +3492,28 @@ line blocks.
    discount); Celestial Reunion (a creature type chosen as it's cast and behold two as an optional cost); Capricopian,
    Wayta, Archelos, Metamorphic Alteration, Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
    their earlier lists).
+   Round 393 went on down `npm run popular` and the "Out after round N" lists, most played first, to permanents changing
+   hands and a revealed card entering as an enchantment: Arbiter of the Ideal's "reveal the top card of your library. If
+   it's an artifact, creature, or land card, you may put it onto the battlefield with a manifestation counter on it. That
+   permanent is an enchantment in addition to its other types." (putOntoBattlefield `counters` and `alsoMods`: an
+   enchantment as it enters, so constellation sees it, and from then on whatever happens to the counter, rulings, CR
+   614.12, 611.2c; a card not put there stays on top; oracle/round393.ts); Daring Thief's "you may exchange control of
+   target nonland permanent you control and target permanent an opponent controls that shares a card type with it" (any
+   card type in common, an artifact land for an artifact too, checked as they're chosen and as it resolves, nothing
+   changing hands if either is illegal then, rulings, CR 608.2b, 701.12b); Stardew Valley's "Choose target permanent you
+   control. Draw a card, then another player of your choice may gain control of that permanent." (an opponent chosen as it
+   resolves, CR 608.2d, who decides; for the rest of the game, layer 2; bots give away only a noncreature token, and a bot
+   offered a permanent takes it). Browser tests click through Stardew Valley's player choice, Daring Thief's two targets
+   and Arbiter's offer. +3, 31,575 of 31,936 (with Lane B through B236). The compiled text of every other card is
+   unchanged. Main 8644854 (Lane B through B236) was merged in first; Aladdin's Lamp's draw now keeps the Blood Scrivener
+   and Enduring Renewal count of a draw a replacement made (CR 614.5). Known limit: bots don't use Stardew Valley's third
+   ability on their own.
+   Out after round 393 (looked at, not done): Hero of Bretagard and Ranar the Ever-Watchful (who controls the effect that
+   exiles a permanent isn't recorded on zone moves); Lodestone Bauble (a player chosen as it's activated even with no
+   target); Whims of the Fates (three piles of permanents); C.A.M.P. (the colors of the mana its land produced);
+   Abandoned Sarcophagus ("it wasn't cycled"); Helm of Kaldra (which Equipment when you control several with a name);
+   Kraven the Hunter, Jasmine Boreal, Filigree Vector and the rest above rank 15,000 (still out, for the reasons in their
+   earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -10879,7 +10901,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Gather Specimens (creatures entering under an opponent's control this turn, against other replacement effects),
   Varchild's War-Riders (done in round B206) (cumulative upkeep tokens each for a different opponent), Shaun & Rebecca, Agents (a reflexive
   trigger inside a mana ability), Timecrafting (a permanent with time counters or a suspended card as one target),
-  Stardew Valley ("another player of your choice may gain control of that permanent"), Merieke Ri Berit (done in round B186) (destroy the
+  Stardew Valley ("another player of your choice may gain control of that permanent", done in round 393), Merieke Ri Berit (done in round B186) (destroy the
   creature when ~ leaves the battlefield or becomes untapped), Fortune's Favor (an opponent splits the cards into two
   piles, face down), Templar Knight (done in round B198) (tap five untapped attacking creatures named ~ as a cost), Muse Vessel (the card its discard exiled isn't
   linked yet; "choose a card exiled with ~, you may play it this turn"; done in round B152), Purgatory (pay {4} and 2 life at upkeep to

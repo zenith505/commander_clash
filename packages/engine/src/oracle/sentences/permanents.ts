@@ -2246,6 +2246,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const b = addTarget(ctx, { kind: "object", types: [], controller: "opponent", sharesCardTypeWith: [a], sharesCardTypeAmong: among, text: "target permanent an opponent controls that shares one of those types with it" });
     return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
   }
+  // Daring Thief (round 393): "exchange control of target nonland permanent you control and target permanent an opponent
+  // controls that shares a card type with it": any card type in common (artifact, battle, creature, enchantment, kindred,
+  // planeswalker; the second may be a land that shares one of those, rulings), as they're chosen and again as it resolves;
+  // either illegal then, and nothing changes control (rulings, CR 608.2b, 701.12b).
+  if (/^[Ee]xchange control of target nonland permanent you control and target permanent an opponent controls that shares a card type with it$/.test(s)) {
+    const a = addTarget(ctx, { kind: "object", types: [], notTypes: ["Land"], notColors: [], controller: "you", text: "target nonland permanent you control" });
+    const b = addTarget(ctx, { kind: "object", types: [], notTypes: [], notColors: [], controller: "opponent", sharesCardTypeWith: [a], text: "target permanent an opponent controls that shares a card type with it" });
+    return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
+  }
   // Role Reversal: "Exchange control of two target permanents that share a permanent type": a permanent type in common
   // (CR 110.4: artifact, battle, creature, enchantment, land, planeswalker; supertypes don't count, rulings), as they're
   // chosen and again as it resolves (CR 608.2b); either illegal, or both under one player's control, and nothing happens.

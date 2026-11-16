@@ -1855,6 +1855,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a6cefecd-459e-439a-a62c-689c2919b689",
+  "name": "Arbiter of the Ideal",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying\nInspired — Whenever this creature becomes untapped, reveal the top card of your library. If it's an artifact, creature, or land card, you may put it onto the battlefield with a manifestation counter on it. That permanent is an enchantment in addition to its other types.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Inspired"
+  ],
+  "commanderLegal": "legal",
+  "set": "bng",
+  "releasedAt": "2014-02-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5acc8b39-3c3e-4012-8cfd-ac3c2c4ca982",
   "name": "Arc Lightning",
   "manaCost": "{2}{R}",
@@ -6060,6 +6093,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b795ecfd-31ac-4a2a-9679-97b088932d93",
+  "name": "Burst of Energy",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Untap target permanent.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6656d47a-9490-46ee-a6ed-7cbcab7539c8",
   "name": "Butcher Orgg",
   "manaCost": "{4}{R}{R}{R}",
@@ -9851,6 +9910,39 @@
   "set": "rix",
   "releasedAt": "2018-01-19",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e01289ea-634b-4be5-8b8e-5e1179761a9b",
+  "name": "Daring Thief",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "Inspired — Whenever this creature becomes untapped, you may exchange control of target nonland permanent you control and target permanent an opponent controls that shares a card type with it.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Inspired"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -39312,6 +39404,33 @@
   "set": "dsc",
   "releasedAt": "2024-09-27",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6a4ee425-b3b8-487d-866c-9e2d73682466",
+  "name": "Stardew Valley",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{2}, {T}, Tap an untapped creature you control: Create a Food token.\n{3}, {T}: Choose target permanent you control. Draw a card, then another player of your choice may gain control of that permanent. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Food"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-07-27",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

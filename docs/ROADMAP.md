@@ -1,6 +1,6 @@
 # Roadmap
 
-31,468 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,473 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9632,6 +9632,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   CompiledCard.foretellActionLess, game.ts foretellActionCost; the Foretell button shows the cost). Browser tests for
   Shimmer's land type, Hall of Gemstone's color at your upkeep and foretelling on Ana's turn for {1}. +4, 31,468 of 31,936.
   The compiled text of every other card is unchanged.
+- Round B227 (least played first, from the Lane B skip lists): Anafenza, the Foremost (an opponent's nontoken creature that
+  would die, and a creature card of theirs going to their graveyard from anywhere else, is exiled instead, CR 614.1a; what
+  it is in the zone it leaves counts, rulings: an animated land is exiled, a bestowed Aura isn't; graveyardExile `typesNow`).
+  Intermediate Chirography (level 3's "if a modified creature died under your control this turn": a counter on it,
+  equipped by anyone's Equipment, or enchanted by an Aura its controller controlled, as it last existed, CR 700.9, rulings;
+  diedTypesThisTurn `modified`). Cherished Hatchling (when it dies, Dinosaur spells with flash this turn, CR 702.8a, and a
+  delayed trigger for the turn giving each Dinosaur spell you cast "When this creature enters, you may have it fight another
+  target creature", CR 603.7c). Fishing Pole (its granted "{1}, {T}, Tap Fishing Pole" taps the Equipment that gave it,
+  an untapped one, CR 602.2b; grantSourceCost `tap`). Aeon Engine (reverse the game's turn order: everything that uses
+  turn order uses the new one, and reversed again it's the first one, rulings; the next normal turn after an extra turn
+  counts from the last normal one; GameState.seating keeps the seats, so "left" and "right" and the screen don't move).
+  Browser tests for Fishing Pole's granted ability and Aeon Engine's reversal. +5, 31,473 of 31,936. The compiled text of
+  every other card is unchanged. Bots never activate Aeon Engine (an exile-itself cost).
+- Out after round B227 (looked at, not done): the lists after round B226 stay out.
 - Out after round B226 (looked at, not done): Snowfall (its "may add" in a triggered mana ability, a choice that matters
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
   would have to keep apart), Jasmine Boreal of the Seven (a creature spell with no abilities, counting abilities other

@@ -608,7 +608,7 @@ export type Count =
   | { kind: "artifactsToGraveyardThisTurn" }
   /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
   | { kind: "typeToYourGraveyardThisTurn"; type: string; /** "A land you controlled was put into a graveyard from the battlefield this turn" (The Lady of Otaria): any graveyard, controlled by you as it left. */ controlled?: true }
-  | { kind: "diedThisTurn"; yours?: true; /** "If a creature died under an opponent's control this turn" (Sidequest: Hunt the Mark). */ opponents?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string; /** "A non-Skeleton creature died under your control this turn" (Cult Conscript): not of this type as it last existed. */ notSubtype?: string }
+  | { kind: "diedThisTurn"; yours?: true; /** "If a creature died under an opponent's control this turn" (Sidequest: Hunt the Mark). */ opponents?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string; /** "A non-Skeleton creature died under your control this turn" (Cult Conscript): not of this type as it last existed. */ notSubtype?: string; /** Intermediate Chirography: "a modified creature died under your control this turn": modified as it last existed (CR 700.9). */ modified?: true }
   /** Genesis of the Daleks: "the total power of Daleks that died this turn": of this creature type, each one's power as it last existed (CR 608.2h), anyone's. */
   | { kind: "diedThisTurnPower"; subtype: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
@@ -4481,6 +4481,8 @@ export type Effect =
    * (CR 400.7). Its `effects` are about ObjRef "rememberedPermanents", filled in with them as it's made.
    */
   | { type: "delayedForAffected"; when: "nextEndStep"; effects: Effect[]; text: string }
+  /** Aeon Engine: "Reverse the game's turn order." (rulings: anything that uses turn order uses the new one; again, back). */
+  | { type: "reverseTurnOrder" }
   /**
    * Mirror of Fate (round B218): "Choose up to seven face-up exiled cards you own. Exile all the cards from your library,
    * then put the chosen cards on top of your library.": up to `n`, chosen as it resolves; then the library exiled face up,
@@ -7212,7 +7214,7 @@ export interface ActivatedAbility {
    * aim counters from Hankyu"): every `counter` counter on it, none included, the number for "removed this way"
    * (StackItem.countersRemoved).
    */
-  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
+  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;
@@ -8129,7 +8131,7 @@ export interface CompiledCard {
    * (not tokens or copies of spells, rulings) going to the graveyard of the player it enchants, its owner's (CR 404.2).
    */
   graveyardToLibraryBottom?: true;
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[] };
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[]; /** Anafenza, the Foremost: "a nontoken creature ... would die or a creature card not on the battlefield": of one of these card types as it is in the zone it's leaving (rulings), a permanent's from the layers. */ typesNow?: string[] };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */

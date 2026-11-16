@@ -2168,6 +2168,11 @@ export interface GameState {
   /** Players who have passed priority in succession without any action. CR 117.4 */
   passedInSuccession: PlayerId[];
   turnOrder: PlayerId[];
+  /**
+   * Aeon Engine: the seats around the table, each player's left the next one (CR 101.4), kept here while the turn order is
+   * reversed (then `turnOrder` is these backwards); absent while the turn order is the one the game began with.
+   */
+  seating?: PlayerId[];
   players: Player[];
   objects: Record<ObjectId, GameObject>;
   cards: Record<string, CardDef>;
@@ -2191,7 +2196,7 @@ export interface GameState {
   /** Their names, as they last existed ("" for a face-down one, CR 708.2): "a creature not named ~ died this turn" (Ebondeath). */
   diedNamesThisTurn?: string[];
   /** Their creature types as they last existed ("for each Zubera that died this turn"): `all` for a changeling (CR 702.73a); none for a face-down one. */
-  diedTypesThisTurn?: { subtypes: string[]; all?: true; /** Who controlled it as it died. */ controller?: PlayerId; /** Its power as it last existed (Genesis of the Daleks: "the total power of Daleks that died this turn"). */ power?: number }[];
+  diedTypesThisTurn?: { subtypes: string[]; all?: true; /** Who controlled it as it died. */ controller?: PlayerId; /** Its power as it last existed (Genesis of the Daleks: "the total power of Daleks that died this turn"). */ power?: number; /** Modified as it last existed (CR 700.9; Intermediate Chirography). */ modified?: true }[];
   /** The same for nontoken creatures (Gadrak, the Crown-Scourge). */
   nontokenDiedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */

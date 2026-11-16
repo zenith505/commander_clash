@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
+import { seatOrder, turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
@@ -2079,7 +2079,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return "paused";
       }
       // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
-      const seats = s.turnOrder.filter((p) => !player(s, p).lost);
+      const seats = seatOrder(s).filter((p) => !player(s, p).lost);
       const next = (pid: PlayerId) => seats[(seats.indexOf(pid) + (side === "left" ? 1 : seats.length - 1)) % seats.length]!;
       const sc = (r.scratch ??= {});
       if (!sc.queue) {
@@ -2123,7 +2123,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
       // Who controls what is seen once, then every player takes control of their new permanents at the same time
       // (rulings); a phased-out permanent is treated as though it doesn't exist (CR 702.26b).
-      const seats = s.turnOrder.filter((p) => !player(s, p).lost);
+      const seats = seatOrder(s).filter((p) => !player(s, p).lost);
       const next = (pid: PlayerId) => seats[(seats.indexOf(pid) + (side === "left" ? 1 : seats.length - 1)) % seats.length]!;
       const byController = new Map<PlayerId, ObjectId[]>();
       for (const id of s.battlefield) {

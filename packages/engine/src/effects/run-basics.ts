@@ -466,7 +466,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "flashUntilNextTurn":
       (s.flashUntil ??= []).push({ controller: ctx.controller, filter: e.filter, ...(e.thisTurn ? { turn: s.turn } : {}) });
-      log(s, `${player(s, ctx.controller).name} may cast ${e.filter.text} as though they had flash until their next turn.`);
+      log(s, `${player(s, ctx.controller).name} may cast ${e.filter.text} as though they had flash ${e.thisTurn ? "this turn" : "until their next turn"}.`);
       return;
     case "opponentsHandOnlyUntilNextTurn":
       (s.handOnlyUntil ??= []).push({ controller: ctx.controller, source: src });

@@ -1071,6 +1071,9 @@ export function moveObject(
   // "If you sacrificed a Food this turn" (Elanor Gardner): as it last existed (CR 701.21a: its controller sacrifices it).
   if (opts.sacrificed && fromZone === "battlefield") ((s.turnLog ??= {}).sacrificed ??= []).push({ player: lastController, types: [...last.types], subtypes: [...last.subtypes], ...(o.isToken ? { token: true as const } : {}) });
   const wasCreature = last.types.includes("Creature");
+  // Intermediate Chirography: "if a modified creature died under your control this turn": modified as it last existed, with
+  // counters, equipped, or enchanted by an Aura its controller controlled (CR 700.9), one leaving at the same time too.
+  const diedModified = fromZone === "battlefield" && to === "graveyard" && wasCreature && diedAsModified(s, o, lastController);
   // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
   // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
@@ -1398,7 +1401,7 @@ export function moveObject(
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedNamesThisTurn ??= []).push(o.faceDown ? "" : last.name);
-  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push(o.faceDown ? { subtypes: [], controller: lastController, power: last.power } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}), controller: lastController, power: last.power });
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push({ ...(o.faceDown ? { subtypes: [] } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}) }), controller: lastController, power: last.power, ...(diedModified ? { modified: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && !o.isToken) (s.nontokenDiedThisTurn ??= []).push(lastController);
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
@@ -2341,8 +2344,11 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   // Sanctifier en-Vec: its colors in the zone it's leaving (rulings: a Clone copying a red creature is red; Order, cast, is
   // white), a permanent's from the layers (CR 613.1e), a spell's or card's as defOf gives them (CR 105.2).
   const colorsNow = fromZone === "battlefield" ? characteristics(s, o).colors : defOf(s, o).colors;
+  // Anafenza, the Foremost: its card types the same way (rulings: an animated land dies as a creature; a bestowed Aura
+  // isn't one, CR 702.103b).
+  const typesNow = fromZone === "battlefield" ? characteristics(s, o).types : defOf(s, o).types;
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c)));
+    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c))) && (!x.typesNow || typesNow.some((t) => x.typesNow!.includes(t)));
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;
@@ -2359,6 +2365,19 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
     if (applies(x, l.controller)) return { source: defOf(s, obj(s, l.id)).name, ...(x!.counter ? { counter: x!.counter } : {}) };
   }
   return undefined;
+}
+
+/**
+ * Was `o`, about to die under `controller`'s control, modified (CR 700.9): a counter on it, an Equipment attached, or an
+ * Aura its controller controls; an Aura or Equipment leaving at the same time was still attached (CR 603.10a).
+ */
+function diedAsModified(s: GameState, o: GameObject, controller: PlayerId): boolean {
+  if (objectMatches(s, { kind: "object", types: [], notTypes: [], notColors: [], status: "modified", text: "modified creature" }, o, controller, false)) return true;
+  return (s.leftTogether ?? []).some((l) => {
+    if (l.attachedTo !== o.id || l.id === o.id) return false;
+    const subtypes = s.lastKnown?.[l.id]?.source?.subtypes ?? [];
+    return subtypes.includes("Equipment") || (subtypes.includes("Aura") && l.controller === controller);
+  });
 }
 
 /** Wheel of Sun and Moon: the name of a permanent whose replacement effect sends `o` (going to its owner's graveyard) to the bottom of that player's library, also one leaving at the same time. */
@@ -9715,6 +9734,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (!g || g.zone !== "battlefield" || (g.zoneChanges ?? 0) !== ab.grantSourceCost.zc) return "the permanent that gave that ability is gone";
     if (ab.grantSourceCost.action === "sacrifice" && (controllerOf(s, g) !== pid || !canSacrificeForCost(s, g))) return `you can't sacrifice ${nameOf(s, g.id)}`;
     if (ab.grantSourceCost.action === "unattach" && g.attachedTo !== o.id) return `${nameOf(s, g.id)} isn't attached to ${d.name}`;
+    // "Tap Fishing Pole": an untapped one (CR 701.26a); the cost doesn't ask who controls it (unlike "you control").
+    if (ab.grantSourceCost.action === "tap" && g.tapped) return `${nameOf(s, g.id)} is tapped`;
   }
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
   if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
@@ -10362,6 +10383,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
       granter.attachedTo = undefined;
       invalidateCharacteristics(s);
     }
+    // Fishing Pole's granted "{1}, {T}, Tap Fishing Pole": the Equipment that gave it, as the costs are paid (CR 602.2b).
+    if (ab.grantSourceCost?.action === "tap" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc && !granter.tapped) tapPermanent(s, granter);
     for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
     // Heart of Kiran: a loyalty counter removed instead (not a loyalty ability, rulings).
     if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) removeCountersCost(s, obj(s, costs.crewLoyalty), { counter: "loyalty", n: 1 });
@@ -12949,11 +12972,19 @@ export function attackDirections(s: GameState): ("left" | "right")[] {
 }
 
 /**
+ * The players in their seats around the table, each one's left the next (CR 101.4): the turn order the game began with,
+ * even after Aeon Engine reverses the turn order: the players don't change seats, and "left" and "right" are about seats.
+ */
+export function seatOrder(s: GameState): PlayerId[] {
+  return s.seating ?? s.turnOrder;
+}
+
+/**
  * The nearest opponent of `pid` to their left or right: the next player in turn order is "usually the player seated to the
  * active player's left" (CR 101.4), so that one is to their left; players who left the game have no seat (CR 800.4a).
  */
 export function nearestOpponent(s: GameState, pid: PlayerId, side: "left" | "right"): PlayerId | undefined {
-  const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === pid);
+  const seats = seatOrder(s).filter((p) => !player(s, p).lost || p === pid);
   const i = seats.indexOf(pid);
   const p = i < 0 ? undefined : seats[(i + (side === "left" ? 1 : seats.length - 1)) % seats.length];
   return p !== undefined && p !== pid ? p : undefined;

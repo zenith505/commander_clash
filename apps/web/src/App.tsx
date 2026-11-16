@@ -220,6 +220,7 @@ import {
   costChoiceShares,
   mayPayUse,
   canActAtSorcerySpeed,
+  seatOrder,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -316,7 +317,8 @@ function enchantsYours(s: GameState, o: GameObject): boolean {
 }
 
 function seatCorners(s: GameState): Record<Corner, PlayerId | undefined> {
-  const order = s.turnOrder;
+  // The seats, not the turn order (Aeon Engine reverses that, but nobody moves).
+  const order = seatOrder(s);
   const h = order.indexOf(HUMAN);
   const at = (k: number) => order[(h + k) % order.length];
   return { br: HUMAN, bl: at(1), tl: at(2), tr: at(3) };

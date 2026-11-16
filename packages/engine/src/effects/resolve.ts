@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { seatOrder, addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { CAST_BY_SOURCE, casterMark, compileCard, SPELL_CONTROLLER, playerMark } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION, isLandwalk } from "../keywords";
@@ -70,6 +70,7 @@ import { runLaneB220Effect } from "./run-laneb220";
 import { runLaneB221Effect } from "./run-laneb221";
 import { runLaneB222Effect } from "./run-laneb222";
 import { runLaneB223Effect } from "./run-laneb223";
+import { runLaneB227Effect } from "./run-laneb227";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1019,7 +1020,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "neighbor": {
       // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
-      const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === ctx.controller);
+      const seats = seatOrder(s).filter((p) => !player(s, p).lost || p === ctx.controller);
       const i = seats.indexOf(ctx.controller);
       const p = seats[(i + (ref.side === "left" ? 1 : seats.length - 1)) % seats.length];
       return i >= 0 && p !== undefined && p !== ctx.controller ? [p] : [];
@@ -1978,6 +1979,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB221Effect(s, e, ctx, src);
     case "delayedForAffected":
       return runLaneB223Effect(s, e, ctx, src);
+    case "reverseTurnOrder":
+      return runLaneB227Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

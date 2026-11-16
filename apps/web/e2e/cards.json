@@ -429,6 +429,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "af471455-6b9f-4c14-bb90-a74a44ecd247",
+  "name": "Aeon Engine",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters tapped.\n{T}, Exile this artifact: Reverse the game's turn order. (For example, if play had proceeded clockwise around the table, it now goes counterclockwise.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "14c3e48b-4c4e-4787-8c50-0e3aee19aa23",
   "name": "Aerith Rescue Mission",
   "manaCost": "{3}{W}",
@@ -14247,6 +14269,32 @@
   "set": "fic",
   "releasedAt": "2025-12-05",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c1d3e9e-213e-492a-ad5a-91139d70bc0f",
+  "name": "Fishing Pole",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has \"{1}, {T}, Tap Fishing Pole: Put a bait counter on Fishing Pole.\"\nWhenever equipped creature becomes untapped, remove a bait counter from this Equipment. If you do, create a 1/1 blue Fish creature token.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -1124,6 +1124,7 @@ export function moveObject(
     o.convoked = undefined;
     o.manaSpent = undefined;
     o.spent = undefined;
+    o.spentOnX = undefined;
     o.castNth = undefined;
     o.castInMain = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
@@ -4364,6 +4365,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
+  s.pilesOnlyThisTurn = undefined;
   s.cantBeBlockedThisTurn = undefined;
   if (!s.costModsThisTurn?.length) s.costModsThisTurn = undefined;
   s.keepManaThisTurn = undefined;
@@ -6658,7 +6660,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -6883,9 +6885,29 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // rulings), is paid with that type, as colored symbols (CR 601.2g-h). Not when mana of any type (or as though of any
   // color) can be spent (CR 609.4b).
   const onX = compileCard(d).spendOnlyOnX;
-  const xPaid = onX && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  // Soul Burn (round B234): "Spend only black and/or red mana on X": each of X's mana a {B/R} hybrid symbol (CR 107.4e).
+  const onXHybrid = compileCard(d).spendOnlyOnXHybrid;
+  // Soul Burn: how much mana paid X (CR 601.2h), and whether mana of any type could pay the colored symbols (CR 609.4b).
+  if (how.xOut && compileCard(d).spentOnXOf) (how.xOut.part = how.faceDown ? 0 : Math.min(extra, Math.max(0, x * xCount(mana) - less))), (how.xOut.any = anyTypeNow || anyColorNow);
+  const xPaid = (onX || onXHybrid) && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  if (xPaid && onXHybrid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "hybrid" as const, options: [...onXHybrid] }))] }, extra: extra - xPaid });
   if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
   return costAtLeast(s, { cost: reducedCost, extra });
+}
+
+/**
+ * Soul Burn (round B234): "the amount of {B} spent on X". The player decides which of the mana spent pays which part of
+ * the total cost (CR 601.2h), so as much of that type as could have gone to X: what's left of it after the symbols only
+ * it can pay ({B}), and no more than X's part. With mana of any type paying colored symbols (CR 609.4b), other mana spent
+ * pays those first.
+ */
+function spentOnXNow(type: ManaType | undefined, cost: ParsedCost, spent: Partial<Record<ManaType, number>>, xOut: { part?: number; any?: boolean }): number | undefined {
+  if (!type || !xOut.part) return undefined;
+  const mine = spent[type] ?? 0;
+  const others = Object.entries(spent).reduce((n, [k, v]) => n + (k === type ? 0 : (v ?? 0)), 0);
+  const only = cost.symbols.filter((y) => y.kind === "colored" && y.color === type).length;
+  const n = Math.min(xOut.part, mine - Math.max(0, only - (xOut.any ? others : 0)));
+  return n > 0 ? n : undefined;
 }
 
 /**
@@ -7084,7 +7106,7 @@ export function hasDelve(s: GameState, pid: PlayerId, o: GameObject): boolean {
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
-function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } | string {
+function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[]; modes?: number[]; xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } | string {
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
@@ -7633,7 +7655,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const tax = fromCommand ? commanderTax(p, o, d) : 0;
   const taxLife = fromCommand ? commanderTaxLife(p, o, d) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
-  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes }) as { cost: ParsedCost; extra: number };
+  const xOut: { part?: number; any?: boolean } = {};
+  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes, xOut }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
@@ -7676,6 +7699,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const spentFrom = Object.fromEntries(Object.entries(paid.from).filter(([, n]) => n > 0));
   if (Object.keys(spentFrom).length) spent.from = spentFrom;
   o.spent = Object.keys(spent).length ? spent : undefined;
+  o.spentOnX = spentOnXNow(compileCard(d).spentOnXOf, cost.cost, paid.spent, xOut);
   o.treasureSpent = paid.treasure || undefined;
   // "Spend this mana only to cast a creature spell of the chosen type, and that spell can't be countered" (Cavern of Souls).
   o.uncounterableCast = paid.uncounterable;
@@ -12927,6 +12951,15 @@ function chosenAttackersForbid(s: GameState, o: GameObject): boolean {
   return Object.values(s.chosenAttackers ?? {}).some((c) => c.player === s.activePlayer && s.turn > c.sinceTurn && !c.chosen.includes(key));
 }
 
+/**
+ * Fight or Flight, Stand or Fall (round B234, GameState.pilesOnlyThisTurn): `o` isn't in every chosen pile of that kind
+ * this turn, as the object it was (CR 400.7), so it can't attack or block (CR 508.1c, 509.1b). Whoever controls it now.
+ */
+function pilesForbid(s: GameState, o: GameObject, kind: "attack" | "block"): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return (s.pilesOnlyThisTurn ?? []).some((r) => r.kind === kind && !r.ids.includes(key));
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   if (arbiterStopsAttacks(s, pid)) return [];
@@ -12942,6 +12975,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // Oracle en-Vec (round B233): during that player's next turn, only the chosen creatures can attack (CR 508.1c).
       !chosenAttackersForbid(s, o) &&
+      // Fight or Flight (round B234): only creatures in the chosen pile can attack this turn (CR 508.1c).
+      !pilesForbid(s, o, "attack") &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       // "Only the chosen creatures can attack during that combat phase" (Last Night Together): those objects only (CR 400.7).
@@ -14229,6 +14264,8 @@ export function cantBeBlockedNow(s: GameState, o: GameObject): boolean {
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
   // Decayed means "This creature can't block" (CR 702.147a).
   if (characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0)))) return true;
+  // Stand or Fall (round B234): only creatures in the chosen piles can block this turn (CR 509.1b).
+  if (pilesForbid(s, o, "block")) return true;
   // Void Winnower: an opponent's creature with an even mana value (X is 0, CR 202.3b; a face-down one's is 0).
   const you = controllerOf(s, o);
   return defMv(defOf(s, o)) % 2 === 0 && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== you && abilitiesOf(s, s.objects[id]!).opponentsCantBlockEven);

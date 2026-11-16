@@ -350,7 +350,7 @@ export type Count =
    * ability's damage dealt to permanents beyond lethal damage, their loyalty or their defense (CR 120.4a, 120.10).
    */
   /** "You gain life equal to the damage dealt this way" (Syphon Soul): all the damage the instructions before dealt, after prevention. */
-  | { kind: "damageThisWay"; /** Drain Life: "but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness": each recipient's part no more than that (ResolvingState.damageCappedThisWay). */ capped?: true }
+  | { kind: "damageThisWay"; /** Drain Life: "but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness": each recipient's part no more than that (ResolvingState.damageCappedThisWay). */ capped?: true; /** Soul Burn (round B234): and no more than the amount of mana of the spell's CompiledCard.spentOnXOf type spent on X (GameObject.spentOnX). */ spentOnXCap?: true }
   | { kind: "excessThisWay"; /** Only that target's (The Last Agni Kai's "add that much {R}"). */ target?: number }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay"; /** "If no life is lost this way" (Blitzwing, Cruel Tormentor): what its loseLife instructions took off life totals, any player's. */ byLoss?: true }
@@ -4571,6 +4571,12 @@ export type Effect =
    * destroy each of the chosen creatures that didn't attack this turn." (GameState.chosenAttackers.)
    */
   | { type: "chosenAttackNextTurn"; who: PlayerRef }
+  /**
+   * Fight or Flight, Stand or Fall (round B234): for each of `who` (CR 101.4 order), you separate all creatures that player
+   * controls into two piles (CR 700.3) and that player chooses one; only the creatures in the chosen piles can attack
+   * (`kind` "attack") or block ("block") this turn (GameState.pilesOnlyThisTurn).
+   */
+  | { type: "pilesOnly"; who: PlayerRef; kind: "attack" | "block" }
   /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
   | { type: "chosenAttackDestroy"; key: string }
   /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */
@@ -7035,6 +7041,13 @@ export interface TriggeredAbility {
   /** "When ~ dies, if it's not a Spirit, ..." (Otherworldly Escort): an intervening if (CR 603.4) on its subtypes as it last existed (CR 603.10a). */
   ifNotSubtype?: string;
   ifNotToken?: true;
+  /**
+   * Decaying Soil (round B234): its threshold-granted "Whenever a nontoken creature is put into your graveyard from the
+   * battlefield": it exists only if its controller had at least this many cards in their graveyard just before the event,
+   * which the trigger looks back to (CR 603.10a; rulings). Checked as it triggers only: once it triggers, it resolves
+   * whatever happens to threshold (CR 113.7a).
+   */
+  lookBackYardAtLeast?: number;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
   ifNotBlocking?: true;
   /** Mongrel Pack: "When ~ dies during combat": only if it dies during a combat phase (CR 506.1). */
@@ -8725,6 +8738,10 @@ export interface CompiledCard {
   onePoisonForYou?: true;
   /** Drain Life, Consume Spirit: "Spend only black mana on X." in a spell whose mana cost has more than {X}: the mana paying X is of this type (spellCost), less whatever reductions take off X (rulings). */
   spendOnlyOnX?: ManaType;
+  /** Soul Burn (round B234): "Spend only black and/or red mana on X.": each mana paying X is one of these colors, as a hybrid symbol (spellCost). */
+  spendOnlyOnXHybrid?: Color[];
+  /** Soul Burn (round B234): "not more than the amount of {B} spent on X": note the most mana of this type that could have paid X (GameObject.spentOnX). */
+  spentOnXOf?: ManaType;
   /** Tapestry Warden: "Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power." (amounts.ts stationPower, rulings). */
   stationByToughness?: true;
   /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */

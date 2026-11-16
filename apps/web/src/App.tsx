@@ -4366,6 +4366,8 @@ function PilePicker({
 }) {
   const whose = pending.of === HUMAN ? "your" : `${s.players[pending.of ?? 0]!.name}'s`;
   const faceDown = pending.pileMode === "faceDown";
+  // Fight or Flight, Stand or Fall (round B234): piles of creatures, the chosen one's the only ones that can attack (block).
+  const creaturePiles = pending.pileMode === "canAttack" || pending.pileMode === "canBlock";
   return (
     <div className="modal-backdrop">
       <div className="modal search">
@@ -4376,11 +4378,11 @@ function PilePicker({
           {(pending.piles ?? [[], []]).map((pile, i) => (
             <div key={i} data-pile={i}>
               <h4>
-                {faceDown ? (i === 0 ? "Face-down pile" : "Face-up pile") : `Pile ${i + 1}`} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
-                <button onClick={() => onDone(String(i))}>{pending.destroyPile ? `Destroy pile ${i + 1}` : pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "turnFaceUp" ? `Turn pile ${i + 1} face up` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : pending.pileMode === "exile" ? `Exile pile ${i + 1}` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
+                {faceDown ? (i === 0 ? "Face-down pile" : "Face-up pile") : `Pile ${i + 1}`} ({pile.length === 1 ? `1 ${creaturePiles ? "creature" : pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${creaturePiles ? "creatures" : pending.sacrificePile ? "permanents" : "cards"}`}){" "}
+                <button onClick={() => onDone(String(i))}>{pending.destroyPile ? `Destroy pile ${i + 1}` : pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "turnFaceUp" ? `Turn pile ${i + 1} face up` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : pending.pileMode === "exile" ? `Exile pile ${i + 1}` : pending.pileMode === "canAttack" || pending.pileMode === "canBlock" ? `Only pile ${i + 1} can ${pending.pileMode === "canAttack" ? "attack" : "block"}` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
               </h4>
               <div className="modal-cards">
-                {pile.length === 0 && <span className="muted">{pending.sacrificePile ? "No permanents" : "No cards"}</span>}
+                {pile.length === 0 && <span className="muted">{creaturePiles ? "No creatures" : pending.sacrificePile ? "No permanents" : "No cards"}</span>}
                 {/* Atris: the face-down pile's cards stay hidden from the player choosing (rulings). */}
                 {faceDown && i === 0 && pile.map((id) => <CardBack key={id} label="Face down" />)}
                 {!(faceDown && i === 0) && pile.map((id) => {

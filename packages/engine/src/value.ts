@@ -87,6 +87,13 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     const sum = (os: GameObject[]) => os.reduce((n, o) => n + worth(s, pid, o), 0);
     return Math.max(...(["left", "right"] as const).map((side) => sum(nonland(nearestOpponent(s, pid, side))))) - sum(nonland(pid));
   }
+  // Over the Top (round 389): each player gets about as many cards as nonland permanents they control, so only when we
+  // control more of them than the opponents do on average; each card revealed is worth about a card drawn.
+  if (body.effects.some((e) => e.type === "overTheTop")) {
+    const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && !characteristics(s, obj(s, id)).types.includes("Land")).length;
+    const opps = livingPlayers(s).filter((p) => p !== pid);
+    return opps.length ? (n(pid) - opps.reduce((m, p) => m + n(p), 0) / opps.length) * 2 : 0;
+  }
   // Thieves' Auction, Warp World: everything is shared out again, so only when we're behind the opponents on average.
   if (body.effects.some((e) => e.type === "thievesAuction" || e.type === "warpWorld")) {
     const sum = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);

@@ -2568,6 +2568,8 @@ export function endWhileTapped(s: GameState): boolean {
   for (const id of s.phasedOut ?? []) {
     const p = s.objects[id]!.phased;
     if (p?.lockWhile && !whileControlledHolds(s, p.lockWhile)) p.lockWhile = undefined;
+    // The Pandorica (round 389): "for as long as ~ remains tapped", over for good once it untaps, leaves or phases out.
+    if (p?.lockWhileTapped && !whileTappedHolds(s, p.lockWhileTapped)) p.lockWhileTapped = undefined;
   }
   // Rootwater Matriarch: "for as long as that creature is enchanted", the same once it has no Aura attached.
   for (const e of s.effects) {

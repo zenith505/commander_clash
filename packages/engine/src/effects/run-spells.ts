@@ -196,7 +196,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         // War Barge: "When ~ leaves the battlefield this turn, destroy that creature": ~ watched, about the target as it is
         // now (CR 603.7c, 400.7); none if that target is gone.
-        const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === "battlefield") : undefined;
+        // The Pandorica (round 389): about the target it just phased out (`aboutPhasedOut`).
+        const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === (e.aboutPhasedOut ? "phasedOut" : "battlefield")) : undefined;
         if (e.about !== undefined && !about) return;
         for (const o of objects(s, e.of, ctx)) {
           if (o.zone !== "battlefield") continue;

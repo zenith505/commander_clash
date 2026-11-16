@@ -624,6 +624,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
             if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lockWhile = { id: me.id, zc: me.zoneChanges ?? 0, controller: ctx.controller };
           }
       }
+      // The Pandorica (round 389): "It can't phase in for as long as ~ remains tapped": only if it's tapped now; otherwise
+      // the duration never begins (CR 611.2b) and it phases in at its controller's next untap step as usual (CR 702.26a).
+      if (e.lockWhileSourceTapped) {
+        const me = objects(s, { ref: "self" }, ctx)[0];
+        if (me?.tapped)
+          for (const id of ids) {
+            const p = s.objects[id]!.phased;
+            if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lockWhileTapped = { id: me.id, zc: me.zoneChanges ?? 0, untaps: me.untaps ?? 0 };
+          }
+      }
       return;
     }
     case "earthbend": {

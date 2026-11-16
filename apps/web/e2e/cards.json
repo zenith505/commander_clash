@@ -3378,6 +3378,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d1ce7fcf-42f8-4b35-9ba1-55033c65c43e",
+  "name": "Barroom Brawl",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature you control fights target creature the opponent to your left controls. Then that player may copy this spell and may choose new targets for the copy.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Fight"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8294539d-7982-4ec9-8392-99eed78542f5",
   "name": "Battle for Bretagard",
   "manaCost": "{1}{G}{W}",
@@ -29899,6 +29927,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b82d8bdf-e292-490a-aee7-d830cc2c29df",
+  "name": "Over the Top",
+  "manaCost": "{5}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player reveals a number of cards from the top of their library equal to the number of nonland permanents they control, puts all permanent cards they revealed this way onto the battlefield, and puts the rest into their graveyard.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4669e8c7-fc37-4b97-9cb7-8d29b43d9176",
   "name": "Overlord of the Hauntwoods",
   "manaCost": "{3}{G}{G}",
@@ -41625,6 +41679,34 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "94d5c904-6504-4df2-b242-daf88a988475",
+  "name": "The Pandorica",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may choose not to untap The Pandorica during your untap step.\n{1}{W}, {T}: Untap another target nonland permanent, then it phases out. It can't phase in for as long as The Pandorica remains tapped. When The Pandorica becomes untapped or leaves the battlefield, that permanent phases in. Activate only as a sorcery.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "8a6eda31-2791-4def-b9e7-3adde155a4f0",

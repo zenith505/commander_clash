@@ -702,7 +702,7 @@ export interface GameObject {
    * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
-  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number }; /** The Phasing of Zhalfir: it can't phase in while `controller` controls `id` (as that object, CR 400.7); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhile?: { id: ObjectId; zc: number; controller: PlayerId } };
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number }; /** The Phasing of Zhalfir: it can't phase in while `controller` controls `id` (as that object, CR 400.7); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhile?: { id: ObjectId; zc: number; controller: PlayerId }; /** The Pandorica (round 389): it can't phase in while `id` is still that object on the battlefield, tapped, without having untapped since (`untaps`); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhileTapped?: { id: ObjectId; zc: number; untaps: number } };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
@@ -3478,6 +3478,8 @@ export interface Resolving {
     noteType?: string;
     /** Warp World (Effect warpWorld): each player's revealed cards, and the step: 1 artifacts, creatures and lands; 2 enchantments; 3 the rest to the bottom (`bottomAt`, by APNAP). */
     warp?: { revealed: Record<number, ObjectId[]>; stage: number; bottomAt?: number };
+    /** Over the Top (Effect overTheTop, round 389): each player's revealed cards, and whether the permanent cards among them have entered. */
+    overTop?: { revealed: Record<number, ObjectId[]>; entered?: true };
     /** Rona, Tolarian Obliterator (Effect "exileRandomThenPlay"): the card exiled, and whether it's been offered. */
     exiledAtRandom?: { id: ObjectId; zc: number; asked?: true };
     /** castTargetFree with several targets: the ones offered already. */

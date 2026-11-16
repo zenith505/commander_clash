@@ -4,7 +4,7 @@ import { compileCard, compileGranted } from "../oracle";
 import { PLANESWALKER_TYPES } from "../oracle/targets";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, printedManaAbilities, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
-import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
+import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, nearestOpponent, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, LAND_TYPE_LIST, protectedFromPlayer, type SourceQuality } from "../keywords";
@@ -240,6 +240,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
+  // Barroom Brawl (round 389): "the opponent to your left".
+  if (spec.leftOpponentControls && c.controller !== nearestOpponent(s, controller, "left")) return false;
   if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || spec.controller === "modeChooser" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.notControlledBy !== undefined && c.controller === spec.notControlledBy) return false;
   if (spec.controlledByAny && !spec.controlledByAny.includes(c.controller)) return false;

@@ -995,7 +995,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       // Coffin Queen: kept tapped while the creature it returned would be exiled as it untaps.
       const guarding = (id: string) => (s.delayed ?? []).some((d) => d.when === "lostControl" && d.orUntaps && d.subject.id === id && !!d.about && s.objects[d.about.id]?.zone === "battlefield");
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id) || guarding(id)) }];
+      // The Pandorica (round 389): kept tapped while an opponent's permanent it phased out can't phase in.
+      const locking = (id: string) => (s.phasedOut ?? []).some((x) => s.objects[x]!.phased?.lockWhileTapped?.id === id && s.objects[x]!.phased!.by !== pid);
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id) || guarding(id) || locking(id)) }];
     }
     // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
     if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
@@ -5594,6 +5596,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (r && e?.type === "eachMay" && e.chain) {
     // "They may copy ~", asked after the land is sacrificed: what it was for.
     if (r.scratch?.offer) return true;
+    // Barroom Brawl (round 389): only with a creature of ours that kills one of our left opponent's in the fight and
+    // survives it, so each copy costs someone a creature and the brawl ends.
+    const brawl = r.body.effects.find((x) => x.type === "fight");
+    const [mine, theirs] = r.body.targets;
+    if (brawl && theirs?.kind === "object" && theirs.leftOpponentControls && mine) {
+      const ours = legalTargets(s, mine, pid).flatMap((t) => (t.kind === "object" ? [obj(s, t.id)] : []));
+      const foes = legalTargets(s, theirs, pid).flatMap((t) => (t.kind === "object" ? [obj(s, t.id)] : []));
+      return ours.some((m) => foes.some((f) => power(s, m) >= toughness(s, f) && power(s, f) < toughness(s, m)));
+    }
     const spec = r.body.targets[0];
     const cost = e.effects[0]?.type === "pick";
     const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;

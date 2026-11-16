@@ -2168,7 +2168,7 @@ line blocks.
    Widow, Super Spy); "Otherwise, you may put a face-up exiled card they own into their graveyard" (Binding Negotiation,
    chosen as it resolves, with a browser test for the picker). +9, 29,980 of 31,936 with B113-B115.
    Out after round 283 (looked at, not done): Squall, Gunblade Duelist (an intervening if over the creatures attacking
-   one opponent and a chosen number); Barroom Brawl ("the opponent to your left", then that player may copy it with new
+   one opponent and a chosen number); Barroom Brawl (done in round 389) ("the opponent to your left", then that player may copy it with new
    targets); Vault 11: Voter's Dilemma (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
    one of the revealed cards and may cast it free); Hew the Entwood (done in round B204) (sacrifice any number of lands as it resolves);
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
@@ -2784,7 +2784,7 @@ line blocks.
    more, and keep The Moment's phasing for an opponent's spell or ability aimed at one of their creatures. +5, 31,326 of
    31,936 with Lane B's B204. The compiled text of every other card is unchanged.
    Out after round 365 (looked at, not done): Archelos, Lagoon Mystic and Kraven the Hunter (still out, as in the earlier
-   lists); The Pandorica ("It can't phase in for as long as ~ remains tapped", then phasing in when it untaps or leaves:
+   lists); The Pandorica (done in round 389) ("It can't phase in for as long as ~ remains tapped", then phasing in when it untaps or leaves:
    a lock tied to the source's tapped state); Ashes of the Fallen (done in round 374) (a chosen creature type for creature cards in your
    graveyard only: the off-field type statics cover every zone outside the battlefield); Garland, Royal Kidnapper and Reap
    (still out).
@@ -3263,7 +3263,7 @@ line blocks.
    Out after round 383 (looked at, not done): Reed Richards, Smartest Man (still out: with Alhammarret's Archive replacing
    the same first draw, whether the Archive's two draws are still "the first time you would draw" isn't settled, CR 614.6,
    616.1); Lodestone Bauble (still out: a player chosen as it's activated even with no target, rulings); Pulmonic Sliver,
-   Filigree Vector, Lich's Mirror, Over the Top, Vault 11: Voter's Dilemma, Riddles in the Dark and the rest above rank
+   Filigree Vector, Lich's Mirror, Over the Top (done in round 389), Vault 11: Voter's Dilemma, Riddles in the Dark and the rest above rank
    14,000 (still out, for the reasons in their earlier lists).
    Polish: Explosion of Riches's reflexive triggers log the target before "triggers ... targeting" (two lines for each).
    Round 384 went on down `npm run popular` and the "Out after round N" lists, most played first, to a council's dilemma
@@ -3368,7 +3368,7 @@ line blocks.
    usual creature type pick (the type most common among their creatures and cards in hand) for Oko's emblem.
    Out after round 387 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
    ability); Abstruse Appropriation (still out: colorless mana spent as though it were any color, which hybrid payment
-   options can't hold); The Pandorica (its phasing lock needs main's round B223 code, not on this branch's chain yet: next
+   options can't hold); The Pandorica (done in round 389) (its phasing lock needs main's round B223 code, not on this branch's chain yet: next
    round after the chain merges); Kraven the Hunter (still out: the greatest power among a player's creatures immediately
    before several die at once, CR 603.10a); Helm of Kaldra and the rest above rank 10,000 (still out, for the reasons in
    their earlier lists).
@@ -3394,6 +3394,29 @@ line blocks.
    one or more creatures" event); Ziatora's Envoy and Pulmonic Sliver (still out, as in their earlier lists); Guff
    Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest above rank 13,000 (still out,
    for the reasons in their earlier lists).
+   Round 389 went on down `npm run popular` and the "Out after round N" lists, most played first: The Pandorica's
+   "{1}{W}, {T}: Untap another target nonland permanent, then it phases out. It can't phase in for as long as ~ remains
+   tapped. When ~ becomes untapped or leaves the battlefield, that permanent phases in." (GameObject.phased
+   `lockWhileTapped`, over for good once ~ untaps, leaves or phases out, CR 611.2b, rulings; never begun if ~ isn't tapped
+   as it resolves; the delayed trigger as Merieke Ri Berit's, about the phased-out permanent, Effect phaseInSubject; with
+   "You may choose not to untap ~", bots keep it tapped while it locks an opponent's permanent); Over the Top's "Each
+   player reveals a number of cards from the top of their library equal to the number of nonland permanents they
+   control, puts all permanent cards they revealed this way onto the battlefield, and puts the rest into their
+   graveyard." (Effect overTheTop: counted as it resolves, every player's permanent cards, lands too, entering at once
+   under their own control, CR 110.4a, 101.4; an Aura enchanting only something already there, its player choosing,
+   APNAP, CR 303.4f, and one with nothing to enchant left out and put with the rest; bots cast it only when they control
+   more nonland permanents than the opponents on average); Barroom Brawl's "Target creature you control fights target
+   creature the opponent to your left controls. Then that player may copy ~ and may choose new targets for the copy."
+   (TargetSpec `leftOpponentControls`, the nearest opponent on the left as seated; the copy is that player's, so its
+   targets are theirs and their left opponent's, CR 707.10; one target illegal: no fight, the copy still offered; both
+   illegal: no copy, rulings; bots copy only when a creature of theirs kills one of their left opponent's and survives).
+   Browser tests click through The Pandorica's ability and the untap step's keep-tapped choice both ways, Barroom
+   Brawl's targets (Ben's creature refused) and Over the Top's Aura host pick; no new prompts. +3, 31,542 of 31,936. The
+   compiled text of every other card is unchanged.
+   Out after round 389 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with
+   no target); Daring Thief and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
+   Coil, Supper for Spiders, Verdant Mastery, Duelist's Flame, Wizard's Spellbook and the rest above rank 15,000 (still
+   out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5896,7 +5919,7 @@ line blocks.
      than or equal to the number of Islands", Old Man of the Sea (done in round B163), Entrancing Lyre's X, Seasinger (done in round B131)), "a creature of an
      opponent's choice" (Preacher (done in round B141)), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
      attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod (done in round B186)), "when ~ becomes untapped
-     or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
+     or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica (done in round 389)), Giant Oyster's counters, Hivis's Dragon filter, Hedge
      Whisperer and The Blackstaff of Waterdeep's animation (both done in round B127).
    - Entwine with a non-mana cost (Betrayal of Flesh, Solar Tide); the other unsupported entwine cards fail on a mode.
    - Job select (11 of 19): granted quoted abilities that don't compile (Ninja's Blades, Blue Mage's Cane, Summoner's
@@ -9593,7 +9616,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it enters, CR 508.4, never having "attacked", rulings; the step now happens even with no attackers when such a trigger
   is due, CR 508.8; Noctis "can't be blocked that combat"; a token doesn't come back, CR 111.8). The punisher prompt for
   "you" and "that player" now reads "If you do". +6, 31,251 of 31,936 with B189 to B198 and rounds 348 to 357.
-- Out after round B199 (looked at, not done): Over the Top (each player's revealed permanent cards onto the battlefield at
+- Out after round B199 (looked at, not done): Over the Top (done in round 389) (each player's revealed permanent cards onto the battlefield at
   once, Auras among them attached as they enter), Lich's Mirror (losing the game replaced by shuffling your hand, graveyard
   and every permanent you own, even ones others control, into your library), Mana Cache (a mana ability any player may
   activate during their turn before the end step), Cultivator Drone (mana spendable only on colorless spells, abilities of
@@ -10165,7 +10188,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   in the middle of damage) stay out.
 - Out after round B215 (looked at, not done): Land Equilibrium (whether it applies once for each land when several enter
   at once isn't settled by its rulings), Winter's Chill (a three-way payment for each target, {1}, {2} or nothing),
-  Sacred Ground (what caused a land to go to the graveyard) and Over the Top (every player's permanent cards entering at
+  Sacred Ground (what caused a land to go to the graveyard) and Over the Top (done in round 389) (every player's permanent cards entering at
   once, Auras among them) stay out.
 - Out after round B214 (looked at, not done): Decaying Soil (a threshold-granted dies trigger that looks back, CR 603.10a),
   Silhouette (damage from a source whose spell or ability targets the creature), Essence of the Wild (a copy replacement
@@ -10444,7 +10467,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   targets of different types returned at once, then 5/5 Elementals), Grifter's Blade (done in round B136) (an enters choice of a creature to enter
   attached to), Jandor's Ring (the last card you drew this turn isn't tracked).
 - Out after round B117 (looked at, not done): Price of Betrayal (done in round B156) (counters removed from a target that may be a player: no
-  player counters as a target yet), Barroom Brawl (the copy's controller, the opponent to the left, "that player"),
+  player counters as a target yet), Barroom Brawl (done in round 389) (the copy's controller, the opponent to the left, "that player"),
   Pit Automaton (done in round 364) (a delayed trigger on the next exhaust ability activated).
 - Out after round B116 (looked at, not done): Earthbind (an Aura gaining a static ability with the timestamp of the gain,
   CR 613.7a, after an intervening if on the enchanted creature), Goblin Test Pilot (done in round B136) (a target chosen at random as an
@@ -10553,7 +10576,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sacrificed), Noxious Vapors (one card of each color chosen), Gauntlets of Chaos (exchange of control sharing a type) (done in round B152).
 - Out after round B95 (looked at, not done): Enduring Renewal, Breathstealer's Crypt, Zur's Weirding and Chains of
   Mephistopheles (draw replacements that would have to be ordered with the existing draw replacements, CR 616.1), Wheel
-  of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (every player's
+  of Sun and Moon (a replacement for cards going to a player's graveyard from anywhere), Over the Top (done in round 389) (every player's
   permanent cards entering at once, Auras needing hosts among them), Spirit-Sister's Call (a sacrifice sharing a card
   type with a card put into your graveyard, then a granted leave-the-battlefield replacement), Back from the Brink (a
   token copy of the card exiled to pay the cost), Dream Halls (an alternative cost for every player's spells: discard a

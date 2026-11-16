@@ -1,6 +1,6 @@
 # Roadmap
 
-31,539 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,546 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,904 of
 9,979 (99%).
 
@@ -319,7 +319,7 @@ line blocks.
    Out after round 182 (ranks 12,330 to 13,222): City of
    Solitude (mana abilities only on your turn), Words of Waste (done in round 383), Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins (done in round 325),
-   Pyromancer Ascension (done in round 367), Verdant Mastery, Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
+   Pyromancer Ascension (done in round 367), Verdant Mastery (done in round 390), Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld (done in round 374), Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
@@ -1054,7 +1054,7 @@ line blocks.
    (needs tracking of cards cast and abilities activated from graveyards); Kraven the Hunter (greatest power as it
    died); The Eighth Doctor; Arcade Gannon. Next fresh candidates, not looked at
    closely: Seize the Storm, Aberrant Mind Sorcerer, Key to the Side-Door, Prized Amalgam, Kathril, Aspect Warper,
-   Super-Adaptoid, Zimone's Experiment, Bane, Lord of Darkness, Weftwalking, Last Laugh, Sanctuary Blade.
+   Super-Adaptoid, Zimone's Experiment, Bane, Lord of Darkness, Weftwalking, Last Laugh, Sanctuary Blade (done in round 390).
    Round 218 took those fresh candidates and more: "creatures you control gain flying until end of turn if a creature
    card in your graveyard has flying. The same is true for ..." (Bleeding Effect, addKeywords sharedAmongYours
    "graveyard"); "If that creature has haste and ~ doesn't, put a haste counter on ~. Do the same for ..."
@@ -1889,7 +1889,7 @@ line blocks.
    counters from among permanents on the battlefield. You draw cards and lose life equal to the number of counters removed
    this way" (Eventide's Shadow: gatherCounters without `onto`, one counter at a time, with a browser test). +7 (29,546 of
    31,936).
-   Out after round 264 (looked at, not done): Regenerations Restored (its trigger now parses, but "Then if ~ has no time
+   Out after round 264 (looked at, not done): Regenerations Restored (done in round 390) (its trigger now parses, but "Then if ~ has no time
    counters on it, exile it. When you do, take an extra turn" needs a reflexive trigger after a mandatory exile, and its
    order against vanishing's own trigger on the last counter matters); Magma Pummeler ("When one or more counters are
    removed from ~ this way": a reflexive trigger from inside the damage shield); Pardic Dragon (done in round B152) ("that player may put a
@@ -2873,7 +2873,7 @@ line blocks.
    Out after round 368 (looked at, not done): Aragorn, Company Leader ("one or more counters" put on a creature at once
    comes as one event per kind of counter); Captain America, First Avenger (the damage division announced before the
    cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
-   ability); Sanctuary Blade and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
+   ability); Sanctuary Blade (done in round 390) and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
    out); Altaïr Ibn-La'Ahad (its short name now reads; memory counters on token copies still missing).
    Round 369 went on down `npm run popular`, most played first, to card types, supertypes and colors of cards outside the
    battlefield: Encroaching Mycosynth's "Nonland permanents you control are artifacts in addition to their other types. The
@@ -2914,7 +2914,7 @@ line blocks.
    pick and Chandra's −9 search. No new prompts. +4, 31,391 of 31,936 with round 369 and Lane B's B209-B212. The compiled text of every other card is
    unchanged.
    Out after round 370 (looked at, not done): Words of Waste (done in round 383) ("each opponent discards a card instead": a discard choice in
-   the middle of a replaced draw, with nothing to resume the draws after it); Verdant Mastery (three destinations for the
+   the middle of a replaced draw, with nothing to resume the draws after it); Verdant Mastery (done in round 390) (three destinations for the
    lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (still out, as in
    their earlier lists). Polish: the free-cast prompt of Bre, Breaching Dragonstorm and Solstice
    Revelations doesn't say the card goes to the hand if not cast.
@@ -3348,7 +3348,7 @@ line blocks.
    Out after round 386 (looked at, not done): Battlefield Thaumaturge (still out: "{1} less for each creature it
    targets" over every target of a spell with several target words, CR 115.3, and its ruling's "even if the spell targets
    a creature more than once" isn't settled for one creature in two target slots); Lara Croft, Tomb Raider and
-   Regenerations Restored (still out, as in their earlier lists); Guff Rewrites History, Sunken Palace, Ulalek, Filigree
+   Regenerations Restored (done in round 390) (still out, as in their earlier lists); Guff Rewrites History, Sunken Palace, Ulalek, Filigree
    Vector, Possibility Storm and the rest above rank 10,000 (still out, for the reasons in their earlier lists).
    Round 387 went on down `npm run popular` and the "Out after round N" lists, most played first: Ashling, Rimebound's
    "Whenever this creature transforms into Ashling, Rimebound and at the beginning of your first main phase, add two mana
@@ -3415,8 +3415,31 @@ line blocks.
    compiled text of every other card is unchanged.
    Out after round 389 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with
    no target); Daring Thief and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
-   Coil, Supper for Spiders, Verdant Mastery, Duelist's Flame, Wizard's Spellbook and the rest above rank 15,000 (still
+   Coil, Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame, Wizard's Spellbook and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
+   Round 390 went on down `npm run popular` and the "Out after round N" lists, most played first: Glimpse of Tomorrow's
+   "Shuffle all permanents you own into your library, then reveal that many cards from the top of your library. Put all
+   non-Aura permanent cards revealed this way onto the battlefield, then do the same for Aura cards, then put the rest on
+   the bottom of your library in a random order." (Effect glimpseOfTomorrow, as round 376's Warp World for one player:
+   every permanent you own, whoever controls it, tokens counted but never revealed, a commander sent to the command zone
+   still counted, rulings, CR 903.9b; the cards enter under your control, CR 110.2a; an Aura enchanting only something
+   already there, or left with the rest, CR 303.4f-g; bots cast it from suspend only when their library's permanent cards
+   are worth more than what they have); Regenerations Restored's "Then if ~ has no time counters on it, exile it. When you
+   do, take an extra turn after this one." (of ~ as it is, so once vanishing's sacrifice has resolved it can't be exiled
+   and there's no extra turn, CR 400.7, 603.12; on the last counter its trigger resolves before vanishing's sacrifice,
+   TriggeredAbility.resolveFirst as Warping Wurm's, the order its controller would choose, CR 603.3b); Verdant Mastery's
+   three places for the lands it finds (Effect search `second`: with the {3}{G} cost paid, the first goes onto the
+   battlefield tapped under the opponent you choose as it resolves, rulings, the next two under yours, the rest into your
+   hand; otherwise two and the rest; the searcher's order of finding decides which goes where); Sanctuary Blade's "As ~
+   becomes attached to a creature, choose a color." (CompiledCard.attachChooseColor, game.ts askAttachColor: asked as it
+   becomes attached by any equip, effect or entering attached, as an "as ~ enters" choice is, CR 614.12; not again when
+   equipped to the creature it's already on, rulings, CR 701.3b; "the last chosen color" is Chosen.color, replaced each
+   time; with none chosen, no protection, rulings). Browser tests click through Verdant Mastery's alternative cost, the
+   opponent and the three-way search, and Sanctuary Blade's color as it's equipped. +4, 31,546 of 31,936. The compiled text
+   of every other card is unchanged.
+   Out after round 390 (looked at, not done): Psychic Paper (still out: a name and a creature type chosen as it becomes
+   attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil, Supper for Spiders, Duelist's Flame,
+   Wizard's Spellbook, Lodestone Bauble and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -3631,7 +3654,7 @@ line blocks.
    the Hydra's counters only to their own permanents. Still simplified: a card with both a {0} and a mana-cost granted
    flashback offers only the {0} one (so an {X} card can't pick X there); bots never activate Nomad Mythmaker; Watcher's
    surveil and suspend's cast trigger aren't ordered by their controller (as with Aeon Chronicler).
-   Out after round 340 (looked at, not done): Regenerations Restored (its last-counter trigger and vanishing's sacrifice
+   Out after round 340 (looked at, not done): Regenerations Restored (done in round 390) (its last-counter trigger and vanishing's sacrifice
    trigger go on the stack in an order its controller picks, CR 603.3b, and the engine has no such choice yet); Rift
    Elemental (a cost removing a time counter from a permanent or suspended card); Words of Waste (done in round 383) (a choice in the middle
    of a draw); Fade Away (done in round B212) (every player's payments announced before any sacrifice); Lodestone Bauble (one player's
@@ -4817,7 +4840,7 @@ line blocks.
    Out after round 280 (looked at, not done): Wild Evocation (done in round 349) (a random card from hand cast "if able" as the trigger
    resolves); Oath of Druids (done in round B143) (a target chosen by the upkeep player among opponents with more creatures, then reveal until
    a creature); Fraying Line (done in round B199) (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
-   piles of permanents and one chosen at random); Glimpse of Tomorrow (non-Aura permanents first, then Auras attached as
+   piles of permanents and one chosen at random); Glimpse of Tomorrow (done in round 390) (non-Aura permanents first, then Auras attached as
    they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
    Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (a draw replacement that depends on which
    draw it is in the draw step).

@@ -33,6 +33,7 @@ import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run
 import { runChooseSourceNowEffect } from "./run-round364";
 import { runMillUntilEffect } from "./run-round373";
 import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
+import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
 import { runNoteCreatureTypeEffect } from "./run-round380";
 import { runGoadChosenNamesEffect } from "./run-round382";
@@ -1902,6 +1903,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runThievesAuctionEffect(s, ctx, src);
     case "warpWorld":
       return runWarpWorldEffect(s, ctx, src);
+    case "glimpseOfTomorrow":
+      return runGlimpseOfTomorrowEffect(s, ctx, src);
     case "phaseInSubject":
       return runPhaseInSubjectEffect(s, ctx, src);
     case "overTheTop":

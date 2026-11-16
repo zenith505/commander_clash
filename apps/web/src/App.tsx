@@ -4449,7 +4449,8 @@ function LibrarySearch({
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
   };
-  const where = (i: number) => (pending.firstTo ? (i < (pending.firstN ?? 1) ? pending.firstTo : pending.othersTo) : null);
+  // Verdant Mastery (round 390): the next `secondN` after the first ones go to `secondTo`, only the rest to `othersTo`.
+  const where = (i: number) => (pending.firstTo ? (i < (pending.firstN ?? 1) ? pending.firstTo : pending.secondTo && i < (pending.firstN ?? 1) + (pending.secondN ?? 0) ? pending.secondTo : pending.othersTo) : null);
   return (
     <div className="modal-backdrop">
       <div className="modal search">
@@ -4517,6 +4518,8 @@ function LibrarySearch({
               ? `The rest ${dig.rest}.`
               : dig
               ? `The rest go ${dig.rest}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}${dig.payLife ? ` You'll pay ${found.length * dig.payLife} life.` : ""}`
+              : pending.firstTo && pending.secondTo
+                ? `The first you find goes ${pending.firstTo}, the next ${pending.secondN ?? 0} ${pending.secondTo}, the rest ${pending.othersTo}.`
               : pending.firstTo
                 ? pending.firstN && pending.firstN > 1 ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal

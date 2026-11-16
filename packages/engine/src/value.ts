@@ -2,9 +2,9 @@
 // them, and whether paying for a card with some colors helps them (its text hoping some was spent to cast it).
 
 import { allEffects, type AbilityBody, type ChosenTarget, type Effect, type ObjRef, type SpentReq } from "./abilities";
-import { power, toughness, defOf } from "./cards";
+import { power, toughness, defOf, isPermanentCard } from "./cards";
 import { bindChosen, estimate, harmfulCounter, harmfulTargets, legalTargets, lethalDamage, modsAreHarmful, objectMatches } from "./effects";
-import { livingPlayers, nearestOpponent, obj, opponents } from "./game";
+import { livingPlayers, nearestOpponent, obj, opponents, player } from "./game";
 import { characteristics, controllerOf } from "./layers";
 import { compileCard } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type PlayerId } from "./types";
@@ -99,6 +99,22 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     const sum = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);
     const opps = livingPlayers(s).filter((p) => p !== pid);
     return opps.length ? opps.reduce((n, p) => n + sum(p), 0) / opps.length - sum(pid) : 0;
+  }
+  // Glimpse of Tomorrow (round 390): our permanents (tokens and all) for as many cards from the top of our library, only
+  // its permanent cards staying (worth what they'd be worth there, a token's nothing), so only when what we have is worth
+  // less than that many cards of our library are on average.
+  if (body.effects.some((e) => e.type === "glimpseOfTomorrow")) {
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && o.owner === pid);
+    const lib = player(s, pid).library.map((id) => obj(s, id));
+    const cardWorth = (o: GameObject) => {
+      const d = defOf(s, o);
+      if (!isPermanentCard(d)) return 0;
+      if (d.types.includes("Land")) return 3;
+      if (d.types.includes("Creature")) return Math.max(1, Number(d.power) + Number(d.toughness) || 0) + 1;
+      return 1 + mv(s, o.id);
+    };
+    const avg = lib.length ? lib.reduce((n, o) => n + cardWorth(o), 0) / lib.length : 0;
+    return Math.min(mine.length, lib.length + mine.filter((o) => !o.isToken).length) * avg - mine.reduce((n, o) => n + worth(s, pid, o), 0);
   }
   let v: number | null = null;
   const group = (r: ObjRef) => {

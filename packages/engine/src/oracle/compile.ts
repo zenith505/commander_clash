@@ -110,6 +110,7 @@ import { round377Line } from "./round377";
 import { round378Line } from "./round378";
 import { round380Line } from "./round380";
 import { round389Line } from "./round389";
+import { markExileBeforeVanishing, round390Line } from "./round390";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -167,6 +168,8 @@ export function compileCard(card: CardDef): CompiledCard {
   const phasesIn = out.triggers.findIndex((t) => t.event === "selfPhasesIn");
   if (phasesIn >= 0 && out.triggers.some((t) => t.event === "yourUpkeep" && allEffects(t.body.effects).some((e) => e.type === "phaseOut" && e.what.ref === "self")))
     out.triggers[phasesIn] = { ...out.triggers[phasesIn]!, resolveFirst: true };
+  // Regenerations Restored: its exile on the last time counter before vanishing's sacrifice (oracle/round390.ts).
+  markExileBeforeVanishing(out);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
@@ -6244,6 +6247,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round387Line(line, raw, out, isSpell)) continue;
     // Round 389's whole lines (oracle/round389.ts).
     if (round389Line(line, raw, out, isSpell)) continue;
+    // Round 390's whole lines (oracle/round390.ts).
+    if (round390Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -8240,6 +8245,8 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   // Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType) is its targets' type.
   if (out.castChooseType) choices.add("creatureType");
   if (out.entersNamesWithOpponent) choices.add("cardName");
+  // Sanctuary Blade (round 390): "the last chosen color" is the one chosen as it last became attached (askAttachColor).
+  if (out.attachChooseColor) choices.add("color");
   // Oko, Shadowmoor Scion's emblem (round 387): its "chosen type" is the one chosen as the ability that made it resolved.
   if (d.typeLine === "Emblem" && d.oracleId.endsWith(CHOSEN_TYPE_EMBLEM)) choices.add("creatureType");
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
@@ -8366,8 +8373,9 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   }
   // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
   // permanent's enters trigger.
-  // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
-  const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
+  // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery; Verdant Mastery's "... if
+  // the {3}{G} cost was paid" at the end of a sentence, round 390).
+  const masteryMana = /\b[Ii]f the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
   for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge"] as const) {

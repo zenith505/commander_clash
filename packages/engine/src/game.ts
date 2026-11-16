@@ -1658,6 +1658,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Dauntless Bodyguard: "As ~ enters, choose another creature you control" (CR 614.12).
   if (printed.entersChooseObject) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "chosenObject" });
   if (printed.entersAttachedToYours) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "attachHost" });
+  // Sanctuary Blade: entering attached to a creature is becoming attached to it.
+  askAttachColor(s, o);
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
   if (printed.entersChooseTwoPlayers) for (let i = 0; i < 2; i++) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", pair: true });
@@ -12316,6 +12318,22 @@ function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId | ObjectId[
 }
 
 /**
+ * Sanctuary Blade (round 390): "As ~ becomes attached to a creature, choose a color." (CompiledCard.attachChooseColor): its
+ * controller chooses as it becomes attached to a creature, every way it can (an equip ability, an effect that attaches
+ * it, entering attached), as an "as ~ enters" choice is made (CR 614.12), before state-based actions and before anything
+ * else uses it; the color goes into Chosen.color, so the last one chosen is the one it gives protection from. Attached
+ * again to the creature it's already attached to, it doesn't become attached (CR 701.3b), so nothing new is chosen
+ * (rulings).
+ */
+export function askAttachColor(s: GameState, o: GameObject): void {
+  if (o.zone !== "battlefield" || !o.attachedTo || !compileCard(defOf(s, o)).attachChooseColor) return;
+  const host = s.objects[o.attachedTo];
+  if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature")) return;
+  if (s.entersChoices?.some((c) => c.id === o.id && c.what === "color")) return;
+  (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "color" });
+}
+
+/**
  * Ask for the next "as ~ enters, choose ..." choice still to be made. It's made as the permanent
  * enters (CR 614.12), so before state-based actions and before its enters triggers go on the stack.
  */
@@ -12330,6 +12348,7 @@ function enterAttachedTo(s: GameState, o: GameObject, host: ObjectId) {
   o.attachedTo = host;
   invalidateCharacteristics(s);
   log(s, `${defOf(s, o).name} enters attached to ${nameOf(s, host)}.`);
+  askAttachColor(s, o);
 }
 
 function askEntersChoice(s: GameState): boolean {

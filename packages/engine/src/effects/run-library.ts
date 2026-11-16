@@ -1556,7 +1556,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(agent?.controller !== undefined ? { controlling: p.id } : {}),
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
           // Rootweaver Druid: the one found for another player's control says whose it becomes (round 354).
-          ...(e.others && agent?.exileFor === undefined ? { firstTo: `${describeDest(e.dest)}${underName(e.dest) !== undefined ? ` under ${underName(e.dest)}'s control` : ""}`, othersTo: `${describeDest(e.others)}${underName(e.dest) !== undefined && !e.others.under ? " under your control" : ""}`, ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
+          ...(e.others && agent?.exileFor === undefined ? { firstTo: `${describeDest(e.dest)}${underName(e.dest) !== undefined ? ` under ${underName(e.dest)}'s control` : ""}`, othersTo: `${describeDest(e.others)}${underName(e.dest) !== undefined && !e.others.under && e.others.zone === "battlefield" ? " under your control" : ""}`, ...(e.firstN ? { firstN: e.firstN } : {}), ...(e.second ? { secondN: e.second.n, secondTo: `${describeDest(e.second.dest)} under your control` } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.oneName ? { oneName: true as const } : {}),
           ...(e.exactly ? { exactly: true as const } : {}),
@@ -1619,7 +1619,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.cardTo && printedMatches(e.cardTo.card, defOf(s, obj(s, id))) ? e.cardTo.dest : e.condDest && condNow ? e.condDest.dest : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? (e.second && foundBy(pid).indexOf(id) < (e.firstN ?? 1) + e.second.n ? e.second.dest : e.others) : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.cardTo && printedMatches(e.cardTo.card, defOf(s, obj(s, id))) ? e.cardTo.dest : e.condDest && condNow ? e.condDest.dest : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).

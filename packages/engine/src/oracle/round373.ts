@@ -10,13 +10,17 @@ import { parseObject } from "./targets";
 import { round387Sentence } from "./round387";
 import { round388Sentence } from "./round388";
 import { round389Sentence } from "./round389";
+import { round390Sentence } from "./round390";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round373Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
-  // Round 389's sentences (oracle/round389.ts), then round 388's (oracle/round388.ts), then round 387's (oracle/round387.ts), first.
+  // Round 390's sentences (oracle/round390.ts), then round 389's (oracle/round389.ts), then round 388's (oracle/round388.ts),
+  // then round 387's (oracle/round387.ts), first.
+  const r390 = round390Sentence(s, sentences, si, ctx, _effects);
+  if (r390) return r390;
   const r389 = round389Sentence(s, sentences, si, ctx, _effects);
   if (r389) return r389;
   const r388 = round388Sentence(s, sentences, si, ctx, _effects);

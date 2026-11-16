@@ -1,6 +1,6 @@
 # Roadmap
 
-31,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,481 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9660,6 +9660,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   118.9, 702.193a; game.ts freePowerUp, TurnLog.powerUps; with {X} in the cost only when X is 0, CR 107.3b). Browser tests
   for Giant Oyster's tapped-creature target and a {0} power-up with no lands. +4, 31,477 of 31,936. The compiled text of
   every other card is unchanged.
+- Round B229 (least played first, from the Lane B skip lists): Suffocation ("cast only if you were dealt damage this turn
+  by a red instant or sorcery spell", a red instant or a red sorcery, rulings; 4 damage to the controller of the latest
+  such spell to deal you damage, as it dealt it). Backdraft (a player who cast a sorcery spell this turn, and half the damage
+  one of those spells dealt this turn to anything, rounded down, both chosen as it resolves, CR 608.2d; copies aren't cast,
+  CR 707.10; a sorcery that dealt none is a choice for 0). Both read TurnLog.spellDamage: each time an instant or sorcery
+  spell deals damage, the spell as the object it is, its controller, colors and types then, and whether it was cast
+  (DamageSource.cast). Ulamog's Despoiler (two cards opponents own put from exile into their owners' graveyards as it
+  enters, CR 614.12, all or none, a face-down card by its group and then at random, rulings; four +1/+1 counters with
+  them; CompiledCard.entersProcess, EntersOption "processExile", searchLibrary `entering`). Vodalian War Machine (the
+  permanents tapped to pay its abilities' costs this turn, TurnLog.costTapped, by the War Machine as the permanent it was;
+  its dies trigger destroys each one still the same object and a Merfolk). Browser tests for Backdraft's choice, the
+  Despoiler's pick as it enters and casting Suffocation. +4, 31,481 of 31,936. The compiled text of every other card is
+  unchanged.
+- Out after round B229 (looked at, not done): Divine Intervention (still out: who removed the last counter isn't kept on
+  the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel and Research // Development (nothing outside
+  the game here), Golgothian Sylex, Apocalypse Chime and City in a Bottle (the set a name was originally printed in isn't in
+  the card data). Known gaps: damage a spell deals through its own reflexive or delayed trigger (CR 603.7d, 603.12) counts for
+  Suffocation but isn't counted as a cast spell's for Backdraft; bots activate Vodalian War Machine's abilities without
+  weighing the Merfolk its death would destroy.
 - Out after round B228 (looked at, not done): Hollow Warrior (attack and block costs that tap another creature that
   isn't attacking or blocking: attack costs that aren't mana only sacrifice or return, and no block cost asks for a pick), Reflecting Mirror (its {X} set by
   the target spell's mana value: definedX doesn't see an ability's targets yet), North Star ("for one spell this turn": the

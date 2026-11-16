@@ -4,6 +4,7 @@ import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities
 import { parseActivated } from "./activated";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
+import { roundB229Spell } from "./laneb229";
 
 /** A trigger line read the usual way, or null. */
 const trig = (text: string) => {
@@ -100,5 +101,5 @@ export function roundB222Spell(text: string): AbilityBody | null | undefined {
     const three: TargetSpec = { kind: "spell", types: [], colorCount: "three", text: "spell with exactly three colors" };
     return { targets: [], effects: [{ ...imp, spellFilter: { ...three, kind: "card", text: "card with exactly three colors" } }, { ...add, only: { ...add.only, text: "Spend this mana only to cast spells with exactly three colors.", spells: { ...add.only.spells, ...three, text: "spells with exactly three colors" } } }], text };
   }
-  return undefined;
+  return roundB229Spell(text);
 }

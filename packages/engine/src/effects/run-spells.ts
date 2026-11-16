@@ -1030,7 +1030,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       // Meddle, Quicksilver Dragon: only a spell with one target now (the same thing targeted twice is two, rulings on
       // Deflection), and that target a creature on the battlefield / ~ itself, still the same object (CR 400.7).
-      if (e.ifOnly) {
+      // Reflecting Mirror (round B235): "if that target is you": the spell's one target is still this ability's controller as
+      // it resolves; otherwise nothing changes (rulings: a spell that affects you without targeting you can't be changed).
+      if (e.ifOnly === "you") {
+        const item = s.stack.find((x) => x.id === t.id);
+        const chosen = (item?.targets ?? []).filter((x) => x.kind !== "none");
+        if (!(chosen.length === 1 && chosen[0]!.kind === "player" && chosen[0]!.id === ctx.controller)) {
+          log(s, `${item?.description ?? "That spell"} doesn't target only ${player(s, ctx.controller).name}, so ${src} does nothing.`);
+          return;
+        }
+      } else if (e.ifOnly) {
         const item = s.stack.find((x) => x.id === t.id);
         const chosen = (item?.targets ?? []).filter((x) => x.kind !== "none");
         const only = chosen.length === 1 && chosen[0]!.kind === "object" ? chosen[0] : undefined;

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,493 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,497 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -2360,7 +2360,7 @@ line blocks.
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (done in round B223) (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
    stack); Damping Engine (done in round 313); Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
-   Chaos Moon (done in round B223); A Killer Among Us (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
+   Chaos Moon (done in round B223); A Killer Among Us (done in round B233) (a creature type chosen secretly, revealed as a cost after the sacrifice); Temporal
    Aperture; Grimoire Thief (done in round B189) (face-down exiles you may look at, then spells countered by their names); Chorus of the
    Conclave (any amount of mana added to creature spells' costs); Flooded Woodlands (done in round B145).
    Round 334 took the next card no list named (Ore-Rich Stalactite) and the craft cards whose materials or back faces
@@ -2733,7 +2733,7 @@ line blocks.
    Durnan of the Yawning Portal (undaunted granted to a spell cast from exile); Decoy Gambit (done in round B212) ("unless its controller has
    you draw a card", one choice per opponent); Sphinx Ambassador (an opponent names a card after a hidden search);
    Choreographed Sparks ("can't be copied", and a copy of a creature spell with granted text); Mirror of Life Trapping and
-   Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (in Lane B's range).
+   Archnemesis (not yet looked at closely); Fell Beast's Shriek and Riddles in the Dark (done in round B233) (in Lane B's range).
    Round 364 went on down the "Out after round N" lists and `npm run popular`, most played first, to blocking requirements,
    a copied exhaust ability, next-time damage effects for a chosen source and a permission from the top of the library:
    Nacatl War-Pride's "~ must be blocked by exactly one creature if able." (one requirement, CR 509.1c: unblocked or blocked
@@ -4298,7 +4298,7 @@ line blocks.
    (Null Summoner, linked to its exile from a hand); "When you play a card exiled with ~, transform ~" (Voltaic Visionary).
    +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
-   Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (chosen creatures attack next turn, the others can't); False
+   Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
    Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (noted
    mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
@@ -4949,7 +4949,7 @@ line blocks.
    permanent's controller. With both a doubler and Vorinclex's halving on the same counters the order is picked
    for the player (CR 616.1): halved first for -1/-1, stun and poison counters, doubled first for the rest. Smaller gaps from round 95: Cinder
    Cloud, Intrude on the Mind (counting the cards put into the graveyard this way), face-down piles (Fortune's Favor,
-   Riddles in the Dark, Curator of Destinies (done in round 318), Sauron's Ransom (done in round 318), Atris) and piles of permanents (Liliana of the Veil's
+   Riddles in the Dark (done in round B233), Curator of Destinies (done in round 318), Sauron's Ransom (done in round 318), Atris) and piles of permanents (Liliana of the Veil's
    −6, Do or Die, Make an Example), Jace, Architect of Thought's +1 and −8; Tibalt's Trickery compares only the front
    face's name of a modal double-faced spell; "cast this turn" filters (castThisTurn) read the printed card, so
    Maskwood Nexus's creature types for cards off the battlefield don't count there; Conduit of Worlds casts for the
@@ -5467,7 +5467,7 @@ line blocks.
    Left from the filter lands/divided damage/X costs round:
    - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate (done in round 318), Pollen Remedy (done in round B159) (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
-   - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom! (done in round B210), Memory Vampire, Singularity
+   - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom! (done in round B210), Memory Vampire (done in round B233), Singularity
      Rupture, Curse of Surveillance (done in round 321); Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
      lands" (Devastating Dreams), "with mana value X" (Fix What's Broken, Vicious Rivalry), Devastating Summons' X/X
@@ -9012,7 +9012,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   347.
 - Out after round B189 (looked at, not done): Noxious Vapors ("chooses one card of each color": how a multicolored card
   counts has no ruling), The Prismatic Piper and Faceless One (a color chosen before the game begins, before mulligans:
-  no pre-game choice exists yet), A Killer Among Us (a creature type chosen secretly, revealed as a cost after the
+  no pre-game choice exists yet), A Killer Among Us (done in round B233) (a creature type chosen secretly, revealed as a cost after the
   sacrifice), Chorus of the Conclave (an extra mana payment of any amount added to every creature spell you cast), Essence
   of the Wild, Decaying Soil, Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal stay out for the
   reasons in the earlier lists.
@@ -9717,6 +9717,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   toughness still kill it). Browser tests for Butcher Orgg's division with Ana among the choices, its "Assign it the usual
   way" and Heroism's {2}{R} question for your attacking Hill Giant. +4, 31,493 of 31,936. The compiled text of every other
   card is unchanged.
+- Round B233 (least played first, from the Lane B skip lists): Memory Vampire (any number of target players, none too,
+  each mill that many; then collect evidence 9, CR 701.59, and the reflexive trigger, CR 603.12, targets a nonland card in the
+  defending player's graveyard as it's put on the stack, cast without paying its mana cost as it resolves, CR 608.2g).
+  Riddles in the Dark (Curator of Destinies' face-down and face-up piles from the top four, an opponent you choose picking the
+  one for your hand). Oracle en-Vec (the target opponent chooses any number of their creatures as it resolves; during their
+  next turn the chosen ones attack if able, an attacksIfAble effect for that player's turn, and no other creature can attack,
+  GameState.chosenAttackers, CR 508.1c-d; a delayed trigger destroys the chosen ones that didn't attack as that turn's end
+  step begins; a bot target chooses none). A Killer Among Us (the three tokens, then Human, Merfolk or Goblin chosen
+  secretly as the trigger resolves, kept on the enchantment, GameObject.secretType, and shown only to its chooser; revealing
+  it is part of the cost, so only that player can activate it, rulings; the pump only if the target attacking token has the
+  chosen type, a changeling's included, as the sacrificed enchantment last existed). Browser tests for Oracle en-Vec's
+  choice when Ana targets you and A Killer Among Us's secret choice with its chip. +4, 31,497 of 31,936. The compiled text
+  of every other card is unchanged.
+- Out after round B233 (looked at, not done): the lists after round B232 stay out, and Peace Talks ("can't be the targets
+  of spells or activated abilities" still needs targets checked by whether the ability was activated or triggered),
+  Charmed Pendant (mana from a mana ability whose amount and colors depend on the card its cost milled, with a color chosen
+  for each hybrid symbol), Eye for an Eye (a replacement that keeps the damage and adds the same amount from another source
+  to another player in one event), Benthic Explorers ("Untap a tapped land an opponent controls" as a cost) and Grime Gorger
+  (still out: "one card of each card type" for cards with two types). Known gaps: bots never activate A Killer Among Us and,
+  as Oracle en-Vec's target, choose no creatures (so none of theirs attacks that turn); Memory Vampire's "defending player" is
+  the player it dealt the combat damage to, as for every "deals combat damage to a player" trigger here, so combat damage
+  redirected to another player would use that player's graveyard.
 - Out after round B232 (looked at, not done): the lists after round B231 stay out. Known gaps: a blocking Butcher Orgg
   isn't offered the division ("defending player" is defined for an attacking creature, CR 508.5); a blocked Orgg with
   trample whose blockers are all gone assigns its damage to the player the usual way (CR 702.19e) and isn't asked either;
@@ -9767,7 +9789,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ability's cost) and the lists after round B223 stay out.
 - Out after round B223 (looked at, not done): Eye for an Eye (a replacement, not a prevention, that keeps the damage and
   adds Eye for an Eye's own; the affected player orders it with prevention shields and redirections, CR 616.1, and the
-  result differs between orders), Oracle en-Vec (chosen creatures that must attack during that player's next turn while
+  result differs between orders), Oracle en-Vec (done in round B233) (chosen creatures that must attack during that player's next turn while
   the others can't), and Noxious Vapors, Grime Gorger, Allure of the Unknown and Glimpse of Tomorrow (as after round
   B222) stay out.
 - Out after round B222 (looked at, not done): Noxious Vapors (whether one multicolored card can be the card kept for each
@@ -10391,7 +10413,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
   evidence X" as a cost (Urgent Necropsy; Incinerator of the Guilty's done in round 313), "if evidence was collected, instead" (Analyze the Pollen,
   Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer (done in round B127), Lamplight Phoenix,
-  Memory Vampire, Tenth District Hero (done in round B200), Deadly Cover-Up).
+  Memory Vampire (done in round B233), Tenth District Hero (done in round B200), Deadly Cover-Up).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
   "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't
   supported), Coin of Mastery (mana from an artifact source).

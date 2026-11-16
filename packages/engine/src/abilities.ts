@@ -4566,6 +4566,16 @@ export type Effect =
    */
   | { type: "attackersPayOrPrevent"; filter: TargetSpec; cost: string }
   /**
+   * Oracle en-Vec (round B233): "Target opponent chooses any number of creatures they control. During that player's next
+   * turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step,
+   * destroy each of the chosen creatures that didn't attack this turn." (GameState.chosenAttackers.)
+   */
+  | { type: "chosenAttackNextTurn"; who: PlayerRef }
+  /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
+  | { type: "chosenAttackDestroy"; key: string }
+  /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */
+  | { type: "secretCreatureType"; options: string[] }
+  /**
    * Storm Herald (round B208): "return any number of Aura cards from your graveyard to the battlefield attached to creatures
    * you control": only Auras that could be attached to a creature you control (rulings), chosen as it resolves, each
    * one's creature chosen as they enter together (CR 303.4f); the Auras that entered are ResolvingInfo.created.
@@ -5897,6 +5907,8 @@ export type SpellCondition =
   | { kind: "libraryHas"; n: number }
   /** Sigarda's Splendor: "if your life total is greater than or equal to the last noted life total for ~" (GameObject.notedLife; none noted, no). */
   | { kind: "lifeAtLeastNoted" }
+  /** A Killer Among Us (round B233): "If target attacking creature token is the chosen type": that target has the creature type its source's controller chose secretly (GameObject.secretType, as the source last existed). */
+  | { kind: "targetIsSecretType"; index: number }
   /**
    * "If this is the second time this ability has resolved this turn" (Omnath, Locus of Creation): how many times this
    * ability of this object has resolved this turn, this time included; `not`: "Otherwise" (none of `n`). A new object
@@ -7335,6 +7347,11 @@ export interface ActivatedAbility {
   onlyPlayer?: number;
   /** With `anyPlayer`, Merseine (round B211): "Only the controller of the enchanted creature may activate this ability": the player who controls the permanent its source is attached to as it's activated. */
   enchantedControllerOnly?: true;
+  /**
+   * A Killer Among Us (round B233): "Reveal the creature type you chose" in its cost: only the player who chose it secretly,
+   * for this object (GameObject.secretType), can reveal it and so activate it (rulings).
+   */
+  revealSecretType?: true;
   /** Merseine (round B211): "Pay enchanted creature's mana cost": the mana cost of the permanent its source is attached to as it's activated (CardDef.manaCost by defOf: a copy's, CR 707.2), {X} as 0 (CR 107.3h); unpayable with none, or with nothing attached (CR 118.6). `manaCost` is unused. */
   attachedManaCost?: true;
   /**

@@ -24521,6 +24521,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1c09f2d1-413b-4a92-aa39-99c1a2106814",
+  "name": "Mana Cache",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's end step, put a charge counter on this enchantment for each untapped land that player controls.\nRemove a charge counter from this enchantment: Add {C}. Any player may activate this ability but only during their turn before the end step.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "nem",
+  "releasedAt": "2000-02-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "82909ff4-f6f7-44f1-bbd0-6e54afa5ee6d",
   "name": "Mana Web",
   "manaCost": "{3}",

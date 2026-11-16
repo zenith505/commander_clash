@@ -1,5 +1,6 @@
 // Lane B round B236 in the browser: Primitive Justice's two additional costs, each counted on its own, then one more target
-// artifact for each time either was paid; Enduring Renewal's reveal offered beside dredge for your draw.
+// artifact for each time either was paid; Enduring Renewal's reveal offered beside dredge for your draw; an opponent's Mana
+// Cache paying for your spell.
 import { expect, test } from "@playwright/test";
 import { LANDS, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, resolveUntil } from "./ui";
@@ -39,5 +40,19 @@ test("Enduring Renewal: your draw can be its reveal or a dredge; the creature ca
   expect(after.players[0]!.library[0]).toBe(bolt);
   expect(after.objects[thug]!.zone).toBe("graveyard");
   expect(after.log.some((l) => l.text.startsWith("You reveals Grizzly Bears from the top of their library instead of drawing and puts it into their graveyard (Enduring Renewal)."))).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Mana Cache: on your turn, your payment can remove counters from an opponent's Mana Cache for {C}", async ({ page }) => {
+  const s = scene({ hand: ["Mind Stone"] }, [{ board: ["Mana Cache"] }]);
+  const cache = one(s, "Mana Cache");
+  s.objects[cache]!.counters.charge = 3;
+  const stone = one(s, "Mind Stone");
+  await open(page, s);
+  // No lands of your own: the Cache's {C}{C} pays for it, two counters removed by you.
+  await card(page, "Mind Stone", s).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[stone]!.zone === "battlefield");
+  expect(after.objects[cache]!.counters.charge).toBe(1);
+  expect(after.objects[cache]!.controller).toBe(1);
   expect(pageErrors(page)).toEqual([]);
 });

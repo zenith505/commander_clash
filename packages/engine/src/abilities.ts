@@ -2824,7 +2824,7 @@ export const timedCondition = (c: StaticCondition | undefined): boolean =>
  * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
  * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
  */
-export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
+export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | /** Mana Cache (round B236): "before the end step": any step of the turn before its end step (CR 513), the untap step aside (no player gets priority there, CR 502.4). */ "beforeEnd" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
 
 /**
  * "Only before combat", "only before attackers are declared", "only before blockers are declared", "only before the
@@ -7550,6 +7550,8 @@ export type ManaProduce =
  */
 export interface ManaAbility {
   text: string;
+  /** Mana Cache (round B236): "Any player may activate this ability" (CR 602.2): its activator controls it (CR 113.8) and gets the mana. */
+  anyPlayer?: true;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
   toChosenPlayer?: true;
   /**

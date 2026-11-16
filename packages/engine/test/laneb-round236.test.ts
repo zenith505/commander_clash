@@ -3,8 +3,8 @@
 // Mana Cache (a mana ability any player may activate).
 
 import { describe, expect, it } from "vitest";
-import { act, putOnBattlefield, setup } from "./helpers";
-import { botActions, handRevealed, invalidateCharacteristics, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { act, passUntil, putOnBattlefield, setup } from "./helpers";
+import { applyAction, botActions, handRevealed, invalidateCharacteristics, isFullySupported, manaAbilityProblem, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 // Real card data (Scryfall).
 const primitiveJustice = (): CardDef => ({"oracleId":"cf38ac6e-e370-4ca5-90cd-26a1b812c63a","name":"Primitive Justice","manaCost":"{1}{R}","cmc":2,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"As an additional cost to cast this spell, you may pay {1}{R} and/or {1}{G} any number of times.\nDestroy target artifact. For each additional {1}{R} you paid, destroy another target artifact. For each additional {1}{G} you paid, destroy another target artifact, and you gain 1 life.","colors":["R"],"colorIdentity":["G","R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/d/6/d6b7829b-2a10-47e7-9cf9-8ae49d2b398a.jpg?1783947177","artUrl":"https://cards.scryfall.io/art_crop/front/d/6/d6b7829b-2a10-47e7-9cf9-8ae49d2b398a.jpg?1783947177","commanderLegal":"legal","set":"all","releasedAt":"1996-06-10","rarity":"uncommon","layout":"normal","gameChanger":false}) as CardDef;
@@ -20,6 +20,7 @@ const diabolicServitude = (): CardDef => ({"oracleId":"e275cbfb-3d25-4189-84f0-3
 const akromasVengeance = (): CardDef => ({"oracleId":"ae19dce5-c9fc-4fbe-99b5-dc6a12124a68","name":"Akroma's Vengeance","manaCost":"{4}{W}{W}","cmc":6,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Destroy all artifacts, creatures, and enchantments.\nCycling {3} ({3}, Discard this card: Draw a card.)","colors":["W"],"colorIdentity":["W"],"keywords":["Cycling"],"imageUrl":"https://cards.scryfall.io/normal/front/4/f/4f112edd-1d2f-45ad-aaeb-6c0934d24c1f.jpg?1783939877","artUrl":"https://cards.scryfall.io/art_crop/front/4/f/4f112edd-1d2f-45ad-aaeb-6c0934d24c1f.jpg?1783939877","commanderLegal":"legal","set":"v13","releasedAt":"2013-08-23","rarity":"mythic","layout":"normal","gameChanger":false}) as CardDef;
 const disenchant = (): CardDef => ({"oracleId":"a7e97fa9-4b72-4548-b854-5be5f18a6f1a","name":"Disenchant","manaCost":"{1}{W}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Destroy target artifact or enchantment.","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/6/5/658c5caa-d739-4d30-a512-43ac4de900cb.jpg?1783920133","artUrl":"https://cards.scryfall.io/art_crop/front/6/5/658c5caa-d739-4d30-a512-43ac4de900cb.jpg?1783920133","commanderLegal":"legal","set":"bro","releasedAt":"2022-11-18","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
 const unsummon = (): CardDef => ({"oracleId":"837182db-1bf3-4a2c-bd01-1af9d9873561","name":"Unsummon","manaCost":"{U}","cmc":1,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Return target creature to its owner's hand.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/d/d/ddad9f16-52d5-49de-82b0-b1a5294a9c44.jpg?1789556722","artUrl":"https://cards.scryfall.io/art_crop/front/d/d/ddad9f16-52d5-49de-82b0-b1a5294a9c44.jpg?1789556722","commanderLegal":"legal","set":"fra","releasedAt":"2026-10-02","rarity":"common","layout":"normal","gameChanger":false}) as CardDef;
+const manaCache = (): CardDef => ({"oracleId":"1c09f2d1-413b-4a92-aa39-99c1a2106814","name":"Mana Cache","manaCost":"{1}{R}{R}","cmc":3,"typeLine":"Enchantment","supertypes":[],"types":["Enchantment"],"subtypes":[],"oracleText":"At the beginning of each player's end step, put a charge counter on this enchantment for each untapped land that player controls.\nRemove a charge counter from this enchantment: Add {C}. Any player may activate this ability but only during their turn before the end step.","colors":["R"],"colorIdentity":["R"],"keywords":[],"producedMana":["C"],"imageUrl":"https://cards.scryfall.io/normal/front/5/8/583a33b3-7833-48e5-88c3-849a5771ef6e.jpg?1783945818","artUrl":"https://cards.scryfall.io/art_crop/front/5/8/583a33b3-7833-48e5-88c3-849a5771ef6e.jpg?1783945818","commanderLegal":"legal","set":"nem","releasedAt":"2000-02-14","rarity":"rare","layout":"normal","gameChanger":false}) as CardDef;
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -59,7 +60,7 @@ const onlyInHand = (s: GameState, pid: PlayerId, keep: string[]) => {
 };
 
 describe("Lane B round B236", () => {
-  it("are fully supported", () => supported(primitiveJustice(), enduringRenewal(), diabolicServitude()));
+  it("are fully supported", () => supported(primitiveJustice(), enduringRenewal(), diabolicServitude(), manaCache()));
 });
 
 describe("Lane B round B236: Primitive Justice", () => {
@@ -268,5 +269,72 @@ describe("Lane B round B236: Diabolic Servitude", () => {
     s = settle(run(s, planCast(s, ap, ids[2]!, [tgt(bear)])));
     expect(zone(s, bear)).toBe("graveyard");
     expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+});
+
+describe("Lane B round B236: Mana Cache", () => {
+  const game = () => {
+    const { s, ap, opp } = setup([]);
+    const cache = putOnBattlefield(s, ap, manaCache());
+    return { s, ap, opp, cache };
+  };
+  const removeOne = (pid: PlayerId, cache: string): Action => ({ type: "activateMana", player: pid, objectId: cache, mana: "C", ability: 0 });
+
+  it("at each player's end step, a charge counter for each untapped land that player controls", () => {
+    const { s: s0, ap, cache } = game();
+    // The active player's 14 lands, all untapped.
+    const s = passUntil(s0, "cleanup", ap);
+    expect(s.objects[cache]!.counters.charge).toBe(14);
+  });
+
+  it("its controller removes a counter for {C} during their turn before the end step", () => {
+    const { s: s0, ap, cache } = game();
+    s0.objects[cache]!.counters.charge = 2;
+    const s = act(s0, removeOne(ap, cache));
+    expect(s.objects[cache]!.counters.charge).toBe(1);
+    expect(s.players[ap]!.manaPool.C).toBe(1);
+  });
+
+  it("any other player may activate it during their own turn, getting the mana; not during another player's turn", () => {
+    const { s: s0, ap, opp, cache } = game();
+    s0.objects[cache]!.counters.charge = 3;
+    // Not during the controller's turn.
+    expect(manaAbilityProblem(s0, opp, s0.objects[cache]!, 0)).toMatch(/can.t be activated now/);
+    let s = passUntil(s0, "main1", opp);
+    s.objects[cache]!.counters.charge = 3; // past its controller's end step, which added more
+    s = act(s, removeOne(opp, cache));
+    expect(s.objects[cache]!.counters.charge).toBe(2);
+    expect(s.players[opp]!.manaPool.C).toBe(1);
+    expect(s.objects[cache]!.controller).toBe(ap);
+    // The controller can't on that turn.
+    expect(manaAbilityProblem(s, ap, s.objects[cache]!, 0)).toMatch(/can.t be activated now/);
+  });
+
+  it("not during the end step", () => {
+    const { s: s0, ap, cache } = game();
+    s0.objects[cache]!.counters.charge = 3;
+    let s = passUntil(s0, "end", ap);
+    // Its own end step trigger puts counters on it; still none can be removed now.
+    expect(manaAbilityProblem(s, ap, s.objects[cache]!, 0)).toMatch(/can.t be activated now/);
+  });
+
+  it("another player's payment can use it automatically", () => {
+    const { s: s0, opp, cache } = game();
+    let s = passUntil(s0, "main1", opp);
+    s.objects[cache]!.counters.charge = 2;
+    // Their lands are all tapped: only the Cache's two counters can pay for Mind Stone.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === opp) s.objects[id]!.tapped = true;
+    const p = s.players[opp]!;
+    const stone = onTop(s, opp, mindStone());
+    p.library.shift();
+    s.objects[stone]!.zone = "hand";
+    p.hand.push(stone);
+    const plan = planCast(s, opp, stone);
+    // Activated twice, once for each counter it has (no {T} in its cost).
+    expect(plan!.filter((a) => a.type === "activateMana" && a.objectId === cache).length).toBe(2);
+    expect(plan).not.toBeNull();
+    s = settle(run(s, plan));
+    expect(zone(s, stone)).toBe("battlefield");
+    expect(s.objects[cache]!.counters.charge ?? 0).toBe(0);
   });
 });

@@ -218,6 +218,12 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       out.insteadIf = { cond, produces };
     }
     else if (extra === "Activate only as an instant." && !out.instantOnly) out.instantOnly = true;
+    // Mana Cache (round B236): any player may activate it (CR 602.2), and controls the ability then (CR 113.8), so "their
+    // turn" is the activator's; removing the counter from a permanent they don't control is still its cost (CR 602.2b).
+    else if (extra === "Any player may activate this ability but only during their turn before the end step." && !out.activateIf && !out.oncePerTurn && !out.tap && !out.tapCost && !out.manaCost && !out.sacrificeSelf) {
+      out.anyPlayer = true;
+      out.activateIf = { kind: "during", window: "beforeEnd", turn: "you" };
+    }
     // Foraging Wickermaw: "Add one mana of any color. ~ becomes that color until end of turn." The color of the mana it
     // added (CR 605.3b), its only color until end of turn (CR 105.3).
     else if (extra === "~ becomes that color until end of turn." && out.produces.kind === "oneOf" && out.produces.amount === 1 && !out.becomesManaColor && !out.produces.n) out.becomesManaColor = true;

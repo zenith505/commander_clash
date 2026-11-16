@@ -6231,7 +6231,8 @@ function Controls({
           {pending.kind === "discard" ? <strong>{pending.source}: </strong> : "Hand size: "}
           click {pending.kind === "discard" && pending.upTo ? "up to " : ""}
           {pending.count} {pending.kind === "discard" && pending.filter ? pending.filter.text.replace(/^(?:an? )/, "") : "card"}
-          {pending.count === 1 ? "" : "s"} {pending.kind === "discard" && pending.among && !pending.exile ? `of the ones you just drew (${pending.among.map((id) => cardOf(s, id).name).join(", ")})` : "in your hand"} to {pending.kind === "discard" && pending.keep ? "keep (the rest are shuffled into your library)" : pending.kind === "discard" && pending.exile ? "exile" : "discard"}.
+          {pending.count === 1 ? "" : "s"} {pending.kind === "discard" && pending.among && !pending.exile ? `of the ones you just drew (${pending.among.map((id) => cardOf(s, id).name).join(", ")})` : "in your hand"} to {pending.kind === "discard" && pending.keep ? "keep (the rest are shuffled into your library)" : pending.kind === "discard" && pending.exile ? "exile" : "discard"}
+          {pending.kind === "discard" && pending.thenDraw ? " instead of drawing; then you draw a card" : ""}.
         </span>
         <button
           disabled={(pending.kind === "discard" && pending.upTo ? discards.length > pending.count : discards.length !== pending.count) || (pending.kind === "discard" && !!pending.filter && discards.some((id) => !printedMatches(pending.filter!, cardOf(s, id)))) || (pending.kind === "discard" && !!pending.among && discards.some((id) => !pending.among!.includes(id)))}

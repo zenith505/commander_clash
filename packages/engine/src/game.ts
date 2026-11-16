@@ -155,7 +155,8 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   for (const p of s.players) draw(s, p.id, 7);
   s.handAsTurnBegan = s.players.map((p) => p.hand.length);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
-  for (const p of s.players) delete p.draws;
+  // Nor is the first time each would draw a card this turn (Scion of Halaster, Reed Richards: round B237).
+  for (const p of s.players) delete p.draws, delete p.firstWouldDraw, delete p.firstOtherWouldDraw;
   log(s, `Game start. ${s.players[first]!.name} goes first.`);
   if (opts.mulligans) {
     s.mulligans = { taken: {}, kept: [], toDeclare: turnOrderFrom(s, first), going: [] };
@@ -236,6 +237,8 @@ function nextMulliganDecision(s: GameState) {
       shuffleLibrary(s, p);
       draw(s, g, OPENING_HAND);
       delete p.draws; // CR 103.5, as above
+      delete p.firstWouldDraw;
+      delete p.firstOtherWouldDraw;
       m.taken[g] = (m.taken[g] ?? 0) + 1;
     }
     m.going = [];
@@ -2835,6 +2838,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     // chooses which applies (CR 616.1, the Words' and Notion Thief's rulings); a shield not chosen waits for the next draw.
     const fromMade = made.length > 0;
     const choices = drawReplacementChoices(s, pid, fromMade ? archivesOfMade(made[0]!) : undefined, fromMade ? scrivsOfMade(made[0]!) : 0);
+    // Reed Richards (round B237): this instruction's draw was the turn's first but the draw step's first card, whatever
+    // replaces it (another replacement chosen first takes the place of "the first time", as for Scion of Halaster's look).
+    if (!fromMade && !(s.step === "draw" && s.activePlayer === pid && player(s, pid).drewInDrawStep !== s.turn)) player(s, pid).firstOtherWouldDraw = s.turn;
     if (choices) {
       const entry = fromMade ? made.shift()! : 0;
       const archives = archivesOfMade(entry);
@@ -3028,7 +3034,8 @@ function drawWithoutAsking(s: GameState, pid: PlayerId) {
   if (portal) return skipDraw(s, pid, portal);
   const p = player(s, pid);
   const asks = dredgeOptions(s, pid).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook));
-  if (!asks) draw(s, pid, 1, undefined, [], true);
+  // Reed Richards (round B237) replaces this draw too, as an ordinary one.
+  if (!asks || reedRichards(s, pid)) draw(s, pid, 1, undefined, [], true);
   else if (!notionThief(s, pid)) drawOne(s, pid);
   else draw(s, pid, 1, undefined, [], true);
 }
@@ -3201,9 +3208,14 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
 const SCRIVENER_UNIT = 1000;
 /**
  * Enduring Renewal (round B236): the Scriveners' number (the pendings' `scriv`) also counts the Enduring Renewals that already
- * replaced a draw this one was made of, this many to one (CR 614.5), so it travels with the draw unchanged.
+ * replaced a draw this one was made of (CR 614.5), so it travels with the draw unchanged; round B237 adds Chains of
+ * Mephistopheles and Zur's Weirding. Each kind is one base-100 digit of it: Scriveners, Renewals, Chains, Weirdings.
  */
-const RENEWAL_UNIT = 1000;
+const RENEWAL_UNIT = 100;
+const CHAINS_UNIT = 10_000;
+const WEIRDING_UNIT = 1_000_000;
+/** How many of one kind (its unit above, 1 for Blood Scriveners) already replaced a draw this one was made of. */
+const appliedOf = (scriv: number, unit: number) => Math.floor(scriv / unit) % 100;
 const madeEntry = (archives: number, scrivs: number) => archives + SCRIVENER_UNIT * scrivs;
 const archivesOfMade = (entry: number) => entry % SCRIVENER_UNIT;
 const scrivsOfMade = (entry: number) => Math.floor(entry / SCRIVENER_UNIT);
@@ -3498,10 +3510,19 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const p = player(s, pid);
   // Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand", mandatory; those that haven't
   // replaced a draw this one was made of yet (CR 614.5). All of them do the same, so one choice stands for them.
-  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - (madeScriv % RENEWAL_UNIT) : 0;
+  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - appliedOf(madeScriv, 1) : 0;
   // Enduring Renewal (round B236): mandatory, those of its controller's that haven't replaced a draw this one was made of
   // (CR 614.5). All of them do the same, so one choice stands for them.
-  const renewals = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard).length - Math.floor(madeScriv / RENEWAL_UNIT);
+  const renewals = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard).length - appliedOf(madeScriv, RENEWAL_UNIT);
+  // Chains of Mephistopheles and Zur's Weirding (round B237): anyone's, for every player's draws, mandatory; those that haven't
+  // replaced a draw this one was made of (CR 614.5). Each kind's do the same, so one choice stands for them. Chains doesn't
+  // apply to the first card its player draws in their own draw step (one actually drawn, CR 614.6, as for Notion Thief).
+  const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
+  const chains = firstInDrawStep ? 0 : s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawChains).length - appliedOf(madeScriv, CHAINS_UNIT);
+  const weirdings = s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawWeirding).length - appliedOf(madeScriv, WEIRDING_UNIT);
+  // Reed Richards (round B237): an instruction's draw (not one a replacement made, as for Scion of Halaster's look), the turn's
+  // first one but the first card drawn in its player's own draw step.
+  const reed = madeArchives === undefined ? reedRichards(s, pid) : undefined;
   const shields = drawShields(s, pid);
   const thief = notionThief(s, pid);
   const mine = (f: (a: CompiledCard) => unknown) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && f(abilitiesOf(s, obj(s, id))));
@@ -3525,8 +3546,11 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Forbidden Crypt: one of each name, mandatory (two of them do the same thing; the first replaces the draw, CR 614.5).
   const crypts: ObjectId[] = [];
   for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && renewals <= 0) return undefined;
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
   const out = [...shields];
+  if (reed !== undefined) out.push({ key: "reed", label: `Draw four cards instead (${nameOf(s, reed)})` });
+  if (chains > 0) out.push({ key: "chains", label: "Discard a card instead, then draw a card; with no card in hand, mill a card (Chains of Mephistopheles)" });
+  if (weirdings > 0) out.push({ key: "weirding", label: "Reveal the card instead; any other player may pay 2 life to put it into your graveyard, otherwise you draw it (Zur's Weirding)" });
   if (scriveners > 0) out.push({ key: "scrivener", label: "Draw two cards and lose 1 life instead (Blood Scrivener)" });
   if (renewals > 0) out.push({ key: "renewal", label: "Reveal the top card of your library instead: a creature card goes into your graveyard, any other card is drawn (Enduring Renewal)" });
   for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
@@ -3555,7 +3579,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
     out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && renewals <= 0 && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -3657,6 +3681,17 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
     made.unshift(madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + RENEWAL_UNIT));
     return;
   }
+  if (key === "reed") {
+    // Reed Richards (round B237): four draws instead (CR 614.1a), new events it doesn't replace again (once each turn); the
+    // Archives that could replace this draw and the rest can replace each of them, as for Blood Scrivener.
+    log(s, `${p.name} draws four cards instead of one (${nameOf(s, reedRichards(s, pid, true)!)}).`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    const n = madeArchives ?? archivesFor(s, pid);
+    made.unshift(...Array<number>(4).fill(madeEntry(n, madeScriv)));
+    return;
+  }
+  if (key === "chains") return chainsInstead(s, pid, left, after, made, madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + CHAINS_UNIT));
+  if (key === "weirding") return weirdingInstead(s, pid, left, after, made, madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + WEIRDING_UNIT));
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
@@ -3822,6 +3857,109 @@ export function continueDraws(s: GameState, pid: PlayerId, left: number, after: 
   if (!draw(s, pid, left, after, made, true)) return;
   if (after === "drawStep") drawStepDrawn(s);
   else if (s.resolving) continueResolution(s);
+}
+
+/**
+ * Reed Richards, Smartest Man (round B237): one `pid` controls whose "the first time you would draw a card each turn except the
+ * first card you draw during each of your draw steps" applies to their next instruction's draw (`used`: the one that applied
+ * to the draw just marked). Two of them are the same first time, so the first replaces it (as for Scion of Halaster).
+ */
+function reedRichards(s: GameState, pid: PlayerId, used = false): ObjectId | undefined {
+  const p = player(s, pid);
+  if (!used && (p.firstOtherWouldDraw === s.turn || (s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn))) return undefined;
+  return s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawFourFirstOther);
+}
+
+/**
+ * Chains of Mephistopheles (round B237) instead of a draw (CR 614.1a): `pid` discards a card of their choice (CR 701.9b), and
+ * if they do (a madness card exiled is still discarded, CR 702.35a), draws a card: `entry`, a new draw this Chains doesn't
+ * replace again (CR 614.5) but another one does, and so do the Archives and the rest (rulings: each Chains in turn, a discard
+ * each, until one finds no card to discard). With an empty hand they mill a card instead (CR 701.17), and don't draw (rulings).
+ * `left` and `made` are the draws after it.
+ */
+function chainsInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], entry: number): "paused" | void {
+  const p = player(s, pid);
+  const src = nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawChains)!);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  if (!p.hand.length) {
+    const ids = p.library.slice(0, millCount(s, pid, 1));
+    for (const id of ids) moveObject(s, id, "graveyard", { milled: true });
+    log(s, `${p.name} has no card to discard instead of drawing, and mills ${ids.length === 1 ? nameOf(s, ids[0]!) : `${ids.length} cards`} (${src}).`);
+    return;
+  }
+  if (p.hand.length === 1) {
+    chainsDiscard(s, pid, p.hand[0]!, src);
+    made.unshift(entry);
+    return;
+  }
+  s.pending = { kind: "discard", player: pid, count: 1, source: src, thenDraw: { left, made: [entry, ...made], ...(after ? { after } : {}) } };
+  return "paused";
+}
+
+/**
+ * The card discarded for Chains of Mephistopheles: by its controller's effect (Obstinate Baloth's "an opponent" counts it), not
+ * part of what's resolving ("discarded this way" means that spell's own discards).
+ */
+function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string) {
+  const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
+  const r = s.resolving;
+  s.resolving = null;
+  try {
+    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined);
+  } finally {
+    s.resolving = r;
+  }
+}
+
+/**
+ * Zur's Weirding (round B237) instead of a draw (CR 614.1a): `pid` reveals the top card of their library (CR 701.20a), then each
+ * other player in turn order from the active player (CR 101.4) who can pay 2 life (CR 119.4) may, until one does: then that
+ * card goes into its owner's graveyard straight from the library (rulings: it was never drawn). With no one paying, `pid` draws
+ * a card, `entry`: a new draw this Weirding doesn't replace again (CR 614.5), but dredge and the rest can (rulings).
+ */
+function weirdingInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], entry: number): "paused" | void {
+  const p = player(s, pid);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  const top = p.library[0];
+  const src = nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawWeirding)!);
+  log(s, top !== undefined ? `${p.name} reveals ${nameOf(s, top)} instead of drawing it (${src}).` : `${p.name} would draw from an empty library, and reveals no card instead (${src}).`);
+  const seat = (x: PlayerId) => (s.turnOrder.indexOf(x) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  const others = s.turnOrder.filter((x) => x !== pid && !player(s, x).lost).sort((a, b) => seat(a) - seat(b));
+  return askWeirding(s, { drawer: pid, remaining: others, left, made, ...(after ? { after } : {}), entry }, src);
+}
+
+/** Zur's Weirding's offer to the next player in `w.remaining` who can pay 2 life; with none left, the draw it leads to. */
+function askWeirding(s: GameState, w: NonNullable<Extract<PendingDecision, { kind: "chooseMay" }>["weirding"]>, src: string): "paused" | void {
+  const top = player(s, w.drawer).library[0];
+  const remaining = [...w.remaining];
+  while (remaining.length) {
+    const q = remaining.shift()!;
+    if (payableLife(s, q) < 2) continue;
+    const what = top !== undefined ? nameOf(s, top) : "no card (their library is empty)";
+    s.pending = { kind: "chooseMay", player: q, source: src, prompt: `pay 2 life to put ${what} into ${player(s, w.drawer).name}'s graveyard instead of ${player(s, w.drawer).name} drawing it`, ...(top !== undefined ? { card: top } : {}), pay: { life: 2 }, weirding: { ...w, remaining } };
+    return "paused";
+  }
+  w.made.unshift(w.entry);
+}
+
+/** Answers Zur's Weirding's offer (askWeirding); then the draws go on. */
+function answerWeirding(s: GameState, p: Player, yes: boolean) {
+  const pend = s.pending;
+  if (pend?.kind !== "chooseMay" || !pend.weirding) throw new RulesError("nothing to decide");
+  const w = pend.weirding;
+  if (yes && payableLife(s, p.id) < 2) throw new RulesError("you can't pay 2 life"); // CR 119.4
+  s.pending = null;
+  const made = [...w.made];
+  if (yes) {
+    payLife(s, p.id, 2);
+    const top = player(s, w.drawer).library[0];
+    if (top !== undefined && top === pend.card) moveObject(s, top, "graveyard");
+    log(s, `${p.name} pays 2 life${top !== undefined ? `, and ${nameOf(s, top)} goes into ${player(s, w.drawer).name}'s graveyard` : ""} (${pend.source}).`);
+  } else {
+    log(s, `${p.name} doesn't pay 2 life (${pend.source}).`);
+    if (askWeirding(s, { ...w, made }, pend.source) === "paused") return;
+  }
+  continueDraws(s, w.drawer, w.left, w.after, made);
 }
 
 /**
@@ -10843,6 +10981,14 @@ const hasLegalTargetsFor: typeof hasLegalTargets = (...a) => hasLegalTargets(...
 function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
+  if (pend?.kind === "discard" && pend.player === p.id && pend.thenDraw) {
+    // Chains of Mephistopheles (round B237): the card discarded instead of a draw, then the draws go on.
+    if (ids.length !== 1 || !p.hand.includes(ids[0]!)) throw new RulesError("choose a card from your hand");
+    s.pending = null;
+    chainsDiscard(s, p.id, ids[0]!, pend.source);
+    continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, [...pend.thenDraw.made]);
+    return;
+  }
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
@@ -12752,6 +12898,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     continueResolution(s);
     return;
   }
+  if (pend?.kind === "chooseMay" && pend.player === p.id && pend.weirding) return answerWeirding(s, p, yes);
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.skipDraw) {
     const { from, declined } = pend.skipDraw;
     s.pending = null;

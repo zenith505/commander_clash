@@ -272,7 +272,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
       // Forbidden Crypt with an empty graveyard loses the game: anything else first.
       const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
+      // Reed Richards (round B237): its four cards before the Archive's two (once the Archive applies, Reed's first time is gone).
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("reed") ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -290,6 +291,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
     if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
+    // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
+    if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.

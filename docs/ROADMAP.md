@@ -1,6 +1,6 @@
 # Roadmap
 
-31,481 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,485 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9673,6 +9673,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   its dies trigger destroys each one still the same object and a Merfolk). Browser tests for Backdraft's choice, the
   Despoiler's pick as it enters and casting Suffocation. +4, 31,481 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B230 (least played first, from the Lane B skip lists): Bone Shaman (its granted "Creatures dealt damage by ~ this
+  turn can't be regenerated this turn", a static ability, CR 604.1, CompiledCard.damagedCantRegenerate: any creature this
+  permanent, as the object it is, dealt damage to this turn, before or after it gained the ability, TurnLog.damageDealtTo
+  `src`; worked out before state-based actions or a destroy-all spell destroy several at once, CR 704.3, so a Bone Shaman
+  destroyed beside them still counts; game.ts damagedNoRegen). Sea Troll ("Activate only if ~ blocked or was blocked by a
+  blue creature this turn": StaticCondition blockedWithColorThisTurn, the colors as the block was declared, TurnLog.blocks
+  `col`, as Time to Reflect reads creature types). Glyph of Reincarnation (the creatures the target Wall, as the object it
+  is, blocked this turn, destroyed at once and can't be regenerated; for each that died, CR 700.4, you choose a creature card
+  in the graveyard of the player who controlled it as it last became blocked by the Wall, TurnLog.blocks `ac`, the destroyed
+  ones too, rulings; as many as there are; they enter together under their owners' control, CR 110.2; the bot picks what
+  helps an opponent least). Infinite Authority (once for each creature with toughness 3 or less the enchanted creature blocks
+  or is blocked by, CR 509.3c-d; a delayed end of combat destroy about that creature, then, only if it was destroyed, CR
+  603.4, a +1/+1 counter at the next end step on the creature enchanted as it triggered, rulings). Browser test for Glyph of
+  Reincarnation's pick. +4, 31,485 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
+  target whose legality depends on another target), Runesword, Mangara's Equity, Silhouette, Ghostly Flame, Torrent of Lava
+  and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
+  effects) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
+  creatures' colors are kept with a block (Sea Troll is the only reader).
 - Out after round B229 (looked at, not done): Divine Intervention (still out: who removed the last counter isn't kept on
   the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel and Research // Development (nothing outside
   the game here), Golgothian Sylex, Apocalypse Chime and City in a Bottle (the set a name was originally printed in isn't in

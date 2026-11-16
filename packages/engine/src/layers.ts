@@ -1437,6 +1437,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return cond.types.some((t) => !!s.turnLog?.toOwnGraveyardTypes?.[you]?.includes(t));
     case "noncombatByColor":
       return (s.turnLog?.noncombatByColor?.[you]?.[cond.color] ?? 0) >= cond.n;
+    case "blockedWithColorThisTurn": {
+      // Sea Troll (round B230): in a block this turn, as this object (CR 400.7), with a creature of that color as the block
+      // was declared (TurnLog.blocks).
+      const me = s.objects[sourceId];
+      const key = me ? `${sourceId}@${me.zoneChanges ?? 0}` : "";
+      return !!me && (s.turnLog?.blocks ?? []).some((b) => (b.blocker === key && !!b.aq?.col?.includes(cond.color)) || (b.attacker === key && !!b.bq?.col?.includes(cond.color)));
+    }
     case "spellDamagedYou":
       return (s.turnLog?.spellDamage ?? []).some((d) => d.player === you && d.colors.includes(cond.color) && d.types.some((t) => cond.types.includes(t)));
     case "sourceDealtAtLeast":

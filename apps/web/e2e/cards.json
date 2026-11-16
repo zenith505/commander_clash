@@ -16331,6 +16331,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "93d9a1c6-9f6f-487f-a46c-bfd80946ccdf",
+  "name": "Glyph of Reincarnation",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Cast this spell only after combat.\nDestroy all creatures that were blocked by target Wall this turn. They can't be regenerated. For each creature that died this way, put a creature card from the graveyard of the player who controlled that creature the last time it became blocked by that Wall onto the battlefield under its owner's control.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0efe1357-bfbb-42c0-9cc9-6a919d686c66",
   "name": "Go Nuts!",
   "manaCost": "{G}",
@@ -44143,6 +44169,38 @@
   "set": "lea",
   "releasedAt": "1993-08-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "aa5e6894-8c97-46f8-a0fd-07c6db51e9a7",
+  "name": "Wall of Wood",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender (This creature can't attack.)",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

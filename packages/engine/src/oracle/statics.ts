@@ -861,6 +861,10 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Sea Troll (round B230): "Activate only if ~ blocked or was blocked by a blue creature this turn": a creature that was
+  // blue as the block was declared (TurnLog.blocks, which keeps the colors of a block with a blue creature in it), this
+  // object in it (CR 400.7).
+  if (/^~ blocked or was blocked by a blue creature this turn$/.test(text)) return { kind: "blockedWithColorThisTurn", color: "U" };
   // Tazri, Stalwart Survivor's granted ability: "Activate only if this creature has another activated ability": any other
   // one, even one that can't be activated now or on the battlefield (cycling, rulings), mana abilities too (CR 605.1a).
   if (/^~ has another activated ability$/.test(text)) return { kind: "self", is: "hasAnotherActivatedAbility" };

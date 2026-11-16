@@ -2730,6 +2730,8 @@ export type StaticCondition =
   | { kind: "noncombatByColor"; color: Color; n: number }
   /** Suffocation (round B229): "you were dealt damage this turn by a red instant or sorcery spell": a spell of one of `types` with `color` as it dealt the damage (TurnLog.spellDamage). */
   | { kind: "spellDamagedYou"; color: Color; types: string[] }
+  /** Sea Troll (round B230): "~ blocked or was blocked by a blue creature this turn": the source as the object it is (CR 400.7), in a block declared this turn with a creature of `color` as the block was declared (TurnLog.blocks `bq`/`aq` `col`). */
+  | { kind: "blockedWithColorThisTurn"; color: Color }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
   | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number; /** "As long as an opponent has cast a spell this turn" (Captain Mar-Vell): spells cast by any one opponent. */ byOpponent?: true }
   /** "There are five colors among permanents you control" (CR 105.2). */
@@ -4496,6 +4498,25 @@ export type Effect =
    * the damage each spell dealt this turn from TurnLog.spellDamage.
    */
   | { type: "halfSpellDamageBack" }
+  /**
+   * Glyph of Reincarnation (round B230): "Destroy all creatures that were blocked by target Wall this turn. They can't be
+   * regenerated. For each creature that died this way, put a creature card from the graveyard of the player who controlled
+   * that creature the last time it became blocked by that Wall onto the battlefield under its owner's control.": target 0.
+   */
+  | { type: "glyphReincarnation" }
+  /**
+   * Infinite Authority (round B230), as its trigger resolves: "destroy the other creature at end of combat" (a delayed
+   * trigger about that creature as it is now, CR 603.7c, 400.7), with the enchanted creature as the trigger's event had it
+   * (its group: rulings, moving the Aura after it triggered changes nothing) for "the first creature".
+   */
+  | { type: "authorityLink" }
+  /**
+   * Infinite Authority's end of combat trigger: destroy that creature; if it's destroyed (CR 701.8; wherever a replacement
+   * then sends it), "At the beginning of the next end step, if that creature was destroyed this way, put a +1/+1 counter on
+   * the first creature" is set up then, about `host` as the object it was (an intervening if, CR 603.4: with none destroyed,
+   * nothing triggers).
+   */
+  | { type: "authorityDestroy"; host: { id: ObjectId; zc: number } }
   /**
    * Vodalian War Machine (round B229): "destroy all Merfolk tapped this turn to pay for its abilities": the permanents tapped
    * for the costs of the source's abilities this turn (TurnLog.costTapped), the source as the permanent it was, each still the
@@ -8185,6 +8206,8 @@ export interface CompiledCard {
   entersProcess?: { n: number; counters: number };
   /** Vodalian War Machine (round B229): the permanents tapped to pay its abilities' costs are kept this turn (TurnLog.costTapped). */
   logsCostTapped?: true;
+  /** Bone Shaman (round B230): "Creatures dealt damage by ~ this turn can't be regenerated this turn." (game.ts damagedNoRegen). */
+  damagedCantRegenerate?: true;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

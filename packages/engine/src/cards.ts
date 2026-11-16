@@ -333,9 +333,26 @@ export const toughness = (s: GameState, o: GameObject) => characteristics(s, o).
  * Zilortha, Strength Incarnate its power instead, at least 1 (rulings: a creature with 0 power needs 1 damage).
  */
 export function lethalLeft(s: GameState, o: GameObject): number {
+  return Math.max(0, lethalAmount(s, o) - o.damage);
+}
+
+/** The damage that's lethal to creature `o` (CR 120.6): its toughness, or with Zilortha its power, at least 1. */
+function lethalAmount(s: GameState, o: GameObject): number {
   const c = controllerOf(s, o);
   const byPower = s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).lethalByPower && controllerOf(s, s.objects[id]!) === c);
-  return Math.max(0, (byPower ? Math.max(1, power(s, o)) : toughness(s, o)) - o.damage);
+  return byPower ? Math.max(1, power(s, o)) : toughness(s, o);
+}
+
+/**
+ * Whether the damage marked on creature `o` destroys it (CR 704.5g): lethal damage is marked on it, and, for Ogre Enforcer
+ * ("can't be destroyed by lethal damage unless lethal damage dealt by a single source is marked on it", round B232), one
+ * source's damage is lethal by itself (rulings).
+ */
+export function lethalDamageMarked(s: GameState, o: GameObject): boolean {
+  if (o.damage <= 0 || lethalLeft(s, o) > 0) return false;
+  if (!abilitiesOf(s, o).lethalFromOneSource) return true;
+  const lethal = lethalAmount(s, o);
+  return Object.values(o.damageFrom ?? {}).some((n) => n >= lethal);
 }
 
 /** Is this object of card type `t` right now (after type-changing effects)? */

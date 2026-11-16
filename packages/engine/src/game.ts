@@ -10,7 +10,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, castCardAs, lethalLeft, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -1179,6 +1179,7 @@ export function moveObject(
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && o.damagedBy?.length) ((s.turnLog ??= {}).diedDamaged ??= []).push({ id, zc: o.zoneChanges, by: [...o.damagedBy] });
   o.tapped = false;
   o.damage = 0;
+  o.damageFrom = undefined;
   o.damagedBy = undefined;
   o.damagedByKinds = undefined;
   o.shroudWaivedFor = undefined;
@@ -2661,6 +2662,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   if ((o.removeDamageShields ?? 0) > 0) {
     o.removeDamageShields! -= 1;
     o.damage = 0;
+    o.damageFrom = undefined;
     o.deathtouchDamage = false;
     log(s, `All damage is removed from ${defOf(s, o).name} instead of it being destroyed.`);
     return false;
@@ -2697,6 +2699,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
     }
     o.regenerated = { turn: s.turn, n: o.regenerated?.turn === s.turn ? o.regenerated.n + 1 : 1 };
     o.damage = 0;
+    o.damageFrom = undefined;
     o.deathtouchDamage = false;
     tapPermanent(s, o);
     if (o.attacking !== undefined || o.blocking !== undefined) {
@@ -2711,6 +2714,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   const umbra = s.battlefield.map((id) => obj(s, id)).find((a) => a.attachedTo === o.id && (objHasKeyword(s, a, "Umbra armor") || objHasKeyword(s, a, "Totem armor")));
   if (umbra) {
     o.damage = 0;
+    o.damageFrom = undefined;
     o.deathtouchDamage = false;
     log(s, `${defOf(s, umbra).name}'s umbra armor saves ${name}.`);
     destroyPermanent(s, umbra, `${defOf(s, umbra).name} is destroyed instead.`);
@@ -4846,6 +4850,9 @@ function finishCleanup(s: GameState) {
   // "Until the end of your next turn": in the cleanup step of that player's next turn (CR 514.2), or once they've left
   // the game (CR 800.4m).
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn" && !(e.duration === "endOfYourNextTurn" && ((s.activePlayer === e.turnOf && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)))); // CR 514.2
+  // Oracle en-Vec (round B233): over in the cleanup step of that player's next turn, or once they've left the game.
+  for (const [k, c] of Object.entries(s.chosenAttackers ?? {})) if ((s.activePlayer === c.player && s.turn > c.sinceTurn) || player(s, c.player).lost) delete s.chosenAttackers![k];
+  if (s.chosenAttackers && !Object.keys(s.chosenAttackers).length) s.chosenAttackers = undefined;
   // Teferi, Timeless Voyager: "Until the end of your next turn, they can't phase in" (CR 514.2, 800.4m).
   for (const id of s.phasedOut ?? []) {
     const lock = s.objects[id]!.phased?.lock;
@@ -4873,7 +4880,7 @@ function finishCleanup(s: GameState) {
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
     const o = obj(s, id);
     // CR 514.2, phased-out permanents too; not from a permanent whose damage isn't removed (Ancient Adamantoise).
-    if (!(o.zone === "battlefield" && abilitiesOf(s, o).keepsDamage)) o.damage = 0;
+    if (!(o.zone === "battlefield" && abilitiesOf(s, o).keepsDamage)) (o.damage = 0), (o.damageFrom = undefined);
     o.damagedBy = undefined;
     o.damagedByKinds = undefined;
     o.shroudWaivedFor = undefined;
@@ -9857,6 +9864,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
   // Merseine (round B211): only the player who controls the permanent it's attached to now.
   else if (ab.enchantedControllerOnly && (!o.attachedTo || s.objects[o.attachedTo]?.zone !== "battlefield" || controllerOf(s, obj(s, o.attachedTo)) !== pid)) return `only the controller of the creature ${d.name} enchants may activate that ability`;
+  // A Killer Among Us (round B233): only the player who secretly chose the type for this object can reveal it (rulings).
+  else if (ab.revealSecretType && !(o.secretType && o.secretType.by === pid && o.secretType.zc === (o.zoneChanges ?? 0))) return `only the player who secretly chose a creature type for ${d.name} can reveal it`;
   // Merseine: "Pay enchanted creature's mana cost" can't be paid for a creature with no mana cost (CR 118.6).
   else if (ab.attachedManaCost && !attachedManaCostOf(s, o)) return `the creature ${d.name} enchants has no mana cost to pay`;
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
@@ -10601,6 +10610,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
   const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
+  // A Killer Among Us (round B233): revealing the chosen type is part of the cost (CR 602.2b).
+  if (ab.revealSecretType && o.secretType) log(s, `${p.name} reveals the creature type chosen for ${d.name}: ${o.secretType.type}.`);
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
@@ -11010,6 +11021,7 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
 function divideDamageChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
   const pend = s.pending;
   const r = s.resolving;
+  if (pend?.kind === "divideDamage" && pend.player === p.id && pend.combat) return combatDivisionChosen(s, p, pend, parts);
   if (pend?.kind !== "divideDamage" || pend.player !== p.id || !r) throw new RulesError("no damage to divide");
   const given = Object.entries(parts).filter(([, n]) => n !== 0);
   if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`divide the damage among the ${pend.what}`);
@@ -11019,6 +11031,27 @@ function divideDamageChosen(s: GameState, p: Player, parts: Record<ObjectId, num
   s.pending = null;
   log(s, `${p.name} divides ${nameOf(s, pend.by)}'s ${pend.total} damage: ${given.map(([id, n]) => `${n} to ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
+}
+
+/**
+ * Butcher Orgg (round B232): its combat damage divided among the defending player ("p<player>") and creatures they control,
+ * at least 1 to each one chosen and all of it given out (rulings), or none given to assign it the usual way.
+ */
+function combatDivisionChosen(s: GameState, p: Player, pend: Extract<PendingDecision, { kind: "divideDamage" }>, parts: Record<string, number>) {
+  const c = s.creatureDamageChoice;
+  if (!c || c.turn !== s.turn || c.step !== s.step) throw new RulesError("no combat damage to divide");
+  const given = Object.entries(parts).filter(([, n]) => n !== 0);
+  const allowed = [...pend.options, ...(pend.toPlayer !== undefined ? [`p${pend.toPlayer}`] : [])];
+  if (given.some(([id, n]) => !allowed.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`divide the damage among ${pend.toPlayer !== undefined ? player(s, pend.toPlayer).name : "that player"} and the ${pend.what}`);
+  const sum = given.reduce((a, [, n]) => a + n, 0);
+  if (sum && sum !== pend.total) throw new RulesError(`divide all ${pend.total} damage, or none to assign it the usual way`);
+  s.pending = null;
+  const label = (k: string) => (k.startsWith("p") ? player(s, Number(k.slice(1))).name : nameOf(s, k));
+  if (sum) {
+    (c.divide ??= {})[pend.by] = Object.fromEntries(given);
+    log(s, `${p.name} divides ${nameOf(s, pend.by)}'s ${pend.total} combat damage: ${given.map(([k, n]) => `${n} to ${label(k)}`).join(", ")}.`);
+  } else log(s, `${p.name} has ${nameOf(s, pend.by)} assign its combat damage the usual way.`);
+  if (!askUnblocked(s)) dealCombatDamage(s, s.step === "firstStrikeDamage");
 }
 
 /** How a "distribute" effect's counters are divided (CR 608.2d): all of them, among the permanents offered. */
@@ -11672,6 +11705,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "alternatePick") {
     const st = r.scratch?.alternate;
     if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "secretType") {
+    // A Killer Among Us (round B233): the creature type chosen secretly.
+    const st = r.scratch?.secretType;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the creature types offered");
     st.pick = choice;
     continueResolution(s);
     return;
@@ -12839,6 +12880,8 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
     const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), mayPayUse(s, pend), 0, payableLife(s, p.id) - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
+    // Balduvian Fallen (round B232): the mana a cumulative upkeep was paid with, for "for each {B} or {R} spent this way".
+    if (pend.upkeepOf && paid) (r.scratch ??= {}).upkeepSpent = Object.fromEntries(Object.entries(paid.spent).filter(([, n]) => n > 0));
     payLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     loseEnergy(s, p.id, energy);
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
@@ -13062,6 +13105,15 @@ function hasteVsOpponentsOf(s: GameState): PlayerId[] {
   return [...new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).hasteVsYourOpponents).map((id) => controllerOf(s, obj(s, id))))];
 }
 
+/**
+ * Oracle en-Vec (round B233, GameState.chosenAttackers): `o` isn't one of the creatures chosen for the active player's turn
+ * now, the first turn they began after it resolved, so it can't attack (CR 508.1c). Whoever controls it.
+ */
+function chosenAttackersForbid(s: GameState, o: GameObject): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return Object.values(s.chosenAttackers ?? {}).some((c) => c.player === s.activePlayer && s.turn > c.sinceTurn && !c.chosen.includes(key));
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   if (arbiterStopsAttacks(s, pid)) return [];
@@ -13075,6 +13127,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !bridged(s, o) &&
       // Overencumbered: "creatures can't attack this combat", only in the combat phase it was made in.
       !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
+      // Oracle en-Vec (round B233): during that player's next turn, only the chosen creatures can attack (CR 508.1c).
+      !chosenAttackersForbid(s, o) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       // "Only the chosen creatures can attack during that combat phase" (Last Night Together): those objects only (CR 400.7).
@@ -14614,7 +14668,7 @@ function askUnblocked(s: GameState): boolean {
     s.pending = { kind: "pickPermanents", player: pid, source: "Combat damage", action: "unblocked", what: "blocked creature to assign its combat damage as though it weren't blocked", options: ids, count: ids.length, min: 0 };
     return true;
   }
-  return askDamageToCreature(s);
+  return askDamageToCreature(s) || askDivideCombatDamage(s);
 }
 
 /**
@@ -14635,6 +14689,31 @@ function askDamageToCreature(s: GameState): boolean {
     if (!options.length) continue;
     c.current = at.id;
     s.pending = { kind: "pickPermanents", player: controllerOf(s, at), source: nameOf(s, at.id), action: "damageCreature", what: `creature ${player(s, defender).name} controls for ${nameOf(s, at.id)} to assign its combat damage to`, options, count: 1, min: 0 };
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Butcher Orgg (round B232): "You may assign ~'s combat damage divided as you choose among defending player and/or any
+ * number of creatures they control" (an exception to CR 510.1a-c): asked of its controller as the damage is assigned, in
+ * each combat damage step it deals damage in, while it's attacking; "defending player" is the player it's attacking or the
+ * controller of the planeswalker it's attacking (CR 508.5). Blocked by no creature any more, it assigns no combat damage
+ * and the ability can't be used (rulings). True if asked.
+ */
+function askDivideCombatDamage(s: GameState): boolean {
+  const c = s.creatureDamageChoice;
+  if (!c || c.turn !== s.turn || c.step !== s.step) return false;
+  const fs = s.step === "firstStrikeDamage";
+  for (const at of attackers(s)) {
+    if (c.divideAsked?.includes(at.id) || at.attacking === undefined || !abilitiesOf(s, at).divideCombatDamage || c.to[at.id] !== undefined || !dealsDamageThisStep(s, at, fs) || assignsNoCombatDamage(s, at) || combatDamageOf(s, at) <= 0) continue;
+    (c.divideAsked ??= []).push(at.id);
+    const unblocked = (s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id)) || at.unblockedDamageTurn === s.turn || unblockedByTurnChoice(s, at);
+    if (at.blockedBy && !at.blockedBy.length && !unblocked) continue;
+    const defender = at.attacking;
+    if (player(s, defender).lost) continue;
+    const options = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === defender);
+    s.pending = { kind: "divideDamage", player: controllerOf(s, at), source: nameOf(s, at.id), by: at.id, total: combatDamageOf(s, at), options, what: `creatures ${player(s, defender).name} controls`, combat: true, toPlayer: defender };
     return true;
   }
   return false;
@@ -14710,6 +14789,15 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     const toCreature = !at.blockedBy && cd?.turn === s.turn && cd.step === s.step ? cd.to[at.id] : undefined;
     if (toCreature !== undefined && s.objects[toCreature]?.zone === "battlefield") {
       hits.push({ source: at, toObject: obj(s, toCreature), amount: dmg });
+      continue;
+    }
+    // Butcher Orgg (round B232): as its controller divided it (askDivideCombatDamage).
+    const divided = cd?.turn === s.turn && cd.step === s.step ? cd.divide?.[at.id] : undefined;
+    if (divided) {
+      for (const [k, n] of Object.entries(divided)) {
+        if (k.startsWith("p")) hits.push({ source: at, toPlayer: Number(k.slice(1)), amount: n });
+        else if (s.objects[k]?.zone === "battlefield") hits.push({ source: at, toObject: obj(s, k), amount: n });
+      }
       continue;
     }
     if (!at.blockedBy || unblocked) {
@@ -14986,7 +15074,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         log(s, `${d.name} dies.`);
         moveObject(s, id, "graveyard");
         changed = true;
-      } else if (((o.damage > 0 && lethalLeft(s, o) === 0) || o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible")) {
+      } else if ((lethalDamageMarked(s, o) || o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible")) {
         destroyPermanent(s, o, `${d.name} dies.`, barred.has(id)); // 704.5g, 704.5h: destroyed (or regenerated)
         changed = true;
       }
@@ -15347,7 +15435,7 @@ type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /**
 function diesThisCheck(s: GameState, o: GameObject): boolean {
   if (!objIsType(s, o, "Creature")) return false;
   if (toughness(s, o) <= 0) return true;
-  return ((o.damage > 0 && lethalLeft(s, o) === 0) || !!o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible");
+  return (lethalDamageMarked(s, o) || !!o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible");
 }
 
 /**

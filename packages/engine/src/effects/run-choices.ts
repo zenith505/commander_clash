@@ -1034,6 +1034,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
               const pid = controllerOf(s, o);
               return !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === pid);
             })(ctx.targets[(e.cond as { index: number }).index])
+          : e.cond.kind === "targetIsSecretType"
+          ? ((t) => {
+              // A Killer Among Us (round B233): the type chosen for the source as it last existed (CR 608.2h), the target
+              // as it is now (CR 608.2c); a changeling has every creature type (CR 702.73a).
+              const st = ctx.sourceId !== undefined ? s.objects[ctx.sourceId]?.secretType : undefined;
+              const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+              if (!st || (ctx.sourceZc !== undefined && st.zc !== ctx.sourceZc) || !o || o.zone !== "battlefield") return false;
+              const ch = characteristics(s, o);
+              return ch.types.includes("Creature") && (!!ch.allCreatureTypes || ch.subtypes.includes(st.type));
+            })(ctx.targets[(e.cond as { index: number }).index])
           : e.cond.kind === "lifeAtLeastNoted"
           ? ((o) => o?.notedLife !== undefined && player(s, ctx.controller).life >= o.notedLife)(ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined)
           : e.cond.kind === "libraryHas"

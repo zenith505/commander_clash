@@ -523,6 +523,8 @@ export type Count =
   | { kind: "eventAmount" }
   /** Volo, Itinerant Scholar (round 380): "for each creature type noted for target permanent ...": how many are noted for that object (GameState.notedFor). */
   | { kind: "notedTypes"; of: ObjRef }
+  /** Balduvian Fallen (round B232): "for each {B} or {R} spent this way": the mana of these types its event spent (TriggerEventInfo.spent). */
+  | { kind: "eventSpent"; types: ManaType[] }
   /** Ancient Cellarspawn's "the difference": the cast spell's mana value (X included) less the mana spent to cast it. */
   | { kind: "castShortfall" }
   /** "Where X is that excess damage" after "if that creature was dealt excess damage this turn" (CR 120.10). */
@@ -4570,6 +4572,22 @@ export type Effect =
    */
   | { type: "attackersPayOrBlockersGain"; filter: TargetSpec; cost: string; keyword: string }
   /**
+   * Heroism (round B232): "For each attacking red creature, prevent all combat damage that would be dealt by that creature
+   * this turn unless its controller pays {2}{R}.": the creatures as it resolves, each payment made then (rulings), each
+   * attacker's controller in turn order (CR 101.4).
+   */
+  | { type: "attackersPayOrPrevent"; filter: TargetSpec; cost: string }
+  /**
+   * Oracle en-Vec (round B233): "Target opponent chooses any number of creatures they control. During that player's next
+   * turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step,
+   * destroy each of the chosen creatures that didn't attack this turn." (GameState.chosenAttackers.)
+   */
+  | { type: "chosenAttackNextTurn"; who: PlayerRef }
+  /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
+  | { type: "chosenAttackDestroy"; key: string }
+  /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */
+  | { type: "secretCreatureType"; options: string[] }
+  /**
    * Storm Herald (round B208): "return any number of Aura cards from your graveyard to the battlefield attached to creatures
    * you control": only Auras that could be attached to a creature you control (rulings), chosen as it resolves, each
    * one's creature chosen as they enter together (CR 303.4f); the Auras that entered are ResolvingInfo.created.
@@ -5981,6 +5999,8 @@ export type SpellCondition =
   | { kind: "libraryHas"; n: number }
   /** Sigarda's Splendor: "if your life total is greater than or equal to the last noted life total for ~" (GameObject.notedLife; none noted, no). */
   | { kind: "lifeAtLeastNoted" }
+  /** A Killer Among Us (round B233): "If target attacking creature token is the chosen type": that target has the creature type its source's controller chose secretly (GameObject.secretType, as the source last existed). */
+  | { kind: "targetIsSecretType"; index: number }
   /**
    * "If this is the second time this ability has resolved this turn" (Omnath, Locus of Creation): how many times this
    * ability of this object has resolved this turn, this time included; `not`: "Otherwise" (none of `n`). A new object
@@ -7425,6 +7445,11 @@ export interface ActivatedAbility {
   onlyPlayer?: number;
   /** With `anyPlayer`, Merseine (round B211): "Only the controller of the enchanted creature may activate this ability": the player who controls the permanent its source is attached to as it's activated. */
   enchantedControllerOnly?: true;
+  /**
+   * A Killer Among Us (round B233): "Reveal the creature type you chose" in its cost: only the player who chose it secretly,
+   * for this object (GameObject.secretType), can reveal it and so activate it (rulings).
+   */
+  revealSecretType?: true;
   /** Merseine (round B211): "Pay enchanted creature's mana cost": the mana cost of the permanent its source is attached to as it's activated (CardDef.manaCost by defOf: a copy's, CR 707.2), {X} as 0 (CR 107.3h); unpayable with none, or with nothing attached (CR 118.6). `manaCost` is unused. */
   attachedManaCost?: true;
   /**
@@ -8651,6 +8676,10 @@ export interface CompiledCard {
   attachedDamageToController?: true;
   /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */
   keepsDamage?: true;
+  /** Butcher Orgg (round B232): "You may assign ~'s combat damage divided as you choose among defending player and/or any number of creatures they control" (game.ts askDivideCombatDamage). */
+  divideCombatDamage?: true;
+  /** Ogre Enforcer (round B232): "~ can't be destroyed by lethal damage unless lethal damage dealt by a single source is marked on it" (CR 704.5g; GameObject.damageFrom). */
+  lethalFromOneSource?: true;
   /**
    * Wolverine, Fierce Fighter: "If damage would be dealt to ~, instead that damage is dealt, but all other damage already
    * dealt to ~ is healed" (CR 614.1a): the damage marked on it before the event is removed as the new damage is dealt;

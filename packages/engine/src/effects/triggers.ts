@@ -205,7 +205,7 @@ export type TriggerSourceEvent =
   | { type: "timeCountersRemovedExiled"; id: ObjectId; n: number; /** The controller of the effect that removed them (Watcher of Hours' "you remove"). */ by: PlayerId }
   /** "Whenever you discover" (Curator of Sun's Creation): the discover value as `amount`. */
   | { type: "discovered"; player: PlayerId; amount: number }
-  | { type: "cumulativeUpkeepPaid"; id: ObjectId }
+  | { type: "cumulativeUpkeepPaid"; id: ObjectId; /** The mana spent to pay it, by type (Balduvian Fallen, round B232). */ spent?: Partial<Record<ManaType, number>> }
   /** Thought Lash (round B210): `player` didn't pay the cumulative upkeep of permanent `id` (CR 702.24a). */
   | { type: "cumulativeUpkeepUnpaid"; id: ObjectId; player: PlayerId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
@@ -1327,7 +1327,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
   } else if (ev.type === "cumulativeUpkeepPaid") {
     const o = s.objects[ev.id];
-    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepPaid");
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfCumulativeUpkeepPaid", undefined, undefined, undefined, undefined, undefined, undefined, ev.spent ? { spent: ev.spent } : undefined);
   } else if (ev.type === "cumulativeUpkeepUnpaid") {
     // Thought Lash: "When a player doesn't pay ~'s cumulative upkeep, that player ...": the player who didn't pay.
     const o = s.objects[ev.id];

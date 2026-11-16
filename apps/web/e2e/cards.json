@@ -1,5 +1,31 @@
 [
  {
+  "oracleId": "79d577a8-53c0-4220-bc0e-70764d72d5fd",
+  "name": "A Killer Among Us",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, create a 1/1 white Human creature token, a 1/1 blue Merfolk creature token, and a 1/1 red Goblin creature token. Then secretly choose Human, Merfolk, or Goblin.\nSacrifice this enchantment, Reveal the creature type you chose: If target attacking creature token is the chosen type, put three +1/+1 counters on it and it gains deathtouch until end of turn.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cbf09050-39d0-463b-96db-9e22011ae0d8",
   "name": "Aang, Swift Savior // Aang and La, Ocean's Fury",
   "manaCost": "{1}{W}{U}",
@@ -5904,6 +5930,36 @@
   "set": "khm",
   "releasedAt": "2021-02-05",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6656d47a-9490-46ee-a6ed-7cbcab7539c8",
+  "name": "Butcher Orgg",
+  "manaCost": "{4}{R}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Creature — Orgg",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orgg"
+  ],
+  "oracleText": "You may assign this creature's combat damage divided as you choose among defending player and/or any number of creatures they control.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19297,6 +19353,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "74716642-fc8c-4f62-a556-154ed0b4af0e",
+  "name": "Heroism",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a white creature: For each attacking red creature, prevent all combat damage that would be dealt by that creature this turn unless its controller pays {2}{R}.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8818bbf8-58ec-4070-a81a-c7ce248057ab",
   "name": "Hew the Entwood",
   "manaCost": "{3}{R}{R}",
@@ -29549,6 +29632,37 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-07-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "367faa8c-617a-41a0-901c-f65106e86d56",
+  "name": "Oracle en-Vec",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{T}: Target opponent chooses any number of creatures they control. During that player's next turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step, destroy each of the chosen creatures that didn't attack this turn. Activate only during your turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

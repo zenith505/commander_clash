@@ -339,6 +339,7 @@ export function dealDamage(
         if ((!event || o.healEvent !== event) && o.damage > 0) {
           log(s, `The damage already dealt to ${c.name} is healed.`);
           o.damage = 0;
+          o.damageFrom = undefined;
         }
         o.healEvent = event;
       }
@@ -354,6 +355,9 @@ export function dealDamage(
         log(s, `${src.name} deals ${n} damage to ${c.name} (as -1/-1 counters).`);
       } else {
         o.damage += n;
+        // Ogre Enforcer (round B232): the damage marked by each source, as the object it is (CR 400.7).
+        const from = src.ref ? `${src.ref.object}@${src.ref.zc}` : (src.id ?? `name:${src.name}`);
+        (o.damageFrom ??= {})[from] = (o.damageFrom[from] ?? 0) + n;
         log(s, `${src.name} deals ${n} damage to ${c.name}.`);
       }
     }

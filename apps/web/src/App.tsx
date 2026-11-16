@@ -2926,7 +2926,7 @@ function ColorsPick({ pending, dispatch }: { pending: Extract<NonNullable<GameSt
 }
 
 /** Cards from your graveyard to collect evidence N with (CR 701.59a): Done once their mana values add up to N or more. */
-/** Master of the Wild Hunt: your creature's damage divided among the creatures offered, − and + for each, until all of it is given out. */
+/** Master of the Wild Hunt: your creature's damage divided among the creatures offered, − and + for each, until all of it is given out. Butcher Orgg: its combat damage, the defending player among the choices. */
 function DivideDamageChoice({
   s,
   pending,
@@ -2942,11 +2942,27 @@ function DivideDamageChoice({
   const given = Object.values(parts).reduce((a, n) => a + n, 0);
   const left = pending.total - given;
   const set = (id: string, n: number) => setParts({ ...parts, [id]: Math.max(0, n) });
+  // Butcher Orgg (round B232): the defending player is one of the choices too ("p<player>"), and the damage can be assigned
+  // the usual way instead.
+  const toPlayer = pending.toPlayer !== undefined ? `p${pending.toPlayer}` : undefined;
+  const playerPart = toPlayer ? (parts[toPlayer] ?? 0) : 0;
   return (
     <div className="controls">
       <span>
-        <strong>{pending.source}:</strong> divide {cardOf(s, pending.by).name}'s {pending.total} damage among any number of these {pending.what} ({left} left)
+        <strong>{pending.source}:</strong> divide {cardOf(s, pending.by).name}'s {pending.total} {pending.combat ? "combat " : ""}damage among any number of {toPlayer ? `${s.players[pending.toPlayer!]!.name} and ` : ""}these {pending.what} ({left} left)
       </span>
+      {toPlayer && (
+        <span className="divide" data-divide-damage={toPlayer}>
+          {s.players[pending.toPlayer!]!.name}{" "}
+          <button className="ghost" disabled={playerPart <= 0} onClick={() => set(toPlayer, playerPart - 1)}>
+            −
+          </button>
+          <strong>{playerPart}</strong>
+          <button className="ghost" disabled={left <= 0} onClick={() => set(toPlayer, playerPart + 1)}>
+            +
+          </button>
+        </span>
+      )}
       {pending.options.map((id) => {
         const n = parts[id] ?? 0;
         const d = cardOf(s, id);
@@ -2966,6 +2982,11 @@ function DivideDamageChoice({
       <button disabled={left !== 0} onClick={() => dispatch([{ type: "divideDamage", player: HUMAN, parts }])}>
         Done
       </button>
+      {pending.combat && (
+        <button className="ghost" onClick={() => dispatch([{ type: "divideDamage", player: HUMAN, parts: {} }])}>
+          Assign it the usual way
+        </button>
+      )}
     </div>
   );
 }
@@ -3446,6 +3467,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
           // Volo's Journal (round 380): the creature types noted for it.
           <span className="chip other noted" title={`Noted: ${s.notedFor![`${o.id}@${o.zoneChanges ?? 0}`]!.join(", ")}`}>
             {s.notedFor![`${o.id}@${o.zoneChanges ?? 0}`]!.length} noted
+          </span>
+        )}
+        {o.secretType && o.secretType.by === HUMAN && o.secretType.zc === (o.zoneChanges ?? 0) && (
+          <span className="chip other chosen" title={`You secretly chose ${o.secretType.type}; the other players don't know it.`}>
+            {o.secretType.type} (secret)
           </span>
         )}
         {chosen && (
@@ -5647,7 +5673,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "spellDamageBack" || pending.what === "mireLand" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "toyNumber" || pending.what === "toyGuess" || pending.what === "liarGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || pending.what === "redistribute" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "spellDamageBack" || pending.what === "mireLand" || pending.what === "secretType" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "toyNumber" || pending.what === "toyGuess" || pending.what === "liarGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || pending.what === "redistribute" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

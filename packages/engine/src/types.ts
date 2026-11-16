@@ -47,6 +47,24 @@ export interface WasteDraw {
   after?: DrawAfter;
 }
 
+/**
+ * Words of Wind (round 385): a draw replaced by "each player returns a permanent they control to its owner's hand
+ * instead" (CR 614.1a). Every player with a choice to make chooses in APNAP order (CR 101.4); then all of them are
+ * returned at the same time, then the draws still to make go on (CR 614.11a).
+ */
+export interface WindDraw {
+  drawer: PlayerId;
+  source: string;
+  /** Every player still in the game, in APNAP order. */
+  order: PlayerId[];
+  /** The players still to choose, in APNAP order. */
+  queue: PlayerId[];
+  chosen: Record<PlayerId, ObjectId[]>;
+  left: number;
+  made: number[];
+  after?: DrawAfter;
+}
+
 export interface DamageRule {
   id: string;
   turn: number;
@@ -1031,7 +1049,7 @@ export interface Player {
    * Bear creature token (you gain 5 life) instead." One entry for each activation, in turn `turn`; each replaces one draw
    * (CR 614.1a, 614.11); with different ones waiting, the player chooses (PendingDecision "drawInstead").
    */
-  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } }; /** Words of Waste (round 383): each opponent of the drawing player discards a card instead. */ discard?: true }[];
+  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } }; /** Words of Waste (round 383): each opponent of the drawing player discards a card instead. */ discard?: true; /** Words of Wind (round 385): each player returns a permanent they control to its owner's hand instead. */ wind?: true; /** Mangara's Tome (round 385): the top card of the pile its enters ability exiled (linked to `sourceId` as it was, CR 607.2a) into its owner's hand instead. */ pile?: true; /** Aladdin's Lamp (round 385): look at the top this many cards, all but one onto the bottom in a random order, then draw a card. */ lamp?: number }[];
   /**
    * Stunning Reversal: "The next time you would lose the game this turn, instead draw seven cards and your life total
    * becomes 1." One entry for each resolved, in turn `turn`; each replaces one loss (CR 614.1a, 614.11).
@@ -1743,6 +1761,11 @@ export type PendingDecision =
       bottom?: true;
       made?: number[];
       archives?: number;
+      /**
+       * Aladdin's Lamp (round 385): `cards` are the top cards looked at; the one chosen stays on top and the rest go on the
+       * bottom in a random order, then the draws `left` and `made` go on (the Lamp's "then draw a card" already among them).
+       */
+      lamp?: true;
     }
   /**
    * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
@@ -1807,7 +1830,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "keep": the rest are tapped (Regna's Sanction). */ tap?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** Phyrexian Dreadnought: the permanents picked have at least this total power (see the "pick" effect). */ minTotalPower?: number; /** Thelon's Curse: this mana for each permanent picked, paid from the pool as they're chosen (pick `payEach`). */ payEach?: string; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "keep": the rest are tapped (Regna's Sanction). */ tap?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** Phyrexian Dreadnought: the permanents picked have at least this total power (see the "pick" effect). */ minTotalPower?: number; /** Thelon's Curse: this mana for each permanent picked, paid from the pool as they're chosen (pick `payEach`). */ payEach?: string; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true; /** Words of Wind (round 385): the permanent this player returns as a draw is replaced, not a resolving spell's pick. */ wind?: WindDraw }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true; /** Remove up to `total` of them, no more from each than `has` (Sensational Spider-Man). */ remove?: true; has?: Record<ObjectId, number>; /** With `remove`: exactly `total` of them (Overseer of Vault 76). */ exact?: true; /** Up to `total` of them, none included (Stumpsquall Hydra gone before its ability resolves). */ upTo?: true }

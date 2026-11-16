@@ -771,6 +771,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2aa2f96b-5784-4767-b9ea-b8d9222cb1de",
+  "name": "Aladdin's Lamp",
+  "manaCost": "{10}",
+  "cmc": 10,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: The next time you would draw a card this turn, instead look at the top X cards of your library, put all but one of them on the bottom of your library in a random order, then draw a card. X can't be 0.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d5c4d36c-54b3-4149-906b-a57a670260fc",
   "name": "Alhammarret's Archive",
   "manaCost": "{5}",
@@ -24557,6 +24579,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f515c691-07be-47ea-8bc0-46221eab8b46",
+  "name": "Mangara's Tome",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "When this artifact enters, search your library for five cards, exile them in a face-down pile, and shuffle that pile. Then shuffle your library.\n{2}: The next time you would draw a card this turn, instead put the top card of the exiled pile into its owner's hand.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -45964,6 +46010,32 @@
   ],
   "colorIdentity": [
    "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "523d3e3d-8fdf-44f8-868d-7b00995e4577",
+  "name": "Words of Wind",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}: The next time you would draw a card this turn, each player returns a permanent they control to its owner's hand instead.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
   ],
   "keywords": [],
   "commanderLegal": "legal",

@@ -5304,6 +5304,24 @@ function Controls({
       </div>
     );
   }
+  if (pending?.kind === "drawLook" && pending.lamp && pending.player === HUMAN) {
+    // Aladdin's Lamp (round 385): one of the top cards stays on top, the rest go on the bottom in a random order, then you draw.
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> instead of drawing, keep one of the top {pending.cards.length} cards of your library on top and put the rest on the bottom in a random order, then draw a card.
+        </span>
+        {pending.cards.map((id) => {
+          const d = cardOf(s, id);
+          return (
+            <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, objectId: id }])}>
+              Keep {d.name} on top
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   if (pending?.kind === "drawLook" && pending.keep && pending.player === HUMAN) {
     // Underrealm Lich: keep one of the top cards; the rest go to the graveyard. Or another replacement of that draw first.
     return (

@@ -24,6 +24,7 @@ import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./e
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
+import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
@@ -3060,6 +3061,10 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
   const pend = s.pending;
   if (pend?.kind !== "drawLook" || pend.player !== p.id) throw new RulesError("no cards to choose from");
   if (pend.keep) return chooseDig(s, p, pend, id, instead);
+  if (pend.lamp) {
+    if (instead !== undefined) throw new RulesError("no other way to replace that draw");
+    return chooseLampKeep(s, p, pend, id);
+  }
   if (instead !== undefined && typeof instead === "object" && "abundance" in instead) throw new RulesError("nothing lets you reveal instead");
   let more: [number, number[]];
   if (instead === "dig") {
@@ -3427,11 +3432,12 @@ export function drawShields(s: GameState, pid: PlayerId): { key: string; label: 
   (p.nextDrawInstead ?? []).forEach((w, i) => {
     if (w.turn !== s.turn) return;
     // Words of War's shields are told apart by their targets.
-    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null, w.damage ?? null, w.discard ?? null]);
+    // Mangara's Tome's shields by the Tome they came from (each its own pile, CR 607.2a), Aladdin's Lamp's by X.
+    const kind = JSON.stringify([w.source, w.gain ?? null, w.token ?? null, w.damage ?? null, w.discard ?? null, w.wind ?? null, w.pile ? `${w.sourceId}@${w.sourceZc ?? 0}` : null, w.lamp ?? null]);
     if (seen.has(kind)) return;
     seen.add(kind);
     const whom = w.damage && ("player" in w.damage.to ? player(s, w.damage.to.player).name : characteristics(s, obj(s, w.damage.to.object)).name);
-    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : "", w.damage ? `deal ${w.damage.n} damage to ${whom}` : "", w.discard ? "each opponent discards a card" : ""].filter(Boolean).join(" and ");
+    const what = [w.token ? `create a ${w.token.power}/${w.token.toughness} ${w.token.name.replace(/ Token$/, "")} token` : "", w.gain !== undefined ? `gain ${w.gain} life` : "", w.damage ? `deal ${w.damage.n} damage to ${whom}` : "", w.discard ? "each opponent discards a card" : "", w.wind ? "each player returns a permanent they control to its owner's hand" : "", w.pile ? "put the top card of the exiled pile into your hand" : "", w.lamp !== undefined ? `look at the top ${w.lamp === 1 ? "card" : `${w.lamp} cards`}, keep one on top and put the rest on the bottom in a random order, then draw` : ""].filter(Boolean).join(" and ");
     out.push({ key: `words:${i}`, label: `${what.charAt(0).toUpperCase()}${what.slice(1)} (${w.source})` });
   });
   return out;
@@ -3570,7 +3576,7 @@ function exileInstead(s: GameState, pid: PlayerId, src: ObjectId) {
  */
 function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
   const p = player(s, pid);
-  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made);
+  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made, madeArchives);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
@@ -3637,7 +3643,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
 }
 
 /** One of drawShields' shields replaces a draw of `pid`'s (CR 614.6), and is used up. */
-function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[]): "paused" | void {
+function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
   const p = player(s, pid);
   if (key === "exile") {
     // Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of
@@ -3665,6 +3671,10 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number,
   if (!p.nextDrawInstead.length) p.nextDrawInstead = undefined;
   // Words of Waste (round 383): each opponent's discard, then the draws after it (effects/run-round383.ts).
   if (w.discard) return wasteInstead(s, pid, w.source, left, after, made);
+  // Round 385 (effects/run-round385.ts): Words of Wind's returns, Mangara's Tome's pile and Aladdin's Lamp's look.
+  if (w.wind) return windInstead(s, pid, w.source, left, after, made);
+  if (w.pile) return pileInstead(s, pid, w.source, w.sourceId, w.sourceZc);
+  if (w.lamp !== undefined) return lampInstead(s, pid, w.source, w.lamp, left, after, made, madeArchives);
   if (w.gain !== undefined) {
     log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
     gainLife(s, pid, w.gain);
@@ -10751,6 +10761,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 /** "Sacrifice a creature", "return a land you control": the permanents this player picked (see the "pick" effect). */
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
+  if (pend?.kind === "pickPermanents" && pend.wind) return chooseWindPick(s, p, ids);
   const r = s.resolving;
   if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "damageCreature" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");

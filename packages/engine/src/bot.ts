@@ -243,6 +243,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Omen Machine, Wild Evocation: one we must cast if able goes on the stack even when we'd rather not.
       return plan ?? (pend.must ? forcedFreeCast(s, pid, pend.objectId) : null) ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
+    if (pend.kind === "drawLook" && pend.lamp) {
+      // Aladdin's Lamp (round 385): keep on top, to draw, the card we'd most like to draw (as Underrealm Lich's).
+      const best = [...pend.cards].sort((a, b) => Number(wantOnTop(s, pid, b)) - Number(wantOnTop(s, pid, a)) || mv(s, b) - mv(s, a))[0]!;
+      return [{ type: "drawLook", player: pid, objectId: best }];
+    }
     if (pend.kind === "drawLook" && pend.keep) {
       // Underrealm Lich: keep the card we'd most like to draw (what scry would keep, the most expensive of those).
       if (pend.cards.length < 2) return [{ type: "drawLook", player: pid }];
@@ -6628,7 +6633,7 @@ const BOT_LOOP_LIMIT = 8;
 /** Mechtitan Core's ability: this permanent and other permanents exiled to make a 10/10 or bigger token. */
 const makesTitan = (ab: ActivatedAbility) => !!ab.exileSelf && ab.body.effects.some((e) => e.type === "createToken" && (e.token.power ?? 0) >= 10) && !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile && c.other);
 
-function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility) => boolean): Action[] | null {
+function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility, o: GameObject) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid) continue;
@@ -6637,7 +6642,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     const order = abilities.map((_, i) => i).sort((a, b) => Number(!!abilities[b]!.energyX) - Number(!!abilities[a]!.energyX));
     for (const i of order) {
       const ab = abilities[i]!;
-      if (only && !only(ab)) continue;
+      if (only && !only(ab, o)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
       if (ab.mana) continue;
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
@@ -7454,8 +7459,17 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || (e.type === "if" && e.cond.kind === "targetControlledByChosen"));
   // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
   if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
-    const words = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead"));
+    // Not Words of Wind (round 385), which costs every player a permanent, ours too; Mangara's Tome only while its pile
+    // has a card.
+    const words = chooseActivation(s, pid, (ab, o) => ab.body.effects.some((e) => e.type === "nextDrawInstead" && !e.wind && (!e.pile || (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).some((l) => s.objects[l.id]?.zone === "exile" && (obj(s, l.id).zoneChanges ?? 0) === l.zc))));
     if (words) return words;
+    // Aladdin's Lamp (round 385): X = 2, the better of the top two cards drawn (abilities with X are otherwise left alone).
+    for (const id of s.battlefield) {
+      if (controllerOf(s, obj(s, id)) !== pid) continue;
+      const i = abilitiesOf(s, obj(s, id)).activated.findIndex((ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead" && e.lamp));
+      const plan = i >= 0 && player(s, pid).library.length >= 2 ? planActivate(s, pid, id, i, undefined, undefined, undefined, 2) : null;
+      if (plan) return plan;
+    }
   }
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
 }

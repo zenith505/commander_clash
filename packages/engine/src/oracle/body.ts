@@ -5682,7 +5682,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Words of War: "~ deals 2 damage to any target instead": the target chosen as the ability is activated (CR 115.1c,
     // 602.2b), and the damage dealt to it when the draw is replaced. Words of Waste (round 383): "each opponent discards a
     // card instead", each opponent's own choice (CR 701.9b) as the draw is replaced. Wind (each player's choice of a
-    // permanent to return) isn't done.
+    // permanent to return) is a whole line of round 385's (oracle/round385.ts).
     const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token|~ deals (\d+) damage to any target|(each opponent discards a card)) instead$/.exec(s);
     if (wordsOf && !ctx.spell) {
       if (wordsOf[4]) effects.push({ type: "nextDrawInstead", discard: true });

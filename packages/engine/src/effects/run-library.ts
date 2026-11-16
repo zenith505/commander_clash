@@ -92,9 +92,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!ctx.legal[e.damage.target] || !t || (t.kind !== "player" && t.kind !== "object")) return;
         damage = { n: e.damage.n, to: t.kind === "player" ? { player: t.id } : { object: t.id, zc: t.zc ?? obj(s, t.id).zoneChanges ?? 0 } };
       }
-      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}), ...(e.discard ? { discard: true as const } : {}) });
+      // Aladdin's Lamp (round 385): its X as it was activated.
+      const lamp = e.lamp ? amountNow(s, { count: { kind: "x" } }, ctx) : undefined;
+      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}), ...(e.discard ? { discard: true as const } : {}), ...(e.wind ? { wind: true as const } : {}), ...(e.pile ? { pile: true as const } : {}), ...(lamp !== undefined ? { lamp } : {}) });
       const whom = damage && ("player" in damage.to ? player(s, damage.to.player).name : characteristics(s, obj(s, damage.to.object)).name);
-      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : e.discard ? "each opponent discards a card" : `they gain ${e.gain} life`} instead (${src}).`);
+      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : e.discard ? "each opponent discards a card" : e.wind ? "each player returns a permanent they control to its owner's hand" : e.pile ? "they put the top card of the exiled pile into its owner's hand" : lamp !== undefined ? `they look at the top ${lamp === 1 ? "card" : `${lamp} cards`} of their library, put all but one on the bottom in a random order, then draw a card` : `they gain ${e.gain} life`} instead (${src}).`);
       return;
     }
     case "revealUntilLandToGraveyard":

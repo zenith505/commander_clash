@@ -1,6 +1,6 @@
 # Roadmap
 
-31,488 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,491 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,902 of
 9,979 (99%).
 
@@ -1206,7 +1206,7 @@ line blocks.
    Out after round 223 (looked at, not done): Contested War Zone ("that creature's controller gains control of ~" after
    a creature deals combat damage to you); Chandra, the Firebrand ("each of up to six targets"); Ooze Flux (done in round 315) (remove one
    or more +1/+1 counters as a variable cost); Chancellor of the Annex (done in round 338) (the first spell each opponent casts); Kaima,
-   the Fractured Calm (a count of creatures goaded this way); Namor the Sub-Mariner; Words of Worship and Words of Wind
+   the Fractured Calm (a count of creatures goaded this way); Namor the Sub-Mariner; Words of Worship and Words of Wind (done in round 385)
    (replacing the next draw this turn); Become the Pilot (done in round B164) (can't be blocked unless attacking its owner); Nemesis Phoenix
    (returned tapped and attacking from the graveyard); Battletide Alchemist (done in round B213) ("you may prevent X of that damage" for any
    player).
@@ -2356,7 +2356,7 @@ line blocks.
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
    Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
-   Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome and Aladdin's Lamp (a draw replaced); All
+   Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome (done in round 385) and Aladdin's Lamp (done in round 385) (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
    stack); Damping Engine (done in round 313); Dimensional Breach; Phyrexian Splicer (a keyword chosen as a cost, then the target with it);
@@ -3297,6 +3297,31 @@ line blocks.
    Bretagard, Rinoa, Angel Wing, Supper for Spiders, Immortal Coil, Nefarious Lich and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Polish: the Trap's log reads "You reveals" and "You guesses" (the "You plays" grammar of the log).
+   Round 385 went on down `npm run popular` and the "Out after round N" lists, most played first, to three more shields
+   for the next draw this turn (Player.nextDrawInstead, CR 614.1a, 614.6, used up by the draw they replace, even from an
+   empty library, CR 614.11): Words of Wind's "{1}: The next time you would draw a card this turn, each player returns a
+   permanent they control to its owner's hand instead." (every player still in the game, the drawing player too; those
+   with a choice choose in APNAP order, CR 101.4, one with a single permanent returns it, then all are returned at once
+   and the draws after it go on, CR 614.11a: WindDraw on PendingDecision "pickPermanents" `wind`, effects/run-round385.ts);
+   Mangara's Tome's "When ~ enters, search your library for five cards, exile them in a face-down pile, and shuffle that
+   pile. Then shuffle your library." (five cards if the library has them, CR 701.23d, not revealed, 701.23e, linked to the
+   Tome as that object, CR 607.2a, in a random order nobody may look at, CR 406.3: Effect shuffleExiledPile) and "{2}: The
+   next time you would draw a card this turn, instead put the top card of the exiled pile into its owner's hand." (the
+   pile of the Tome that made the shield, whether or not it's still around; not drawn, CR 614.6; with the pile empty the
+   draw is still replaced and nothing happens, rulings); Aladdin's Lamp's "{X}, {T}: The next time you would draw a card
+   this turn, instead look at the top X cards of your library, put all but one of them on the bottom of your library in a
+   random order, then draw a card. X can't be 0." (the draw it makes is a new draw other replacements may replace, a
+   second Lamp's too, rulings, but not one Alhammarret's Archive already doubled, CR 614.5: PendingDecision "drawLook"
+   `lamp`). Browser tests click through Words of Wind's permanent pick, the Lamp's "Keep ... on top" buttons and the Tome's
+   search, ability and replaced draw. New prompt: the Lamp's keep-on-top buttons. +3, 31,491 of 31,936. The compiled
+   text of every other card is unchanged. Bots return their least valuable permanent for Words of Wind and never activate
+   it, activate the Tome in their upkeep while its pile has a card, activate the Lamp in their upkeep with X = 2, and keep
+   the card they'd most like to draw.
+   Out after round 385 (looked at, not done): Domri, Chaos Bringer ("If that mana is spent on a creature spell, it gains
+   riot": mana from a loyalty ability, not a mana ability, CR 605.1a, and whether riot a spell gains applies as the
+   permanent enters, CR 614.12, isn't settled by its rulings); Blood Scrivener and Breathstealer's Crypt (still out: a
+   draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing, Supper for Spiders, Immortal Coil,
+   Nefarious Lich and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -10017,7 +10042,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
   Decaying Soil, Nature's Wrath (done in round B207), Graceful Takedown (done in round B187), Alpine Moon (done in round B214), Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
   stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
-- Out after round B163 (looked at, not done): Words of Waste (done in round 383) and Words of Wind (an opponent's discard or each player's
+- Out after round B163 (looked at, not done): Words of Waste (done in round 383) and Words of Wind (done in round 385) (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
   Sontaran Nurse (done in round B211) ("Choose a player at random. When you do, ~ fights another target creature that player controls": a
   reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (done in round B198) (face-down spells as a cost reduction's
@@ -10432,7 +10457,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment (done in round B156) ("up to one Equipment"
   chosen as it resolves), Chandra, Chill of Compliance (done in round 329) (which cards surveil put into the graveyard).
-- Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste (done in round 383) and Words of Wind (a target or choices in the
+- Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste (done in round 383) and Words of Wind (done in round 385) (a target or choices in the
   middle of a draw), Hedonist's Trove (done in round B192) (lands from its exile any number of times, one spell a turn), Day of the Dragons,
   Lumbering Battlement, Wall of Mourning (cards exiled with ~ from abilities not linked yet; Kayla's Music Box and
   Serpent's Soul-Jar done in round B70), Ashes of the Fallen (done in round 374) (creature types of cards in a graveyard: Lane A's round 227 adds those for Roshan,

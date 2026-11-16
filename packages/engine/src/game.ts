@@ -1660,7 +1660,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersProcess ? (["processExile"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -10415,6 +10415,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const extraCosts = activatedCosts(ab, x, o, s, p.id);
   const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  // Vodalian War Machine (round B229): the permanents tapped to pay for its abilities this turn, by the source as the
+  // permanent it is (CR 400.7), for its dies trigger.
+  if (compileCard(d).logsCostTapped && extraCosts.some((c) => c.kind === "tap" && !c.untap) && costs?.tap?.length) {
+    const list = (((s.turnLog ??= {}).costTapped ??= {})[`${o.id}@${sourceZc}`] ??= []);
+    for (const t of costs.tap) if (s.objects[t]) list.push(`${t}@${s.objects[t]!.zoneChanges ?? 0}`);
+  }
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
   const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
@@ -10961,6 +10967,16 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     nextOpeningAction(s);
     return;
   }
+  if (pend?.kind === "searchLibrary" && pend.entering && pend.player === p.id) {
+    // Ulamog's Despoiler (round B229): the cards to put from exile into graveyards as it enters, all of them or none.
+    if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
+    if (found.length && found.length !== pend.max) throw new RulesError(`choose exactly ${pend.max} cards or none`);
+    s.pending = null;
+    const entry = s.entersChoices?.[0]?.what === "processExile" && s.entersChoices[0].id === pend.entering ? s.entersChoices.shift() : undefined;
+    const o = s.objects[pend.entering];
+    if (o?.zone === "battlefield") processedAsEnters(s, o, found, entry?.enters);
+    return;
+  }
   if (pend?.kind === "searchLibrary" && pend.thenDraw && pend.player === p.id) {
     // Archmage Ascension: the card found goes into the hand, the library is shuffled, and the draws go on.
     if (found.length !== Math.min(pend.max, pend.cards.length) || found.some((id) => !pend.cards.includes(id) || !p.library.includes(id))) throw new RulesError(`find ${pend.what}`);
@@ -11364,7 +11380,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -11473,6 +11489,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "alternatePick") {
     const st = r.scratch?.alternate;
     if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "spellDamageBack") {
+    // Backdraft (round B229): the player and the spell's damage.
+    const st = r.scratch?.spellDamageBack;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose a player and damage offered");
     st.pick = choice;
     continueResolution(s);
     return;
@@ -11929,6 +11953,27 @@ export function removeCountersAsEntersOptions(s: GameState, o: GameObject): Obje
 }
 
 /**
+ * Ulamog's Despoiler (round B229): the cards chosen go from exile into their owners' graveyards (a face-down one chosen by its
+ * group, then at random within it: processPicks), and with that done it enters with its +1/+1 counters (CR 614.1c), even
+ * if a replacement effect kept a card in exile (rulings). Then it has entered, and its enters abilities trigger.
+ */
+const numberWord = (n: number) => ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][n] ?? String(n);
+
+function processedAsEnters(s: GameState, o: GameObject, chosen: ObjectId[], enters?: { x?: number }) {
+  const how = compileCard(defOf(s, o)).entersProcess!;
+  const you = controllerOf(s, o);
+  const cards = chosen.filter((id) => s.objects[id]?.zone === "exile" && processCandidates(s, you).includes(id));
+  if (cards.length === how.n) {
+    processExiled(s, you, cards);
+    invalidateCharacteristics(s);
+    const put = putCounters(s, o, "+1/+1", how.counters, true);
+    log(s, `${defOf(s, o).name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+  } else log(s, `${player(s, you).name} puts no cards from exile into graveyards as ${defOf(s, o).name} enters.`);
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
+/**
  * Sin, Unending Cataclysm: every counter comes off each permanent chosen, and it enters with `per` +1/+1 counters for each
  * one removed, as part of how it enters (CR 614.1c, 614.12).
  * Then it has entered, and its enters abilities trigger.
@@ -12119,6 +12164,20 @@ function askEntersChoice(s: GameState): boolean {
       // Sutured Ghoul, Living Lore, Frankenstein's Monster: one card at a time (enters-yard.ts).
       if (askYardExile(s, o, c)) return true;
       continue;
+    }
+    if (c.what === "processExile") {
+      // Ulamog's Despoiler (round B229): cards opponents own in exile, chosen as it enters (CR 614.12); fewer than it needs,
+      // none can be (rulings), and nothing is asked.
+      const how = compileCard(defOf(s, o)).entersProcess!;
+      const you = controllerOf(s, o);
+      const cards = processCandidates(s, you);
+      if (cards.length < how.n) {
+        q.shift();
+        processedAsEnters(s, o, [], c.enters);
+        continue;
+      }
+      s.pending = { kind: "searchLibrary", player: you, source: defOf(s, o).name, what: `${numberWord(how.n)} cards your opponents own`, cards, min: 0, max: how.n, exactly: true, exiled: true, entering: o.id, dig: { looked: cards, to: `to put into their owners' graveyards as it enters (then it enters with ${numberWord(how.counters)} +1/+1 counters), or none`, rest: "stay in exile" } };
+      return true;
     }
     if (c.what === "discardKeywords") {
       // Indominus Rex: any number of creature cards from its controller's hand (not itself, it isn't there).

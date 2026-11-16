@@ -1256,7 +1256,7 @@ function castSpellSource(s: GameState, ctx: ResolveCtx): DamageSource | undefine
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || !o) return undefined;
   const d = defOf(s, o);
-  return { ...cardSource(d, item.controller, { object: o.id, zc: o.zone === "stack" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0) }), spell: true, colors: item.castColors ?? d.colors, ...(item.castMv !== undefined ? { manaValue: item.castMv } : {}) };
+  return { ...cardSource(d, item.controller, { object: o.id, zc: o.zone === "stack" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0) }), spell: true, ...(item.copy ? {} : { cast: true as const }), colors: item.castColors ?? d.colors, ...(item.castMv !== undefined ? { manaValue: item.castMv } : {}) };
 }
 
 function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {

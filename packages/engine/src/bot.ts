@@ -1979,6 +1979,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
     // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.
     // Preferred Selection (round B216): the card we'd rather draw into our hand, the other one to the bottom.
+    // Backdraft (round B229): the most damage to an opponent; with only ourselves to choose, the least.
+    if (pend.kind === "chooseOption" && pend.what === "spellDamageBack") {
+      const parsed = pend.options.map((o) => ({ o, who: Number(o.split(":")[0]), n: Number(o.split(":")[1]) }));
+      const foes = parsed.filter((x) => x.who !== pid).sort((a, b) => b.n - a.n);
+      const pick = foes[0] ?? parsed.sort((a, b) => a.n - b.n)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick.o }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "lookedCard") {
       const toHand = /into your hand/.test(pend.prompt ?? "");
       const want = pend.options.filter((o) => wantOnTop(s, pid, o));

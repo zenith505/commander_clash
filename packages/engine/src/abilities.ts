@@ -1729,6 +1729,11 @@ export type PlayerRef =
   | { ref: "sacrificedThisWay"; /** Desolation: "each player who sacrificed a Plains this way": only those who sacrificed one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
   /** Desolation: "each player who tapped a land for mana this turn" (TurnLog.tappedLandForMana), still in the game, in APNAP order. */
   | { ref: "tappedLandForMana" }
+  /**
+   * Suffocation (round B229): "the controller of the last red instant or sorcery spell that dealt damage to you this turn":
+   * the latest such damage to you (TurnLog.spellDamage), the spell's controller as it dealt it, while still in the game.
+   */
+  | { ref: "lastSpellDamagedYou"; color: Color; types: string[] }
   /** Erestor of the Council: "each opponent who voted for a choice you voted for" in the vote that triggered it. */
   | { ref: "votedWithYou" }
   /** Grudge Keeper: "each opponent who voted for a choice you didn't vote for", in the vote that triggered it: one none of whose votes matches one of yours (rulings: with extra votes, an opponent counts only if they voted for none of your choices). */
@@ -2723,6 +2728,8 @@ export type StaticCondition =
   | { kind: "sourceDealtAtLeast"; n: number }
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
+  /** Suffocation (round B229): "you were dealt damage this turn by a red instant or sorcery spell": a spell of one of `types` with `color` as it dealt the damage (TurnLog.spellDamage). */
+  | { kind: "spellDamagedYou"; color: Color; types: string[] }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
   | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number; /** "As long as an opponent has cast a spell this turn" (Captain Mar-Vell): spells cast by any one opponent. */ byOpponent?: true }
   /** "There are five colors among permanents you control" (CR 105.2). */
@@ -4484,6 +4491,18 @@ export type Effect =
   /** Aeon Engine: "Reverse the game's turn order." (rulings: anything that uses turn order uses the new one; again, back). */
   | { type: "reverseTurnOrder" }
   /**
+   * Backdraft (round B229): "Choose a player who cast one or more sorcery spells this turn. ~ deals damage to that player equal
+   * to half the damage dealt by one of those sorcery spells this turn, rounded down.": both chosen as it resolves (CR 608.2d),
+   * the damage each spell dealt this turn from TurnLog.spellDamage.
+   */
+  | { type: "halfSpellDamageBack" }
+  /**
+   * Vodalian War Machine (round B229): "destroy all Merfolk tapped this turn to pay for its abilities": the permanents tapped
+   * for the costs of the source's abilities this turn (TurnLog.costTapped), the source as the permanent it was, each still the
+   * object it was and matching `filter`.
+   */
+  | { type: "destroyCostTapped"; filter: TargetSpec }
+  /**
    * Mirror of Fate (round B218): "Choose up to seven face-up exiled cards you own. Exile all the cards from your library,
    * then put the chosen cards on top of your library.": up to `n`, chosen as it resolves; then the library exiled face up,
    * and the chosen cards still in exile put on top in the order their owner chooses (rulings).
@@ -5779,7 +5798,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -8158,6 +8177,14 @@ export interface CompiledCard {
    * it never enters); `counterEach`: one counter of a kind chosen from these for each card exiled.
    */
   entersExileFromYard?: { filter: TargetSpec; n: "any" | "one" | "x"; counterEach?: CounterKind[] };
+  /**
+   * Ulamog's Despoiler (round B229): "As ~ enters, you may put two cards your opponents own from exile into their owners'
+   * graveyards. If you do, ~ enters with four +1/+1 counters on it.": `n` cards chosen as it enters (CR 614.12), all or none,
+   * for `counters` +1/+1 counters (EntersOption "processExile").
+   */
+  entersProcess?: { n: number; counters: number };
+  /** Vodalian War Machine (round B229): the permanents tapped to pay its abilities' costs are kept this turn (TurnLog.costTapped). */
+  logsCostTapped?: true;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

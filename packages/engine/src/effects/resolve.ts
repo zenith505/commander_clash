@@ -71,6 +71,7 @@ import { runLaneB221Effect } from "./run-laneb221";
 import { runLaneB222Effect } from "./run-laneb222";
 import { runLaneB223Effect } from "./run-laneb223";
 import { runLaneB227Effect } from "./run-laneb227";
+import { runLaneB229Effect } from "./run-laneb229";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -929,6 +930,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "tappedLandForMana": {
       const by = new Set(s.turnLog?.tappedLandForMana ?? []);
       return apnap(s, livingPlayers(s).filter((x) => by.has(x)));
+    }
+    case "lastSpellDamagedYou": {
+      // Suffocation (round B229): the latest damage to you from such a spell this turn, its controller as it dealt it.
+      const last = (s.turnLog?.spellDamage ?? []).filter((d) => d.player === ctx.controller && d.colors.includes(ref.color) && d.types.some((t) => ref.types.includes(t))).at(-1);
+      return last && !player(s, last.controller).lost ? [last.controller] : [];
     }
     case "youAndEventPlayers":
       return apnap(s, livingPlayers(s).filter((p) => p === ctx.controller || !!ctx.event?.players?.includes(p)));
@@ -1981,6 +1987,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB223Effect(s, e, ctx, src);
     case "reverseTurnOrder":
       return runLaneB227Effect(s, e, ctx, src);
+    case "halfSpellDamageBack":
+    case "destroyCostTapped":
+      return runLaneB229Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":
@@ -2229,7 +2238,7 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   // controls as the damage is dealt.
   if (spell?.zone === "stack" && item) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === item.controller) for (const g of abilitiesOf(s, obj(s, id)).spellsHaveKeywords ?? []) if (spellMatches(s, g.filter, item)) gained.push(g.keyword);
   const base = cardSource(ctx.sourceDef, ctx.controller, ref);
-  return { ...base, ...(gained.length ? { keywords: [...new Set([...base.keywords, ...gained])] } : {}), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
+  return { ...base, ...(gained.length ? { keywords: [...new Set([...base.keywords, ...gained])] } : {}), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item && !item.copy ? { cast: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
 }
 
 /**

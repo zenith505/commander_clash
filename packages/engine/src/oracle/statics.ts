@@ -1269,6 +1269,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^${NUM} or more sources you controlled dealt damage this turn$`).exec(text))) return { kind: "sourcesDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^(white|blue|black|red|green) sources you controlled dealt ${NUM} or more noncombat damage this turn$`).exec(text))) return { kind: "noncombatByColor", color: COLOR_WORDS[m[1]!]!, n: num(m[2]!) };
   if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
+  // Suffocation (round B229): "if you were dealt damage this turn by a red instant or sorcery spell": a red instant or a red
+  // sorcery (rulings), red as it dealt the damage (TurnLog.spellDamage).
+  if (text === "you were dealt damage this turn by a red instant or sorcery spell") return { kind: "spellDamagedYou", color: "R", types: ["Instant", "Sorcery"] };
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
   // Sigardian Paladin: "as long as you've put one or more +1/+1 counters on a creature this turn", a creature as the

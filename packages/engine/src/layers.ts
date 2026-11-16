@@ -1437,6 +1437,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return cond.types.some((t) => !!s.turnLog?.toOwnGraveyardTypes?.[you]?.includes(t));
     case "noncombatByColor":
       return (s.turnLog?.noncombatByColor?.[you]?.[cond.color] ?? 0) >= cond.n;
+    case "spellDamagedYou":
+      return (s.turnLog?.spellDamage ?? []).some((d) => d.player === you && d.colors.includes(cond.color) && d.types.some((t) => cond.types.includes(t)));
     case "sourceDealtAtLeast":
       return Object.values(s.turnLog?.sourceDamage?.[you] ?? {}).some((n) => n >= cond.n);
     case "sourcesDealtDamage":

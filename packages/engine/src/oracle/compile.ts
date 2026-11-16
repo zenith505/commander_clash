@@ -71,6 +71,7 @@ import { roundB225Line } from "./laneb225";
 import { roundB226Line } from "./laneb226";
 import { roundB227Line } from "./laneb227";
 import { roundB228Line } from "./laneb228";
+import { roundB229Line } from "./laneb229";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2205,6 +2206,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB227Line(line, raw, out, isSpell)) continue;
     // Rayami, First of the Fallen, Escaped Shapeshifter, Giant Oyster, Advancing the Spirit (round B228).
     if (roundB228Line(line, raw, out, isSpell)) continue;
+    // Ulamog's Despoiler, Vodalian War Machine (round B229).
+    if (roundB229Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

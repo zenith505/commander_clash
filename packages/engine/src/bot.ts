@@ -906,6 +906,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         return [{ type: "chooseOption", player: pid, choice: g.includes("+1/+1") ? "+1/+1" : g.find((k) => pend.options.includes(k)) ?? pend.options[0]! }];
       }
     }
+    // Oracle en-Vec (round B233): none of ours, so none of them can be made to attack into blockers or be destroyed for
+    // not attacking (we can't attack with any creature that turn either).
+    const enVec = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "pickPermanents" && enVec?.type === "chosenAttackNextTurn") return [{ type: "pickPermanents", player: pid, ids: [] }];
+    // A Killer Among Us (round B233): any of the three types (which token we'd pump isn't planned for).
+    if (pend.kind === "chooseOption" && pend.what === "secretType") return [{ type: "chooseOption", player: pid, choice: pend.options[s.nextId % pend.options.length]! }];
     // Equipoise (round B222): the other player's best permanents of that type phase out.
     const excess = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && excess?.type === "phaseOutExcess") return [{ type: "pickPermanents", player: pid, ids: [...pend.options].sort((x, y) => worth(s, pid, obj(s, y)) - worth(s, pid, obj(s, x))).slice(0, pend.count) }];

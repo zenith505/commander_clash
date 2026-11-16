@@ -4779,6 +4779,9 @@ function finishCleanup(s: GameState) {
   // "Until the end of your next turn": in the cleanup step of that player's next turn (CR 514.2), or once they've left
   // the game (CR 800.4m).
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn" && !(e.duration === "endOfYourNextTurn" && ((s.activePlayer === e.turnOf && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)))); // CR 514.2
+  // Oracle en-Vec (round B233): over in the cleanup step of that player's next turn, or once they've left the game.
+  for (const [k, c] of Object.entries(s.chosenAttackers ?? {})) if ((s.activePlayer === c.player && s.turn > c.sinceTurn) || player(s, c.player).lost) delete s.chosenAttackers![k];
+  if (s.chosenAttackers && !Object.keys(s.chosenAttackers).length) s.chosenAttackers = undefined;
   // Teferi, Timeless Voyager: "Until the end of your next turn, they can't phase in" (CR 514.2, 800.4m).
   for (const id of s.phasedOut ?? []) {
     const lock = s.objects[id]!.phased?.lock;
@@ -9722,6 +9725,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
   // Merseine (round B211): only the player who controls the permanent it's attached to now.
   else if (ab.enchantedControllerOnly && (!o.attachedTo || s.objects[o.attachedTo]?.zone !== "battlefield" || controllerOf(s, obj(s, o.attachedTo)) !== pid)) return `only the controller of the creature ${d.name} enchants may activate that ability`;
+  // A Killer Among Us (round B233): only the player who secretly chose the type for this object can reveal it (rulings).
+  else if (ab.revealSecretType && !(o.secretType && o.secretType.by === pid && o.secretType.zc === (o.zoneChanges ?? 0))) return `only the player who secretly chose a creature type for ${d.name} can reveal it`;
   // Merseine: "Pay enchanted creature's mana cost" can't be paid for a creature with no mana cost (CR 118.6).
   else if (ab.attachedManaCost && !attachedManaCostOf(s, o)) return `the creature ${d.name} enchants has no mana cost to pay`;
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
@@ -10466,6 +10471,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
   const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
+  // A Killer Among Us (round B233): revealing the chosen type is part of the cost (CR 602.2b).
+  if (ab.revealSecretType && o.secretType) log(s, `${p.name} reveals the creature type chosen for ${d.name}: ${o.secretType.type}.`);
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
@@ -11553,6 +11560,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "alternatePick") {
     const st = r.scratch?.alternate;
     if (!st) throw new RulesError("nothing to choose");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "secretType") {
+    // A Killer Among Us (round B233): the creature type chosen secretly.
+    const st = r.scratch?.secretType;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the creature types offered");
     st.pick = choice;
     continueResolution(s);
     return;
@@ -12903,6 +12918,15 @@ function hasteVsOpponentsOf(s: GameState): PlayerId[] {
   return [...new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).hasteVsYourOpponents).map((id) => controllerOf(s, obj(s, id))))];
 }
 
+/**
+ * Oracle en-Vec (round B233, GameState.chosenAttackers): `o` isn't one of the creatures chosen for the active player's turn
+ * now, the first turn they began after it resolved, so it can't attack (CR 508.1c). Whoever controls it.
+ */
+function chosenAttackersForbid(s: GameState, o: GameObject): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return Object.values(s.chosenAttackers ?? {}).some((c) => c.player === s.activePlayer && s.turn > c.sinceTurn && !c.chosen.includes(key));
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   if (arbiterStopsAttacks(s, pid)) return [];
@@ -12916,6 +12940,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !bridged(s, o) &&
       // Overencumbered: "creatures can't attack this combat", only in the combat phase it was made in.
       !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
+      // Oracle en-Vec (round B233): during that player's next turn, only the chosen creatures can attack (CR 508.1c).
+      !chosenAttackersForbid(s, o) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       // "Only the chosen creatures can attack during that combat phase" (Last Night Together): those objects only (CR 400.7).

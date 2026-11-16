@@ -2,6 +2,7 @@
 // whole spells (after round B231's).
 import type { AbilityBody, CompiledCard, TargetSpec } from "../abilities";
 import { parseActivated } from "./activated";
+import { roundB233Spell } from "./laneb233";
 import { parseTrigger } from "./triggers";
 
 const FALLEN = "Whenever ~'s cumulative upkeep is paid, it gets +1/+0 until end of turn for each {B} or {R} spent this way.";
@@ -66,6 +67,5 @@ export function roundB232Line(line: string, raw: string, out: CompiledCard, isSp
 
 /** Round B232's whole spells: the body, null when it's one of these but can't be read, undefined when it isn't. */
 export function roundB232Spell(text: string): AbilityBody | null | undefined {
-  void text;
-  return undefined;
+  return roundB233Spell(text);
 }

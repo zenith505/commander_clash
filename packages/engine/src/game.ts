@@ -10419,7 +10419,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // permanent it is (CR 400.7), for its dies trigger.
   if (compileCard(d).logsCostTapped && extraCosts.some((c) => c.kind === "tap" && !c.untap) && costs?.tap?.length) {
     const list = (((s.turnLog ??= {}).costTapped ??= {})[`${o.id}@${sourceZc}`] ??= []);
-    for (const t of costs.tap) if (s.objects[t]) list.push(`${t}@${s.objects[t]!.zoneChanges ?? 0}`);
+    for (const t of costs.tap) if (s.objects[t] && !list.includes(`${t}@${s.objects[t]!.zoneChanges ?? 0}`)) list.push(`${t}@${s.objects[t]!.zoneChanges ?? 0}`);
   }
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".

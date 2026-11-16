@@ -592,7 +592,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const forMana = untapCost ? (costs?.tap ?? []).find((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped) : undefined;
   if (forMana !== undefined) {
     if (!untapViaMana(s, pid, obj(s, objectId), untapCost as Extract<AdditionalCost, { kind: "tap" }>).includes(forMana)) return null;
-    const named = namedColors(activationCost(s, pid, obj(s, objectId), ab0!, targets, x));
+    const named = namedColors(activationCost(s, pid, obj(s, objectId), ab0!, targets, x, costs));
     const options = tapManaOptions(s, pid, forMana).sort((a, b) => Number(b.adds.some((m) => named.has(m))) - Number(a.adds.some((m) => named.has(m))));
     for (const option of options) {
       let next: GameState;
@@ -609,7 +609,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const ab = abilitiesOf(s, obj(s, objectId)).activated[index]!;
-  const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x);
+  const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x, costs);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
   const exclude = [...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...(costs?.craft ?? []), ...sacrificedTargets(s, targets)];

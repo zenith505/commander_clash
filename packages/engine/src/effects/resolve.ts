@@ -73,6 +73,7 @@ import { runLaneB223Effect } from "./run-laneb223";
 import { runLaneB227Effect } from "./run-laneb227";
 import { runLaneB229Effect } from "./run-laneb229";
 import { runLaneB230Effect } from "./run-laneb230";
+import { runLaneB231Effect } from "./run-laneb231";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -1995,6 +1996,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "authorityLink":
     case "authorityDestroy":
       return runLaneB230Effect(s, e, ctx, src);
+    case "tombNote":
+    case "tombLeaves":
+    case "tombRemove":
+      return runLaneB231Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

@@ -744,6 +744,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found: [best] }];
     }
     if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.min === 0 && pend.cards.length === 1 && s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "exileFaceDown" && !!x.optional)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards] }];
+    // Kheru Mind-Eater (round B231): a card of our hand exiled face down for another player to play: the one worth least.
+    if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.hand === pid && s.resolving && s.resolving.item.controller !== pid && pend.cards.length)
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => handWorth(s, a) - handWorth(s, b)).slice(0, Math.max(1, pend.min)) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
     // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
@@ -1980,6 +1983,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.
     // Preferred Selection (round B216): the card we'd rather draw into our hand, the other one to the bottom.
     // Backdraft (round B229): the most damage to an opponent; with only ourselves to choose, the least.
+    // Cyclopean Tomb (round B231): our own land with mire counters (it gets its land types back), else one with none (nothing
+    // changes), else an opponent's (only theirs are left).
+    if (pend.kind === "chooseOption" && pend.what === "mireLand") {
+      const score = (id: string) => {
+        const o = s.objects[id];
+        if (!o) return 3;
+        const mine = controllerOf(s, o) === pid;
+        return (o.counters.mire ?? 0) > 0 ? (mine ? 0 : 2) : 1;
+      };
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "spellDamageBack") {
       const parsed = pend.options.map((o) => ({ o, who: Number(o.split(":")[0]), n: Number(o.split(":")[1]) }));
       const foes = parsed.filter((x) => x.who !== pid).sort((a, b) => b.n - a.n);
@@ -6634,6 +6648,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (plan) return plan;
         continue;
       }
+      // Back from the Brink (round B231): a copy of the costliest creature card in our graveyard whose mana cost we can pay.
+      if (ab.manaCostOfExiled) {
+        const plan = exileMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
       // Osgir, the Reconstructor: two copies of the most valuable artifact card in our graveyard we can pay for.
       if (ab.costs?.some((c) => c.kind === "exileFromGraveyard" && c.mvX)) {
         const plan = exileMvXPlan(s, pid, o, i, ab);
@@ -7636,10 +7656,11 @@ function graveSweepX(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAb
 /** Osgir, the Reconstructor ("{X}, {T}, Exile an artifact card with mana value X from your graveyard: Create two tokens that are copies of the exiled card"): the card with the greatest mana value we can pay X for, never a land. */
 function exileMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
   if (ab.body.modal || ab.body.targets.length || !ab.body.effects.every((e) => e.type === "createTokenCopy" && e.what.ref === "costExiled")) return null;
-  const cost = ab.costs!.find((c) => c.kind === "exileFromGraveyard" && c.mvX)!;
+  const cost = ab.costs!.find((c) => c.kind === "exileFromGraveyard" && (c.mvX || ab.manaCostOfExiled))!;
   const cards = player(s, pid).graveyard.filter((c) => cost.kind === "exileFromGraveyard" && !!cost.filter && printedMatches(cost.filter, defOf(s, obj(s, c))) && !isType(defOf(s, obj(s, c)), "Land")).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))));
   for (const card of cards) {
-    const x = defMv(defOf(s, obj(s, card)));
+    // Back from the Brink (round B231): the card's own mana cost is the cost, no X to announce.
+    const x = ab.manaCostOfExiled ? undefined : defMv(defOf(s, obj(s, card)));
     const plan = planActivate(s, pid, o.id, i, undefined, undefined, undefined, x, { exileCards: [card] });
     if (plan) return plan;
   }

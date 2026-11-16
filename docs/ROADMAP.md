@@ -1,6 +1,6 @@
 # Roadmap
 
-31,485 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,489 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9687,6 +9687,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   or is blocked by, CR 509.3c-d; a delayed end of combat destroy about that creature, then, only if it was destroyed, CR
   603.4, a +1/+1 counter at the next end step on the creature enchanted as it triggered, rulings). Browser test for Glyph of
   Reincarnation's pick. +4, 31,485 of 31,936. The compiled text of every other card is unchanged.
+- Round B231 (least played first, from the Lane B skip lists): Rain of Gore (a life gain a spell or ability causes for the
+  player who controls it becomes that much life lost, CR 614.1a: game.ts gainLife's `cause`, by default the spell or ability
+  resolving, a mana ability's too, and for gains outside a resolution the controller of the static or replacement ability
+  that causes them, a prevention shield's controller among them; never lifelink's, CR 702.15b, rulings; applied before the
+  doublers like Tainted Remedy, CR 616.1). Kheru Mind-Eater (the damaged player chooses the card from their hand and exiles
+  it face down, CR 406.3, linked to it, CR 607.2a; whoever controls it may look at those cards, Grimoire Thief's
+  lookControllers, and play them with their usual costs and timing; lost once it leaves, rulings; a bot exiles the card of
+  its hand worth least). Cyclopean Tomb (each land a mire counter was put onto with it, as the object it is, GameState.mireTomb;
+  once it's put into a graveyard, a delayed trigger at each of its controller's upkeeps for the rest of the game, CR 603.7,
+  removes all mire counters from one such land of its controller's choice, chooseOption "mireLand", and that land is done
+  with once one is removed; one with none left stays eligible, rulings). Back from the Brink (the exiled creature card's
+  mana cost is the ability's mana cost, ActivatedAbility.manaCostOfExiled, {X} as 0, a double-faced card's front face,
+  rulings, so activationCost now takes the cost choices; a token copy of that card; a bot copies the costliest creature card
+  it can pay for). Browser tests for Back from the Brink's activation, Cyclopean Tomb's land choice and casting the card
+  Kheru Mind-Eater made Ana exile. +4, 31,489 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B231 (looked at, not done): Torrent of Lava (an activated ability creatures have while it's on the stack,
+  and a shield against damage from that spell only), Guardian Beast ("other players can't gain control of them" while it's
+  untapped, and "can't be enchanted" that doesn't remove Auras already attached), Spy Kit (all names of nonlegendary creature
+  cards), Immortal Coil (a card of your choice exiled for each 1 damage, in the middle of damage) and the lists after round
+  B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
+  by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
   target whose legality depends on another target), Runesword, Mangara's Equity, Silhouette, Ghostly Flame, Torrent of Lava
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like

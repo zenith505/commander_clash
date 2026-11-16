@@ -87,6 +87,9 @@ import { runLaneB230Effect } from "./run-laneb230";
 import { runLaneB231Effect } from "./run-laneb231";
 import { runLaneB232Effect } from "./run-laneb232";
 import { runLaneB233Effect } from "./run-laneb233";
+import { runLaneB234Effect } from "./run-laneb234";
+import { runLaneB235Effect } from "./run-laneb235";
+import { runLaneB236Effect } from "./run-laneb236";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -2051,6 +2054,13 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "chosenAttackDestroy":
     case "secretCreatureType":
       return runLaneB233Effect(s, e, ctx, src);
+    case "pilesOnly":
+      return runLaneB234Effect(s, e, ctx, src);
+    case "damageUnalterable":
+      return runLaneB235Effect(s, e, ctx, src);
+    case "servitudeLink":
+    case "servitudeExile":
+      return runLaneB236Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

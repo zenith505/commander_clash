@@ -819,8 +819,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Prototype Portal: an X the ability's text sets isn't chosen (CR 107.3c).
     const fixedX = definedX(s, s.objects[objectId]!, ab, xOpponent !== undefined ? { xOpponent } : undefined);
     if (x === undefined && fixedX != null) x = fixedX;
+    // Reflecting Mirror: "X is twice the mana value of that spell", set by the target once it's chosen (CR 107.3c, 601.2f).
+    const targetX = !!ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs;
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
-    if (x === undefined && parseManaCost(ab.manaCost).hasX) {
+    if (x === undefined && !targetX && parseManaCost(ab.manaCost).hasX) {
       // Osgir, the Reconstructor: "Exile an artifact card with mana value X from your graveyard": only some X work, so the
       // greatest that does.
       const mvCard = ab.costs?.find((c) => c.kind === "exileFromGraveyard" && c.mvX);
@@ -2712,6 +2714,33 @@ function KickPickBar({
       Cancel
     </button>
   );
+  // Primitive Justice (round B236): two costs, each any number of times; a count for each.
+  if (pick.multi && pick.costs.length === 2) {
+    const counts = [0, 1].map((i) => pick.chosen.filter((x) => x === i).length);
+    const set = (i: number, k: number) => onChange([0, 1].flatMap((j) => Array(Math.max(0, j === i ? k : counts[j]!)).fill(j) as number[]));
+    const total = counts[0]! + counts[1]!;
+    return (
+      <div className="targeting x-pick">
+        <span>
+          <strong>{pick.label}</strong>: how many times to pay each additional cost?
+        </span>
+        {[0, 1].map((i) => (
+          <span key={i} className="kick-cost">
+            <ManaCost cost={pick.costs[i]!} size="sm" />
+            <button className="ghost" disabled={counts[i]! <= 0} onClick={() => set(i, counts[i]! - 1)} aria-label={`Pay ${pick.costs[i]} one time fewer`}>
+              −
+            </button>
+            <span className="kick-count">{counts[i]}</span>
+            <button className="ghost" disabled={!can([...pick.chosen, i])} onClick={() => set(i, counts[i]! + 1)} aria-label={`Pay ${pick.costs[i]} one more time`}>
+              +
+            </button>
+          </span>
+        ))}
+        <button onClick={() => onDone(pick.chosen)}>{total ? `Pay ${total === 1 ? "once" : `${total} times`}` : "Don't pay"}</button>
+        {cancel}
+      </div>
+    );
+  }
   if (pick.multi) {
     const n = pick.chosen.length;
     const set = (k: number) => onChange(Array(Math.max(0, k)).fill(0) as number[]);
@@ -4402,6 +4431,8 @@ function PilePicker({
 }) {
   const whose = pending.of === HUMAN ? "your" : `${s.players[pending.of ?? 0]!.name}'s`;
   const faceDown = pending.pileMode === "faceDown";
+  // Fight or Flight, Stand or Fall (round B234): piles of creatures, the chosen one's the only ones that can attack (block).
+  const creaturePiles = pending.pileMode === "canAttack" || pending.pileMode === "canBlock";
   return (
     <div className="modal-backdrop">
       <div className="modal search">
@@ -4412,11 +4443,11 @@ function PilePicker({
           {(pending.piles ?? [[], []]).map((pile, i) => (
             <div key={i} data-pile={i}>
               <h4>
-                {faceDown ? (i === 0 ? "Face-down pile" : "Face-up pile") : `Pile ${i + 1}`} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
-                <button onClick={() => onDone(String(i))}>{pending.destroyPile ? `Destroy pile ${i + 1}` : pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "turnFaceUp" ? `Turn pile ${i + 1} face up` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : pending.pileMode === "exile" ? `Exile pile ${i + 1}` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
+                {faceDown ? (i === 0 ? "Face-down pile" : "Face-up pile") : `Pile ${i + 1}`} ({pile.length === 1 ? `1 ${creaturePiles ? "creature" : pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${creaturePiles ? "creatures" : pending.sacrificePile ? "permanents" : "cards"}`}){" "}
+                <button onClick={() => onDone(String(i))}>{pending.destroyPile ? `Destroy pile ${i + 1}` : pending.sacrificePile ? `Sacrifice pile ${i + 1}` : pending.pileMode === "pickOne" ? `Choose pile ${i + 1}` : pending.pileMode === "turnFaceUp" ? `Turn pile ${i + 1} face up` : pending.pileMode === "battlefield" ? `Put pile ${i + 1} onto the battlefield` : pending.pileMode === "exile" ? `Exile pile ${i + 1}` : pending.pileMode === "canAttack" || pending.pileMode === "canBlock" ? `Only pile ${i + 1} can ${pending.pileMode === "canAttack" ? "attack" : "block"}` : faceDown ? `Put the ${i === 0 ? "face-down" : "face-up"} pile into ${whose} hand` : `Put pile ${i + 1} into ${whose} hand`}</button>
               </h4>
               <div className="modal-cards">
-                {pile.length === 0 && <span className="muted">{pending.sacrificePile ? "No permanents" : "No cards"}</span>}
+                {pile.length === 0 && <span className="muted">{creaturePiles ? "No creatures" : pending.sacrificePile ? "No permanents" : "No cards"}</span>}
                 {/* Atris: the face-down pile's cards stay hidden from the player choosing (rulings). */}
                 {faceDown && i === 0 && pile.map((id) => <CardBack key={id} label="Face down" />)}
                 {!(faceDown && i === 0) && pile.map((id) => {

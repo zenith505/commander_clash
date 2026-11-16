@@ -4498,7 +4498,7 @@ line blocks.
    of target tapped nontoken creatures face down. They're 2/2 Horror creatures" (Illithid Harvester, FaceDownKind
    "horror", CR 708.2a). +8, 30,491 of 31,936 (30,499 with B144).
    Out after round 306 (looked at, not done): Bend or Break (each player separates their lands, and an opponent of each
-   player's choice picks the pile: a chooser chosen per player); Fight or Flight and Stand or Fall (piles that limit
+   player's choice picks the pile: a chooser chosen per player); Fight or Flight (done in round B234) and Stand or Fall (done in round B234) (piles that limit
    which creatures can attack or block this turn); Midnight Crusader Shuttle (a creature gained until end of turn that's
    tapped and attacking that player); Genesis of the Daleks's chapter IV (the total power of Daleks that died this
    turn); Hot Pursuit (done in round 349) (still out, as noted before). Bot gap: a bot casts Ixidron even when it turns more of its own
@@ -4778,7 +4778,7 @@ line blocks.
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
    Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (noted
-   mana); Illusionary Mask; Stand or Fall and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
+   mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
@@ -7202,7 +7202,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Artificers, and/or Monks" (The Archimandrite), "Whenever a creature is put into your graveyard from the battlefield,
   you may pay {1}{W}. If you do, return that card" (Sigil of the New Dawn), Clockwork Hydra, Grozoth, Tibalt, the
   Fiend-Blooded, Trade Route Envoy and Witness the Future (rewordings). +33 (28,264 of 31,936 with rounds 217 to 221).
-- Out after round B50 (looked at, not done): Decaying Soil (now unsupported on purpose: a threshold-granted "Whenever a
+- Out after round B50 (looked at, not done): Decaying Soil (done in round B234) (now unsupported on purpose: a threshold-granted "Whenever a
   nontoken creature is put into your graveyard from the battlefield" must look back in time, CR 603.10a, so the
   creature that makes seven doesn't trigger it, but granted abilities are read after the event), Pinnacle Starcage (done in round B192)
   ("Put each card exiled with ~ into its owner's graveyard, then create ... Robot"), Not Forgotten (done in round B113) and Swat Away (top or
@@ -9491,7 +9491,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counts has no ruling), The Prismatic Piper and Faceless One (a color chosen before the game begins, before mulligans:
   no pre-game choice exists yet), A Killer Among Us (done in round B233) (a creature type chosen secretly, revealed as a cost after the
   sacrifice), Chorus of the Conclave (an extra mana payment of any amount added to every creature spell you cast), Essence
-  of the Wild, Decaying Soil, Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal stay out for the
+  of the Wild, Decaying Soil (done in round B234), Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal stay out for the
   reasons in the earlier lists.
 - Round B190 (least played first, from the Lane B skip lists): Evolving Door ("Count the colors of the sacrificed creature,
   then search your library for a creature card that's exactly that many colors plus one. Exile that card, then shuffle. You
@@ -10207,6 +10207,69 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   chosen type, a changeling's included, as the sacrificed enchantment last existed). Browser tests for Oracle en-Vec's
   choice when Ana targets you and A Killer Among Us's secret choice with its chip. +4, 31,497 of 31,936. The compiled text
   of every other card is unchanged.
+- Round B234 (least played first, from the Lane B skip lists): Fight or Flight and Stand or Fall (Effect pilesOnly: you
+  separate all creatures that player controls into two piles, CR 700.3, either possibly empty, and that player chooses one;
+  at the beginning of combat every opponent is a defending player, CR 802.2, so Stand or Fall asks each in turn order; only
+  the creatures in the chosen piles can attack, CR 508.1c, or block, CR 509.1b, this turn, GameState.pilesOnlyThisTurn, so
+  creatures that enter later can't, and with two of them only creatures in both chosen piles can, rulings). Decaying Soil
+  (its threshold-granted dies trigger read as its own trigger that looks back in time, CR 603.10a: it triggers only if its
+  controller had seven or more cards in their graveyard just before the event, the cards the same instruction or
+  state-based-action pass put there taken out, so the creature that makes seven doesn't trigger it and creatures dying
+  together all trigger it or none do, rulings; once triggered it resolves whatever happens to threshold, CR 113.7a;
+  TriggeredAbility.lookBackYardAtLeast). Soul Burn (each mana paying X a {B/R} hybrid symbol, less what reductions take off X;
+  the life gained is also no more than the {B} spent on X, noted as it's cast, GameObject.spentOnX: the most black mana that
+  could have gone to X after the {B} symbol, since the caster decides which mana pays which part, CR 601.2h; a copy has none,
+  CR 707.10). Browser tests for Fight or Flight's separation of Ana's creatures and Stand or Fall's pile choice for your
+  blockers. +4, 31,501 of 31,936. The compiled text of every other card is unchanged.
+- Round B235 (least played first, from the Lane B skip lists): Whippoorwill (damage that would be dealt to the target
+  creature this turn can't be prevented, CR 615.12, protection and shields included, or dealt instead to another permanent or
+  player, CR 614.9, whatever its source, a redirection to it too, while it's the object it was: GameObject.damageUnalterableTurn,
+  damage.ts damageUnalterableTo; excess damage a spell sends to the controller isn't a redirection, CR 120.4a; it can't be
+  regenerated; a delayed trigger exiles the card it becomes if it dies this turn). Reflecting Mirror (X defined by the target
+  spell, twice its mana value with its X, CR 107.3c, 202.3e, worked out after targets, CR 601.2f: ActivatedAbility.xIs
+  twiceTargetSpellMv, definedX now takes the targets, and the X picker is skipped for it; the target changes only if the
+  spell's one target is still you as it resolves, ifOnly "you", to a player, Rebound's mustBe; a bot answers a harmful spell
+  aimed only at it). Blood Scrivener (each draw while its controller's hand is empty is replaced by two draws and 1 life lost,
+  CR 614.1a; a Scrivener doesn't replace the draws it made, CR 614.5, but another one does, rulings: one draw with two of them
+  is three cards and 2 life; the `made` draws now carry how many Scriveners already applied, game.ts madeEntry; with dredge, an
+  Archive or another replacement the player chooses the order, CR 616.1, drawReplacementChoices "scrivener"). Browser tests for
+  Reflecting Mirror's activation and new target and Blood Scrivener's choice beside dredge. +3, 31,504 of 31,936. The compiled
+  text of every other card is unchanged.
+- Round B236 (least played first, from the Lane B skip lists): Primitive Justice (two optional additional costs, each paid
+  any number of times, CR 601.2b, chosen and paid like a multikicker with two costs: CompiledCard.kicker.multi with {1}{R} at
+  index 0 and {1}{G} at 1, not kicker for other cards; one more target artifact for each time either is paid, all different,
+  rulings, CR 601.2c; each still legal one is destroyed and 1 life gained for each {1}{G}, CR 608.2b; the cast picker counts each
+  cost on its own; bots pay the {1}{G}s first). Enduring Renewal (its controller plays with their hand revealed, revealHands
+  "you"; each of their draws is replaced by revealing the top card, CR 614.1a: a creature card, by its characteristics there,
+  goes into the graveyard, anything else or no card means a draw this Renewal doesn't replace again, CR 614.5, but another
+  Renewal, an Archive, dredge and the rest still can; drawReplacementChoices "renewal", the Renewals already applied counted in
+  the `scriv` number beside the Scriveners, RENEWAL_UNIT; from an empty library that draw is one the player can't make, CR
+  704.5b). Diabolic Servitude (the creature its enters ability returned is linked to the object it was, CR 607.2a,
+  GameState.animated: Effect servitudeLink; "when the creature put onto the battlefield with ~ dies" is a leaves-the-battlefield
+  trigger that looks back, CR 603.10a, TriggeredAbility.dies.animatedBySelf, exiling the card and returning ~ only while ~ is
+  still that object, CR 400.7; leaving, ~ exiles that creature if it's still there, Effect servitudeExile; rulings: a creature
+  returned to hand or exiled is lost track of). Mana Cache (a mana ability any player may activate, CR 602.2, during their own
+  turn before the end step: ManaAbility.anyPlayer, TimingWindow "beforeEnd"; the activator removes the counter and gets the
+  {C}; automatic payment uses another player's Cache on your turn, once for each counter, autopay.ts "#n" sources). Browser
+  tests for Primitive Justice's two counts and targets, Enduring Renewal's reveal beside dredge and paying with an opponent's
+  Mana Cache. +4, 31,508 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B236 (looked at, not done): the lists after round B235 stay out, and Turf War (still out: a player with no
+  land to target), Emblazoned Golem (one mana of each color on its kicker X, not tracked by the kicker's payment), Snowblind and
+  Titania's Song (as before). Known gaps: another player can use Mana Cache only through automatic payment (not by clicking it),
+  and bots don't count another player's Cache as mana they have when planning; Enduring
+  Renewal counts the Renewals that already applied in a chain of draws, not which ones, as Blood Scrivener does.
+- Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star ("for one spell this turn":
+  only the mana cost's symbols, not additional costs, and the player picks the spell), Sanctuary Blade (a choice in the middle
+  of every way an Equipment becomes attached), Hollow Warrior (attack and block costs that tap another creature), Blood of the
+  Martyr (an optional redirection asked for each damage event) and Guardian Angel (paying {1} any time you could cast an
+  instant for a new shield). Known gaps: Blood Scrivener counts the Scriveners that already applied in a chain of draws, not
+  which ones, so one leaving in the middle of a chain could leave another unapplied; its life is lost as the draw is
+  replaced, before the two draws; bots order a Scrivener and an Archive the Archive first (fewer cards).
+- Out after round B234 (looked at, not done): the lists after round B233 stay out, and Threefold Signal and Djinn
+  Illuminatus (still out: replicate granted to spells needs a second kicker-like cost beside a spell's own, rulings, and
+  Threefold Signal's copies of permanent spells become tokens). Known gaps: bots separate piles to be even by their worth
+  and choose the pile worth more; Decaying Soil's look-back treats every card one instruction moved as moved at the same
+  time.
 - Out after round B233 (looked at, not done): the lists after round B232 stay out, and Peace Talks ("can't be the targets
   of spells or activated abilities" still needs targets checked by whether the ability was activated or triggered),
   Charmed Pendant (mana from a mana ability whose amount and colors depend on the card its cost milled, with a color chosen
@@ -10308,7 +10371,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   at once isn't settled by its rulings), Winter's Chill (a three-way payment for each target, {1}, {2} or nothing),
   Sacred Ground (what caused a land to go to the graveyard) and Over the Top (done in round 389) (every player's permanent cards entering at
   once, Auras among them) stay out.
-- Out after round B214 (looked at, not done): Decaying Soil (a threshold-granted dies trigger that looks back, CR 603.10a),
+- Out after round B214 (looked at, not done): Decaying Soil (done in round B234) (a threshold-granted dies trigger that looks back, CR 603.10a),
   Silhouette (damage from a source whose spell or ability targets the creature), Essence of the Wild (a copy replacement
   applied before other enters replacements) stay out for the reasons in the earlier lists. Known gap: the engine still
   orders each player's own simultaneous triggers itself (CR 603.3b) rather than asking.
@@ -10368,7 +10431,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards cast), Back from the Brink (paying the mana cost of the card a cost exiled) stay out; Thelon's Chant (done in round B207), Tourach's
   Chant, Nature's Wrath (done in round B207) and Overburden (done in round B207) still need who put a permanent onto the battlefield. A "Pay {1}" for Nafs Asp is
   offered only while you have priority: in "auto" mode your upkeep doesn't stop for it.
-- Out after round B179 (looked at, not done): Soul Burn ("not more than the amount of {B} spent on X": which of the black
+- Out after round B179 (looked at, not done): Soul Burn (done in round B234) ("not more than the amount of {B} spent on X": which of the black
   mana went to X and which to the {2} is the payer's, not tracked), Emblazoned Golem (one mana of each color on its kicker
   X), Kaya, Ghost Assassin (done in round B206) ("Exile ~ or up to one target creature": which one chosen as it resolves), Sigardian Zealot (done in round B187)
   ("any number of creatures with different powers"), Faceless One (a color chosen before the game begins), Peace Talks,
@@ -10427,7 +10490,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (what a {2/W} symbol adds isn't settled by its rulings), Charmed Pendant (a hybrid symbol's color chosen inside a mana
   ability after the mill), Cleansing (done in round B215) (a punisher for each land in turn, any player paying for any land) stay out.
 - Out after round B165 (looked at, not done): Gloom (the tax reaches mana abilities), Twinning Glass, Yixlid Jailer,
-  Decaying Soil, Nature's Wrath (done in round B207), Graceful Takedown (done in round B187), Alpine Moon (done in round B214), Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
+  Decaying Soil (done in round B234), Nature's Wrath (done in round B207), Graceful Takedown (done in round B187), Alpine Moon (done in round B214), Thought Prison (done in round B189), Grimoire Thief (done in round B189) and Kianne, Dean of Substance (done in round B189)
   stay out for the reasons in the earlier lists. Protective Sphere and Imperiosaur, out after B162 and B67, are done.
 - Out after round B163 (looked at, not done): Words of Waste (done in round 383) and Words of Wind (done in round 385) (an opponent's discard or each player's
   bounce chosen in the middle of a draw: a pause the draw sequence resumes from only for some replacements), Strax,
@@ -10507,7 +10570,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Orgg (combat damage divided among the player and their creatures).
 - Out after round B143 (looked at, not done): Preferred Selection (done in round B216) (the two cards looked at should be shown with the
   "sacrifice ~ and pay {2}{G}{G}" question, a look with no prompt yet, and that sacrifice-and-pay "you may" isn't parsed).
-- Out after round B142 (looked at, not done): Decaying Soil (a dies trigger granted by threshold needs a look-back,
+- Out after round B142 (looked at, not done): Decaying Soil (done in round B234) (a dies trigger granted by threshold needs a look-back,
   CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
   opponent's land as a mana ability's cost), Charmed Pendant (mana by the milled card's mana symbols, instant-speed
   only), Grime Gorger (exiling cards that share a type is ambiguous for multi-type cards).
@@ -10720,7 +10783,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B92 (looked at, not done): Reality Twist (done in round B224) ("Plains produce {R}, Swamps produce {G}...": a land with two
   basic land types lets its controller pick the color, rulings), Harvest Mage and Pulse of Llanowar (mana of a color of
   your choice instead: a choice as the land is tapped; both done in round B224), Escaped Shapeshifter (keywords and protection read from opponents'
-  creatures, a layer 6 dependency), Spoils of War (done in round B164) (X set by an opponent's graveyard as you cast it), Drain Life (done in round B179), Soul Burn
+  creatures, a layer 6 dependency), Spoils of War (done in round B164) (X set by an opponent's graveyard as you cast it), Drain Life (done in round B179), Soul Burn (done in round B234)
   and Consume Spirit (done in round B179) ("Spend only black mana on X" on a spell, with cost reductions), Emblazoned Golem (one mana of each
   color on X), Fatal Lore (done in round B142) (an opponent chooses the mode), Echo Chamber (done in round B141) (an opponent chooses the target), Butcher Orgg (done in round B232) and
   Cunning Giant (done in round B144) (combat damage assigned to other creatures).

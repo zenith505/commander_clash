@@ -16,7 +16,7 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
+import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
@@ -923,6 +923,7 @@ export function moveObject(
   }
   o.exileIfDiesTurn = undefined;
   o.noRegenTurn = undefined;
+  o.damageUnalterableTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
   o.attackWithoutTappingCombat = undefined;
@@ -1132,6 +1133,7 @@ export function moveObject(
     o.convoked = undefined;
     o.manaSpent = undefined;
     o.spent = undefined;
+    o.spentOnX = undefined;
     o.castNth = undefined;
     o.castInMain = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
@@ -2844,16 +2846,18 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
     // Underrealm Lich or dredge, Underrealm Lich and Tomorrow, a Notion Thief and the player's own), the drawing player
     // chooses which applies (CR 616.1, the Words' and Notion Thief's rulings); a shield not chosen waits for the next draw.
     const fromMade = made.length > 0;
-    const choices = drawReplacementChoices(s, pid, fromMade ? made[0]! : undefined);
+    const choices = drawReplacementChoices(s, pid, fromMade ? archivesOfMade(made[0]!) : undefined, fromMade ? scrivsOfMade(made[0]!) : 0);
     if (choices) {
-      const archives = fromMade ? made.shift()! : 0;
+      const entry = fromMade ? made.shift()! : 0;
+      const archives = archivesOfMade(entry);
+      const scriv = scrivsOfMade(entry);
       if (!fromMade) n--;
       if (!fromMade) player(s, pid).firstWouldDraw = s.turn; // the turn's first would-be draw, whatever replaces it
       if (choices.length > 1) {
-        s.pending = { kind: "drawInstead", player: pid, options: choices.map((x) => x.key), labels: choices.map((x) => x.label), left: n, ...(made.length ? { made: [...made] } : {}), ...(after ? { after } : {}), ...(fromMade ? { archives } : {}) };
+        s.pending = { kind: "drawInstead", player: pid, options: choices.map((x) => x.key), labels: choices.map((x) => x.label), left: n, ...(made.length ? { made: [...made] } : {}), ...(after ? { after } : {}), ...(fromMade ? { archives } : {}), ...(scriv ? { scriv } : {}) };
         return false;
       }
-      const done = applyDrawReplacement(s, pid, choices[0]!.key, n, after, made, fromMade ? archives : undefined);
+      const done = applyDrawReplacement(s, pid, choices[0]!.key, n, after, made, fromMade ? archives : undefined, scriv);
       if (done === "paused") return false;
       if (done === "again") n++;
       continue;
@@ -2875,13 +2879,19 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
       continue;
     }
     let archives: number;
+    // Blood Scrivener (round B235): how many already replaced a draw this one was made of (CR 614.5).
+    let scriv = 0;
     if (!made.length) {
       n--;
       const look = firstDrawLook(s, pid, n, after);
       if (look === "paused") return false;
       archives = archivesFor(s, pid);
-    } else archives = made.shift()!;
-    const dig = digInstead(s, pid, n, after, made, archives);
+    } else {
+      const entry = made.shift()!;
+      archives = archivesOfMade(entry);
+      scriv = scrivsOfMade(entry);
+    }
+    const dig = digInstead(s, pid, n, after, made, archives, undefined, scriv);
     if (dig === "paused") return false;
     if (dig) continue;
     const options = dredgeOptions(s, pid);
@@ -2890,14 +2900,14 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
     if (options.length || abundance) {
       // Dredge and an Archive could both replace this draw: the player picks which applies first (CR 616.1, Archive
       // ruling). Not dredging means the Archive's "draw two instead", which isn't optional.
-      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}), ...(after ? { after } : {}) };
+      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(scriv ? { scriv } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}), ...(after ? { after } : {}) };
       return false;
     }
     if (archives) {
       // Nothing can dredge, and a draw can't put a card with dredge into the graveyard: every Archive applies.
       log(s, `${player(s, pid).name} draws ${2 ** archives} cards instead of one.`);
       if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
-      made.unshift(...Array<number>(2 ** archives).fill(0));
+      made.unshift(...Array<number>(2 ** archives).fill(madeEntry(0, scriv)));
       continue;
     }
     const one = drawOne(s, pid, { left: n, made, ...(after ? { after } : {}) });
@@ -2914,7 +2924,7 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
  * card or none to look at and nothing else to choose, it just happens (an empty library loses no game: nothing is drawn).
  * `left` and `made` are the draws after this one. "paused" when it waits for the player, true when it replaced the draw.
  */
-function digInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], archives: number, chosen?: ObjectId): "paused" | boolean {
+function digInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], archives: number, chosen?: ObjectId, scriv = 0): "paused" | boolean {
   // `chosen`: the look the player chose among the draw's replacements (drawReplacementChoices), so nothing else is offered.
   const src = chosen ?? s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
   if (!src) return false;
@@ -2924,7 +2934,7 @@ function digInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter 
   const abundance = chosen ? undefined : s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
   const instead = archives || dredge.length || abundance ? { ...(archives ? { archive: 2 } : {}), ...(dredge.length ? { dredge } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}) } : undefined;
   if (cards.length > 1 || instead) {
-    s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}), ...(abilitiesOf(s, obj(s, src)).drawDigBottom ? { bottom: true as const } : {}) };
+    s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(scriv ? { scriv } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}), ...(abilitiesOf(s, obj(s, src)).drawDigBottom ? { bottom: true as const } : {}) };
     return "paused";
   }
   keepOne(s, p, nameOf(s, src), cards, cards[0], abilitiesOf(s, obj(s, src)).drawDigBottom);
@@ -3183,7 +3193,7 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
     s.pending = null;
     log(s, `${p.name} draws two cards instead of one.`);
     if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
-    made.unshift(pend.archives - 1, pend.archives - 1);
+    made.unshift(madeEntry(pend.archives - 1, pend.scriv ?? 0), madeEntry(pend.archives - 1, pend.scriv ?? 0));
   } else if (instead === "dig") throw new RulesError("no other way to replace that draw");
   else if (instead && "dredge" in instead) {
     if (!pend.instead?.dredge?.includes(instead.dredge) || !dredgeOptions(s, p.id).includes(instead.dredge)) throw new RulesError("that card can't be dredged");
@@ -3216,6 +3226,20 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
  * your draw steps, draw two cards instead", each one doubling it again (rulings: two make four). Each is its own
  * replacement, so dredge can come before or after any of them (CR 616.1). Counts the draw step's first draw.
  */
+/**
+ * A draw a replacement made (the `made` lists of draw and its pending decisions): how many Alhammarret's Archives can still
+ * replace it, and how many Blood Scriveners already replaced a draw it was made of (round B235, CR 614.5), in one number.
+ */
+const SCRIVENER_UNIT = 1000;
+/**
+ * Enduring Renewal (round B236): the Scriveners' number (the pendings' `scriv`) also counts the Enduring Renewals that already
+ * replaced a draw this one was made of, this many to one (CR 614.5), so it travels with the draw unchanged.
+ */
+const RENEWAL_UNIT = 1000;
+const madeEntry = (archives: number, scrivs: number) => archives + SCRIVENER_UNIT * scrivs;
+const archivesOfMade = (entry: number) => entry % SCRIVENER_UNIT;
+const scrivsOfMade = (entry: number) => Math.floor(entry / SCRIVENER_UNIT);
+
 function archivesFor(s: GameState, pid: PlayerId): number {
   const p = player(s, pid);
   const n = Math.log2(archiveDraws(s, pid));
@@ -3533,8 +3557,14 @@ export function drawShields(s: GameState, pid: PlayerId): { key: string; label: 
  * looks or a Notion Thief with another is there: the draw goes on as before, asking about the rest itself. `madeArchives`
  * is set when the draw is one a replacement already made (how many Archives can still replace it, CR 614.5).
  */
-function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: number): { key: string; label: string }[] | undefined {
+function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: number, madeScriv = 0): { key: string; label: string }[] | undefined {
   const p = player(s, pid);
+  // Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand", mandatory; those that haven't
+  // replaced a draw this one was made of yet (CR 614.5). All of them do the same, so one choice stands for them.
+  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - (madeScriv % RENEWAL_UNIT) : 0;
+  // Enduring Renewal (round B236): mandatory, those of its controller's that haven't replaced a draw this one was made of
+  // (CR 614.5). All of them do the same, so one choice stands for them.
+  const renewals = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard).length - Math.floor(madeScriv / RENEWAL_UNIT);
   const shields = drawShields(s, pid);
   const thief = notionThief(s, pid);
   const mine = (f: (a: CompiledCard) => unknown) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && f(abilitiesOf(s, obj(s, id))));
@@ -3560,8 +3590,10 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
   // Parallel Thoughts (round 386): optional, each with its own pile (two of them are two different replacements).
   const piles = mine((a) => a.drawFromPile);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length) return undefined;
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0) return undefined;
   const out = [...shields];
+  if (scriveners > 0) out.push({ key: "scrivener", label: "Draw two cards and lose 1 life instead (Blood Scrivener)" });
+  if (renewals > 0) out.push({ key: "renewal", label: "Reveal the top card of your library instead: a creature card goes into your graveyard, any other card is drawn (Enduring Renewal)" });
   for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
   for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
   for (const id of exilers) {
@@ -3589,7 +3621,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   }
   for (const id of piles) out.push({ key: `pthoughts:${id}`, label: pileDrawLabel(s, id) });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge, Parallel Thoughts): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter|pthoughts):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -3659,9 +3691,39 @@ function exileInstead(s: GameState, pid: PlayerId, src: ObjectId) {
  * "paused" when it waits for the player (Underrealm Lich's look and the like), "again" when a draw is still to come
  * (Scion of Halaster's "Then draw a card").
  */
-function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
+function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number, madeScriv = 0): "paused" | "again" | void {
   const p = player(s, pid);
-  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made, madeArchives);
+  if (key === "scrivener") {
+    // Blood Scrivener (round B235): "instead you draw two cards and you lose 1 life" (CR 614.1a). The two draws are new
+    // events this Scrivener already modified, so it can't replace them (CR 614.5), but another one can, and so can the
+    // Archives that could replace this draw (rulings: with two Scriveners, three cards and 2 life). The life is lost as the
+    // draw is replaced, before those draws, which nothing that could happen in between sees differently.
+    const n = madeArchives ?? archivesFor(s, pid);
+    log(s, `${p.name} draws two cards and loses 1 life instead of drawing one (${nameOf(s, s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand)!)}).`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    made.unshift(madeEntry(n, madeScriv + 1), madeEntry(n, madeScriv + 1));
+    loseLife(s, pid, 1);
+    return;
+  }
+  if (key === "renewal") {
+    // Enduring Renewal (round B236): the top card of the library is revealed instead (CR 614.1a, 701.20a); a creature card
+    // (by its characteristics there, an animated one too, rulings) goes into the graveyard; anything else, or no card at
+    // all, means "draw a card": a new draw this Renewal doesn't replace again (CR 614.5), which another Renewal, the Archives
+    // that could replace this draw and the rest still can. From an empty library that draw is one the player can't make
+    // (CR 704.5b). Rulings: it's the card revealed, unless something changes the library in between.
+    const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard)!;
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    const top = p.library[0];
+    if (top !== undefined && objIsType(s, obj(s, top), "Creature")) {
+      log(s, `${p.name} reveals ${nameOf(s, top)} from the top of their library instead of drawing and puts it into their graveyard (${nameOf(s, src)}).`);
+      moveObject(s, top, "graveyard");
+      return;
+    }
+    log(s, top !== undefined ? `${p.name} reveals ${nameOf(s, top)} from the top of their library instead of drawing, then draws a card (${nameOf(s, src)}).` : `${p.name} reveals no card from their empty library instead of drawing, then draws a card (${nameOf(s, src)}).`);
+    made.unshift(madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + RENEWAL_UNIT));
+    return;
+  }
+  if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made, madeArchives, madeScriv);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
@@ -3710,7 +3772,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
     const n = (madeArchives ?? archivesFor(s, pid)) - 1;
     log(s, `${p.name} draws two cards instead of one.`);
     if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
-    made.unshift(n, n);
+    made.unshift(madeEntry(n, madeScriv), madeEntry(n, madeScriv));
     return;
   }
   if (key === "look") {
@@ -3733,7 +3795,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
 }
 
 /** One of drawShields' shields replaces a draw of `pid`'s (CR 614.6), and is used up. */
-function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number): "paused" | "again" | void {
+function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number, after: DrawAfter | undefined, made: number[], madeArchives?: number, madeScriv = 0): "paused" | "again" | void {
   const p = player(s, pid);
   if (key === "exile") {
     // Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of
@@ -3764,7 +3826,8 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number,
   // Round 385 (effects/run-round385.ts): Words of Wind's returns, Mangara's Tome's pile and Aladdin's Lamp's look.
   if (w.wind) return windInstead(s, pid, w.source, left, after, made);
   if (w.pile) return pileInstead(s, pid, w.source, w.sourceId, w.sourceZc);
-  if (w.lamp !== undefined) return lampInstead(s, pid, w.source, w.lamp, left, after, made, madeArchives);
+  // The Lamp's draw keeps the Blood Scrivener / Enduring Renewal count of a draw a replacement made (CR 614.5).
+  if (w.lamp !== undefined) return lampInstead(s, pid, w.source, w.lamp, left, after, made, madeArchives === undefined ? undefined : madeEntry(madeArchives, madeScriv));
   if (w.gain !== undefined) {
     log(s, `${p.name} gains ${w.gain} life instead of drawing a card (${w.source}).`);
     gainLife(s, pid, w.gain, { controller: pid });
@@ -3828,7 +3891,7 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   if (/^(?:sages|mayskip|counter|crypt):/.test(choice) && !s.battlefield.includes(choice.slice(choice.indexOf(":") + 1))) throw new RulesError("that permanent no longer replaces the draw");
   s.pending = null;
   const made = [...(pend.made ?? [])];
-  const done = applyDrawReplacement(s, p.id, choice, pend.left, pend.after, made, pend.archives);
+  const done = applyDrawReplacement(s, p.id, choice, pend.left, pend.after, made, pend.archives, pend.scriv ?? 0);
   if (done === "paused") return;
   continueDraws(s, p.id, pend.left + (done === "again" ? 1 : 0), pend.after, made);
 }
@@ -3901,7 +3964,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     // The Archive first: two draws, which the other Archives and dredge can each still replace.
     log(s, `${p.name} draws two cards instead of one.`);
     if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
-    made.unshift(pend.archive - 1, pend.archive - 1);
+    made.unshift(madeEntry(pend.archive - 1, pend.scriv ?? 0), madeEntry(pend.archive - 1, pend.scriv ?? 0));
   } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
   if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made, true)) return;
   drawsDone(s, pend.after);
@@ -4449,6 +4512,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
+  s.pilesOnlyThisTurn = undefined;
   s.cantBeBlockedThisTurn = undefined;
   if (!s.costModsThisTurn?.length) s.costModsThisTurn = undefined;
   s.keepManaThisTurn = undefined;
@@ -5758,7 +5822,7 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
   if (player(s, pid).handRevealedWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc)) return true;
   return s.battlefield.some((id) => {
     const r = abilitiesOf(s, obj(s, id)).revealHands;
-    return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid);
+    return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid) || (r === "you" && controllerOf(s, obj(s, id)) === pid);
   });
 }
 
@@ -6768,7 +6832,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -6996,9 +7060,29 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // rulings), is paid with that type, as colored symbols (CR 601.2g-h). Not when mana of any type (or as though of any
   // color) can be spent (CR 609.4b).
   const onX = compileCard(d).spendOnlyOnX;
-  const xPaid = onX && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  // Soul Burn (round B234): "Spend only black and/or red mana on X": each of X's mana a {B/R} hybrid symbol (CR 107.4e).
+  const onXHybrid = compileCard(d).spendOnlyOnXHybrid;
+  // Soul Burn: how much mana paid X (CR 601.2h), and whether mana of any type could pay the colored symbols (CR 609.4b).
+  if (how.xOut && compileCard(d).spentOnXOf) (how.xOut.part = how.faceDown ? 0 : Math.min(extra, Math.max(0, x * xCount(mana) - less))), (how.xOut.any = anyTypeNow || anyColorNow);
+  const xPaid = (onX || onXHybrid) && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  if (xPaid && onXHybrid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "hybrid" as const, options: [...onXHybrid] }))] }, extra: extra - xPaid });
   if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
   return costAtLeast(s, { cost: reducedCost, extra });
+}
+
+/**
+ * Soul Burn (round B234): "the amount of {B} spent on X". The player decides which of the mana spent pays which part of
+ * the total cost (CR 601.2h), so as much of that type as could have gone to X: what's left of it after the symbols only
+ * it can pay ({B}), and no more than X's part. With mana of any type paying colored symbols (CR 609.4b), other mana spent
+ * pays those first.
+ */
+function spentOnXNow(type: ManaType | undefined, cost: ParsedCost, spent: Partial<Record<ManaType, number>>, xOut: { part?: number; any?: boolean }): number | undefined {
+  if (!type || !xOut.part) return undefined;
+  const mine = spent[type] ?? 0;
+  const others = Object.entries(spent).reduce((n, [k, v]) => n + (k === type ? 0 : (v ?? 0)), 0);
+  const only = cost.symbols.filter((y) => y.kind === "colored" && y.color === type).length;
+  const n = Math.min(xOut.part, mine - Math.max(0, only - (xOut.any ? others : 0)));
+  return n > 0 ? n : undefined;
 }
 
 /**
@@ -7197,7 +7281,7 @@ export function hasDelve(s: GameState, pid: PlayerId, o: GameObject): boolean {
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
-function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } | string {
+function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[]; modes?: number[]; xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } | string {
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
@@ -7759,7 +7843,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const tax = fromCommand ? commanderTax(p, o, d) : 0;
   const taxLife = fromCommand ? commanderTaxLife(p, o, d) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
-  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes }) as { cost: ParsedCost; extra: number };
+  const xOut: { part?: number; any?: boolean } = {};
+  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes, xOut }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
@@ -7802,6 +7887,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const spentFrom = Object.fromEntries(Object.entries(paid.from).filter(([, n]) => n > 0));
   if (Object.keys(spentFrom).length) spent.from = spentFrom;
   o.spent = Object.keys(spent).length ? spent : undefined;
+  o.spentOnX = spentOnXNow(compileCard(d).spentOnXOf, cost.cost, paid.spent, xOut);
   o.treasureSpent = paid.treasure || undefined;
   // "Spend this mana only to cast a creature spell of the chosen type, and that spell can't be countered" (Cavern of Souls).
   o.uncounterableCast = paid.uncounterable;
@@ -8500,6 +8586,11 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   const k = compileCard(d).kicker!;
   const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
   const name = kickerName(k);
+  // Primitive Justice (round B236): how many times each of its two costs was paid.
+  if (k.optional && k.multi && k.costs.length > 1) {
+    const each = k.costs.map((c, i) => [c, kicks.filter((x) => x === i).length] as const).filter(([, n]) => n > 0);
+    return `, paying the additional ${each.map(([c, n]) => `${c}${n === 1 ? " once" : n === 2 ? " twice" : ` ${n} times`}`).join(" and ")}`;
+  }
   if (k.optional) return `, paying its additional cost (${k.text})`;
   if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
   if (k.extraCosts) return `, kicked (${k.text})`;
@@ -9827,7 +9918,15 @@ export function definedCastX(s: GameState, pid: PlayerId, o: GameObject, choices
  * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
  * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
  */
-export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility, costs?: CostChoices): number | null | undefined {
+export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility, costs?: CostChoices, targets?: TargetChoice[]): number | null | undefined {
+  // Reflecting Mirror (round B235): twice the target spell's mana value, its X included (CR 202.3e); its targets are chosen
+  // before its cost is worked out (CR 601.2c, 601.2f), so undefined until they are, and null when that target isn't a spell.
+  if (ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs) {
+    if (!targets) return undefined;
+    const t = targets[ab.xIs.twiceTargetSpellMv];
+    const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+    return item?.kind === "spell" ? 2 * spellManaValue(s, item) : null;
+  }
   // Bargaining Table: the chosen opponent's hand as it's activated; none chosen yet, X isn't known (a choice to make).
   if (ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs) return costs?.xOpponent !== undefined && s.players[costs.xOpponent] ? s.players[costs.xOpponent]!.hand.length : undefined;
   if (ab.xIs && typeof ab.xIs === "object") return o.counters[ab.xIs.counters] ?? 0;
@@ -9843,8 +9942,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
-  const fixedX = definedX(s, o, ab, costs);
-  if (fixedX === null) return `no card is exiled with ${d.name}, so X isn't defined`;
+  const fixedX = definedX(s, o, ab, costs, targets);
+  if (fixedX === null) return ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs ? `X is twice the mana value of the target spell for ${d.name}'s ability` : `no card is exiled with ${d.name}, so X isn't defined`;
   // Bargaining Table: an opponent is chosen (not targeted) as it's announced, before X (rulings, CR 602.2b, 601.2b).
   if (ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs) {
     const opps = opponents(s, pid);
@@ -10470,7 +10569,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   // Prototype Portal: an X its text sets (CR 107.3c).
-  const x = x0 ?? (ab && definedX(s, o, ab, costs)) ?? undefined;
+  const x = x0 ?? (ab && definedX(s, o, ab, costs, targets)) ?? undefined;
   if (ab?.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && costs?.xOpponent === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose an opponent: X is the number of cards in their hand");
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
@@ -13134,6 +13233,15 @@ function chosenAttackersForbid(s: GameState, o: GameObject): boolean {
   return Object.values(s.chosenAttackers ?? {}).some((c) => c.player === s.activePlayer && s.turn > c.sinceTurn && !c.chosen.includes(key));
 }
 
+/**
+ * Fight or Flight, Stand or Fall (round B234, GameState.pilesOnlyThisTurn): `o` isn't in every chosen pile of that kind
+ * this turn, as the object it was (CR 400.7), so it can't attack or block (CR 508.1c, 509.1b). Whoever controls it now.
+ */
+function pilesForbid(s: GameState, o: GameObject, kind: "attack" | "block"): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return (s.pilesOnlyThisTurn ?? []).some((r) => r.kind === kind && !r.ids.includes(key));
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   if (arbiterStopsAttacks(s, pid)) return [];
@@ -13149,6 +13257,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => (r.combat === undefined || r.combat === (s.combatsThisTurn ?? 0)) && objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // Oracle en-Vec (round B233): during that player's next turn, only the chosen creatures can attack (CR 508.1c).
       !chosenAttackersForbid(s, o) &&
+      // Fight or Flight (round B234): only creatures in the chosen pile can attack this turn (CR 508.1c).
+      !pilesForbid(s, o, "attack") &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       // "Only the chosen creatures can attack during that combat phase" (Last Night Together): those objects only (CR 400.7).
@@ -14580,6 +14690,8 @@ export function cantBeBlockedNow(s: GameState, o: GameObject): boolean {
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
   // Decayed means "This creature can't block" (CR 702.147a).
   if (characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0)))) return true;
+  // Stand or Fall (round B234): only creatures in the chosen piles can block this turn (CR 509.1b).
+  if (pilesForbid(s, o, "block")) return true;
   // Void Winnower: an opponent's creature with an even mana value (X is 0, CR 202.3b; a face-down one's is 0).
   const you = controllerOf(s, o);
   return defMv(defOf(s, o)) % 2 === 0 && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== you && abilitiesOf(s, s.objects[id]!).opponentsCantBlockEven);
@@ -14870,7 +14982,8 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   }
   // Fog: all combat damage is prevented, unless damage can't be prevented (CR 615.12): from anything, or from this source.
   if (s.preventCombatDamage && hits.length && canPreventDamage(s)) {
-    const kept = hits.filter((h) => unpreventable(objectSource(s, h.source), true));
+    // Whippoorwill (round B235): damage to a creature whose damage can't be prevented this turn.
+    const kept = hits.filter((h) => unpreventable(objectSource(s, h.source), true) || (h.toObject !== undefined && damageUnalterableTo(s, { object: h.toObject })));
     log(s, kept.length ? "Combat damage is prevented, except damage that can't be." : "All combat damage is prevented.");
     // "Whenever damage that would be dealt to you is prevented" (Selfless Squire).
     const toPlayers = new Map<PlayerId, number>();

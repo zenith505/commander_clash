@@ -63,7 +63,8 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
   return s.battlefield
     .filter((id) => !exclude.includes(id))
     .map((id) => obj(s, id))
-    .filter((o) => controllerOf(s, o) === pid && (!onlyCreatures || objIsType(s, o, "Creature")) && (!onlyBasicLands || (objIsType(s, o, "Land") && characteristics(s, o).supertypes.includes("Basic"))))
+    // Mana Cache (round B236): another player's permanent with a mana ability any player may activate (CR 602.2), only that one.
+    .filter((o) => (controllerOf(s, o) === pid || manaAbilitiesOn(s, o).some((ab) => ab.anyPlayer)) && (!onlyCreatures || objIsType(s, o, "Creature")) && (!onlyBasicLands || (objIsType(s, o, "Land") && characteristics(s, o).supertypes.includes("Basic"))))
     .map((o) => {
       const abs = manaAbilitiesOn(s, o);
       const treasure = isTreasure(s, o);
@@ -81,9 +82,19 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
           return { id: o.id, ...x, cost: manaAbilityCostOf(s, pid, o, ab), penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
-      if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use)) && (!only || x.adds.every((m) => only.includes(m)))));
+      if ((!onlyTreasures || treasure) && controllerOf(s, o) === pid) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use)) && (!only || x.adds.every((m) => only.includes(m)))));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
       return { id: o.id, options, colors: makes.length, makes, creature: isCreature(o.id) };
+    })
+    // Mana Cache (round B236): no {T} in its cost, so it can be activated again for each counter it has: one source for each
+    // time, told apart by "#n" after its id (toAction drops it), up to ten.
+    .flatMap((src) => {
+      const o = obj(s, src.id);
+      const abs = manaAbilitiesOn(s, o);
+      const ab = abs.length === 1 && abs[0]!.anyPlayer && !abs[0]!.tap && abs[0]!.removeCounters ? abs[0] : undefined;
+      if (!ab || !src.options.length) return [src];
+      const times = Math.min(10, Math.floor((o.counters[ab.removeCounters!.counter] ?? 0) / ab.removeCounters!.n));
+      return Array.from({ length: Math.max(1, times) }, (_, k) => (k ? { ...src, id: `${src.id}#${k}`, options: src.options.map((x) => ({ ...x, id: `${x.id}#${k}` })) } : src));
     })
     .filter((src) => src.options.length > 0)
     // Prefer tapping lands, then the least flexible sources, so creatures and rainbow sources stay available.
@@ -102,7 +113,7 @@ function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): (Option &
 const toAction = (pid: PlayerId, x: Option): Action =>
   x.activated
     ? { type: "activateAbility", player: pid, objectId: x.id, index: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) }
-    : { type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) };
+    : { type: "activateMana", player: pid, objectId: x.id.split("#")[0]!, mana: x.mana, ability: x.ability, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) };
 
 /**
  * What to tap for "Tap an untapped creature you control", best first: what makes no mana itself, then what's
@@ -587,7 +598,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   // "Untap a tapped creature you control" with a creature that's untapped: it's tapped for mana first (Halo Fountain).
   const ab0 = abilitiesOf(s, obj(s, objectId)).activated[index];
   // Prototype Portal: an X the ability sets (CR 107.3c).
-  const x = x0 ?? (ab0 && definedX(s, obj(s, objectId), ab0, costs)) ?? undefined;
+  const x = x0 ?? (ab0 && definedX(s, obj(s, objectId), ab0, costs, targets)) ?? undefined;
   const untapCost = ab0?.costs?.find((c) => c.kind === "tap" && c.untap);
   const forMana = untapCost ? (costs?.tap ?? []).find((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped) : undefined;
   if (forMana !== undefined) {

@@ -84,7 +84,8 @@ export function parseEntersChoice(line: string): EntersChoice | null {
 /**
  * Threshold granting "Whenever a nontoken creature is put into your graveyard from the battlefield" (Decaying Soil): a
  * leaves-the-battlefield trigger looks back in time (CR 603.10a), so the creature that makes seven doesn't trigger it
- * (rulings), but the granted ability is read from the graveyard as it is after the event. Not supported.
+ * (rulings), but the granted ability is read from the graveyard as it is after the event. Not supported here; Decaying
+ * Soil's own line is read by round B234 (oracle/laneb234.ts) as a trigger that looks back (TriggeredAbility.lookBackYardAtLeast).
  */
 function lookBackGrant(st: StaticAbility | null): StaticAbility | null {
   return st?.condition?.kind === "graveyardAtLeast" && st.mods.some((m) => m.kind === "addAbility" && /^Whenever .*(?:\bdies\b|put into [a-z']+ graveyard from the battlefield)/.test(m.text)) ? null : st;
@@ -910,6 +911,8 @@ export function parseDuring(text: string): StaticCondition | null {
   if ((m = /^(your|an opponent's) end step$/.exec(text))) return { kind: "during", window: "end", ...whose(m[1]) };
   // "Any player may activate this ability but only during their draw step" (Well of Knowledge): the activator's.
   if (text === "your draw step") return { kind: "during", window: "draw", turn: "you" };
+  // Mana Cache (round B236): "Any player may activate this ability but only during their turn before the end step".
+  if (text === "your turn before the end step") return { kind: "during", window: "beforeEnd", turn: "you" };
   if ((m = /^(?:the|(your)) declare (attackers|blockers) step( on your turn| on an opponent's turn)?$/.exec(text)))
     return { kind: "during", window: m[2] === "attackers" ? "declareAttackers" : "declareBlockers", ...whose(m[1] ?? m[3]) };
   if (text === "the end of combat step") return { kind: "during", window: "endCombat" };

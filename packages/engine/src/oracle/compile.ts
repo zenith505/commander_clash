@@ -77,6 +77,9 @@ import { roundB230Line } from "./laneb230";
 import { roundB231Line } from "./laneb231";
 import { roundB232Line } from "./laneb232";
 import { roundB233Line } from "./laneb233";
+import { roundB234Line } from "./laneb234";
+import { roundB235Line } from "./laneb235";
+import { roundB236Line } from "./laneb236";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2246,6 +2249,12 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB232Line(line, raw, out, isSpell)) continue;
     // Memory Vampire, Oracle en-Vec, A Killer Among Us (round B233).
     if (roundB233Line(line, raw, out, isSpell)) continue;
+    // Soul Burn, Fight or Flight, Stand or Fall, Decaying Soil (round B234).
+    if (roundB234Line(line, raw, out, isSpell, d)) continue;
+    // Whippoorwill, Reflecting Mirror, Blood Scrivener (round B235).
+    if (roundB235Line(line, raw, out, isSpell)) continue;
+    // Primitive Justice, Enduring Renewal, Diabolic Servitude, Mana Cache (round B236).
+    if (roundB236Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

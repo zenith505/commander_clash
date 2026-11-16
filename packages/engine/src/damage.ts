@@ -80,6 +80,16 @@ export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource[
 /** Can't this source's damage be prevented (CR 615.12)? */
 export const unpreventable = (src: DamageSource, combat: boolean) => src.unpreventable === "all" || (src.unpreventable === "combat" && combat);
 
+/**
+ * Whippoorwill (round B235): damage that would be dealt to this permanent this turn can't be prevented (CR 615.12) or dealt
+ * instead to another permanent or player (redirection, CR 614.9), while it's the object it was then (CR 400.7).
+ */
+export function damageUnalterableTo(s: GameState, to: { object: ObjectId | GameObject } | { player: PlayerId }): boolean {
+  if (!("object" in to)) return false;
+  const o = typeof to.object === "string" ? s.objects[to.object] : to.object;
+  return !!o && o.zone === "battlefield" && o.damageUnalterableTurn === s.turn;
+}
+
 const has = (src: DamageSource, k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 
 export { protectedFrom };
@@ -173,6 +183,8 @@ export function dealDamage(
   opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean; witherCounters?: Map<string, number> } = {},
 ): number {
   if (n <= 0) return 0;
+  // Whippoorwill: damage to it can't be prevented or redirected, from whatever source (round B235).
+  if (damageUnalterableTo(s, to)) src = { ...src, unpreventable: "all", noRedirect: true };
   if (opts.combat && s.preventCombatDamage && canPreventDamage(s) && !unpreventable(src, true)) return 0;
   if (!opts.shielded) {
     const ev: DamageEvent = { src, to: "object" in to ? { object: to.object.id } : { player: to.player }, n, ...(opts.combat ? { combat: true } : {}) };
@@ -913,7 +925,9 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   // "Damage can't be prevented" (CR 615.12): protection, shield counters and prevention shields don't stop it, nor
   // damage from a source whose damage can't be prevented.
   const preventing = canPreventDamage(s);
-  const prev = (e: DamageEvent) => preventing && !unpreventable(e.src, !!e.combat);
+  // Whippoorwill (round B235): nor damage to a permanent whose damage can't be prevented this turn, which can't be
+  // redirected either (CR 614.9), wherever that damage comes from, a redirection to it included.
+  const prev = (e: DamageEvent) => preventing && !unpreventable(e.src, !!e.combat) && !damageUnalterableTo(s, e.to);
   // Damage rules' shields: what's left of each, shared by all it protects, and how much of it each may take.
   const ruleCap = new Map<string, number>();
   const alloc = new Map<string, Map<string, number>>();
@@ -947,7 +961,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   // Pariah).
   const staticRedirect = (k: string) => k.startsWith("static-redirect:");
   const takes = (sh: PlanShield, e: DamageEvent) =>
-    (sh.kind !== "prevent" || prev(e)) && !(sh.kind === "redirect" && e.src.noRedirect) && !(e.applied ?? []).includes(sh.key) && !(staticRedirect(sh.key) && (e.applied ?? []).some(staticRedirect)) && (!sh.rule || ruleTakes(s, sh.rule, e));
+    (sh.kind !== "prevent" || prev(e)) && !(sh.kind === "redirect" && (e.src.noRedirect || damageUnalterableTo(s, e.to))) && !(e.applied ?? []).includes(sh.key) && !(staticRedirect(sh.key) && (e.applied ?? []).some(staticRedirect)) && (!sh.rule || ruleTakes(s, sh.rule, e));
   let queue = events.filter((e) => e.n > 0).map((e) => ({ ...e, applied: e.applied ?? [] }));
   const order = turnOrderFrom(s, s.activePlayer);
   // A rule's "next N damage" shield protecting several permanents and players (Harm's Way's "you and/or permanents you
@@ -1392,7 +1406,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
 export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: number, combat = true): number {
   if (n <= 0) return 0;
   const src = objectSource(s, from);
-  const prev = canPreventDamage(s) && !unpreventable(src, combat);
+  const prev = canPreventDamage(s) && !unpreventable(src, combat) && !damageUnalterableTo(s, to);
   if (combat && s.preventCombatDamage && prev) return 0;
   const phantom = "object" in to && s.objects[to.object] ? abilitiesOf(s, obj(s, to.object)).phantom : undefined;
   if ("object" in to && prev && phantom && (phantom !== "whileCounter" || (obj(s, to.object).counters["+1/+1"] ?? 0) > 0)) return 0;

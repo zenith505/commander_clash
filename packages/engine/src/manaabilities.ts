@@ -622,7 +622,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
   if (!ab) return `${name} has no such mana ability`;
-  if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
+  if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
   if (ab.tap && characteristics(s, o).cantActivateTap) return `${name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary (rulings)
   const banned = nameActivationBan(s, o, true) ?? abolisherBan(s, pid, o); // Phyrexian Revoker, Grand Abolisher: mana abilities too

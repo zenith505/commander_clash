@@ -2,6 +2,7 @@
 // whole spells (after round B232's).
 import type { AbilityBody, CompiledCard } from "../abilities";
 import { parseActivated } from "./activated";
+import { roundB234Spell } from "./laneb234";
 import { parseTrigger } from "./triggers";
 
 const VAMPIRE = "Whenever ~ deals combat damage to a player, any number of target players each mill that many cards. Then you may collect evidence 9. When you do, you may cast target nonland card from defending player's graveyard without paying its mana cost.";
@@ -90,5 +91,5 @@ export function roundB233Spell(text: string): AbilityBody | null | undefined {
   // you choose as it resolves, sees the face-up pile and how many cards the face-down one has; either pile may be empty
   // (rulings, CR 700.3c). The face-down pile isn't revealed if it goes to your hand (rulings).
   if (text === RIDDLES) return { targets: [], effects: [{ type: "piles", n: 4, separator: "you", rest: "graveyard", faceDown: true }], text };
-  return undefined;
+  return roundB234Spell(text);
 }

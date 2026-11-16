@@ -401,6 +401,15 @@ function diesMatches(
   if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
   // Dance of Many: a token this object created, as the object it is now (CR 400.7).
   if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
+  // Diabolic Servitude (round B236): the creature its enters ability put onto the battlefield, linked to the object the
+  // watcher was (GameState.animated, CR 607.2a), still that object as it died; the watcher leaving at the same time too,
+  // as it last existed (CR 603.10a).
+  if (d.animatedBySelf) {
+    const src = s.objects[srcId];
+    const zc = src?.zone === "battlefield" ? (src.zoneChanges ?? 0) : s.lastKnown?.[srcId]?.zc;
+    const link = zc !== undefined ? s.animated?.[`${srcId}@${zc}`] : undefined;
+    return !!link && link.id === dying.o.id && s.lastKnown?.[link.id]?.zc === link.zc && dying.c.types.includes("Creature");
+  }
   if (srcId === dying.o.id) {
     // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
     if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;
@@ -1018,10 +1027,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       });
       if (equipment.length) (lki as LastKnown).equipment = equipment;
       const dying = { o: ev.snapshot, c: ev.chars };
+      // Decaying Soil (round B234, TriggeredAbility.lookBackYardAtLeast): the cards in that player's graveyard just before
+      // this event (CR 603.10a), so not those the same event put there (moves of one instruction happen at once, CR 608.2c),
+      // and with those it took out.
+      const yardBefore = (pid: PlayerId) => {
+        const moves = s.zoneBatch ?? [];
+        const yard = player(s, pid).graveyard;
+        const came = new Set(moves.filter((m) => m.to === "graveyard" && yard.includes(m.id)).map((m) => m.id));
+        const left = new Set(moves.filter((m) => m.from === "graveyard" && m.owner === pid && !yard.includes(m.id)).map((m) => m.id));
+        return yard.length - came.size + left.size;
+      };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0)) && !(d.notSacrificed && ev.sacrificed);
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[], damagedById?: ObjectId) =>
-        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen, damagedById), triggers, undefined, o, lki);
+        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && !(t.lookBackYardAtLeast !== undefined && yardBefore(ctrl) < t.lookBackYardAtLeast) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen, damagedById), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
         const src = obj(s, id);
         consider(src, controllerOf(s, src), ev.attachments?.includes(id) ? ev.id : src.attachedTo);

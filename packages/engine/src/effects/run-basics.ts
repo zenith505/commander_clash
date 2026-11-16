@@ -5,7 +5,7 @@ import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, 
 import { addPhases, endWhileTapped, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
-import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, type DamageEvent, type DamageSource } from "../damage";
+import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, damageUnalterableTo, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { emptyPool } from "../mana";
@@ -301,7 +301,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // (CR 616.1): an amount off this damage only is never worse for them than another shield first.
       const off = e.preventOf !== undefined ? Math.max(0, amountNow(s, e.preventOf, ctx)) : 0;
       if (off > 0 && canPreventDamage(s) && !unpreventable(from, false)) {
-        events = events.map((ev) => ({ ...ev, n: Math.max(0, ev.n - off) })).filter((ev) => ev.n > 0);
+        // Whippoorwill (round B235): not damage to a creature whose damage can't be prevented this turn.
+        events = events.map((ev) => (damageUnalterableTo(s, ev.to) ? ev : { ...ev, n: Math.max(0, ev.n - off) })).filter((ev) => ev.n > 0);
         log(s, `${src}: ${off} of that damage is prevented.`);
       }
       const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));

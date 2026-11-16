@@ -350,7 +350,7 @@ export type Count =
    * ability's damage dealt to permanents beyond lethal damage, their loyalty or their defense (CR 120.4a, 120.10).
    */
   /** "You gain life equal to the damage dealt this way" (Syphon Soul): all the damage the instructions before dealt, after prevention. */
-  | { kind: "damageThisWay"; /** Drain Life: "but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness": each recipient's part no more than that (ResolvingState.damageCappedThisWay). */ capped?: true }
+  | { kind: "damageThisWay"; /** Drain Life: "but not more life than the player's life total before the damage was dealt, the planeswalker's loyalty before the damage was dealt, or the creature's toughness": each recipient's part no more than that (ResolvingState.damageCappedThisWay). */ capped?: true; /** Soul Burn (round B234): and no more than the amount of mana of the spell's CompiledCard.spentOnXOf type spent on X (GameObject.spentOnX). */ spentOnXCap?: true }
   | { kind: "excessThisWay"; /** Only that target's (The Last Agni Kai's "add that much {R}"). */ target?: number }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay"; /** "If no life is lost this way" (Blitzwing, Cruel Tormentor): what its loseLife instructions took off life totals, any player's. */ byLoss?: true }
@@ -2834,7 +2834,7 @@ export const timedCondition = (c: StaticCondition | undefined): boolean =>
  * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
  * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
  */
-export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
+export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | /** Mana Cache (round B236): "before the end step": any step of the turn before its end step (CR 513), the untap step aside (no player gets priority there, CR 502.4). */ "beforeEnd" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
 
 /**
  * "Only before combat", "only before attackers are declared", "only before blockers are declared", "only before the
@@ -4585,6 +4585,24 @@ export type Effect =
    * destroy each of the chosen creatures that didn't attack this turn." (GameState.chosenAttackers.)
    */
   | { type: "chosenAttackNextTurn"; who: PlayerRef }
+  /**
+   * Fight or Flight, Stand or Fall (round B234): for each of `who` (CR 101.4 order), you separate all creatures that player
+   * controls into two piles (CR 700.3) and that player chooses one; only the creatures in the chosen piles can attack
+   * (`kind` "attack") or block ("block") this turn (GameState.pilesOnlyThisTurn).
+   */
+  | { type: "pilesOnly"; who: PlayerRef; kind: "attack" | "block" }
+  /**
+   * Whippoorwill (round B235): "Damage that would be dealt to that creature this turn can't be prevented or dealt instead to
+   * another permanent or player" (CR 615.12, 614.9): GameObject.damageUnalterableTurn, while it's the object it is (CR 400.7).
+   */
+  | { type: "damageUnalterable"; what: ObjRef }
+  /**
+   * Diabolic Servitude (round B236): "the creature put onto the battlefield with this enchantment" (CR 607.2a): "link" notes
+   * the object target `target` became on the battlefield as this source's (GameState.animated); "exile" exiles it, if it's
+   * still that object on the battlefield (rulings: once it leaves, the link is gone).
+   */
+  | { type: "servitudeLink"; target: number }
+  | { type: "servitudeExile" }
   /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
   | { type: "chosenAttackDestroy"; key: string }
   /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */
@@ -5066,7 +5084,7 @@ export type Effect =
    * to the same new target, one that meets each of those targets' conditions (rulings). `mustBe`: "The new target must be a
    * player / a creature" (Rebound, Silver Wyvern).
    */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true; all?: true; mustBe?: "player" | "creature"; /** Meddle: "If target spell has only one target and that target is a creature" (Quicksilver Dragon: "is ~"): checked as this resolves, and nothing changes otherwise; any spell can be targeted. */ ifOnly?: "creature" | "self" }
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true; all?: true; mustBe?: "player" | "creature"; /** Meddle: "If target spell has only one target and that target is a creature" (Quicksilver Dragon: "is ~"): checked as this resolves, and nothing changes otherwise; any spell can be targeted. */ ifOnly?: "creature" | "self" | /** Reflecting Mirror (round B235): "if that target is you": its one target is this ability's controller. */ "you" }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -7125,7 +7143,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Another creature dealt damage this turn by a Spider you controlled" (Shelob, Child of Ungoliant): by a source of this creature type controlled by the trigger's controller as it dealt the damage (GameObject.damagedByKinds). */ damagedByKindYours?: string; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Another creature dealt damage this turn by a Spider you controlled" (Shelob, Child of Ungoliant): by a source of this creature type controlled by the trigger's controller as it dealt the damage (GameObject.damagedByKinds). */ damagedByKindYours?: string; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; /** Diabolic Servitude (round B236): "When the creature put onto the battlefield with ~ dies": the one this object's enters ability returned (GameState.animated), as the objects they were (CR 603.10a). */ animatedBySelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -7158,6 +7176,13 @@ export interface TriggeredAbility {
   /** "When ~ dies, if it's not a Spirit, ..." (Otherworldly Escort): an intervening if (CR 603.4) on its subtypes as it last existed (CR 603.10a). */
   ifNotSubtype?: string;
   ifNotToken?: true;
+  /**
+   * Decaying Soil (round B234): its threshold-granted "Whenever a nontoken creature is put into your graveyard from the
+   * battlefield": it exists only if its controller had at least this many cards in their graveyard just before the event,
+   * which the trigger looks back to (CR 603.10a; rulings). Checked as it triggers only: once it triggers, it resolves
+   * whatever happens to threshold (CR 113.7a).
+   */
+  lookBackYardAtLeast?: number;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
   ifNotBlocking?: true;
   /** Mongrel Pack: "When ~ dies during combat": only if it dies during a combat phase (CR 506.1). */
@@ -7505,7 +7530,7 @@ export interface ActivatedAbility {
    * "{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card." (Prototype Portal): X is
    * defined by the ability, not chosen (CR 107.3c), worked out as it's activated; with no card exiled it can't be (rulings).
    */
-  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind } | /** Bargaining Table: "X is the number of cards in an opponent's hand": the opponent chosen as it's announced (CostChoices.xOpponent, rulings). */ { opponentHand: true };
+  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind } | /** Bargaining Table: "X is the number of cards in an opponent's hand": the opponent chosen as it's announced (CostChoices.xOpponent, rulings). */ { opponentHand: true } | /** Reflecting Mirror (round B235): "X is twice the mana value of that spell": the spell this target (an index of the body's targets) is, as the cost is worked out after targets (CR 107.3c, 601.2f). */ { twiceTargetSpellMv: number };
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -7648,6 +7673,8 @@ export type ManaProduce =
  */
 export interface ManaAbility {
   text: string;
+  /** Mana Cache (round B236): "Any player may activate this ability" (CR 602.2): its activator controls it (CR 113.8) and gets the mana. */
+  anyPlayer?: true;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
   toChosenPlayer?: true;
   /**
@@ -8855,6 +8882,10 @@ export interface CompiledCard {
   onePoisonForYou?: true;
   /** Drain Life, Consume Spirit: "Spend only black mana on X." in a spell whose mana cost has more than {X}: the mana paying X is of this type (spellCost), less whatever reductions take off X (rulings). */
   spendOnlyOnX?: ManaType;
+  /** Soul Burn (round B234): "Spend only black and/or red mana on X.": each mana paying X is one of these colors, as a hybrid symbol (spellCost). */
+  spendOnlyOnXHybrid?: Color[];
+  /** Soul Burn (round B234): "not more than the amount of {B} spent on X": note the most mana of this type that could have paid X (GameObject.spentOnX). */
+  spentOnXOf?: ManaType;
   /** Tapestry Warden: "Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power." (amounts.ts stationPower, rulings). */
   stationByToughness?: true;
   /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */
@@ -9014,6 +9045,13 @@ export interface CompiledCard {
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
    * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
   drawTwoInstead?: true | "always";
+  /** Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand, instead you draw two cards and you lose 1 life." */
+  drawTwoLoseLifeEmptyHand?: true;
+  /**
+   * Enduring Renewal (round B236): "If you would draw a card, reveal the top card of your library instead. If it's a creature
+   * card, put it into your graveyard. Otherwise, draw a card." (CR 614.1a; the draw it makes isn't replaced by it again, CR 614.5).
+   */
+  drawRevealCreatureToYard?: true;
   /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
@@ -9819,8 +9857,8 @@ export interface CompiledCard {
   attackNearestChosen?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
-  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */
-  revealHands?: "players" | "opponents";
+  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy); "you": "Play with your hand revealed" (Enduring Renewal, round B236), its controller's. */
+  revealHands?: "players" | "opponents" | "you";
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

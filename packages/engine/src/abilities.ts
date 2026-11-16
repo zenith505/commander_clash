@@ -8909,6 +8909,11 @@ export interface CompiledCard {
   /** Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand, instead you draw two cards and you lose 1 life." */
   drawTwoLoseLifeEmptyHand?: true;
   /**
+   * Enduring Renewal (round B236): "If you would draw a card, reveal the top card of your library instead. If it's a creature
+   * card, put it into your graveyard. Otherwise, draw a card." (CR 614.1a; the draw it makes isn't replaced by it again, CR 614.5).
+   */
+  drawRevealCreatureToYard?: true;
+  /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
    * each draw would happen.
@@ -9682,8 +9687,8 @@ export interface CompiledCard {
   attackNearestChosen?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
-  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */
-  revealHands?: "players" | "opponents";
+  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy); "you": "Play with your hand revealed" (Enduring Renewal, round B236), its controller's. */
+  revealHands?: "players" | "opponents" | "you";
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

@@ -4,6 +4,7 @@ import type { AbilityBody, CompiledCard } from "../abilities";
 import type { CardDef } from "../types";
 import { parseManaCost } from "../mana";
 import { parseBody } from "./body";
+import { roundB236Spell } from "./laneb236";
 import { parseTrigger } from "./triggers";
 
 const FIGHT = "At the beginning of combat on each opponent's turn, separate all creatures that player controls into two piles. Only creatures in the pile of their choice can attack this turn.";
@@ -84,5 +85,5 @@ export function roundB234Spell(text: string): AbilityBody | null | undefined {
     if (!body || body.effects.length !== 2 || body.effects[0]!.type !== "damage" || gain?.type !== "gainLife" || n?.kind !== "damageThisWay" || !n.capped) return null;
     return { ...body, effects: [body.effects[0]!, { ...gain, n: { count: { ...n, spentOnXCap: true } } }], text };
   }
-  return undefined;
+  return roundB236Spell(text);
 }

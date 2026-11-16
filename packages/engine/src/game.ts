@@ -3199,6 +3199,11 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
  * replace it, and how many Blood Scriveners already replaced a draw it was made of (round B235, CR 614.5), in one number.
  */
 const SCRIVENER_UNIT = 1000;
+/**
+ * Enduring Renewal (round B236): the Scriveners' number (the pendings' `scriv`) also counts the Enduring Renewals that already
+ * replaced a draw this one was made of, this many to one (CR 614.5), so it travels with the draw unchanged.
+ */
+const RENEWAL_UNIT = 1000;
 const madeEntry = (archives: number, scrivs: number) => archives + SCRIVENER_UNIT * scrivs;
 const archivesOfMade = (entry: number) => entry % SCRIVENER_UNIT;
 const scrivsOfMade = (entry: number) => Math.floor(entry / SCRIVENER_UNIT);
@@ -3493,7 +3498,10 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const p = player(s, pid);
   // Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand", mandatory; those that haven't
   // replaced a draw this one was made of yet (CR 614.5). All of them do the same, so one choice stands for them.
-  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - madeScriv : 0;
+  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - (madeScriv % RENEWAL_UNIT) : 0;
+  // Enduring Renewal (round B236): mandatory, those of its controller's that haven't replaced a draw this one was made of
+  // (CR 614.5). All of them do the same, so one choice stands for them.
+  const renewals = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard).length - Math.floor(madeScriv / RENEWAL_UNIT);
   const shields = drawShields(s, pid);
   const thief = notionThief(s, pid);
   const mine = (f: (a: CompiledCard) => unknown) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && f(abilitiesOf(s, obj(s, id))));
@@ -3517,9 +3525,10 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Forbidden Crypt: one of each name, mandatory (two of them do the same thing; the first replaces the draw, CR 614.5).
   const crypts: ObjectId[] = [];
   for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0) return undefined;
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && renewals <= 0) return undefined;
   const out = [...shields];
   if (scriveners > 0) out.push({ key: "scrivener", label: "Draw two cards and lose 1 life instead (Blood Scrivener)" });
+  if (renewals > 0) out.push({ key: "renewal", label: "Reveal the top card of your library instead: a creature card goes into your graveyard, any other card is drawn (Enduring Renewal)" });
   for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
   for (const id of sages) out.push({ key: `sages:${id}`, label: `Reveal the top ${abilitiesOf(s, obj(s, id)).drawRevealCreatures} cards instead, the creature cards into your hand, the rest on the bottom of your library (${nameOf(s, id)})` });
   for (const id of exilers) {
@@ -3546,7 +3555,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
     out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && scriveners <= 0 && renewals <= 0 && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -3628,6 +3637,24 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
     if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
     made.unshift(madeEntry(n, madeScriv + 1), madeEntry(n, madeScriv + 1));
     loseLife(s, pid, 1);
+    return;
+  }
+  if (key === "renewal") {
+    // Enduring Renewal (round B236): the top card of the library is revealed instead (CR 614.1a, 701.20a); a creature card
+    // (by its characteristics there, an animated one too, rulings) goes into the graveyard; anything else, or no card at
+    // all, means "draw a card": a new draw this Renewal doesn't replace again (CR 614.5), which another Renewal, the Archives
+    // that could replace this draw and the rest still can. From an empty library that draw is one the player can't make
+    // (CR 704.5b). Rulings: it's the card revealed, unless something changes the library in between.
+    const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard)!;
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    const top = p.library[0];
+    if (top !== undefined && objIsType(s, obj(s, top), "Creature")) {
+      log(s, `${p.name} reveals ${nameOf(s, top)} from the top of their library instead of drawing and puts it into their graveyard (${nameOf(s, src)}).`);
+      moveObject(s, top, "graveyard");
+      return;
+    }
+    log(s, top !== undefined ? `${p.name} reveals ${nameOf(s, top)} from the top of their library instead of drawing, then draws a card (${nameOf(s, src)}).` : `${p.name} reveals no card from their empty library instead of drawing, then draws a card (${nameOf(s, src)}).`);
+    made.unshift(madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + RENEWAL_UNIT));
     return;
   }
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key);
@@ -5690,7 +5717,7 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
   if (player(s, pid).handRevealedWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc)) return true;
   return s.battlefield.some((id) => {
     const r = abilitiesOf(s, obj(s, id)).revealHands;
-    return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid);
+    return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid) || (r === "you" && controllerOf(s, obj(s, id)) === pid);
   });
 }
 
@@ -8428,6 +8455,11 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   const k = compileCard(d).kicker!;
   const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
   const name = kickerName(k);
+  // Primitive Justice (round B236): how many times each of its two costs was paid.
+  if (k.optional && k.multi && k.costs.length > 1) {
+    const each = k.costs.map((c, i) => [c, kicks.filter((x) => x === i).length] as const).filter(([, n]) => n > 0);
+    return `, paying the additional ${each.map(([c, n]) => `${c}${n === 1 ? " once" : n === 2 ? " twice" : ` ${n} times`}`).join(" and ")}`;
+  }
   if (k.optional) return `, paying its additional cost (${k.text})`;
   if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
   if (k.extraCosts) return `, kicked (${k.text})`;

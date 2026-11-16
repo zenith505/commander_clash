@@ -814,8 +814,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Prototype Portal: an X the ability's text sets isn't chosen (CR 107.3c).
     const fixedX = definedX(s, s.objects[objectId]!, ab, xOpponent !== undefined ? { xOpponent } : undefined);
     if (x === undefined && fixedX != null) x = fixedX;
+    // Reflecting Mirror: "X is twice the mana value of that spell", set by the target once it's chosen (CR 107.3c, 601.2f).
+    const targetX = !!ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs;
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
-    if (x === undefined && parseManaCost(ab.manaCost).hasX) {
+    if (x === undefined && !targetX && parseManaCost(ab.manaCost).hasX) {
       // Osgir, the Reconstructor: "Exile an artifact card with mana value X from your graveyard": only some X work, so the
       // greatest that does.
       const mvCard = ab.costs?.find((c) => c.kind === "exileFromGraveyard" && c.mvX);

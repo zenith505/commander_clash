@@ -1,6 +1,6 @@
 # Roadmap
 
-31,501 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,504 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9744,6 +9744,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   could have gone to X after the {B} symbol, since the caster decides which mana pays which part, CR 601.2h; a copy has none,
   CR 707.10). Browser tests for Fight or Flight's separation of Ana's creatures and Stand or Fall's pile choice for your
   blockers. +4, 31,501 of 31,936. The compiled text of every other card is unchanged.
+- Round B235 (least played first, from the Lane B skip lists): Whippoorwill (damage that would be dealt to the target
+  creature this turn can't be prevented, CR 615.12, protection and shields included, or dealt instead to another permanent or
+  player, CR 614.9, whatever its source, a redirection to it too, while it's the object it was: GameObject.damageUnalterableTurn,
+  damage.ts damageUnalterableTo; excess damage a spell sends to the controller isn't a redirection, CR 120.4a; it can't be
+  regenerated; a delayed trigger exiles the card it becomes if it dies this turn). Reflecting Mirror (X defined by the target
+  spell, twice its mana value with its X, CR 107.3c, 202.3e, worked out after targets, CR 601.2f: ActivatedAbility.xIs
+  twiceTargetSpellMv, definedX now takes the targets, and the X picker is skipped for it; the target changes only if the
+  spell's one target is still you as it resolves, ifOnly "you", to a player, Rebound's mustBe; a bot answers a harmful spell
+  aimed only at it). Blood Scrivener (each draw while its controller's hand is empty is replaced by two draws and 1 life lost,
+  CR 614.1a; a Scrivener doesn't replace the draws it made, CR 614.5, but another one does, rulings: one draw with two of them
+  is three cards and 2 life; the `made` draws now carry how many Scriveners already applied, game.ts madeEntry; with dredge, an
+  Archive or another replacement the player chooses the order, CR 616.1, drawReplacementChoices "scrivener"). Browser tests for
+  Reflecting Mirror's activation and new target and Blood Scrivener's choice beside dredge. +3, 31,504 of 31,936. The compiled
+  text of every other card is unchanged.
+- Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star ("for one spell this turn":
+  only the mana cost's symbols, not additional costs, and the player picks the spell), Sanctuary Blade (a choice in the middle
+  of every way an Equipment becomes attached), Hollow Warrior (attack and block costs that tap another creature), Blood of the
+  Martyr (an optional redirection asked for each damage event) and Guardian Angel (paying {1} any time you could cast an
+  instant for a new shield). Known gaps: Blood Scrivener counts the Scriveners that already applied in a chain of draws, not
+  which ones, so one leaving in the middle of a chain could leave another unapplied; its life is lost as the draw is
+  replaced, before the two draws; bots order a Scrivener and an Archive the Archive first (fewer cards).
 - Out after round B234 (looked at, not done): the lists after round B233 stay out, and Threefold Signal and Djinn
   Illuminatus (still out: replicate granted to spells needs a second kicker-like cost beside a spell's own, rulings, and
   Threefold Signal's copies of permanent spells become tokens). Known gaps: bots separate piles to be even by their worth

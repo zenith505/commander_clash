@@ -4577,6 +4577,11 @@ export type Effect =
    * (`kind` "attack") or block ("block") this turn (GameState.pilesOnlyThisTurn).
    */
   | { type: "pilesOnly"; who: PlayerRef; kind: "attack" | "block" }
+  /**
+   * Whippoorwill (round B235): "Damage that would be dealt to that creature this turn can't be prevented or dealt instead to
+   * another permanent or player" (CR 615.12, 614.9): GameObject.damageUnalterableTurn, while it's the object it is (CR 400.7).
+   */
+  | { type: "damageUnalterable"; what: ObjRef }
   /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
   | { type: "chosenAttackDestroy"; key: string }
   /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */
@@ -5039,7 +5044,7 @@ export type Effect =
    * to the same new target, one that meets each of those targets' conditions (rulings). `mustBe`: "The new target must be a
    * player / a creature" (Rebound, Silver Wyvern).
    */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true; all?: true; mustBe?: "player" | "creature"; /** Meddle: "If target spell has only one target and that target is a creature" (Quicksilver Dragon: "is ~"): checked as this resolves, and nothing changes otherwise; any spell can be targeted. */ ifOnly?: "creature" | "self" }
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true; all?: true; mustBe?: "player" | "creature"; /** Meddle: "If target spell has only one target and that target is a creature" (Quicksilver Dragon: "is ~"): checked as this resolves, and nothing changes otherwise; any spell can be targeted. */ ifOnly?: "creature" | "self" | /** Reflecting Mirror (round B235): "if that target is you": its one target is this ability's controller. */ "you" }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -7395,7 +7400,7 @@ export interface ActivatedAbility {
    * "{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card." (Prototype Portal): X is
    * defined by the ability, not chosen (CR 107.3c), worked out as it's activated; with no card exiled it can't be (rulings).
    */
-  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind } | /** Bargaining Table: "X is the number of cards in an opponent's hand": the opponent chosen as it's announced (CostChoices.xOpponent, rulings). */ { opponentHand: true };
+  xIs?: "linkedCardMv" | /** Voodoo Doll: "X is the number of pin counters on ~": that many on it as it's activated (rulings). */ { counters: CounterKind } | /** Bargaining Table: "X is the number of cards in an opponent's hand": the opponent chosen as it's announced (CostChoices.xOpponent, rulings). */ { opponentHand: true } | /** Reflecting Mirror (round B235): "X is twice the mana value of that spell": the spell this target (an index of the body's targets) is, as the cost is worked out after targets (CR 107.3c, 601.2f). */ { twiceTargetSpellMv: number };
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -8901,6 +8906,8 @@ export interface CompiledCard {
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
    * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
   drawTwoInstead?: true | "always";
+  /** Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand, instead you draw two cards and you lose 1 life." */
+  drawTwoLoseLifeEmptyHand?: true;
   /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as

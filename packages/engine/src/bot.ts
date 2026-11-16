@@ -3743,6 +3743,18 @@ function chooseSpellskite(s: GameState, pid: PlayerId, top: StackItem): Action[]
         if (plan) return plan;
         continue;
       }
+      // Reflecting Mirror (round B235): an opponent's harmful spell aimed only at us, turned onto another player, when we can
+      // pay its X (twice the spell's mana value, set by the target).
+      const mirror = abilities[i]!.body.effects.find((x) => x.type === "changeTarget" && x.ifOnly === "you");
+      if (mirror?.type === "changeTarget") {
+        const chosen = (top.targets ?? []).filter((c) => c.kind !== "none");
+        const j = (top.targets ?? []).findIndex((c) => c.kind !== "none");
+        const atMe = top.kind === "spell" && chosen.length === 1 && chosen[0]!.kind === "player" && chosen[0]!.id === pid && harm[j] && !!body.targets[j];
+        const elsewhere = atMe && changeTargetOptions(s, top, body.targets[j]!, chosen[0]!).some((t) => t.kind === "player" && t.id !== pid);
+        const plan = elsewhere ? planActivate(s, pid, id, i, [{ kind: "stack", id: top.id }]) : null;
+        if (plan) return plan;
+        continue;
+      }
       const e = abilities[i]!.body.effects.find((x) => x.type === "changeTarget" && x.anyOne);
       if (!e) continue;
       const specs = body.targets;
@@ -6795,6 +6807,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "~ becomes a Kithkin Spirit with base power and toughness 2/2" when it's that big already, or bigger (Figure of
       // Destiny after its later steps): it would only shrink.
       if (shrinksSelf(s, o, ab.body)) continue;
+      // Reflecting Mirror (round B235): only in answer to a spell aimed at us (chooseSpellskite).
+      if (ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs) continue;
       // Biomancer's Familiar: only for a creature of ours with +1/+1 counters that could adapt again this turn.
       const refresh = ab.body.effects.some((e) => e.type === "adaptFresh") ? adaptAgain(s, pid) : undefined;
       if (refresh === null) continue;

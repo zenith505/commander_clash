@@ -587,7 +587,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   // "Untap a tapped creature you control" with a creature that's untapped: it's tapped for mana first (Halo Fountain).
   const ab0 = abilitiesOf(s, obj(s, objectId)).activated[index];
   // Prototype Portal: an X the ability sets (CR 107.3c).
-  const x = x0 ?? (ab0 && definedX(s, obj(s, objectId), ab0, costs)) ?? undefined;
+  const x = x0 ?? (ab0 && definedX(s, obj(s, objectId), ab0, costs, targets)) ?? undefined;
   const untapCost = ab0?.costs?.find((c) => c.kind === "tap" && c.untap);
   const forMana = untapCost ? (costs?.tap ?? []).find((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped) : undefined;
   if (forMana !== undefined) {

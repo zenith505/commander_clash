@@ -4424,6 +4424,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "af66da4b-2f36-4dd2-a5c6-18e6023c5aba",
+  "name": "Blood Scrivener",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wizard"
+  ],
+  "oracleText": "If you would draw a card while you have no cards in hand, instead you draw two cards and you lose 1 life.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dgm",
+  "releasedAt": "2013-05-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1534d90f-fc88-42dc-bf01-8b0986485e78",
   "name": "Blood Sun",
   "manaCost": "{2}{R}",
@@ -17008,6 +17039,40 @@
   "set": "grn",
   "releasedAt": "2018-10-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a426a258-fd8b-489c-8642-9868ee47de85",
+  "name": "Golgari Thug",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "When this creature dies, put target creature card from your graveyard on top of your library.\nDredge 4 (If you would draw a card, you may mill four cards instead. If you do, return this card from your graveyard to your hand.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Dredge",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2019-12-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32027,6 +32092,28 @@
   "set": "afc",
   "releasedAt": "2021-07-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2fb505c6-3d28-4b83-9820-4b9db64c8304",
+  "name": "Reflecting Mirror",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: Change the target of target spell with a single target if that target is you. The new target must be a player. X is twice the mana value of that spell.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

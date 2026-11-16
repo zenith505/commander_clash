@@ -455,6 +455,8 @@ export interface GameObject {
   exileIfDiesTurn?: number;
   /** "It can't be regenerated this turn": the turn its regeneration shields don't apply (CR 701.19c). */
   noRegenTurn?: number;
+  /** Whippoorwill (round B235): "Damage that would be dealt to that creature this turn can't be prevented or dealt instead to another permanent or player": the turn (CR 615.12, 614.9). */
+  damageUnalterableTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
   noCombatDamageTurn?: number;
   /** Gurzigost: "You may have ~ assign its combat damage this turn as though it weren't blocked", chosen as it resolved (rulings): the turn. */
@@ -1714,6 +1716,8 @@ export type PendingDecision =
       bottom?: true;
       made?: number[];
       archives?: number;
+      /** Blood Scrivener (round B235): how many Scriveners already replaced a draw this one was made of (CR 614.5). */
+      scriv?: number;
     }
   /**
    * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
@@ -1737,6 +1741,8 @@ export type PendingDecision =
       after?: "drawStep";
       /** This draw is one a replacement made: how many Alhammarret's Archives can still replace it (CR 614.5). */
       archives?: number;
+      /** Blood Scrivener (round B235): how many Scriveners already replaced a draw this one was made of (CR 614.5). */
+      scriv?: number;
     }
   | {
       kind: "dredge";
@@ -1750,6 +1756,8 @@ export type PendingDecision =
        * cards instead", rather than drawing.
        */
       archive?: number;
+      /** Blood Scrivener (round B235): how many Scriveners already replaced a draw this one was made of (CR 614.5). */
+      scriv?: number;
       /** Abundance could replace this draw too (CR 616.1): the permanent's name; choosing land or nonland applies it. */
       abundance?: string;
       after?: "drawStep";

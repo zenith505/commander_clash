@@ -399,6 +399,15 @@ function diesMatches(
   if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
   // Dance of Many: a token this object created, as the object it is now (CR 400.7).
   if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
+  // Diabolic Servitude (round B236): the creature its enters ability put onto the battlefield, linked to the object the
+  // watcher was (GameState.animated, CR 607.2a), still that object as it died; the watcher leaving at the same time too,
+  // as it last existed (CR 603.10a).
+  if (d.animatedBySelf) {
+    const src = s.objects[srcId];
+    const zc = src?.zone === "battlefield" ? (src.zoneChanges ?? 0) : s.lastKnown?.[srcId]?.zc;
+    const link = zc !== undefined ? s.animated?.[`${srcId}@${zc}`] : undefined;
+    return !!link && link.id === dying.o.id && s.lastKnown?.[link.id]?.zc === link.zc && dying.c.types.includes("Creature");
+  }
   if (srcId === dying.o.id) {
     // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
     if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;

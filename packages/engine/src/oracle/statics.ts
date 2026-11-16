@@ -911,6 +911,8 @@ export function parseDuring(text: string): StaticCondition | null {
   if ((m = /^(your|an opponent's) end step$/.exec(text))) return { kind: "during", window: "end", ...whose(m[1]) };
   // "Any player may activate this ability but only during their draw step" (Well of Knowledge): the activator's.
   if (text === "your draw step") return { kind: "during", window: "draw", turn: "you" };
+  // Mana Cache (round B236): "Any player may activate this ability but only during their turn before the end step".
+  if (text === "your turn before the end step") return { kind: "during", window: "beforeEnd", turn: "you" };
   if ((m = /^(?:the|(your)) declare (attackers|blockers) step( on your turn| on an opponent's turn)?$/.exec(text)))
     return { kind: "during", window: m[2] === "attackers" ? "declareAttackers" : "declareBlockers", ...whose(m[1] ?? m[3]) };
   if (text === "the end of combat step") return { kind: "during", window: "endCombat" };

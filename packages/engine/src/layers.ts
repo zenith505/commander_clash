@@ -717,6 +717,8 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
       return s.step === w;
     case "afterUpkeep":
       return s.step !== "untap" && s.step !== "upkeep";
+    case "beforeEnd":
+      return s.step !== "untap" && s.step !== "end" && s.step !== "cleanup";
     case "combat": // any combat phase of the turn (CR 506.8c)
       return ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
     case "combatBeforeBlocks": // before the declare blockers step begins (CR 506.8b)

@@ -4861,6 +4861,16 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?:
   if (compileCard(defOf(s, obj(s, id))).flashIfKicked) return canActAtSorcerySpeed(s, pid) ? [[]] : [[0]];
   // "Kicker {X}": kicked only with an X chosen for it, else not.
   if (parseManaCost(k.costs[0]!).hasX && !parseManaCost(defOf(s, obj(s, id)).manaCost).hasX) return x ? [[0]] : [[]];
+  // Primitive Justice (round B236): two costs, each any number of times; the {1}{G}s first (they gain life too), then
+  // the {1}{R}s, most paid first. Whether there are targets enough for them is planCast's.
+  if (k.multi && k.costs.length === 2) {
+    const each = Math.max(1, ...k.costs.map((c) => manaValue(parseManaCost(c))));
+    const spare = availableMana(s, pid) - (free ? 0 : totalWithoutX(s, pid, id));
+    const most = Math.min(4, Math.floor(spare / each));
+    const out: number[][] = [];
+    for (let t = most; t >= 0; t--) for (let g = t; g >= 0; g--) out.push([...(Array(t - g).fill(0) as number[]), ...(Array(g).fill(1) as number[])]);
+    return out;
+  }
   if (k.multi) {
     const each = manaValue(parseManaCost(k.costs[0]!));
     const spare = availableMana(s, pid) - (free ? 0 : totalWithoutX(s, pid, id));

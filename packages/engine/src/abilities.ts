@@ -2824,7 +2824,7 @@ export const timedCondition = (c: StaticCondition | undefined): boolean =>
  * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
  * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
  */
-export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
+export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | /** Mana Cache (round B236): "before the end step": any step of the turn before its end step (CR 513), the untap step aside (no player gets priority there, CR 502.4). */ "beforeEnd" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
 
 /**
  * "Only before combat", "only before attackers are declared", "only before blockers are declared", "only before the
@@ -4582,6 +4582,13 @@ export type Effect =
    * another permanent or player" (CR 615.12, 614.9): GameObject.damageUnalterableTurn, while it's the object it is (CR 400.7).
    */
   | { type: "damageUnalterable"; what: ObjRef }
+  /**
+   * Diabolic Servitude (round B236): "the creature put onto the battlefield with this enchantment" (CR 607.2a): "link" notes
+   * the object target `target` became on the battlefield as this source's (GameState.animated); "exile" exiles it, if it's
+   * still that object on the battlefield (rulings: once it leaves, the link is gone).
+   */
+  | { type: "servitudeLink"; target: number }
+  | { type: "servitudeExile" }
   /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
   | { type: "chosenAttackDestroy"; key: string }
   /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */
@@ -7013,7 +7020,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Another creature dealt damage this turn by a Spider you controlled" (Shelob, Child of Ungoliant): by a source of this creature type controlled by the trigger's controller as it dealt the damage (GameObject.damagedByKinds). */ damagedByKindYours?: string; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Another creature dealt damage this turn by a Spider you controlled" (Shelob, Child of Ungoliant): by a source of this creature type controlled by the trigger's controller as it dealt the damage (GameObject.damagedByKinds). */ damagedByKindYours?: string; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; /** Diabolic Servitude (round B236): "When the creature put onto the battlefield with ~ dies": the one this object's enters ability returned (GameState.animated), as the objects they were (CR 603.10a). */ animatedBySelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -7543,6 +7550,8 @@ export type ManaProduce =
  */
 export interface ManaAbility {
   text: string;
+  /** Mana Cache (round B236): "Any player may activate this ability" (CR 602.2): its activator controls it (CR 113.8) and gets the mana. */
+  anyPlayer?: true;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
   toChosenPlayer?: true;
   /**
@@ -8909,6 +8918,11 @@ export interface CompiledCard {
   /** Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand, instead you draw two cards and you lose 1 life." */
   drawTwoLoseLifeEmptyHand?: true;
   /**
+   * Enduring Renewal (round B236): "If you would draw a card, reveal the top card of your library instead. If it's a creature
+   * card, put it into your graveyard. Otherwise, draw a card." (CR 614.1a; the draw it makes isn't replaced by it again, CR 614.5).
+   */
+  drawRevealCreatureToYard?: true;
+  /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
    * each draw would happen.
@@ -9682,8 +9696,8 @@ export interface CompiledCard {
   attackNearestChosen?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
-  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */
-  revealHands?: "players" | "opponents";
+  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy); "you": "Play with your hand revealed" (Enduring Renewal, round B236), its controller's. */
+  revealHands?: "players" | "opponents" | "you";
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

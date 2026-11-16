@@ -2688,6 +2688,33 @@ function KickPickBar({
       Cancel
     </button>
   );
+  // Primitive Justice (round B236): two costs, each any number of times; a count for each.
+  if (pick.multi && pick.costs.length === 2) {
+    const counts = [0, 1].map((i) => pick.chosen.filter((x) => x === i).length);
+    const set = (i: number, k: number) => onChange([0, 1].flatMap((j) => Array(Math.max(0, j === i ? k : counts[j]!)).fill(j) as number[]));
+    const total = counts[0]! + counts[1]!;
+    return (
+      <div className="targeting x-pick">
+        <span>
+          <strong>{pick.label}</strong>: how many times to pay each additional cost?
+        </span>
+        {[0, 1].map((i) => (
+          <span key={i} className="kick-cost">
+            <ManaCost cost={pick.costs[i]!} size="sm" />
+            <button className="ghost" disabled={counts[i]! <= 0} onClick={() => set(i, counts[i]! - 1)} aria-label={`Pay ${pick.costs[i]} one time fewer`}>
+              −
+            </button>
+            <span className="kick-count">{counts[i]}</span>
+            <button className="ghost" disabled={!can([...pick.chosen, i])} onClick={() => set(i, counts[i]! + 1)} aria-label={`Pay ${pick.costs[i]} one more time`}>
+              +
+            </button>
+          </span>
+        ))}
+        <button onClick={() => onDone(pick.chosen)}>{total ? `Pay ${total === 1 ? "once" : `${total} times`}` : "Don't pay"}</button>
+        {cancel}
+      </div>
+    );
+  }
   if (pick.multi) {
     const n = pick.chosen.length;
     const set = (k: number) => onChange(Array(Math.max(0, k)).fill(0) as number[]);

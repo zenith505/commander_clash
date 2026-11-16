@@ -1,7 +1,7 @@
 import type { AbilityBody, Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "../cards";
 import { nameLandBan } from "../names";
-import { cardTypesAmong, castPayText, nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
+import { cardTypesAmong, castPayText, nearestOpponent, faceDownExileGroup, hiddenInExile, adventureExileCards, graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, payLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, damagedNoRegen, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -2048,11 +2048,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           list = [pick];
         }
       }
+      // Bone Shaman (round B230): which can't be regenerated, before any of them is destroyed (they're destroyed at once).
+      const barred = list.length > 1 && !e.noRegen ? damagedNoRegen(s) : undefined;
       for (const o of list) {
         // As it last existed, for "for each creature destroyed this way" (CR 608.2h).
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) };
         // "If that creature dies this way": it was put into a graveyard (CR 700.4), not exiled or moved elsewhere instead.
-        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen === "creatures" ? objIsType(s, o, "Creature") : !!e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
+        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen === "creatures" ? objIsType(s, o, "Creature") : !!e.noRegen || !!barred?.has(o.id), ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
       }
       return;
     }

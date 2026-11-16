@@ -2603,6 +2603,25 @@ export function useShieldCounter(s: GameState, o: GameObject, what: string): boo
 }
 
 /**
+ * Bone Shaman (round B230): the permanents that can't be regenerated because a permanent with "Creatures dealt damage by ~
+ * this turn can't be regenerated this turn" (CompiledCard.damagedCantRegenerate) dealt them damage this turn, each as the
+ * object it is now (TurnLog.damageDealtTo `src`, CR 400.7). Worked out before a state-based action destroys several
+ * creatures at once (CR 704.3), so a Bone Shaman dying beside them still counts (its ability applies to the event it leaves in).
+ */
+export function damagedNoRegen(s: GameState): Set<ObjectId> {
+  const out = new Set<ObjectId>();
+  const dealt = s.turnLog?.damageDealtTo;
+  if (!dealt) return out;
+  const shamans = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).damagedCantRegenerate).map((id) => `${id}@${obj(s, id).zoneChanges ?? 0}`));
+  if (!shamans.size) return out;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (objIsType(s, o, "Creature") && (dealt[`${id}@${o.zoneChanges ?? 0}`] ?? []).some((d) => !!d.src && shamans.has(d.src))) out.add(id);
+  }
+  return out;
+}
+
+/**
  * Destroy a permanent (CR 701.8): indestructible ones aren't (CR 702.12b), and a
  * regeneration shield replaces it (CR 701.19a): damage is removed, it's tapped, and it
  * leaves combat. Returns true if it was destroyed, wherever a replacement effect then sent it.
@@ -2623,6 +2642,8 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   const name = defOf(s, o).name;
   // "It can't be regenerated (this turn)": its shields don't apply (CR 701.19c); they stay for later.
   // Mossbridge Troll: "If ~ would be destroyed, regenerate it": regenerated with no shield used up (rulings).
+  // Bone Shaman (round B230): "Creatures dealt damage by ~ this turn can't be regenerated this turn" (CR 701.19c).
+  if (!noRegen && ((o.regenShields ?? 0) > 0 || abilitiesOf(s, o).regeneratesInsteadOfDestroyed) && damagedNoRegen(s).has(o.id)) noRegen = true;
   const always = !noRegen && o.noRegenTurn !== s.turn && !!abilitiesOf(s, o).regeneratesInsteadOfDestroyed;
   if (!noRegen && o.noRegenTurn !== s.turn && ((o.regenShields ?? 0) > 0 || always)) {
     if (!always) {
@@ -13941,9 +13962,10 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
 function blockQualities(s: GameState, bl: GameObject, at: GameObject): { bq?: BlockQualities; aq?: BlockQualities } {
   const q = (o: GameObject): BlockQualities => {
     const c = characteristics(s, o);
-    return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}) };
+    return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}), ...(c.colors.length ? { col: [...c.colors] } : {}) };
   };
-  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary");
+  // Sea Troll (round B230): a blue creature in it, its colors then.
+  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary") || !!x.col?.includes("U");
   const [b, a] = [q(bl), q(at)];
   return { ...(notable(b) ? { bq: b } : {}), ...(notable(a) ? { aq: a } : {}) };
 }
@@ -13957,7 +13979,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
     bl.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
-    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, at) });
+    ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${at.id}@${at.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, at), ac: controllerOf(s, at) });
     at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
@@ -13972,7 +13994,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       bl.blocking!.push(m.id);
       (m.blockedBy ??= []).push(bl.id);
       m.becameBlockedTurn = s.turn;
-      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, m) });
+      ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, m), ac: controllerOf(s, m) });
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }
@@ -14586,6 +14608,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         log(s, `${p.name} starts their engines: speed 1.`);
         changed = true;
       }
+    // Bone Shaman (round B230): which of them can't be regenerated, as this pass's actions all happen at once (CR 704.3).
+    const barred = damagedNoRegen(s);
     for (const id of [...s.battlefield]) {
       const o = s.objects[id];
       if (!o || o.zone !== "battlefield") continue;
@@ -14606,7 +14630,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         moveObject(s, id, "graveyard");
         changed = true;
       } else if (((o.damage > 0 && lethalLeft(s, o) === 0) || o.deathtouchDamage) && !objHasKeyword(s, o, "Indestructible")) {
-        destroyPermanent(s, o, `${d.name} dies.`); // 704.5g, 704.5h: destroyed (or regenerated)
+        destroyPermanent(s, o, `${d.name} dies.`, barred.has(id)); // 704.5g, 704.5h: destroyed (or regenerated)
         changed = true;
       }
     }

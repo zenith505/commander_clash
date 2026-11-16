@@ -1316,6 +1316,8 @@ export interface ExtraTurn {
 export interface BlockQualities {
   sub: string[] | "all";
   sup?: string[];
+  /** Its colors as the block was declared (Sea Troll's "blocked or was blocked by a blue creature this turn"). */
+  col?: Color[];
 }
 
 export interface PendingTrigger {
@@ -1839,7 +1841,7 @@ export interface TurnLog {
    * Blocks declared this turn (CR 509.1), banding's included (CR 702.22h): each blocker and the attacker it blocked as
    * `id@zoneChanges` (Venomous Breath's "creatures that blocked or were blocked by it this turn").
    */
-  blocks?: { blocker: string; attacker: string; /** The combat phase it was declared in (GameState.combatsThisTurn): Ride Down's "this combat". */ combat?: number; /** The blocker's and the attacker's creature types ("all" for a changeling) and supertypes as the block was declared: Time to Reflect's "blocked or was blocked by a Zombie" (TargetSpec.blockedWith). */ bq?: BlockQualities; aq?: BlockQualities }[];
+  blocks?: { blocker: string; attacker: string; /** The combat phase it was declared in (GameState.combatsThisTurn): Ride Down's "this combat". */ combat?: number; /** The blocker's and the attacker's creature types ("all" for a changeling) and supertypes as the block was declared: Time to Reflect's "blocked or was blocked by a Zombie" (TargetSpec.blockedWith). */ bq?: BlockQualities; aq?: BlockQualities; /** The attacker's controller as it became blocked (Glyph of Reincarnation's "the player who controlled that creature the last time it became blocked by that Wall"). */ ac?: PlayerId }[];
   /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
   cycled?: Record<number, number>;
   /** Power-up abilities each player activated this turn (Advancing the Spirit's "the first power-up ability you activate during each of your turns"). */
@@ -2957,6 +2959,8 @@ export interface Resolving {
     lookTopMay?: { looked: ObjectId[]; did?: boolean; pick?: string };
     /** Backdraft (round B229): the player and spell damage chosen ("player:amount"). */
     spellDamageBack?: { pick?: string };
+    /** Glyph of Reincarnation (round B230): how many creatures that died this way each player controlled as each became blocked by the Wall, the players still to choose for, and the cards chosen so far. */
+    glyph?: { left: { player: PlayerId; n: number }[]; chosen: ObjectId[] };
     /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */
     iceCave?: { queue: PlayerId[] };
     /** Tidal Flats (Effect attackersPayOrBlockersGain, round B214): the attackers whose controllers are still to choose, and those not paid for. */

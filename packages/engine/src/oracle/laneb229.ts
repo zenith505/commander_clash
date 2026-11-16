@@ -2,6 +2,7 @@
 // whole spells (after round B222's).
 import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseBody } from "./body";
+import { roundB230Spell } from "./laneb230";
 import { parseTrigger } from "./triggers";
 
 const DESPOILER = "As ~ enters, you may put two cards your opponents own from exile into their owners' graveyards. If you do, ~ enters with four +1/+1 counters on it.";
@@ -56,5 +57,5 @@ export function roundB229Spell(text: string): AbilityBody | null | undefined {
   }
   // Backdraft: see Effect halfSpellDamageBack.
   if (text === BACKDRAFT) return { targets: [], effects: [{ type: "halfSpellDamageBack" }], text };
-  return undefined;
+  return roundB230Spell(text);
 }

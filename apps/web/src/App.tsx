@@ -3695,8 +3695,11 @@ function Seat({
         {(s.emblems ?? [])
           .filter((id) => s.objects[id]!.owner === pid)
           .map((id) => {
-            const title = `${cardOf(s, id).name} (in the command zone): ${cardOf(s, id).oracleText.replace(/~/g, "this emblem").replace(/\n/g, " ")}`;
-            const label = <>✦ Emblem: {cardOf(s, id).name.replace(/ emblem$/, "").split(",")[0]}</>;
+            // Oko, Shadowmoor Scion's (round 387): the creature type chosen for it.
+            const type = s.objects[id]!.chosen?.type;
+            const text = cardOf(s, id).oracleText.replace(/~/g, "this emblem").replace(/\n/g, " ");
+            const title = `${cardOf(s, id).name} (in the command zone): ${type ? text.replace(/\bof the chosen type\b/g, `of the chosen type (${type})`) : text}`;
+            const label = <>✦ Emblem: {cardOf(s, id).name.replace(/ emblem$/, "").split(",")[0]}{type ? ` (${type})` : ""}</>;
             // Yours, with an activated ability (Ob Nixilis of the Black Oath's): click it for its menu (CR 114.4).
             if (pid === HUMAN && abilitiesOf(s, s.objects[id]!).activated.length)
               return (

@@ -7,6 +7,7 @@ import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, X_MODES_MAX, type CastHow } from "../modes";
 import type { CardDef, Color, ManaType, PlayerId } from "../types";
+import { CHOSEN_TYPE_EMBLEM } from "../emblems";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -105,6 +106,7 @@ import { round383Line } from "./round383";
 import { round384Line } from "./round384";
 import { round385Line } from "./round385";
 import { round386Line } from "./round386";
+import { round387Line } from "./round387";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -1184,6 +1186,8 @@ export function compile(d: CardDef): CompiledCard {
     if (d.types.includes("Planeswalker") && roundB206Line(line, raw, out, isSpell)) continue;
     // Garruk, Curse Breaker's −4 (round B219).
     if (d.types.includes("Planeswalker") && roundB219Line(line, raw, out, isSpell)) continue;
+    // Oko, Lorwyn Liege's +2 and Oko, Shadowmoor Scion's −6 (round 387).
+    if (d.types.includes("Planeswalker") && round387Line(line, raw, out, isSpell)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
     if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
@@ -6208,6 +6212,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round385Line(line, raw, out, isSpell)) continue;
     // Round 386's whole lines (oracle/round386.ts).
     if (round386Line(line, raw, out, isSpell)) continue;
+    // Round 387's whole lines (oracle/round387.ts).
+    if (round387Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7458,7 +7464,7 @@ export function compile(d: CardDef): CompiledCard {
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
-  checkCastingLinks(out);
+  checkCastingLinks(out, d);
   // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_NUMBER_EXCEPT_PROTECTION) && !out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push("(protection from mana values but a chosen number with no number chosen as it enters)");
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
@@ -8085,7 +8091,7 @@ function linkExile(out: CompiledCard) {
  * Text that refers to how the spell was cast needs the cost it refers to: "if it was kicked with its
  * {1}{U} kicker" becomes that kicker's index (CR 702.33f), "the sacrificed creature" needs a sacrifice cost.
  */
-function checkCastingLinks(out: CompiledCard) {
+function checkCastingLinks(out: CompiledCard, d: CardDef) {
   let bad = false;
   for (const k of out.entersKicked ?? []) {
     // "If ~ was kicked" with one (not multi-) kicker: that one.
@@ -8201,6 +8207,8 @@ function checkCastingLinks(out: CompiledCard) {
   // Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType) is its targets' type.
   if (out.castChooseType) choices.add("creatureType");
   if (out.entersNamesWithOpponent) choices.add("cardName");
+  // Oko, Shadowmoor Scion's emblem (round 387): its "chosen type" is the one chosen as the ability that made it resolved.
+  if (d.typeLine === "Emblem" && d.oracleId.endsWith(CHOSEN_TYPE_EMBLEM)) choices.add("creatureType");
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   // "The exiled card's power" (Corpse Lunge): the one card an "exile a creature card from your graveyard" cost exiled,
   // with nothing sacrificed to share the record.

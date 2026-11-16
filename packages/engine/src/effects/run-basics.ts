@@ -683,9 +683,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "emblem": {
       // Named for its source as it is now, or as it last existed (CR 114.3: most emblems have no name; this is for the log).
       const from = ctxSource(s, ctx).name.split(" // ")[0]!;
+      // Oko, Shadowmoor Scion: the creature type chosen as this resolved (none chosen: nothing to give it, CR 608.2h).
+      const type = e.chosenType ? ctx.chosen?.type : undefined;
+      if (e.chosenType && type === undefined) return;
       for (const pid of players(s, e.who, ctx)) {
-        createEmblem(s, pid, e.abilities, from);
-        log(s, `${player(s, pid).name} gets an emblem with ${e.abilities.map((a) => `"${a.replace(/~/g, "this emblem")}"`).join(" and ")}.`);
+        createEmblem(s, pid, e.abilities, from, type);
+        log(s, `${player(s, pid).name} gets an emblem with ${e.abilities.map((a) => `"${(type !== undefined ? a.replace(/\bof the chosen type\b/g, `of the chosen type (${type})`) : a).replace(/~/g, "this emblem")}"`).join(" and ")}.`);
       }
       invalidateCharacteristics(s);
       return;

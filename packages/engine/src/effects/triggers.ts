@@ -259,6 +259,8 @@ export type TriggerSourceEvent =
   | { type: "roomFullyUnlocked"; id: ObjectId; player: PlayerId }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
+  /** A mentor ability whose source is `source` and whose target is `target` resolved (CR 702.134c), round 387. */
+  | { type: "mentored"; source: ObjectId; target: ObjectId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
   | { type: "transformed"; id: ObjectId; face: number }
   /** A permanent's saddle ability resolved (CR 702.171b), its first time this turn. */
@@ -1681,6 +1683,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = obj(s, id);
         if (controllerOf(s, w) === you) add(w, you, (e) => e === "creatureYouControlBecomesRenowned", undefined, undefined, o);
       }
+  } else if (ev.type === "mentored") {
+    // Aegis of the Legion: "Whenever equipped creature mentors a creature": the Equipment attached to the mentor ability's
+    // source as it resolved (rulings: not one that became unattached before, one attached since), the target the subject.
+    const src = s.objects[ev.source];
+    const t = s.objects[ev.target];
+    if (src && t && src.zone === "battlefield") addHosted(src, (e) => e === "selfMentors", undefined, t);
   } else if (ev.type === "evolved") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfEvolves");

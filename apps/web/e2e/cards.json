@@ -28579,6 +28579,88 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a0c956dc-d7de-4f11-b76f-7537fbee1731",
+  "name": "Oko, Lorwyn Liege // Oko, Shadowmoor Scion",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Oko // Legendary Planeswalker — Oko",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Oko"
+  ],
+  "oracleText": "At the beginning of your first main phase, you may pay {G}. If you do, transform Oko.\n+2: Up to one target creature gains all creature types. (This effect doesn't end.)\n+1: Target creature gets -2/-0 until your next turn.",
+  "loyalty": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Transform",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Oko, Lorwyn Liege",
+    "manaCost": "{2}{U}",
+    "typeLine": "Legendary Planeswalker — Oko",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Planeswalker"
+    ],
+    "subtypes": [
+     "Oko"
+    ],
+    "oracleText": "At the beginning of your first main phase, you may pay {G}. If you do, transform Oko.\n+2: Up to one target creature gains all creature types. (This effect doesn't end.)\n+1: Target creature gets -2/-0 until your next turn.",
+    "loyalty": "3",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/1/d/1dab370a-1067-4d94-be1f-10362d4abf5a.jpg?1783904490",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/1/d/1dab370a-1067-4d94-be1f-10362d4abf5a.jpg?1783904490"
+   },
+   {
+    "name": "Oko, Shadowmoor Scion",
+    "manaCost": "",
+    "typeLine": "Legendary Planeswalker — Oko",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Planeswalker"
+    ],
+    "subtypes": [
+     "Oko"
+    ],
+    "oracleText": "At the beginning of your first main phase, you may pay {U}. If you do, transform Oko.\n−1: Mill three cards. You may put a permanent card from among them into your hand.\n−3: Create two 3/3 green Elk creature tokens.\n−6: Choose a creature type. You get an emblem with \"Creatures you control of the chosen type get +3/+3 and have vigilance and hexproof.\"",
+    "loyalty": "3",
+    "colors": [
+     "G"
+    ],
+    "colorIndicator": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/1/d/1dab370a-1067-4d94-be1f-10362d4abf5a.jpg?1783904490",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/1/d/1dab370a-1067-4d94-be1f-10362d4abf5a.jpg?1783904490"
+   }
+  ]
+ },
+ {
   "oracleId": "dbf05c40-7274-4aaa-94d7-1f28cbe15e09",
   "name": "Omen Machine",
   "manaCost": "{6}",

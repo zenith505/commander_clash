@@ -7,12 +7,16 @@ import { CREATURE_TYPES } from "../keywords";
 import { parseActivated } from "./activated";
 import { parseBody, type Ctx } from "./body";
 import { parseObject } from "./targets";
+import { round387Sentence } from "./round387";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 
 export function round373Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
+  // Round 387's sentences (oracle/round387.ts) first.
+  const r387 = round387Sentence(s, sentences, si, ctx, _effects);
+  if (r387) return r387;
   // Nashi, Moon's Legacy: "exile up to one target legendary or Rat card from your graveyard and copy it. You may cast the
   // copy.", the last sentences of its ability: the copy is made in exile and cast as this resolves or never, paying its
   // costs (X chosen as usual), one not cast ceasing to exist (rulings, CR 608.2g, 707.12), as Kaervek's and Demilich's.

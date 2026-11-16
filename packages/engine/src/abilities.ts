@@ -5129,7 +5129,7 @@ export type Effect =
    * "You get an emblem with "..."", "each opponent gets an emblem with ..." (CR 114.2): each of those players puts an
    * emblem with these abilities into the command zone. "This emblem" in them is "~".
    */
-  | { type: "emblem"; who: PlayerRef; abilities: string[] }
+  | { type: "emblem"; who: PlayerRef; abilities: string[]; /** Oko, Shadowmoor Scion (round 387): "Choose a creature type. You get an emblem with "Creatures you control of the chosen type ..."": the type this ability chose as it resolved, kept on the emblem (GameObject.chosen). */ chosenType?: true }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
   /** "You get an experience counter" (CR 122.1): a counter on the player, counted by other abilities. */
@@ -6410,6 +6410,8 @@ export type TriggerEvent =
   | "selfAttacksAlone"
   | "selfBlocksOrBecomesBlocked" // bushido (CR 702.45a)
   | "selfBlocksCreature"
+  /** Aegis of the Legion (round 387): "Whenever equipped creature mentors a creature": a mentor ability of the host resolved with that creature its target (CR 702.134c), the subject. */
+  | "selfMentors"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
   | "selfBlocksOrBlockedByCreature"
   /** "Whenever ~ deals (combat) damage to a creature": once for each creature dealt damage, its subject. */

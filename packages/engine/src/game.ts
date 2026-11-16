@@ -30,6 +30,7 @@ import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChoose
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
+import { MENTOR_TEXT } from "./oracle/keyword-abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
@@ -4933,7 +4934,11 @@ function resolveTop(s: GameState) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
-    if (item.body && beginResolution(s, item, item.body) === "fizzled") log(s, `${def.name}'s ability does nothing (its targets are gone).`);
+    const res = item.body ? beginResolution(s, item, item.body) : undefined;
+    if (res === "fizzled") log(s, `${def.name}'s ability does nothing (its targets are gone).`);
+    // Mentor (CR 702.134c, round 387): "whenever a creature mentors another creature" triggers as a mentor ability whose
+    // source is the first and whose target is the second resolves (its target still legal, CR 608.2b).
+    else if (item.body?.text === MENTOR_TEXT && item.sourceId && item.targets?.[0]?.kind === "object") fireEvent(s, { type: "mentored", source: item.sourceId, target: item.targets[0].id });
     return;
   }
   if (!item.objectId) return;
@@ -5961,7 +5966,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
-export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(compileCard(d).basicLandManaOnly ? { basicLandOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
+export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject, x?: number): ManaUse => ({ spell: d, ...(x ? { x } : {}), ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(compileCard(d).basicLandManaOnly ? { basicLandOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
 export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; fromGraveyard?: true; flashbackFromGraveyard?: true; owner?: PlayerId; faceDown?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" ? { fromGraveyard: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}), ...(choices?.faceDown ? { faceDown: true as const } : {}) });
@@ -6627,12 +6632,12 @@ export function castProblem(
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
-  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt, cost.cost, choices, o), cost.extra, p.life)) {
+  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt, cost.cost, choices, o, x), cost.extra, p.life)) {
     // Costs not chosen yet: a permanent offered pays part of it (CR 702.48c).
     const offerable = !choices && compileCard(d).offering ? offeringCandidates(s, pid, id) : [];
     const paid = offerable.some((offering) => {
       const c = costToPay(s, pid, o, convoke, improvise, x, undefined, { offering, targets, modes });
-      return typeof c !== "string" && canPayFromPool(s, pid, c.cost, spellUse(d, undefined, c.cost, undefined, o), c.extra, p.life);
+      return typeof c !== "string" && canPayFromPool(s, pid, c.cost, spellUse(d, undefined, c.cost, undefined, o, x), c.extra, p.life);
     });
     if (!paid) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   }
@@ -7673,8 +7678,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
-  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices, o)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, sylexed(s, payableLife(s, p.id)), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
+  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices, o, x)).pool);
+  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o, x) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, sylexed(s, payableLife(s, p.id)), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   payLife(s, p.id, paid.lifePaid);

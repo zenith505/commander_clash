@@ -1,7 +1,7 @@
 # Roadmap
 
-31,494 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,902 of
+31,498 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,903 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -102,7 +102,7 @@ line blocks.
    (an exile trigger counting cards and permanents), Kid Loki (a static for each creature), Abby, Merciless Soldier
    (named tokens plus entering under an opponent's control), Wurmquake (done in round B196) (corrupted, then "another one of those tokens"). Out after round 166:
    The Everflowing Well (a permanent becomes a copy of a spell), Summon: Esper Valigarmanda (cast a card exiled with ~
-   with mana of any type), Zurzoth, Chaos Rider (done in round 266), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
+   with mana of any type), Zurzoth, Chaos Rider (done in round 266), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater; done in round 387), Gideon's Sacrifice (all
    damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
    anywhere other than your hand"), Everlasting Torment (all damage as
    though it had wither), Kotis, the Fangkeeper (done in round 267), Vial Smasher the Fierce (an
@@ -949,7 +949,7 @@ line blocks.
    this creature's power" (Rootwire Amalgam); "when the tenth +1/+1 counter is put on" (Shang-Chi); "~ and target Frog
    you control" (Tatsunari); "permanent cards with cycling abilities" (Herald of the Forgotten). +26 (27,893 of 31,936
    with rounds 211 and 212 and B40-B43).
-   Out after round 213: Aegis of the Legion still needs "whenever equipped creature mentors a creature".
+   Out after round 213: Aegis of the Legion still needs "whenever equipped creature mentors a creature" (done in round 387).
    Round 214 took fresh cards from ranks 11,000 to 14,200: "exile the top card of each player's library. You may play
    those cards" this turn or until the end of your next turn (Mezzio Mugger, Lidless Gaze); "exile that many cards from
    the top of your library. Until end of turn, you may cast spells from among those exiled cards" (Dream Pillager);
@@ -3350,6 +3350,28 @@ line blocks.
    a creature more than once" isn't settled for one creature in two target slots); Lara Croft, Tomb Raider and
    Regenerations Restored (still out, as in their earlier lists); Guff Rewrites History, Sunken Palace, Ulalek, Filigree
    Vector, Possibility Storm and the rest above rank 10,000 (still out, for the reasons in their earlier lists).
+   Round 387 went on down `npm run popular` and the "Out after round N" lists, most played first: Ashling, Rimebound's
+   "Whenever this creature transforms into Ashling, Rimebound and at the beginning of your first main phase, add two mana
+   of any one color. Spend this mana only to cast spells with mana value 4 or greater." (one ability with two trigger
+   events, which works as two with the same effect, CR 603.2; its transforming into this face, CR 701.27e; the mana value
+   of the spell on the stack, X included, CR 202.3e, 106.6: ManaUse spell `x`, spend restriction `manaValue`); Oko, Lorwyn
+   Liege's "+2: Up to one target creature gains all creature types. (This effect doesn't end.)" (a resolved effect with no
+   duration lasts for the rest of the game, CR 611.2a, on that object only, CR 400.7, layer 4, CR 613.1d: continuous
+   duration "game"); Oko, Shadowmoor Scion's "−6: Choose a creature type. You get an emblem with "Creatures you control of
+   the chosen type get +3/+3 and have vigilance and hexproof."" (the type chosen as it resolves, CR 608.2, and kept with the
+   emblem, CR 114.2, 114.4: emblem Effect `chosenType`, the emblem's `chosen.type`, its chip in the command zone showing the
+   type); Aegis of the Legion's "Whenever equipped creature mentors a creature, put a shield counter on that creature."
+   (the creature's mentor ability resolving, not fizzling, CR 702.134c: GameEvent "mentored", TriggerEvent "selfMentors"
+   with host "attached"); Invisible Woman's "target creature gets +1/+0 until end of turn for each creature you control and
+   can't be blocked this turn" (counted once as it resolves, CR 608.2h, 611.2c). A browser test clicks through Oko's −6
+   and its creature type pick. +4, 31,498 of 31,936. The compiled text of every other card is unchanged. Bots use their
+   usual creature type pick (the type most common among their creatures and cards in hand) for Oko's emblem.
+   Out after round 387 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability); Abstruse Appropriation (still out: colorless mana spent as though it were any color, which hybrid payment
+   options can't hold); The Pandorica (its phasing lock needs main's round B223 code, not on this branch's chain yet: next
+   round after the chain merges); Kraven the Hunter (still out: the greatest power among a player's creatures immediately
+   before several die at once, CR 603.10a); Helm of Kaldra and the rest above rank 10,000 (still out, for the reasons in
+   their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -10482,7 +10504,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   them), Anhelo, the Painter (done in round 299) and Ashad, the Lone Cyberman (done in round 299) (granted casualty, several instances), Unidentified Hovership (done in round 273)
   (the owner of each card it exiled), Crafty Cutpurse (tokens an opponent would create, against token doubling and the
   attack rulings), Insatiable Frugivore (done in round 320) (a repeat loop), Galloping Lizrog (done in round 315) (counters spread over creatures).
-- Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type),
+- Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type; done in round 387),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment (done in round B156) ("up to one Equipment"
   chosen as it resolves), Chandra, Chill of Compliance (done in round 329) (which cards surveil put into the graveyard).
 - Out after round B67 (looked at, not done): Words of War (done in round B163), Words of Waste (done in round 383) and Words of Wind (done in round 385) (a target or choices in the

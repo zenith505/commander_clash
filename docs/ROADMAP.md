@@ -1,6 +1,6 @@
 # Roadmap
 
-31,504 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,508 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9758,6 +9758,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Archive or another replacement the player chooses the order, CR 616.1, drawReplacementChoices "scrivener"). Browser tests for
   Reflecting Mirror's activation and new target and Blood Scrivener's choice beside dredge. +3, 31,504 of 31,936. The compiled
   text of every other card is unchanged.
+- Round B236 (least played first, from the Lane B skip lists): Primitive Justice (two optional additional costs, each paid
+  any number of times, CR 601.2b, chosen and paid like a multikicker with two costs: CompiledCard.kicker.multi with {1}{R} at
+  index 0 and {1}{G} at 1, not kicker for other cards; one more target artifact for each time either is paid, all different,
+  rulings, CR 601.2c; each still legal one is destroyed and 1 life gained for each {1}{G}, CR 608.2b; the cast picker counts each
+  cost on its own; bots pay the {1}{G}s first). Enduring Renewal (its controller plays with their hand revealed, revealHands
+  "you"; each of their draws is replaced by revealing the top card, CR 614.1a: a creature card, by its characteristics there,
+  goes into the graveyard, anything else or no card means a draw this Renewal doesn't replace again, CR 614.5, but another
+  Renewal, an Archive, dredge and the rest still can; drawReplacementChoices "renewal", the Renewals already applied counted in
+  the `scriv` number beside the Scriveners, RENEWAL_UNIT; from an empty library that draw is one the player can't make, CR
+  704.5b). Diabolic Servitude (the creature its enters ability returned is linked to the object it was, CR 607.2a,
+  GameState.animated: Effect servitudeLink; "when the creature put onto the battlefield with ~ dies" is a leaves-the-battlefield
+  trigger that looks back, CR 603.10a, TriggeredAbility.dies.animatedBySelf, exiling the card and returning ~ only while ~ is
+  still that object, CR 400.7; leaving, ~ exiles that creature if it's still there, Effect servitudeExile; rulings: a creature
+  returned to hand or exiled is lost track of). Mana Cache (a mana ability any player may activate, CR 602.2, during their own
+  turn before the end step: ManaAbility.anyPlayer, TimingWindow "beforeEnd"; the activator removes the counter and gets the
+  {C}; automatic payment uses another player's Cache on your turn, once for each counter, autopay.ts "#n" sources). Browser
+  tests for Primitive Justice's two counts and targets, Enduring Renewal's reveal beside dredge and paying with an opponent's
+  Mana Cache. +4, 31,508 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B236 (looked at, not done): the lists after round B235 stay out, and Turf War (still out: a player with no
+  land to target), Emblazoned Golem (one mana of each color on its kicker X, not tracked by the kicker's payment), Snowblind and
+  Titania's Song (as before). Known gaps: another player can use Mana Cache only through automatic payment (not by clicking it),
+  and bots don't count another player's Cache as mana they have when planning; Enduring
+  Renewal counts the Renewals that already applied in a chain of draws, not which ones, as Blood Scrivener does.
 - Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star ("for one spell this turn":
   only the mana cost's symbols, not additional costs, and the player picks the spell), Sanctuary Blade (a choice in the middle
   of every way an Equipment becomes attached), Hollow Warrior (attack and block costs that tap another creature), Blood of the

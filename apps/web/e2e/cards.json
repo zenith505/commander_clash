@@ -211,6 +211,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bf034a20-e362-4f38-9bf9-857777c62598",
+  "name": "Acidic Dagger",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{4}, {T}: Whenever target creature deals combat damage to a non-Wall creature this turn, destroy that non-Wall creature. When the targeted creature leaves the battlefield this turn, sacrifice this artifact. Activate only before blockers are declared.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
   "name": "Ad Nauseam",
   "manaCost": "{3}{B}{B}",
@@ -16237,6 +16259,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "014ca38f-d4ac-4417-bfa8-785a7d6fce43",
+  "name": "Goblin Flotilla",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin"
+  ],
+  "oracleText": "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nAt the beginning of each combat, unless you pay {R}, whenever this creature blocks or becomes blocked by a creature this combat, that creature gains first strike until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Islandwalk"
+  ],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4a10c945-ad8b-47b6-8cbd-7b4e2612a9b0",
   "name": "Goblin Game",
   "manaCost": "{5}{R}{R}",
@@ -17966,6 +18021,34 @@
   "set": "blc",
   "releasedAt": "2024-08-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1e1d8c64-4cea-4c2c-8933-be19d13bf07c",
+  "name": "Heart of Bogardan",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {2} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhen a player doesn't pay this enchantment's cumulative upkeep, this enchantment deals X damage to target player or planeswalker and each creature that player or that planeswalker's controller controls, where X is twice the number of age counters on this enchantment minus 2.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22647,6 +22730,36 @@
   "set": "cmm",
   "releasedAt": "2023-08-04",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5542afeb-285f-4889-9d09-46ce20d0d189",
+  "name": "Lesser Werewolf",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Werewolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Werewolf"
+  ],
+  "oracleText": "{B}: If this creature's power is 1 or more, it gets -1/-0 until end of turn and put a -0/-1 counter on target creature blocking or blocked by this creature. Activate only during the declare blockers step.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

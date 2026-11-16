@@ -1,6 +1,6 @@
 # Roadmap
 
-31,460 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,464 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4306,7 +4306,7 @@ line blocks.
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen; Drought and Brutal Suppression (sacrifices added to costs);
-   Delif's Cube (done in round B207) and Acidic Dagger (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
+   Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
    battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
@@ -5067,7 +5067,7 @@ line blocks.
    Left from the round after Show and Tell (Alhammarret's Archive and dredge in either order, Grand Abolisher, Living
    Death, Parallax Wave, Memory Jar, life swaps, Glacial Chasm, Terminus, Bonfire of the Damned, "each other opponent",
    a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
-   - Life swaps still out: Heart of Bogardan, Spirit of Resistance (done in round B106).
+   - Life swaps still out: Heart of Bogardan (done in round B225), Spirit of Resistance (done in round B106).
    - "You can't cast" variants other than creature or noncreature spells are still out. Ward costs still out: discard
      a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors), "discard a card or pay {2}"
      (Titania), blight, collect evidence, poison counters; most of these cards have other lines that are out too.
@@ -5593,7 +5593,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (done in round B144) (an attack requirement
   that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
   single source); Groffskithur (done in round B129) ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
-  Panther (a cost that sacrifices creatures by name); Sworn Defender (done in round B135) and Lesser Werewolf (power-dependent combat
+  Panther (a cost that sacrifices creatures by name); Sworn Defender (done in round B135) and Lesser Werewolf (done in round B225) (power-dependent combat
   tricks).
 - Round B2 (ranks 32,230 up to about 31,000, plus some more played cards the same templates cover): prevention of
   damage a creature deals to, or is dealt by, creatures of a color, snow creatures, Walls, enchanted creatures or
@@ -6076,7 +6076,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Voice, Earthlore, Krovikan Plague, Tourach's Gate). Snow as a supertype changed in layer 4 (Melting, Arcum's
   Weathervane, Thermal Flux). Tek and Tribal Golem's "has X as long as you control a Y, ..." lists. "Look at target
   face-down creature" (Smoke Teller, Aven Soulgazer; only the looking player's log names it, CR 708.5). +32 (26,816 with rounds 188 and 189).
-- Skipped there, with reasons: Goblin Flotilla (a block trigger set up only for this combat by a pay-or-not); Infinite
+- Skipped there, with reasons: Goblin Flotilla (done in round B225) (a block trigger set up only for this combat by a pay-or-not); Infinite
   Authority (a delayed end step check on "if that creature was destroyed this way").
 - Round B22 (harder skipped cards, least played first): a color change on a spell (CR 112.4): "Target spell or
   permanent becomes <color> / the color of your choice (until end of turn)" and "Target instant or sorcery spell
@@ -9607,6 +9607,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Llanowar's five colors on a Forest, Naked Singularity's {U} or {B} for Taiga, and Harvest Mage's discard and then one {G}
   from a Mountain. +4, 31,460 of 31,936. The compiled text of
   every other card is unchanged.
+- Round B225 (least played first, from the Lane B skip lists): Heart of Bogardan ("When a player doesn't pay ~'s cumulative
+  upkeep" now triggers for a mana upkeep too, CR 702.24a; X is twice its age counters as it last existed minus 2, the mana
+  last spent on its upkeep, rulings, to the target player or planeswalker and each creature that player or that
+  planeswalker's controller controls). Lesser Werewolf (its power checked as the ability resolves, doing nothing at 0 or
+  less though it can still be activated, rulings; the -0/-1 counter on the creature blocking or blocked by it; bots don't
+  activate it for nothing). Goblin Flotilla (at each beginning of combat, unless its controller pays {R}, a delayed trigger
+  about it for that combat, CR 603.7b-c: each creature it blocks or that blocks it gains first strike, CR 509.3b, 509.3d,
+  before the combat damage step, 510.4). Acidic Dagger (before blockers are declared in the turn's first combat, CR 506.8b,
+  two delayed triggers about the target this turn: each non-Wall creature it deals combat damage to is destroyed, none when
+  the damage is prevented, rulings, and the Dagger is sacrificed when the target leaves; bots don't activate it). The
+  targeting bar reads "~" in an activated ability's text as the card's name. Browser tests for Heart of Bogardan's unpaid
+  upkeep and target, Lesser Werewolf's target, Goblin Flotilla's {R} question and Acidic Dagger's target. +4, 31,464 of
+  31,936. The compiled text of every other card is unchanged.
+- Out after round B225 (looked at, not done): Cultivator Drone (its mana pays "a cost that contains {C}", a trigger's
+  payment too, rulings: a cost paid as something resolves isn't known to the mana yet), Threefold Signal (a second
+  replicate cost beside a spell's own, rulings: one kicker-like cost per spell is modeled), Bösium Strip (casting from the top
+  of a graveyard), Pure Intentions (a turn's delayed trigger on "one or more cards" an opponent's spell or ability makes you
+  discard, once per event) and the lists after round B224 stay out.
 - Out after round B224 (looked at, not done): Peace Talks (activated abilities, not triggered ones, can't target: target
   legality doesn't yet know whether an ability was activated or triggered), False Dawn (mana from spells and abilities, not
   only lands, turned white, and white mana spent as any color), Benthic Explorers (untapping an opponent's land as a mana

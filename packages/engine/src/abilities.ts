@@ -9363,6 +9363,13 @@ export interface CompiledCard {
    * as the spell is cast; `firstEachTurn`: only its controller's first spell this turn matching `filter`.
    */
   spellsHaveCasualty?: { filter: TargetSpec; n: number; firstEachTurn?: true; text: string }[];
+  /**
+   * Round B248: "Each Sliver spell you cast has replicate. The replicate cost is equal to its mana cost." (Hatchery Sliver,
+   * Djinn Illuminatus, Ian Chesterton), "Each spell you cast that's exactly three colors has replicate {3}." (Threefold
+   * Signal): an instance of replicate for each such spell as it's cast, beside any it has, each paid separately (CR
+   * 702.56a-b, rulings). `cost`: a fixed replicate cost; without it, the spell's own mana cost, with the X chosen for it.
+   */
+  spellsHaveReplicate?: { filter: TargetSpec; cost?: string; text: string }[];
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];

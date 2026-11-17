@@ -1262,6 +1262,11 @@ export interface StackItem {
   conspired?: boolean;
   /** For a spell: how many instances of conspire were paid, when more than one (CR 702.78b). */
   conspiredTimes?: number;
+  /**
+   * Round B248: for a spell, the instances of replicate permanents gave it that were paid (CR 702.56b): the permanent giving
+   * each (its zone-change count then) and the times it was paid, for that instance's own copy trigger.
+   */
+  replicated?: { source: ObjectId; zc: number; times: number }[];
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
   /** For a spell: cast during its controller's main phase (addendum, "if you cast this spell during your main phase"). */
@@ -1496,6 +1501,11 @@ export interface CostChoices {
   crewLoyalty?: ObjectId;
   /** Kicker costs to pay, by index; multikicker's index 0 once per time (CR 702.33). */
   kicks?: number[];
+  /**
+   * Round B248: how many times to pay each instance of replicate a permanent gives the spell (Djinn Illuminatus, Threefold
+   * Signal), in the order `replicateGranted` lists them; the spell's own replicate is `kicks` (CR 702.56a-b).
+   */
+  replicate?: number[];
   /** Casting from a graveyard: which way (flashback, jump-start, retrace, escape). */
   via?: CastFromGraveyardKind;
   /** Pay the buyback cost (CR 702.27a). */

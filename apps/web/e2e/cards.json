@@ -11257,6 +11257,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d7dcf1be-2779-419d-8c90-03800f9e7ea2",
+  "name": "Djinn Illuminatus",
+  "manaCost": "{5}{U/R}{U/R}",
+  "cmc": 7,
+  "typeLine": "Creature — Djinn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Djinn"
+  ],
+  "oracleText": "({U/R} can be paid with either {U} or {R}.)\nFlying\nEach instant and sorcery spell you cast has replicate. The replicate cost is equal to its mana cost. (When you cast it, copy it for each time you paid its replicate cost. You may choose new targets for the copies.)",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "gpt",
+  "releasedAt": "2006-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f25af42d-f1bf-4bd3-aded-ecadafdbf6e6",
   "name": "Do or Die",
   "manaCost": "{1}{B}",
@@ -18736,6 +18770,38 @@
   "set": "nem",
   "releasedAt": "2000-02-14",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6227fb65-d7ef-4bc6-a076-9aa10941632c",
+  "name": "Hatchery Sliver",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Sliver",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sliver"
+  ],
+  "oracleText": "Replicate {1}{G} (When you cast this spell, copy it for each time you paid its replicate cost.)\nEach Sliver spell you cast has replicate. The replicate cost is equal to its mana cost. (A copy of a permanent spell becomes a token.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Replicate"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -144,6 +144,7 @@ import {
   shareCreatureType,
   mustAttackPlayers,
   conspireInstances,
+  replicateGranted,
   walkersFreeToAttack,
   attackTargetScore,
   discardKeywordKinds,
@@ -4894,6 +4895,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
         .map((o) => obj(s, o))
         .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && extra.casualty !== o.id && extra.bargain !== o.id && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && (o.isToken || worth(s, pid, o) <= 3))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+  for (const replicate of replicateOptions(s, pid, id, free))
   for (const offer of offering ? [undefined, offering.id] : [undefined])
     for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
       for (const buyback of buybacks)
@@ -4902,7 +4904,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
           // Splice costs beyond mana (Torrent of Stone's "sacrifice two Mountains"): paid as our other costs would be.
           const spliceCosts = splice?.costly && !buyback && !kicks.length ? chooseExtraCosts(s, pid, id, all ?? [], via, alt, extra.costOr, x ?? 0, modes, false, undefined, splice.ids) : undefined;
           if (splice?.costly && !spliceCosts) continue;
-          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
           if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
           if (plan) return plan;
@@ -4950,6 +4952,24 @@ function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, t
 function wantsEvidence(c: CompiledCard): boolean {
   if (c.evidenceReduction) return true;
   return JSON.stringify([c.spell ?? null, c.triggers]).includes('"kind":"evidence"') || c.triggers.some((t) => t.ifEvidence);
+}
+
+/**
+ * Round B248: payments for the instances of replicate our permanents give the spell (Djinn Illuminatus), to try most first,
+ * ending with none: the cheapest instance as many times as the spare mana covers, up to three. Not for a legendary
+ * permanent spell, whose token copies the legend rule would take (CR 704.5j).
+ */
+function replicateOptions(s: GameState, pid: PlayerId, id: string, free: boolean): (number[] | undefined)[] {
+  const d = defOf(s, obj(s, id));
+  const grants = replicateGranted(s, pid, d);
+  if (!grants.length || (d.supertypes.includes("Legendary") && isPermanentCard(d))) return [undefined];
+  const priced = grants.flatMap((g, i) => (g.cost === null ? [] : [{ i, each: manaValue(parseManaCost(g.cost)) }])).sort((a, b) => a.each - b.each)[0];
+  if (!priced) return [undefined];
+  const spare = availableMana(s, pid) - (free ? 0 : totalWithoutX(s, pid, id));
+  const most = priced.each > 0 ? Math.min(3, Math.floor(spare / priced.each)) : 1;
+  const out: (number[] | undefined)[] = [];
+  for (let n = most; n >= 1; n--) out.push(grants.map((_, i) => (i === priced.i ? n : 0)));
+  return [...out, undefined];
 }
 
 /** Kicker choices to try, most kicked first, ending with not kicking it. */

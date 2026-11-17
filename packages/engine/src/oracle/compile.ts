@@ -4577,6 +4577,17 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveCasualty ??= []).push({ filter: { ...f, text: `${giveCasualty[2]} spell` }, n: Number(giveCasualty[4]), ...(giveCasualty[3] ? { firstEachTurn: true as const } : {}), text: line });
       continue;
     }
+    // Round B248: "Each Sliver spell you cast has replicate. The replicate cost is equal to its mana cost." (Hatchery
+    // Sliver), "Each instant and sorcery spell you cast has ..." (Djinn Illuminatus), "Each Saga spell you cast has ..."
+    // (Ian Chesterton), "Each spell you cast that's exactly three colors has replicate {3}." (Threefold Signal): an instance
+    // of replicate for each such spell as it's cast, beside any it has, each paid separately (CR 702.56a-b, rulings).
+    const giveReplicate = /^Each (?:(Sliver|instant and sorcery|Saga) spell you cast|spell you cast that's exactly (three) colors) has replicate(?:\. The replicate cost is equal to its mana cost| ((?:\{\d+\})+))\.$/.exec(line);
+    if (giveReplicate && !giveReplicate[1] === !!giveReplicate[3]) {
+      const f: TargetSpec | null = giveReplicate[2] ? { kind: "spell", types: [], notTypes: [], notColors: [], colorCount: "three", text: "spell that's exactly three colors" } : parseTargetPhrase(`${giveReplicate[1]!.replace(" and ", " or ")} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveReplicate ??= []).push({ filter: { ...f, text: giveReplicate[2] ? "spell that's exactly three colors" : `${giveReplicate[1]} spell` }, ...(giveReplicate[3] ? { cost: giveReplicate[3] } : {}), text: line });
+      continue;
+    }
     // Silverquill Lecturer: "Creature spells you cast have demonstrate" (CR 702.144a): the spell's own "when you cast this
     // spell, you may copy it ...", one for each instance (702.144b), while the permanent is there as it's cast.
     const giveDemonstrate = /^([A-Z][a-z]+) spells you cast have demonstrate\.$/.exec(line);

@@ -2443,6 +2443,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const n = Math.min(paid, casualtyGranted(s, ev.controller, defOf(s, spell), spell).length);
       for (let i = 0; i < n; i++) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASUALTY_BODY, cause: ev.stackId });
     }
+    // Round B248: replicate a permanent gave the spell (Djinn Illuminatus): the spell's own "when you cast this spell, copy it
+    // for each time its replicate cost was paid", one for each instance paid, copying it for that instance's payments only
+    // (CR 702.56a-b); only if the spell still has it as it becomes cast, its giver still there (as for conspire).
+    if (spell && item?.replicated && !ev.copy) {
+      const d = defOf(s, spell);
+      for (const r of item.replicated) {
+        const g = s.objects[r.source];
+        if (!g || g.zone !== "battlefield" || (g.zoneChanges ?? 0) !== r.zc || controllerOf(s, g) !== ev.controller || !(abilitiesOf(s, g).spellsHaveReplicate ?? []).some((x) => printedMatches(x.filter, d))) continue;
+        s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: replicateBody(r.times), cause: ev.stackId });
+      }
+    }
     // Demonstrate a permanent gives the spell (Silverquill Lecturer): one trigger for each instance (CR 702.144a-b).
     if (spell && !ev.copy) {
       const d = defOf(s, spell);
@@ -3478,6 +3489,8 @@ function speedTrigger(s: GameState, loser: PlayerId) {
 }
 
 const DEMONSTRATE_BODY: AbilityBody = { targets: [], effects: [{ type: "may", effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, demonstrate: true }], text: "copy ~ (an opponent you choose then copies it too)" }], text: "Demonstrate: you may copy ~. If you do, choose an opponent to also copy it. Players may choose new targets for their copies." };
+/** Round B248: a granted replicate's copy trigger, for the times that instance was paid (CR 702.56a-b). */
+const replicateBody = (n: number): AbilityBody => ({ targets: [], effects: [{ type: "copySpell", spell: "cause", n, newTargets: true }], text: `Replicate: copy ~ ${n === 1 ? "once" : n === 2 ? "twice" : `${n} times`}. You may choose new targets for the copies.` });
 const CASUALTY_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Casualty: copy ~. You may choose new targets for the copy." };
 const CONSPIRE_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Conspire: copy ~. You may choose new targets for the copy." };
 const STORM_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." };

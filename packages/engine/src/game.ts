@@ -6900,6 +6900,8 @@ export function castProblem(
     return "X can't be greater than the greatest toughness among creatures you control";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
+  const rp = replicateProblem(s, pid, d, choices?.replicate);
+  if (rp) return rp;
   const or = compileCard(d).costOr;
   if (choices?.costOr !== undefined && (!or || !Number.isInteger(choices.costOr) || !or[choices.costOr])) return `${d.name} has no such cost to choose`;
   // Not chosen yet: one of the ways has to be possible (a mana one is, as far as the mana check below goes).
@@ -6965,7 +6967,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -6982,7 +6984,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
   // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
-  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
+  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor, kicks.length > 0 && isRealKicker(kicker));
@@ -7963,6 +7965,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const taxLife = fromCommand ? commanderTaxLife(p, o, d) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
   const xOut: { part?: number; any?: boolean } = {};
+  // Round B248: the instances of replicate permanents give it, as its total cost is locked in (CR 702.56b, 601.2f).
+  const replicateNow = choices.replicate?.some((n) => n > 0) ? replicateGranted(s, p.id, d) : [];
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes, xOut }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
@@ -8156,6 +8160,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
+  // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
+  const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
+  if (replicated.length) item.replicated = replicated;
   for (const t of spentQueue) if (!("spell" in t) || spellMatches(s, t.spell, item)) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
   if (castTrigger) s.triggerQueue.push({ sourceId: castTrigger.sourceId, sourceCardId: castTrigger.sourceCardId, sourceZc: castTrigger.sourceZc, controller: p.id, index: -1, body: castTrigger.body, cause: stackId, subject: { id, zc: o.zoneChanges ?? 0 } });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
@@ -8174,6 +8181,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
+  const replicateText = replicated.map((r) => `, paying replicate ${replicateNow.find((g) => g.source === r.source)!.cost}${r.times === 1 ? " once" : r.times === 2 ? " twice" : ` ${r.times} times`} (from ${nameOf(s, r.source)})`).join("");
   // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
   const payWay = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id ? s.pending.pay : undefined;
   const howText =
@@ -8187,7 +8195,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -8779,6 +8787,47 @@ export function casualtyGranted(s: GameState, pid: PlayerId, d: CardDef, o?: Gam
     for (const g of abilitiesOf(s, p).spellsHaveCasualty ?? []) if (printedMatches(g.filter, d) && (!g.firstEachTurn || (!!o && firstOfKindThisTurn(s, pid, o, g.filter)))) out.push(g.n);
   }
   return out;
+}
+
+/**
+ * Round B248: the instances of replicate permanents `pid` controls give this card as they cast it ("Each instant and
+ * sorcery spell you cast has replicate. The replicate cost is equal to its mana cost.", Djinn Illuminatus; "... has
+ * replicate {3}", Threefold Signal), in the order they're on the battlefield, beside any replicate it has (CR 702.56a-b).
+ * `cost`: null when it's unpayable, the mana cost of a spell that has none (CR 118.6).
+ */
+export function replicateGranted(s: GameState, pid: PlayerId, d: CardDef): { source: ObjectId; cost: string | null; text: string }[] {
+  const out: { source: ObjectId; cost: string | null; text: string }[] = [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).spellsHaveReplicate ?? []) if (printedMatches(g.filter, d)) out.push({ source: id, cost: g.cost ?? (d.manaCost ? d.manaCost : null), text: g.text });
+  }
+  return out;
+}
+
+/** The most times one instance of replicate may be paid here: a cost of {0} could otherwise be paid without end. */
+export const REPLICATE_MAX = 20;
+
+/** Why these replicate payments for the instances permanents give the spell aren't allowed (CR 702.56a, 118.6). */
+function replicateProblem(s: GameState, pid: PlayerId, d: CardDef, times?: number[]): string | null {
+  if (!times?.length) return null;
+  if (times.some((n) => !Number.isInteger(n) || n < 0)) return "replicate is paid a whole number of times";
+  if (times.every((n) => n === 0)) return null;
+  const grants = replicateGranted(s, pid, d);
+  if (times.length > grants.length) return `${d.name} doesn't have that many instances of replicate`;
+  for (const [i, n] of times.entries()) {
+    if (!n) continue;
+    if (grants[i]!.cost === null) return `${d.name} has no mana cost, so its replicate cost can't be paid`;
+    if (n > REPLICATE_MAX) return `replicate is paid no more than ${REPLICATE_MAX} times here`;
+  }
+  return null;
+}
+
+/** The mana paid for the instances of replicate permanents give the spell (CR 702.56a, 601.2f): each cost that many times. */
+function replicateMana(s: GameState, pid: PlayerId, d: CardDef, times?: number[]): string {
+  if (!times?.some((n) => n > 0)) return "";
+  const grants = replicateGranted(s, pid, d);
+  return times.map((n, i) => (grants[i]?.cost ?? "").repeat(Math.max(0, n))).join("");
 }
 
 /** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a); with several instances, the least N. */

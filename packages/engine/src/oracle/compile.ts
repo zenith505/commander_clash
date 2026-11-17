@@ -91,6 +91,7 @@ import { roundB244Line, roundB244Loyalty } from "./laneb244";
 import { roundB245Line, roundB245Spell } from "./laneb245";
 import { roundB246Line } from "./laneb246";
 import { roundB247Line } from "./laneb247";
+import { roundB249Line } from "./laneb249";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2308,6 +2309,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB246Line(line, raw, out, isSpell)) continue;
     // Urgent Necropsy, Expert-Level Safe, Inniaz, the Gale Force (round B247).
     if (roundB247Line(line, raw, out, isSpell)) continue;
+    // Essence of the Wild, Infinite Reflection, The Prismatic Piper, Faceless One (round B249).
+    if (roundB249Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -4619,6 +4622,17 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${giveCasualty[2]!.replace(" and ", " or ")} spell`);
       if (f?.kind !== "spell" || !f.types?.length) out.unsupported.push(raw);
       else (out.spellsHaveCasualty ??= []).push({ filter: { ...f, text: `${giveCasualty[2]} spell` }, n: Number(giveCasualty[4]), ...(giveCasualty[3] ? { firstEachTurn: true as const } : {}), text: line });
+      continue;
+    }
+    // Round B248: "Each Sliver spell you cast has replicate. The replicate cost is equal to its mana cost." (Hatchery
+    // Sliver), "Each instant and sorcery spell you cast has ..." (Djinn Illuminatus), "Each Saga spell you cast has ..."
+    // (Ian Chesterton), "Each spell you cast that's exactly three colors has replicate {3}." (Threefold Signal): an instance
+    // of replicate for each such spell as it's cast, beside any it has, each paid separately (CR 702.56a-b, rulings).
+    const giveReplicate = /^Each (?:(Sliver|instant and sorcery|Saga) spell you cast|spell you cast that's exactly (three) colors) has replicate(?:\. The replicate cost is equal to its mana cost| ((?:\{\d+\})+))\.$/.exec(line);
+    if (giveReplicate && !giveReplicate[1] === !!giveReplicate[3]) {
+      const f: TargetSpec | null = giveReplicate[2] ? { kind: "spell", types: [], notTypes: [], notColors: [], colorCount: "three", text: "spell that's exactly three colors" } : parseTargetPhrase(`${giveReplicate[1]!.replace(" and ", " or ")} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveReplicate ??= []).push({ filter: { ...f, text: giveReplicate[2] ? "spell that's exactly three colors" : `${giveReplicate[1]} spell` }, ...(giveReplicate[3] ? { cost: giveReplicate[3] } : {}), text: line });
       continue;
     }
     // Silverquill Lecturer: "Creature spells you cast have demonstrate" (CR 702.144a): the spell's own "when you cast this

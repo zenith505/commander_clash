@@ -1,6 +1,6 @@
 # Roadmap
 
-31,631 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,637 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,910 of
 9,979 (99%).
 
@@ -3682,7 +3682,7 @@ line blocks.
    Ana's untap step could untap it (now your floating mana holds your end step), the second read the state again after
    its poll, while a bot could still have priority in Ana's beginning of combat (now it keeps the state the poll saw). +3,
    31,600 of 31,936 on this stacked branch. The compiled text of every other card is unchanged. Main 8969737 (Lane B
-   through B246) was merged in afterwards: 31,631 of 31,936, every card compiling as on main or on the Lane A chain; Zur's
+   through B246) and then 668e416 (B247) were merged in afterwards: 31,634 of 31,936, every card compiling as on main or on the Lane A chain; Zur's
    Weirding's and Chains of Mephistopheles' draws keep the damage draws that follow them (DrawAfter "damageDraws").
    Out after round 401 (looked at, not done): Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree
    Vector, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their

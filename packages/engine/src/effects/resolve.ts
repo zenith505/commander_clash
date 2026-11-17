@@ -38,6 +38,7 @@ import { runPlayTopOrHandEffect, runPowerToPlayersEffect } from "./run-round392"
 import { runMoveCurseEffect, runReturnOneOfThemEffect, runStealTokensEffect } from "./run-round394";
 import { runExileUntilNonlandLinkedEffect, runRevealTopsShareTypeEffect } from "./run-round395";
 import { runBecomeCopyOfLinkedEffect } from "./run-round396";
+import { runBecomeCopyOfAmongEffect } from "./run-round405";
 import { runChooseLinkedCardEffect } from "./run-round399";
 import { runGainActivatedOfEffect, runWhenCastGainsActivatedEffect } from "./run-round400";
 import { runExileFromHandOrYardEffect } from "./run-round401";
@@ -1946,6 +1947,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRevealTopsShareTypeEffect(s, ctx, src);
     case "becomeCopyOfLinked":
       return runBecomeCopyOfLinkedEffect(s, e, ctx, src);
+    case "becomeCopyOfAmong":
+      return runBecomeCopyOfAmongEffect(s, e, ctx, src);
     case "chooseLinkedCard":
       return runChooseLinkedCardEffect(s, e, ctx, src);
     case "gainActivatedOf":

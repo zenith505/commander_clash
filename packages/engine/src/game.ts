@@ -836,6 +836,8 @@ export function moveObject(
     emerged?: true;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
+    /** Put into the graveyard by a surveil (CR 701.25a): Eye of Duskmantle (round 405, GameObject.surveilledTurn). */
+    surveilled?: true;
     /** Discarded to pay a cycling cost (CR 702.29a): Abandoned Sarcophagus's "and it wasn't cycled" (round B240). */
     cycled?: true;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
@@ -1336,6 +1338,7 @@ export function moveObject(
   o.fromLibraryTurn = to === "graveyard" && fromZone === "library" ? s.turn : undefined;
   o.fromBattlefieldTurn = to === "graveyard" && fromZone === "battlefield" ? s.turn : undefined;
   o.milledTurn = to === "graveyard" && fromZone === "library" && opts.milled ? s.turn : undefined;
+  o.surveilledTurn = to === "graveyard" && fromZone === "library" && opts.surveilled ? s.turn : undefined;
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
@@ -5886,15 +5889,20 @@ function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): bool
     const cond = abilitiesOf(s, obj(s, id)).landsFromGraveyardIf;
     return !!cond && staticConditionNow(s, cond, id, pid);
   };
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id) || anchored(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
+  // Eye of Duskmantle (round 405): a land card its owner surveilled into their graveyard this turn.
+  const surveilled = (id: ObjectId) => !!abilitiesOf(s, obj(s, id)).landsFromGraveyardSurveilled && arrivedThisTurn(s, o, "surveilled");
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id) || anchored(id) || surveilled(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
 /**
  * A card put into its graveyard this turn from a library (Kagha, Shadow Archdruid), or from anywhere other than the
  * battlefield (Banon, the Returners' Leader), or milled this turn (Raul, Trouble Shooter). Any later zone change makes it a new object that wasn't (CR 400.7).
  */
-function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notFromBattlefield" | "milled"): boolean {
+function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notFromBattlefield" | "milled" | "surveilled"): boolean {
   if (o.zone !== "graveyard" || o.toGraveyardTurn !== s.turn) return false;
+  // Eye of Duskmantle (round 405): "cards in your graveyard you've surveilled this turn": those a surveil put there this
+  // turn, not cards seen while surveilling and put there later another way (rulings), each still that object (CR 400.7).
+  if (how === "surveilled") return o.surveilledTurn === s.turn;
   // Raul, Trouble Shooter: "milled this turn", only a card put there by a mill (CR 701.13a), not one put there from the
   // library some other way (rulings).
   if (how === "milled") return o.milledTurn === s.turn;
@@ -6891,7 +6899,7 @@ export function castProblem(
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "linkedFree" && linkedFreeGrant(s, o, pid) < 0) return `${d.name} isn't a card you may cast this way`;
     if (choices.alt === "topFree" && !topFreeGrant(s, o, pid)) return `${d.name} isn't a card you may cast this way`;
-    if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid)) return "only the top card of your library is cast for life";
+    if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid) && !yardCitadel(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
@@ -6903,7 +6911,7 @@ export function castProblem(
     // Casting a prototype card prototyped isn't an alternative cost (CR 718.3): it may be cast so without paying its mana
     // cost (rulings on Powerbalance).
     if (((via && !permissionWay(via)) || free || plotted) && choices.alt !== "prototype") return `${d.name} can't be cast for its ${choices.alt} cost this way`;
-    if (via && (choices.alt === "foretell" || choices.alt === "citadel" || choices.alt === "omniscience" || choices.alt === "miracle")) return `${d.name} can't be cast for its ${choices.alt} cost from a graveyard`;
+    if (via && (choices.alt === "foretell" || (choices.alt === "citadel" && !yardCitadel(s, o, pid)) || choices.alt === "omniscience" || choices.alt === "miracle")) return `${d.name} can't be cast for its ${choices.alt} cost from a graveyard`;
     // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
     const cond = altCost(d, choices.alt, s, pid, o)?.if;
     if (cond && !staticConditionNow(s, cond, id, pid)) return `${d.name}'s alternative cost can't be paid now`;
@@ -6912,7 +6920,8 @@ export function castProblem(
     if (x && parseManaCost(d.manaCost).hasX && !parseManaCost(paid.mana).hasX && !paid.costs?.some((c) => xCost(c) || (c.kind === "exileFromHand" && c.mvX))) return "X is 0 unless the cost you pay has X";
     if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand" && !(via?.alt === "warp" && choices.alt === "warp")) return "warp works only from your hand"; // CR 702.185a
   }
-  if (via?.alt && choices?.alt !== via.alt) return `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
+  // Eye of Duskmantle (round 405): only for life equal to its mana value (rulings).
+  if (via?.alt && choices?.alt !== via.alt) return via.alt === "citadel" ? `${d.name} can be cast from your graveyard this way only by paying life equal to its mana value` : `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
@@ -7703,9 +7712,10 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
   if (alt === "citadel") {
     const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
-    // Valgavoth's exiled cards too (castProblem checks the card is one).
+    // Valgavoth's exiled cards too (castProblem checks the card is one), and Eye of Duskmantle's (round 405) surveilled cards
+    // in the graveyard (castProblem checks with yardCitadel).
     // Nashi's exiled cards: their own permission says so.
-    const valgavoth = s && pid !== undefined && (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife) || s.turnOrder.some((q) => player(s, q).exile.some((id) => obj(s, id).mayPlay?.life && obj(s, id).mayPlay?.player === pid)));
+    const valgavoth = s && pid !== undefined && (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife) || s.turnOrder.some((q) => player(s, q).exile.some((id) => obj(s, id).mayPlay?.life && obj(s, id).mayPlay?.player === pid)) || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).graveyardGrants?.some((g) => g.way.alt === "citadel")));
     if (!valgavoth && (!top || !mayPlayFromTop(s!, top, pid!, "life"))) return undefined;
     const n = manaValue(parseManaCost(d.manaCost));
     return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
@@ -7962,7 +7972,7 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -8731,7 +8741,23 @@ function targetsLike(s: GameState, targets: TargetChoice[] | undefined, filter: 
   return (targets ?? []).some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, filter, s.objects[t.id]!, pid, false));
 }
 
-const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0);
+// Eye of Duskmantle (round 405): a permission only for life rather than mana is the last its caster would keep; with a
+// plain one too, paying life stays an alternative cost of that one (yardCitadel).
+const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0) + (w.alt === "citadel" ? 4 : 0);
+
+/**
+ * Eye of Duskmantle (round 405): "You may ... cast spells from among cards in your graveyard you've surveilled this turn. If
+ * you cast a spell this way, you pay life equal to its mana value rather than paying its mana cost.": a permanent `pid`
+ * controls lets them cast this card in their graveyard for life (AltCostKind "citadel", CR 118.9), its X at 0 (rulings).
+ */
+export function yardCitadel(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.zone !== "graveyard" || o.owner !== pid) return false;
+  const d = defOf(s, o);
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && !!abilitiesOf(s, p).graveyardGrants?.some((g) => g.way.alt === "citadel" && printedMatches(g.filter, d) && (!g.arrived || arrivedThisTurn(s, o, g.arrived)) && (!g.yourTurn || s.activePlayer === pid));
+  });
+}
 
 /**
  * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
@@ -8759,7 +8785,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.anyGraveyard ? holder !== caster : holder !== o.owner) continue;
       if (g.yourTurn && s.activePlayer !== holder) continue;
       if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
-      if (!d.manaCost && !g.way.mana) continue;
+      // Eye of Duskmantle (round 405): life rather than the mana cost, which a card without one can pay too (CR 118.6a).
+      if (!d.manaCost && !g.way.mana && g.way.alt !== "citadel") continue;
       if (!printedMatches(g.filter, d)) continue;
       if (g.arrived && !arrivedThisTurn(s, o, g.arrived)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
@@ -12264,6 +12291,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // Koh, the Face Stealer (round 399): which creature card exiled with it is chosen.
     if (r.scratch?.kohCard === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
     r.scratch.kohCard = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "copyAmong") {
+    // Lazav, Wearer of Faces and Spirit of Resilience (round 405): the card to become a copy of, or none.
+    if (r.scratch?.copyAmong === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    r.scratch.copyAmong = choice;
     continueResolution(s);
     return;
   }

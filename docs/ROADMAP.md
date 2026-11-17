@@ -1,7 +1,7 @@
 # Roadmap
 
-31,637 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,910 of
+31,646 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,911 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -526,7 +526,7 @@ line blocks.
    (Jace, the Living Guildpact). Rules fix: "half X, rounded down" where X is defined elsewhere (a spell's X) kept the
    whole X.
    Out after round 193 (looked at, not done): Shilgengar, Sire of Famine (done in round 270), Armed and Armored (done in round 313) ("choose a Dwarf you
-   control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver, Magus Lucea Kane, Make
+   control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver (done in round B248), Magus Lucea Kane, Make
    Your Own Luck, Lilah, Undefeated Slickshot, Soulcipher Board (done in round B189) ("remove an omen counter ... then if it has no omen
    counters on it, transform it").
    Round 194 went on from the top: "each opponent loses life equal to the number of creatures attacking them" (Within
@@ -2891,7 +2891,7 @@ line blocks.
    `chosen`). Spells cast this turn are now judged by the card types they had as they were cast (castCardAs), so Ethersworn
    Canonist lets a creature spell cast under Biotransference count as an artifact spell. No new prompts. +4, 31,382 of
    31,936 with Lane B's B209-B211. The compiled text of every other card is unchanged.
-   Out after round 369 (looked at, not done): Hatchery Sliver (still out: a second replicate cost beside the spell's own
+   Out after round 369 (looked at, not done): Hatchery Sliver (done in round B248) (still out: a second replicate cost beside the spell's own
    kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales, Nephalia Academy,
    Celestial Reunion and Stalking Leonin (still out, as in their earlier lists).
    Round 370 went on down `npm run popular`, most played first, to a free spell as big as the life gained this turn, spells
@@ -3778,7 +3778,7 @@ line blocks.
    Gambit's "During that turn, damage can't be prevented." (ExtraTurn `noPrevention`, CR 615.12; its cleave cast too).
    +5, 31,156 of 31,936 with round 348 and B188 to B191. Bots cast a card they must even when they'd rather not (any legal modes and
    targets).
-   Out after round 349 (looked at, not done): Hatchery Sliver (a granted replicate whose cost is each Sliver spell's own
+   Out after round 349 (looked at, not done): Hatchery Sliver (done in round B248) (a granted replicate whose cost is each Sliver spell's own
    mana cost, beside any kicker or replicate the spell has: CompiledCard.kicker holds one); Ria Ivor, Bane of Bladehold
    (the next combat damage to players prevented, then tokens for the damage prevented: no such shield with a follow-up);
    Psychic Paper (a name and a creature type chosen as it becomes attached); Gift of Doom (still out, as after round 348).
@@ -4247,7 +4247,7 @@ line blocks.
    Limit). +8, 30,862 of 31,936 with rounds 325 and 326, B165 and B166.
    Bots: for Retraced Image a bot reveals its costliest card that would be put onto the battlefield, or else its
    cheapest card.
-   Out after round 327 (looked at, not done): Hatchery Sliver, Djinn Illuminatus, Ian Chesterton, Threefold Signal
+   Out after round 327 (looked at, not done): Hatchery Sliver (done in round B248), Djinn Illuminatus (done in round B248), Ian Chesterton (done in round B248), Threefold Signal (done in round B248)
    ("each ... spell you cast has replicate") and Zinnia, Valley's Voice ("gain offspring {2} as you cast them"): a card
    has one kicker-like optional cost (CompiledCard.kicker), so a given one needs every cost, autopay, bot and UI path to
    see it, and a spell with a kicker of its own would have two; Consume Spirit and Drain Life (done in round B179) ("Spend only black mana on
@@ -4583,7 +4583,7 @@ line blocks.
    Out after round 314 (looked at, not done): Crashing Wave (done in round 328) and Foggy Swamp Visions (their "waterbend {X}" now reads, but
    "distribute three stun counters among any number of tapped creatures your opponents control" and "for each creature
    card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo (done in round 330), Disorienting Choice (done in round 330), Hot Pursuit (done in round 349),
-   Karn, Living Legacy (done in round 330), Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (done in round B247) (still out,
+   Karn, Living Legacy (done in round 330), Into the Pit, Hatchery Sliver (done in round B248), Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (done in round B247) (still out,
    for the reasons in their earlier lists).
    Round 313 took cards back off the "Out after round N" lists, most played first: paying to ignore a permanent's effect
    until end of turn, a special action (CR 116.2d) offered from that permanent's menu, with nothing on the stack:
@@ -4743,7 +4743,7 @@ line blocks.
    Out after round 307 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
    spell": whether "Phyrexian" also qualifies "artifact creature" isn't settled by its rulings); Zinnia, Valley's Voice
    and Ashling, the Limitless (a keyword cost a spell gains "as you cast" it, and whether the permanent keeps the
-   ability its trigger needs); Hatchery Sliver (a granted replicate whose cost is each spell's own mana cost, beside its
+   ability its trigger needs); Hatchery Sliver (done in round B248) (a granted replicate whose cost is each spell's own mana cost, beside its
    printed one); Geyadrone Dihada (protection from permanents with corruption counters on them); Moxite Refinery ("Remove
    X counters from an artifact or creature you control" as a cost, any kinds); Ashiok, Nightmare Muse's −7 (casting from
    among face-up cards opponents own in exile); Zenos yae Galvus (a creature chosen by its enters trigger, then "when the
@@ -4815,7 +4815,7 @@ line blocks.
    the cost picker only offers your own graveyard); Karn, Living Legacy (done in round 330) ("Pay any amount of mana" as an effect, and an
    emblem whose ability's cost taps an artifact); Moxite Refinery, Abstruse Appropriation, Oskar, Araumi, Ride the
    Avalanche, Panoptic Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba
-   Lysaga, Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
+   Lysaga, Archelos and Hatchery Sliver (done in round B248) (still out, for the reasons in their earlier notes).
    Round 303 took cards back off the "Out after round N" lists, most played first: "Reveal the top six cards of your
    library. You may put up to one land card from among them onto the battlefield tapped and up to one Elf card from
    among them into your hand" (Bounty of Skemfar: the land first, then an Elf card from the cards still there, the rest
@@ -4841,7 +4841,7 @@ line blocks.
    now works); Obsidian Charmaw (done in round 367) (a cost cut counting "each land your opponents control that could produce {C}", near Lane B's round B140 template, left for it); Lumbering Battlement
    (the exile until it leaves isn't linked yet); Spectral Searchlight, Greater Gargadon, Ride the Avalanche (done in round B203), Panoptic
    Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and
-   Hatchery Sliver (still out, for the reasons in their earlier notes).
+   Hatchery Sliver (done in round B248) (still out, for the reasons in their earlier notes).
    Round 302 took cards back off the "Out after round N" lists, most played first: "Whenever players finish voting, each
    opponent who voted for a choice you didn't vote for loses 2 life" (Grudge Keeper: with extra votes, only an opponent
    none of whose votes match one of yours, rulings) and "you and each opponent who voted for a choice you voted for may
@@ -4863,7 +4863,7 @@ line blocks.
    +10, 30,425 of 31,936 with B139.
    Out after round 302 (looked at, not done): Spectral Searchlight and Greater Gargadon (their templates are in Lane B's
    open round B139); Ride the Avalanche (done in round B203), Panoptic Projektor, Read the Runes (done in round 320), Draco, Azra Oddsmaker, Leonin Arbiter (done in round 313),
-   Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and Hatchery Sliver (still out, for the reasons in their earlier
+   Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315), Archelos and Hatchery Sliver (done in round B248) (still out, for the reasons in their earlier
    notes).
    Round 301 took cards back off the "Out after round N" lists, most played first: "the next spell you cast this turn"
    permissions. An alternative cost (CR 118.9) offered only to that spell and used up by it whichever cost is paid
@@ -4892,7 +4892,7 @@ line blocks.
    reduced by "next spell" effects yet); Read the Runes (done in round 320) (the sacrifices chosen first, then the discards for the rest, in
    one step: rulings); Draco (an upkeep "unless you pay {10}" cut by {2} for each basic land type: a punisher cost with
    its own reduction); Azra Oddsmaker, Spectral Searchlight, Leonin Arbiter (done in round 313), Incinerator of the Guilty (done in round 313), Baba Lysaga (done in round 315),
-   Archelos and Hatchery Sliver (still out, for the reasons in their earlier notes).
+   Archelos and Hatchery Sliver (done in round B248) (still out, for the reasons in their earlier notes).
    Round 300 took cards back off the "Out after round N" lists, most played first: an {X} in an alternative cost (CR
    107.3a), announced as the card is cast that way: "Warp {X}{G}" (Broodguard Elite) and "Surge {X}{R}" (Fall of the
    Titans), an {X} the mana cost has too; "Foretell {X}{X}{W}" with "If this spell was foretold, create X of those tokens
@@ -4937,7 +4937,7 @@ line blocks.
    to cast it" (Molten Exhale, CR 601.3c: a browser test in another player's end step). +14, 30,376 of 31,936 with
    B135 to B137.
    Out after round 299 (looked at, not done): Yurlok of Scorch Thrash, Curse of Bounty and Enchanter's Bane (as after
-   round 298); Hatchery Sliver, Zinnia, Valley's Voice and Ian Chesterton (replicate or offspring given to other spells:
+   round 298); Hatchery Sliver (done in round B248), Zinnia, Valley's Voice and Ian Chesterton (done in round B248) (replicate or offspring given to other spells:
    one kicker-like cost each, not a second one); Mirrormind Crown, Esix, Moonlit Meditation and Jinnie Fay
    (tokens created instead as copies of something else: a token-creation replacement); Spectral Searchlight (another
    player chooses the color of mana it adds); Firkraag, Cunning Instigator ("had to attack this combat": attack
@@ -5054,7 +5054,7 @@ line blocks.
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
-   battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
+   battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
@@ -5099,7 +5099,7 @@ line blocks.
    Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
    counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
    Sidequest: Play Blitzball (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
-   (each player plays their own exiled cards and can't play cards from their hand); Ian Chesterton and Hatchery Sliver
+   (each player plays their own exiled cards and can't play cards from their hand); Ian Chesterton (done in round B248) and Hatchery Sliver (done in round B248)
    (replicate granted to Saga or Sliver spells, its cost equal to the spell's mana cost); Rashmi and Ragavan (cast free
    only if the mana value is less than your artifacts, else castable this turn); Boltbender (new targets for any number
    of other spells and abilities).
@@ -5129,7 +5129,7 @@ line blocks.
    Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
    Moon's Legacy (done in round 373) (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
    exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
-   (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
+   (spells with exactly three colors, and mana only for them); Essence of the Wild (done in round B249) (creatures entering as a copy of it,
    ordered with other copy effects, CR 616.1); Ice Cave (done in round B214) (any other player may pay a spell's mana cost to counter it);
    Journey to the Lost City (done in round B204) (a d20 table over the four exiled cards); Ghastly Conscription (done in round 391) (manifesting a shuffled
    face-down pile); Soulflayer (done in round B182) and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
@@ -5174,7 +5174,7 @@ line blocks.
    controller's punisher option is sacrificing that one target); Squee's Revenge (done in round 298) ("choose a number" with no upper bound);
    Ashiok, Nightmare Muse and Jace, Architect of Thought (their other loyalty abilities); Spectral Searchlight and Radiant
    Lotus (mana another player adds); Coram, the Undertaker (casting from every graveyard).
-   Out after round 274 (looked at, not done): Hatchery Sliver ("Each Sliver spell you cast has replicate": a granted
+   Out after round 274 (looked at, not done): Hatchery Sliver (done in round B248) ("Each Sliver spell you cast has replicate": a granted
    replicate beside a spell's own kicker or replicate, two kicker-like costs on one spell, which the cast choices don't
    have yet); Broodguard Elite (done in round 300) ("Warp {X}{G}": an {X} in a warp cost); Cursecloth Wrappings (done in round 303) (a graveyard card gaining
    embalm until end of turn); Spectral Searchlight ("That player adds one mana of any color they choose": mana for
@@ -6153,7 +6153,7 @@ line blocks.
    - Reflexive spells still out: Ill-Timed Explosion (done in round 273; "the greatest mana value among cards discarded this way" carried
      into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
-   - "Triggers an additional time" still out: Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
+   - "Triggers an additional time" still out: Clara Oswald (done in round B249), Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
      of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All (done in round 274), The
      Masamune, Valiant Emberkin, Veyran, Virtue of Knowledge, Wayta, Windcrag Siege, Wizard's Staff.
    - Simplifications: amass with several Armies uses the one with the most +1/+1 counters (CR 701.47a lets you
@@ -7724,7 +7724,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   second mode; Dovin Baan's and Linvala, Shield of Sea Gate's abilities, whose other lines keep them out). A "When ~
   enters, choose a card name" trigger no longer counts as the name a static or ban uses (Petrified Hamlet stays out). +17
   (28,489 of 31,936).
-- Out after round B59 (looked at, not done): Djinn Illuminatus and Reiterating Bolt (done in round 304) (replicate granted or paid with
+- Out after round B59 (looked at, not done): Djinn Illuminatus (done in round B248) and Reiterating Bolt (done in round 304) (replicate granted or paid with
   energy), Heliod's Punishment (a granted ability that refers to its source), Creeping Peeper and Karfell Harbinger (mana
   for special actions), Quarantine Field (done in round B159) (X targets from its counters), Shivan Sand-Mage and Timebender (suspended cards as
   targets), Emrakul's Evangel (sacrificing any number as a cost), Ancestral Knowledge, Ral and the Implicit Maze (the
@@ -9758,10 +9758,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   on it into your hand", one exiled earlier too with X 0, rulings). +5, 31,134 of 31,936 with B187, B188 and rounds 345 to
   347.
 - Out after round B189 (looked at, not done): Noxious Vapors ("chooses one card of each color": how a multicolored card
-  counts has no ruling), The Prismatic Piper and Faceless One (a color chosen before the game begins, before mulligans:
+  counts has no ruling), The Prismatic Piper (done in round B249) and Faceless One (done in round B249) (a color chosen before the game begins, before mulligans:
   no pre-game choice exists yet), A Killer Among Us (done in round B233) (a creature type chosen secretly, revealed as a cost after the
   sacrifice), Chorus of the Conclave (an extra mana payment of any amount added to every creature spell you cast), Essence
-  of the Wild, Decaying Soil (done in round B234), Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal stay out for the
+  of the Wild, Decaying Soil (done in round B234), Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal (done in round B248) stay out for the
   reasons in the earlier lists.
 - Round B190 (least played first, from the Lane B skip lists): Evolving Door ("Count the colors of the sacrificed creature,
   then search your library for a creature card that's exactly that many colors plus one. Exile that card, then shuffle. You
@@ -10684,6 +10684,46 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control change at once, for good, CR 613.1b; a creature given away leaves combat, CR 506.4). Browser tests for the Safe's
   number, Necropsy's targets and evidence, and Inniaz's picks. +3, 31,542 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B248 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): replicate given to
+  the spells you cast (CR 702.56a), CompiledCard `spellsHaveReplicate`: Hatchery Sliver ("Each Sliver spell you cast has
+  replicate. The replicate cost is equal to its mana cost."), Djinn Illuminatus (instants and sorceries), Ian Chesterton
+  (Sagas) and Threefold Signal ("Each spell you cast that's exactly three colors has replicate {3}."). Each permanent's grant is
+  an instance of its own beside any replicate the spell has, each paid separately and copying it only for its own payments
+  (CR 702.56b, rulings: a Hatchery Sliver spell with another Hatchery Sliver out has two): CostChoices `replicate` (times for
+  each instance, in battlefield order, `replicateGranted`), added to the total cost like a kicker (CR 601.2f), also when it's
+  cast without paying its mana cost; X in "equal to its mana cost" is the spell's X (rulings); a spell with no mana cost can't
+  pay it (CR 118.6); StackItem `replicated` keeps each paid instance's giver, and its copy trigger goes on the stack only if
+  that permanent still gives it as the spell becomes cast (as for conspire). Copies of permanent spells become tokens (CR
+  608.3f), a Saga's with its own lore counter. One instance is paid at most 20 times here (a {0} cost could otherwise be paid
+  without end). Bots pay the cheapest instance as many times as their spare mana covers, up to three, never for a legendary
+  permanent spell. Browser tests for the replicate count (Djinn Illuminatus with Lightning Bolt, the copies aimed anew;
+  Hatchery Sliver's own replicate and the given one asked one after the other). +4, 31,546 of 31,936. The compiled text of
+  every other card is unchanged.
+- Round B249 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): creatures entering as
+  copies (CR 614.1c, 707.5), CompiledCard `creaturesEnterAsCopy`: Essence of the Wild ("Creatures you control enter as a copy
+  of ~.": its copiable values as it is now, none of its counters, Auras or other effects, rulings, CR 707.2; tokens too) and
+  Infinite Reflection ("Nontoken creatures you control enter as a copy of enchanted creature.", and "When ~ enters attached
+  to a creature, each other nontoken creature you control becomes a copy of that creature": TriggeredAbility
+  `ifEnteredAttachedCreature`, that creature the trigger's subject even if the Aura is moved before it resolves, rulings).
+  For a creature as it would enter (CR 614.12), under the permanent's controller's control, after control-changing
+  replacements (Xantcha is asked its opponent first) and before every other one (CR 616.1, rulings), so the entering
+  creature's own "enters" replacements (counters, entering tapped, the Volvers' kicked abilities) and triggers don't apply
+  and the copied creature's do; a Clone ends up a copy of it whatever the order (rulings). Mystic Reflection's copy now goes
+  the same way (it used to keep the entering creature's own "enters with" counters). With several copy effects that
+  differ, its controller chooses which applies last (CR 616.1, rulings): the "copyLast" prompt; bots take the copy with the
+  highest mana value. The Prismatic Piper, Faceless One and Clara Oswald ("If ~ is your commander, choose a color before the
+  game begins. ~ is the chosen color."): the color is chosen as the deck is built (CR 903.4b), PlayerSetup
+  `commanderColor`/`secondCommanderColor` (createGame refuses a game without it), GameObject `pregameColor`; its
+  characteristic-defining ability makes it that color in every zone (CR 604.3, 607.2p), not a copy of it or a card that
+  isn't a commander, and the color is part of its color identity (validateCommanderDeck's `colors`, commanderIdentity for
+  Command Tower and the like, `identityOf`). A browser test for the copy prompt. +5, 31,551 of 31,936. The compiled text of
+  every other card is unchanged.
+- Out after round B249 (looked at, not done): the lists after round B248 stay out. Known gaps: two Mystic Reflections
+  still apply in timestamp order rather than asking (only different kinds of copy effect are asked); the app's decks have
+  no way to choose a color for a commander like The Prismatic Piper yet (no sample deck has one).
+- Out after round B248 (looked at, not done): the lists after round B247 stay out, and Zinnia, Valley's Voice and Ashling, the
+  Limitless (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
+  its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
 - Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich and Swans of
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done
   after it merges), Divine Intervention (still out: who removed its last counter isn't recorded), Allure of the Unknown
@@ -10745,9 +10785,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   instant for a new shield). Known gaps: Blood Scrivener counts the Scriveners that already applied in a chain of draws, not
   which ones, so one leaving in the middle of a chain could leave another unapplied; its life is lost as the draw is
   replaced, before the two draws; bots order a Scrivener and an Archive the Archive first (fewer cards).
-- Out after round B234 (looked at, not done): the lists after round B233 stay out, and Threefold Signal and Djinn
+- Out after round B234 (looked at, not done): the lists after round B233 stay out, and Threefold Signal (done in round B248) and Djinn
   Illuminatus (still out: replicate granted to spells needs a second kicker-like cost beside a spell's own, rulings, and
-  Threefold Signal's copies of permanent spells become tokens). Known gaps: bots separate piles to be even by their worth
+  Threefold Signal (done in round B248)'s copies of permanent spells become tokens). Known gaps: bots separate piles to be even by their worth
   and choose the pile worth more; Decaying Soil's look-back treats every card one instruction moved as moved at the same
   time.
 - Out after round B233 (looked at, not done): the lists after round B232 stay out, and Peace Talks ("can't be the targets
@@ -10794,12 +10834,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
   would have to keep apart), Jasmine Boreal of the Seven (a creature spell with no abilities, counting abilities other
   permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth ("Lands can't
-  enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper,
-  Faceless One and Clara Oswald (a color chosen before the game that changes the commander's color identity for deck
+  enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper (done in round B249),
+  Faceless One (done in round B249) and Clara Oswald (done in round B249) (a color chosen before the game that changes the commander's color identity for deck
   building, CR 903.4b), Ranar the Ever-Watchful (its exile trigger, still out; its free first foretell would use Cosmos
   Charger's foretellActionCost) and the lists after round B225 stay out.
 - Out after round B225 (looked at, not done): Cultivator Drone (its mana pays "a cost that contains {C}", a trigger's
-  payment too, rulings: a cost paid as something resolves isn't known to the mana yet), Threefold Signal (a second
+  payment too, rulings: a cost paid as something resolves isn't known to the mana yet), Threefold Signal (done in round B248) (a second
   replicate cost beside a spell's own, rulings: one kicker-like cost per spell is modeled), Bösium Strip (done in round B240) (casting from the top
   of a graveyard), Pure Intentions (done in round B240) (a turn's delayed trigger on "one or more cards" an opponent's spell or ability makes you
   discard, once per event) and the lists after round B224 stay out.
@@ -10852,7 +10892,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Sacred Ground (what caused a land to go to the graveyard) and Over the Top (done in round 389) (every player's permanent cards entering at
   once, Auras among them) stay out.
 - Out after round B214 (looked at, not done): Decaying Soil (done in round B234) (a threshold-granted dies trigger that looks back, CR 603.10a),
-  Silhouette (done in round B239) (damage from a source whose spell or ability targets the creature), Essence of the Wild (a copy replacement
+  Silhouette (done in round B239) (damage from a source whose spell or ability targets the creature), Essence of the Wild (done in round B249) (a copy replacement
   applied before other enters replacements) stay out for the reasons in the earlier lists. Known gap: the engine still
   orders each player's own simultaneous triggers itself (CR 603.3b) rather than asking.
 - Out after round B213 (looked at, not done): a bot picking the land for Desolation's sacrifice isn't told that a Plains
@@ -10914,7 +10954,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B179 (looked at, not done): Soul Burn (done in round B234) ("not more than the amount of {B} spent on X": which of the black
   mana went to X and which to the {2} is the payer's, not tracked), Emblazoned Golem (one mana of each color on its kicker
   X), Kaya, Ghost Assassin (done in round B206) ("Exile ~ or up to one target creature": which one chosen as it resolves), Sigardian Zealot (done in round B187)
-  ("any number of creatures with different powers"), Faceless One (a color chosen before the game begins), Peace Talks,
+  ("any number of creatures with different powers"), Faceless One (done in round B249) (a color chosen before the game begins), Peace Talks,
   Wall of Shadows (done in round B199) and Fishing Pole stay out for the reasons in the earlier lists. Drain Life and Consume Spirit's
   black X is paid as black symbols, so delve or improvise given to them couldn't pay X's part.
 - Out after round B178 (looked at, not done): Peace Talks ("players and permanents can't be the targets of spells or activated
@@ -10931,7 +10971,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (done in round B213) (soulshift X counted
   from the Spirits as they last existed), Barbed Wire (done in round B182) (a "prevent the next damage dealt by ~" shield), Spiteful Repossession
   (each opponent's own difference, then "the damage dealt this way") stay out for these reasons.
-- Out after round B175 (looked at, not done): Chong and Lily (done in round B187), Threefold Signal, Hankyu (done in round B209) and Time Reaper stay out for the
+- Out after round B175 (looked at, not done): Chong and Lily (done in round B187), Threefold Signal (done in round B248), Hankyu (done in round B209) and Time Reaper stay out for the
   reasons in the earlier lists.
 - Out after round B174 (looked at, not done): Demilich (done in round B193), Arcane Proxy (done in round B193) and Roving Actuator (a copy of a graveyard card cast
   while the ability resolves), Sproutback Trudge (done in round B193) (cast from the graveyard as its end step trigger resolves), Outmaneuver and
@@ -10978,7 +11018,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (done in round B198) (face-down spells as a cost reduction's
   filter), Lantern Flare (a cleave cost with {X} on a card whose mana cost has none, X defined by its text otherwise),
   Saproling Burst (a token's power and toughness from the counters on the permanent that made it), Mana Cache (any player
-  activating a mana ability of a permanent they don't control), Essence of the Wild (creatures entering as a copy of it,
+  activating a mana ability of a permanent they don't control), Essence of the Wild (done in round B249) (creatures entering as a copy of it,
   a copy replacement applied before other enters replacements, rulings), Sunglasses of Urza (white mana spent as though
   it were red).
 - Out after round B162 (looked at, not done): Synthesis Pod (reveal until a card with mana value one more than the exiled
@@ -11275,7 +11315,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hydra and Lichenthrope (replacements for each 1 damage, and Rock Hydra's counters removed even if the damage can't be
   prevented), Quenchable Fire ("unless that player pays {U} before that step": a payment any time before the upkeep).
 - Out after round B90 (looked at, not done): Twinning Glass (a free cast by a name cast this turn: split and adventure
-  names), Threefold Signal (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
+  names), Threefold Signal (done in round B248) (replicate granted to spells, beside a spell's own kicker-like cost), Blade of the Swarm
   (done in round 272), Blaze Commando and Flame Channeler (an instant or sorcery spell dealing damage to
   anything, once per instruction), Shorecrasher Elemental (done in round B129) and Skittish Valesk (returning or turning a permanent face
   down), Preferred Selection (done in round B216), Scrying Glass, Hedron Alignment, Ertai's Familiar (done in round B128), Death-Mask Duplicant (done in round B152), Relive the Past (done in round B128).
@@ -11476,7 +11516,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attacker's among several blockers.
 - Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, done in round 312);
   granted trigger Breathkeeper Seraph's "at the beginning of your next upkeep".
-- Faceless One ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
+- Faceless One (done in round B249) ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
   in the engine and `sample-decks.json` (`secondCommander`) but no sample deck uses them yet.
 - Split second conditional on a kicker (Molten Disaster's "if it was kicked", done in round 324); Shadow the Hedgehog's "if mana from an
   artifact was spent" works.
@@ -11490,7 +11530,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
   Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
-  Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection; planeswalkers (Saheeli,
+  Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection (done in round B249); planeswalkers (Saheeli,
   Oko, Kaya).
 - Madness: "if its madness cost was paid" (Grave Scrabbler), X or non-mana madness costs, granting madness (Falkenrath
   Gorger), "whenever you discard a card, if it has madness" (Anje Falkenrath). A madness or suspended commander is

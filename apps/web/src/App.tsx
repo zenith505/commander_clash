@@ -138,6 +138,8 @@ import {
   teamworkPower,
   conspireCandidates,
   conspireInstances,
+  replicateGranted,
+  REPLICATE_MAX,
   dredgeOptions,
   madnessCastOf,
   castPayText,
@@ -399,6 +401,8 @@ type CastDraft = {
   convoke?: string[];
   modes?: number[];
   kicks?: number[];
+  /** Round B248: how many times each instance of replicate a permanent gives it is paid (CostChoices.replicate). */
+  replicate?: number[];
   x?: number;
   targets?: TargetChoice[];
   sacrifice?: string[];
@@ -490,6 +494,9 @@ type XOpponentPick = { label: string; what: string; options: PlayerId[]; /** But
 type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
 
 /** Choosing which kicker costs to pay (CR 702.33). */
+/** Round B248: how many times to pay each instance of replicate permanents give the spell (CR 702.56a-b). */
+type ReplicatePick = { draft: CastDraft; label: string; grants: { cost: string; from: string }[]; counts: number[] };
+
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[]; /** "Kicker—Sacrifice two lands": the cost in words. */ text?: string };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
@@ -630,6 +637,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [xPick, setXPick] = useState<XPick | null>(null);
   const [mixPick, setMixPick] = useState<MixPick | null>(null);
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
+  const [replicatePick, setReplicatePick] = useState<ReplicatePick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [xOppPick, setXOppPick] = useState<XOpponentPick | null>(null);
@@ -682,7 +690,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || castTypePick || buybackPick);
+  const picking = !!(xPick || kickPick || replicatePick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || castTypePick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -695,6 +703,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setTapPick(null);
         setXPick(null);
         setKickPick(null);
+        setReplicatePick(null);
         setCostPick(null);
         setCostOrPick(null);
         setNumberPick(null);
@@ -1073,7 +1082,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
     const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}), ...(d.offering?.length ? { offering: d.offering[0]! } : {}) };
-    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
+    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}) };
     // Offering: the permanent to sacrifice is chosen as the spell is announced (CR 702.48b), and sets its cost and when
     // it can be cast. Skipping isn't offered when it couldn't be cast now without it.
     if (d.offering === undefined && compiled.offering && !free) {
@@ -1095,6 +1104,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.kicks === undefined && compiled.flashIfKicked && canActAtSorcerySpeed(s, HUMAN)) return continueCast({ ...d, kicks: [] });
     if (d.kicks === undefined && compiled.kicker && !compiled.kicker.required)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [], ...(compiled.kicker.text ? { text: compiled.kicker.text } : {}) });
+    // Round B248: replicate a permanent gives it (Djinn Illuminatus), each instance paid any number of times (CR 702.56a-b),
+    // announced with the other additional costs (CR 601.2b). An unpayable one (no mana cost, CR 118.6) isn't offered.
+    if (d.replicate === undefined) {
+      const grants = replicateGranted(s, HUMAN, card);
+      if (grants.some((g) => g.cost !== null))
+        return setReplicatePick({ draft: d, label: card.name, grants: grants.map((g) => ({ cost: g.cost ?? "", from: cardOf(s, g.source).name })), counts: grants.map(() => 0) });
+    }
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
     const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;
     if (d.modes === undefined && kickedModal) {
@@ -2176,6 +2192,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               </button>
             </div>
           )}
+          {replicatePick && (
+            <ReplicatePickBar
+              s={s}
+              pick={replicatePick}
+              onChange={(counts) => setReplicatePick({ ...replicatePick, counts })}
+              onDone={(counts) => {
+                setReplicatePick(null);
+                continueCast({ ...replicatePick.draft, replicate: counts.some((n) => n > 0) ? counts : [] });
+              }}
+              onCancel={() => setReplicatePick(null)}
+            />
+          )}
           {kickPick && (
             <KickPickBar
               s={s}
@@ -2703,6 +2731,38 @@ function ManaMixChoice({ pending, dispatch }: { pending: Extract<NonNullable<Gam
  * Kicker (CR 702.33): pay the kicker cost or not; with two kicker costs, either or both; with
  * multikicker, any number of times. Options your mana can't pay for are disabled.
  */
+/** Round B248: replicate given by permanents (Djinn Illuminatus): a count for each instance, each paid separately (CR 702.56b). */
+function ReplicatePickBar({ s, pick, onChange, onDone, onCancel }: { s: GameState; pick: ReplicatePick; onChange: (counts: number[]) => void; onDone: (counts: number[]) => void; onCancel: () => void }) {
+  const d = pick.draft;
+  // Affordable with X as small as it could be (X is chosen after this, the same X in each replicate cost, rulings).
+  const can = (counts: number[]) => [undefined, 1].some((x) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", x, { ...(d.via ? { via: d.via } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks?.length ? { kicks: d.kicks } : {}), replicate: counts }) !== null);
+  const set = (i: number, n: number) => onChange(pick.counts.map((c, j) => (j === i ? Math.max(0, n) : c)));
+  const total = pick.counts.reduce((a, b) => a + b, 0);
+  return (
+    <div className="targeting x-pick" data-replicate-pick>
+      <span>
+        <strong>{pick.label}</strong>: replicate (copy it for each time you pay), how many times?
+      </span>
+      {pick.grants.map((g, i) => (
+        <span key={i} className="kick-cost">
+          <ManaCost cost={g.cost} size="sm" /> <span className="muted">({g.from})</span>
+          <button className="ghost" disabled={pick.counts[i]! <= 0} onClick={() => set(i, pick.counts[i]! - 1)} aria-label={`Replicate ${g.from} one time fewer`}>
+            −
+          </button>
+          <span className="kick-count">{pick.counts[i]}</span>
+          <button className="ghost" disabled={pick.counts[i]! >= REPLICATE_MAX || !can(pick.counts.map((c, j) => (j === i ? c + 1 : c)))} onClick={() => set(i, pick.counts[i]! + 1)} aria-label={`Replicate ${g.from} one more time`}>
+            +
+          </button>
+        </span>
+      ))}
+      <button onClick={() => onDone(pick.counts)}>{total ? `Replicate ${total === 1 ? "once" : `${total} times`}` : "Don't replicate"}</button>
+      <button className="ghost" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
 function KickPickBar({
   s,
   pick,
@@ -5862,6 +5922,20 @@ function Controls({
     );
   }
   // Sutured Ghoul, Living Lore, Frankenstein's Monster: a card of your graveyard to exile as it enters, one at a time.
+  // Essence of the Wild, Infinite Reflection (round B249): which of several copy effects applies last, each option a copy's card.
+  if (pending?.kind === "chooseOption" && pending.what === "copyLast" && pending.player === HUMAN)
+    return (
+      <div className="controls copy-pick" data-copy-last>
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} onMouseEnter={() => s.cards[o] && onHover(s.cards[o]!)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && (pending.what === "copy" || pending.what === "copyOther" || pending.what === "exileFromYard") && pending.player === HUMAN)
     return (
       <div className="controls copy-pick">

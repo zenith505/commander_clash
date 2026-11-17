@@ -12037,6 +12037,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d7dcf1be-2779-419d-8c90-03800f9e7ea2",
+  "name": "Djinn Illuminatus",
+  "manaCost": "{5}{U/R}{U/R}",
+  "cmc": 7,
+  "typeLine": "Creature — Djinn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Djinn"
+  ],
+  "oracleText": "({U/R} can be paid with either {U} or {R}.)\nFlying\nEach instant and sorcery spell you cast has replicate. The replicate cost is equal to its mana cost. (When you cast it, copy it for each time you paid its replicate cost. You may choose new targets for the copies.)",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "gpt",
+  "releasedAt": "2006-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f25af42d-f1bf-4bd3-aded-ecadafdbf6e6",
   "name": "Do or Die",
   "manaCost": "{1}{B}",
@@ -14076,6 +14110,36 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9d105f83-583d-438b-8f26-b39e818ed295",
+  "name": "Essence of the Wild",
+  "manaCost": "{3}{G}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar"
+  ],
+  "oracleText": "Creatures you control enter as a copy of this creature.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20126,6 +20190,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6227fb65-d7ef-4bc6-a076-9aa10941632c",
+  "name": "Hatchery Sliver",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Sliver",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sliver"
+  ],
+  "oracleText": "Replicate {1}{G} (When you cast this spell, copy it for each time you paid its replicate cost.)\nEach Sliver spell you cast has replicate. The replicate cost is equal to its mana cost. (A copy of a permanent spell becomes a token.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Replicate"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "860affd6-8f48-4630-b613-d147299b0355",
   "name": "Hatchet Bully",
   "manaCost": "{3}{R}",
@@ -21850,6 +21946,36 @@
   "set": "sld",
   "releasedAt": "2022-06-14",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5bbcfb73-cccc-47b0-81ae-17eb7c33ff5e",
+  "name": "Infinite Reflection",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nWhen this Aura enters attached to a creature, each other nontoken creature you control becomes a copy of that creature.\nNontoken creatures you control enter as a copy of enchanted creature.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

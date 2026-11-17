@@ -3747,8 +3747,9 @@ line blocks.
    to foretell." (CompiledCard.firstForetellFree: the special action's cost, CR 702.143a, 116.2h, while its controller
    hasn't foretold this turn, TurnLog `foretold`, counting cards foretold before Ranar was there). Kraven the Hunter's
    "Whenever a creature an opponent controls with the greatest power among creatures that player controls dies" (dies
-   `greatestPowerOfController`: its power as it last existed against the creatures its controller still controls and those
-   that left in the same event, as they last existed, CR 603.10a; tied counts). Eriette, the Beguiler's "Whenever an Aura
+   `greatestPowerOfController`: its power just before the event against every creature its controller controlled then,
+   those dying with it too, a lord's bonus included: the battlefield as the event's first permanent left, GameState.
+   leftTogether `before`, CR 603.10a, as Lane B round B250 found; tied counts). Eriette, the Beguiler's "Whenever an Aura
    you control becomes attached to a nonland permanent an opponent controls with mana value less than or equal to that
    Aura's mana value, gain control of that permanent for as long as that Aura is attached to it." (trigger event
    `auraAttachedToOpponents`, the Aura entering attached or moved; ContinuousEffect `whileAttached`, CR 611.2b; nothing if

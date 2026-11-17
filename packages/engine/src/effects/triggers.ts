@@ -3548,11 +3548,15 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
 
 /** Is this moved object one that `b` counts, for the permanent `w` (as it is now, or as it last existed: `gone`)? */
 /**
- * Kraven the Hunter (round 404): the dying creature's power as it last existed is at least that of each other creature
- * its controller then controlled: those still on the battlefield, and those that left the battlefield in the same event,
- * as they last existed (CR 603.10a).
+ * Kraven the Hunter (round 404): the dying creature's power is at least that of each other creature its controller
+ * controlled just before it left (CR 603.10a), those leaving in the same event too, a tie included: the battlefield as the
+ * event's first permanent left (GameState.leftTogether `before`). Without that snapshot, its power as it last existed
+ * against the others' now and the last known power of those that left with it.
  */
 function hadGreatestPower(s: GameState, dying: { o: GameObject; c: Characteristics }): boolean {
+  const before = s.leftTogether?.find((l) => l.before)?.before;
+  const me = before?.find((b) => b.id === dying.o.id);
+  if (before && me) return before.every((b) => b.controller !== me.controller || b.power <= me.power);
   const who = dying.c.controller;
   const mine = dying.c.power;
   for (const id of s.battlefield) {

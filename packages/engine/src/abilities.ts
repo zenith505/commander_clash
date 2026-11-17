@@ -4218,8 +4218,17 @@ export type Effect =
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
    * the exceptions (CR 707.9), for the rest of the game, until end of turn, or until its controller's next turn.
+   * Round 396's "for as long as" durations (CR 611.2b): "whileTargetTapped", for as long as the permanent `of` (a target)
+   * remains tapped (Zygon Infiltrator); "whileSourceAttached", for as long as the source remains attached to `what`
+   * (Blade of Shared Souls). Never begun if that isn't so as the effect would begin; over for good once it stops.
    */
-  | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" }
+  | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" | "whileTargetTapped" | "whileSourceAttached" }
+  /**
+   * Assimilation Aegis (round 396): "that creature becomes a copy of a creature card exiled with ~" for as long as ~ remains
+   * attached to it: one of the creature cards its linked exile ability exiled (CR 607.2a), as printed (CR 707.2, rulings),
+   * chosen as it resolves when there are several (chooseOption "aegisCopy"); with none, nothing happens (rulings).
+   */
+  | { type: "becomeCopyOfLinked"; what: ObjRef }
   /**
    * Mystic Reflection: "The next time one or more creatures or planeswalkers enter this turn, they enter as copies of the
    * chosen creature": a replacement effect for the next such event (CR 614.1c, 707.5), see GameState.nextEntersAsCopy.

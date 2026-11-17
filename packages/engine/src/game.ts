@@ -74,6 +74,7 @@ import {
   type TurnRule,
   type DeferredAct,
   type DrawAfter,
+  type CopyWhile,
 } from "./types";
 
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
@@ -2593,6 +2594,10 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => s.objects[id]?.zone !== "battlefield" || pw(obj(s, id)) <= pw(me));
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
+  // Round 396: copy effects "for as long as that creature remains tapped" (Zygon Infiltrator) or "for as long as ~ remains
+  // attached to it" (Blade of Shared Souls, Assimilation Aegis), over for good once that stops (CR 611.2b), a phased-out
+  // copy too (CR 702.26f).
+  if (endCopyWhile(s)) lost = true;
   const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
@@ -2601,6 +2606,32 @@ export function endWhileTapped(s: GameState): boolean {
   s.effects = s.effects.filter((e) => !ended.includes(e));
   invalidateCharacteristics(s);
   return true;
+}
+
+/** Whether a round 396 "for as long as" copy duration still holds (CR 611.2b; a phased-out permanent can't be seen, 702.26f). */
+export function copyWhileHolds(s: GameState, w: CopyWhile): boolean {
+  if ("whileTapped" in w) return whileTappedHolds(s, w.whileTapped);
+  const { id, zc, host, hostZc } = w.whileAttached;
+  const a = s.objects[id];
+  const h = s.objects[host];
+  return !!a && !!h && a.zone === "battlefield" && h.zone === "battlefield" && (a.zoneChanges ?? 0) === zc && (h.zoneChanges ?? 0) === hostZc && a.attachedTo === host;
+}
+
+/** End the copy effects whose "for as long as" duration stopped (round 396); true when one ended. */
+export function endCopyWhile(s: GameState): boolean {
+  let ended = false;
+  for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
+    const o = s.objects[id];
+    if (!o?.copyEffects?.some((e) => typeof e.until === "object" && !("turnOf" in e.until))) continue;
+    const kept = o.copyEffects.filter((e) => typeof e.until !== "object" || "turnOf" in e.until || copyWhileHolds(s, e.until));
+    if (kept.length === o.copyEffects.length) continue;
+    const was = defOf(s, o).name;
+    o.copyEffects = kept.length ? kept : undefined;
+    invalidateCharacteristics(s);
+    log(s, `${was} stops being a copy and is ${defOf(s, o).name} again.`);
+    ended = true;
+  }
+  return ended;
 }
 
 /** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
@@ -4341,7 +4372,7 @@ function startNextTurn(s: GameState, skipping = false) {
   }
   s.extraTurn = extra;
   takeControl(s);
-  endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
+  endCopyEffects(s, (e) => typeof e.until === "object" && "turnOf" in e.until && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
   if (ending.length) {
     s.effects = s.effects.filter((e) => !ending.includes(e));
@@ -11840,6 +11871,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // Lynde, Cheerful Tormentor (round 394): which Curse attached to you goes to which opponent, or none.
     if (r.scratch?.curseMove === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the options offered");
     r.scratch.curseMove = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "aegisCopy") {
+    // Assimilation Aegis (round 396): which creature card exiled with it the creature becomes a copy of.
+    if (r.scratch?.aegisCopy === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    r.scratch.aegisCopy = choice;
     continueResolution(s);
     return;
   }

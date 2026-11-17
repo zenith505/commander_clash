@@ -1,7 +1,7 @@
 // Phasing (CR 702.26): a phased-out permanent is treated as though it doesn't exist, without changing zones.
 
 import { abilitiesOf, objHasKeyword } from "./cards";
-import { clearCombat, log, nameOf, obj, removeFromCombat, whileControlledHolds, whileTappedHolds } from "./game";
+import { clearCombat, endCopyWhile, log, nameOf, obj, removeFromCombat, whileControlledHolds, whileTappedHolds } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import { pairedWith } from "./cards";
 import type { GameState, ObjectId, PlayerId } from "./types";
@@ -52,6 +52,8 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
   }
   log(s, `${all.map((id) => nameOf(s, id)).join(", ")} phase${all.length === 1 ? "s" : ""} out.`);
   invalidateCharacteristics(s);
+  // Round 396: a "for as long as" copy effect that tracks one of them ends now, as it can't see it (CR 702.26f).
+  endCopyWhile(s);
 }
 
 /**

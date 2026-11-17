@@ -120,6 +120,7 @@ import { round391Line } from "./round391";
 import { round392Line } from "./round392";
 import { round394Line } from "./round394";
 import { round395Line } from "./round395";
+import { round396Line } from "./round396";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -6276,6 +6277,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round394Line(line, raw, out, isSpell)) continue;
     // Round 395's whole lines (oracle/round395.ts).
     if (round395Line(line, raw, out, isSpell)) continue;
+    // Round 396's whole lines (oracle/round396.ts).
+    if (round396Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7688,6 +7691,15 @@ const castsTheExiled = new WeakSet<CompiledCard>();
  * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
  */
 function linkExile(out: CompiledCard) {
+  // Assimilation Aegis (round 396): "a creature card exiled with ~" is one its enters ability exiled (CR 607.2a), its only
+  // exile instruction.
+  const copyBodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (copyBodies.some((b) => allEffects(b.effects).some((e) => e.type === "becomeCopyOfLinked"))) {
+    const enters = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.until === "sourceLeaves");
+    const others = copyBodies.flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick", "flicker", "exileUntilNonlandLinked"].includes(e.type) || (e.type === "discard" && !!e.exile));
+    if (out.spell || enters.length !== 1 || others.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one exile ability)");
+    else enters[0]!.linked = true;
+  }
   // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
   // linked to the one ability that exiles it as it enters (CR 607.2a).
   if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {

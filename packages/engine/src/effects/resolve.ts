@@ -37,6 +37,7 @@ import { runFaceDownPileEffect } from "./run-round391";
 import { runPlayTopOrHandEffect, runPowerToPlayersEffect } from "./run-round392";
 import { runMoveCurseEffect, runReturnOneOfThemEffect, runStealTokensEffect } from "./run-round394";
 import { runExileUntilNonlandLinkedEffect, runRevealTopsShareTypeEffect } from "./run-round395";
+import { runBecomeCopyOfLinkedEffect } from "./run-round396";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
 import { runNoteCreatureTypeEffect } from "./run-round380";
@@ -1930,6 +1931,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runExileUntilNonlandLinkedEffect(s, e, ctx, src);
     case "revealTopsShareType":
       return runRevealTopsShareTypeEffect(s, ctx, src);
+    case "becomeCopyOfLinked":
+      return runBecomeCopyOfLinkedEffect(s, e, ctx, src);
     case "phaseInSubject":
       return runPhaseInSubjectEffect(s, ctx, src);
     case "overTheTop":

@@ -158,7 +158,7 @@ import {
   attacksIfAbleNow,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
-import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
+import { asFace, castableFaces, defMv, layoutOf, registerFace, restingDef, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { prepareSpellOf } from "./prepare";
 import { castingBody, castTimeTargets, compileCard, compileGranted } from "./oracle";
@@ -2053,6 +2053,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const moves = pend.options.filter((o) => o !== "none");
       const life = (o: string) => player(s, Number(o.split(">")[1])).life;
       return [{ type: "chooseOption", player: pid, choice: moves.sort((a, b) => life(b) - life(a))[0] ?? "none" }];
+    }
+    // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
+    if (pend.kind === "chooseOption" && pend.what === "aegisCopy") {
+      const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
     }
     if (pend.kind === "chooseOption" && pend.what === "mireLand") {
       const score = (id: string) => {
@@ -5980,6 +5985,15 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
     const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== me.id && controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
     return mine.reduce((n, o) => n + defWorth(revealed) - defWorth(defOf(s, o)), 0);
   }
+  // Blade of Shared Souls (round 396): the creature it became attached to becomes a copy of another creature of ours, worth
+  // it when that one is bigger and not a legendary one (the legend rule would cost us one of them, CR 704.5j).
+  if (e.what.ref === "subject" && e.of.ref === "target") {
+    const host = item.subject && s.objects[item.subject.id];
+    const tt = item.targets?.[e.of.index];
+    if (host?.zone !== "battlefield" || controllerOf(s, host) !== pid || tt?.kind !== "object") return 0;
+    const d = defOf(s, obj(s, tt.id));
+    return d.supertypes.includes("Legendary") ? -1 : defWorth(d) - defWorth(defOf(s, host));
+  }
   if (e.what.ref !== "self") return 0;
   const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
   const sub = item.subject && s.objects[item.subject.id];
@@ -7092,6 +7106,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (ab.lifeCostX && (x ?? 0) > player(s, pid).life - 10) continue;
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : leoninTarget ?? (body.targets.length ? chooseTargets(s, pid, body, false, id, x) : []);
         if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
+        // Zygon Infiltrator (round 396): only to become a copy of a creature at least as big as it is.
+        const tappedCopy = body.effects.find((e) => e.type === "becomeCopy" && e.duration === "whileTargetTapped");
+        if (tappedCopy?.type === "becomeCopy" && tappedCopy.of.ref === "target") {
+          const t = targets[tappedCopy.of.index];
+          if (t?.kind !== "object" || defWorth(defOf(s, obj(s, t.id))) < defWorth(defOf(s, o))) continue;
+        }
         // O-Naginata: not to a creature it can't be attached to (it would stay where it is, rulings).
         const only = ab.equip ? abilitiesOf(s, o).attachOnly : undefined;
         if (only && targets.some((t) => t.kind === "object" && !objectMatches(s, only, obj(s, t.id), pid, false))) continue;

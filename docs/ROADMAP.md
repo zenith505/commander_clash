@@ -3557,6 +3557,24 @@ line blocks.
    Out after round 395 (looked at, not done): Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree
    Vector, Possibility Storm, Arvinox and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in
    their earlier lists).
+   Round 396 went on down `npm run popular` and the "Out after round N" lists, most played first, to permanents becoming
+   copies "for as long as" something stays so (CR 611.2b; CopyEffect.until a CopyWhile, ended for good in game.ts
+   endWhileTapped once it stops, and as a tracked permanent phases out, CR 702.26f): Assimilation Aegis's "Whenever this
+   Equipment becomes attached to a creature, for as long as this Equipment remains attached to it, that creature becomes a
+   copy of a creature card exiled with this Equipment." (Effect becomeCopyOfLinked, effects/run-round396.ts: linked to its
+   one exile ability, CR 607.2a, compile.ts linkExile; the card as printed, CR 707.2; one of several chosen each time,
+   chooseOption "aegisCopy"; none, or a noncreature card, and nothing happens, rulings); Blade of Shared Souls' "... you may
+   have that creature become a copy of another target creature you control." (becomeCopy duration "whileSourceAttached";
+   "another" is not that creature, TargetSpec.notSubject; values locked in as it begins, rulings; unattached, it's over,
+   even if attached again); Zygon Infiltrator's "Tap another target creature and put a stun counter on it. This creature
+   becomes a copy of that creature for as long as that creature remains tapped." (duration "whileTargetTapped": its untap
+   step only removes the stun counter, CR 122.1d; once it untaps, leaves or phases out, over for good; bots use it in their
+   main phase 2 on a creature at least as big). Never begun if the condition is already false as the effect would begin
+   (CR 611.2b). Browser tests click through Zygon's ability, the Blade's target and "you may", and the Aegis's pick. +3,
+   31,584 of 31,936. The compiled text of every other card is unchanged.
+   Out after round 396 (looked at, not done): Secret Invasion (still out: the enchanted creature a copy of the creature
+   the Aura exiled, until the Aura leaves); Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility
+   Storm, Arvinox and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -11071,7 +11089,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   can't be blocked", "exile those tokens unless you have the city's blessing".
 - Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
   (Deepfathom Echo, Sakashima's Will; Cytoshape and Polymorphous Rush done in round B139); "for as long as" durations (Assimilation Aegis,
-  Blade of Shared Souls, Zygon Infiltrator, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
+  Blade of Shared Souls and Zygon Infiltrator done in round 396, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
   Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
   Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man,

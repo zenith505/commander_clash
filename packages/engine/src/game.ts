@@ -1612,7 +1612,17 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     }
     if (stolen) withCounters = withCounters?.counter === "+1/+1" ? { ...withCounters, n: withCounters.n + stolen } : { counter: "+1/+1", n: stolen, ...(withCounters ? { also: { counter: withCounters.counter, n: withCounters.n } } : {}) };
   }
-  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || (printed.entersTappedIfXAtMost !== undefined && (opts.x ?? 0) <= printed.entersTappedIfXAtMost) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
+  // Archelos, Lagoon Mystic (round 403): another permanent's "enter tapped" or "enter untapped" as it is tapped or not
+  // (CR 614.1c). With replacement effects of both kinds, the entering permanent's controller chooses their order, so
+  // whether it enters tapped (CR 616.1, rulings): asked once it's there, before anything sees it enter (EntersOption
+  // "tapOrder"). Put onto the battlefield tapped with no replacement effect, an untapped Archelos has it enter untapped
+  // (rulings), as Spelunking does. Without Archelos, Spelunking's "enter untapped" is still applied last, as before.
+  const archelos = othersEnterAsTappedState(s, o);
+  const tapping = printed.entersTapped || entersTappedNow(s, o, printed, opts.untapped) || (printed.entersTappedIfXAtMost !== undefined && (opts.x ?? 0) <= printed.entersTappedIfXAtMost) || othersMakeItEnterTapped(s, o) || archelos.tapped;
+  const untapping = othersMakeItEnterUntapped(s, o) || archelos.untapped;
+  const tapOrder = (archelos.tapped || archelos.untapped) && tapping && untapping;
+  if (tapOrder) o.tapped = false;
+  else if (tapping || opts.tapped) o.tapped = !untapping;
   // Brimstone Vandal: day from the moment it enters, with neither (CR 731.1, 614.12).
   if (printed.entersDay && !s.dayNight) setDayNight(s, "day");
   // "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types"
@@ -1727,7 +1737,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersProcess ? (["processExile"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(tapOrder ? (["tapOrder"] as const) : []), ...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersProcess ? (["processExile"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -2106,6 +2116,24 @@ export function othersMakeItEnterUntapped(s: GameState, o: GameObject): boolean 
     const you = controllerOf(s, src);
     return rules.some((r) => objectMatches(s, r.filter, o, you, false));
   });
+}
+
+/**
+ * Archelos, Lagoon Mystic (round 403): whether another permanent's "As long as ~ is tapped, other permanents enter tapped"
+ * (`tapped`) or "As long as ~ is untapped, other permanents enter untapped" (`untapped`) applies to `o` as it enters: one
+ * already on the battlefield, not one entering with it (rulings), with its abilities (CR 614.12).
+ */
+export function othersEnterAsTappedState(s: GameState, o: GameObject): { tapped: boolean; untapped: boolean } {
+  const out = { tapped: false, untapped: false };
+  for (const id of s.battlefield) {
+    if (id === o.id) continue;
+    const src = obj(s, id);
+    const rule = compileCard(defOf(s, src)).othersEnterAsTappedState;
+    if (!rule || !characteristics(s, src).hasPrintedAbilities) continue;
+    if (src.tapped && rule.tapped) out.tapped = true;
+    if (!src.tapped && rule.untapped) out.untapped = true;
+  }
+  return out;
 }
 
 function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
@@ -10316,6 +10344,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
   // Merseine (round B211): only the player who controls the permanent it's attached to now.
   else if (ab.enchantedControllerOnly && (!o.attachedTo || s.objects[o.attachedTo]?.zone !== "battlefield" || controllerOf(s, obj(s, o.attachedTo)) !== pid)) return `only the controller of the creature ${d.name} enchants may activate that ability`;
+  // Capricopian (round 403): only the player it's attacking now, not while it attacks a planeswalker or battle (rulings).
+  else if (ab.attackedPlayerOnly && (o.attacking !== pid || o.attackingPermanent !== undefined)) return `only the player ${d.name} is attacking may activate that ability`;
   // A Killer Among Us (round B233): only the player who secretly chose the type for this object can reveal it (rulings).
   else if (ab.revealSecretType && !(o.secretType && o.secretType.by === pid && o.secretType.zc === (o.zoneChanges ?? 0))) return `only the player who secretly chose a creature type for ${d.name} can reveal it`;
   // Merseine: "Pay enchanted creature's mana cost" can't be paid for a creature with no mana cost (CR 118.6).
@@ -12015,6 +12045,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry) s.entersChoices!.unshift(entry);
       return;
     }
+    if (pend.what === "tapOrder") {
+      // Archelos, Lagoon Mystic (round 403): entering tapped is part of how it enters (CR 614.1c), not becoming tapped.
+      if (!pend.options.includes(choice)) throw new RulesError("choose tapped or untapped");
+      o.tapped = choice === "tapped";
+      log(s, `${p.name} has ${pend.source} enter ${choice}.`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "readAhead") {
       // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
       const n = Number(choice);
@@ -12090,7 +12129,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters" || pend.what === "tapOrder") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -13164,6 +13203,12 @@ function askEntersChoice(s: GameState): boolean {
       // "As ~ enters, choose Khans or Dragons" (CR 614.12b).
       const words = compileCard(defOf(s, o)).entersAnchor ?? [];
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "anchor", options: words, objectId: o.id, prompt: `choose ${words.join(" or ")}` };
+      return true;
+    }
+    if (c.what === "tapOrder") {
+      // Archelos, Lagoon Mystic (round 403): replacement effects that have it enter tapped and others that have it enter
+      // untapped; its controller orders them, the last one deciding (CR 616.1, rulings).
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "tapOrder", options: ["untapped", "tapped"], labels: ["Enter untapped", "Enter tapped"], objectId: o.id, prompt: "replacement effects would have it enter tapped and untapped: choose which applies last" };
       return true;
     }
     if (c.what === "readAhead") {

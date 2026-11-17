@@ -3330,6 +3330,12 @@ export type Effect =
       each?: true;
       /** Portal Manipulator: "Those creatures are now attacking that player": each of them attacks this player now, no choice (rulings: requirements, restrictions and costs ignored; they still attacked what they were declared attacking). */
       toPlayer?: PlayerRef;
+      /**
+       * Capricopian (round 403): "you may reselect which player ~ is attacking": another player only, no planeswalker or
+       * battle (rulings), or none (a "keep" option); its controller is never one (CR 506.2).
+       */
+      playersOnly?: true;
+      may?: true;
     }
   /**
    * "Return a creature card at random from your graveyard to your hand" (Haunted Fengraf); "an opponent chooses a card at
@@ -6102,7 +6108,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -7624,6 +7630,11 @@ export interface ActivatedAbility {
   /** With `anyPlayer`, Merseine (round B211): "Only the controller of the enchanted creature may activate this ability": the player who controls the permanent its source is attached to as it's activated. */
   enchantedControllerOnly?: true;
   /**
+   * With `anyPlayer`, Capricopian (round 403): "Only the player ~ is attacking may activate this ability": the player its
+   * source is attacking as it's activated, none while it attacks a planeswalker or battle or isn't attacking (rulings).
+   */
+  attackedPlayerOnly?: true;
+  /**
    * A Killer Among Us (round B233): "Reveal the creature type you chose" in its cost: only the player who chose it secretly,
    * for this object (GameObject.secretType), can reveal it and so activate it (rulings).
    */
@@ -8554,6 +8565,13 @@ export interface CompiledCard {
    * (CR 616.1) and has it enter untapped, without paying for a "pay 2 life" choice (rulings on Spelunking).
    */
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
+  /**
+   * Archelos, Lagoon Mystic (round 403): "As long as ~ is tapped, other permanents enter tapped." and "As long as ~ is
+   * untapped, other permanents enter untapped.": replacement effects on every other permanent entering while this one is
+   * tapped or untapped (CR 614.1c), not those entering with it (rulings). Applied with the others that would have it enter
+   * tapped or untapped in the order its controller chooses (CR 616.1, rulings), so a choice when both kinds apply.
+   */
+  othersEnterAsTappedState?: { tapped?: true; untapped?: true };
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
   /** "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types" (Displaced Dinosaurs): other permanents like this enter with these changes, for as long as they're on the battlefield (CR 614.1c, 614.12). */

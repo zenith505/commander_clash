@@ -287,13 +287,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const done = (sc.reselected ??= []);
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "battlefield" || o.attacking === undefined || done.includes(o.id)) continue;
-        const options = reselectOptions(s, o);
+        const options = reselectOptions(s, o).filter((x) => !e.playersOnly || x.planeswalker === undefined);
         if (!options.length) {
           if (e.each) done.push(o.id);
           continue;
         }
         if (sc.reselect === undefined) {
-          const keep = e.each ? [{ key: "keep", label: `Keep attacking ${attackedName(s, o)}` }] : [];
+          const keep = e.each || e.may ? [{ key: "keep", label: `Keep attacking ${attackedName(s, o)}` }] : [];
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "reselectAttack", options: [...keep, ...options].map((x) => x.key), labels: [...keep, ...options].map((x) => x.label), about: o.id, prompt: `choose what ${defOf(s, o).name} attacks now` };
           return "paused";
         }

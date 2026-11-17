@@ -53,7 +53,10 @@ test("Endless Whispers: your Grizzly Bears dies, you target Ana, and she gets it
   expect(waiting.objects[bears]!.zone).toBe("graveyard");
   const after = await resolveUntil(page, (st) => st.objects[bears]!.zone === "battlefield", 80);
   expect(after.objects[bears]!.controller).toBe(1);
-  expect(after.step).toBe("end");
+  // It came back in this turn's end step: the turn it entered (follow-up 17: by the time the poll sees it, the page's
+  // auto-pass may already have moved on from the end step, so the step itself isn't asserted).
+  expect(after.objects[bears]!.controlledSinceTurn).toBe(waiting.turn);
+  expect(after.log.some((l) => l.turn === waiting.turn && l.step === "end" && /Grizzly Bears/.test(l.text))).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });
 

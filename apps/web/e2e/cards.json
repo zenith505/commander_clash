@@ -2180,6 +2180,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fd19a009-d1ab-4148-a829-3d4c3af1b0b2",
+  "name": "Archelos, Lagoon Mystic",
+  "manaCost": "{1}{B}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Turtle Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Turtle",
+   "Shaman"
+  ],
+  "oracleText": "As long as Archelos is tapped, other permanents enter tapped.\nAs long as Archelos is untapped, other permanents enter untapped.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6beec974-891f-4354-8621-ac403c07509a",
   "name": "Archfiend of Spite",
   "manaCost": "{5}{B}{B}",
@@ -6791,6 +6828,37 @@
   "commanderLegal": "legal",
   "set": "m10",
   "releasedAt": "2009-07-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3a5a6732-bdfa-4b64-b897-6817983dbb0e",
+  "name": "Capricopian",
+  "manaCost": "{X}{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Goat Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goat",
+   "Hydra"
+  ],
+  "oracleText": "This creature enters with X +1/+1 counters on it.\n{2}: Put a +1/+1 counter on this creature, then you may reselect which player this creature is attacking. Only the player this creature is attacking may activate this ability and only during the declare attackers step. (It can't attack its controller.)",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -49796,6 +49864,34 @@
   "releasedAt": "2024-08-02",
   "rarity": "uncommon",
   "layout": "class",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "740fe41a-16bb-4c97-a03c-f678f15a0a0c",
+  "name": "Wizard's Spellbook",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{T}: Exile target instant or sorcery card from a graveyard. Roll a d20. Activate only as a sorcery.\n1—9 | Copy that card. You may cast the copy.\n10—19 | Copy that card. You may cast the copy by paying {1} rather than paying its mana cost.\n20 | Copy each card exiled with this artifact. You may cast any number of the copies without paying their mana costs.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

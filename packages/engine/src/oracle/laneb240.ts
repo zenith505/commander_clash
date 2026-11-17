@@ -2,6 +2,7 @@
 // sentences (at the end of round B203's chain).
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { roundB243Sentence } from "./laneb243";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -62,5 +63,6 @@ export function roundB240Sentence(s: string, sentences: string[], si: number, ct
   if (plain(s) === "Until end of turn, you may cast instant and sorcery spells from the top of your graveyard" && plain(sentences[si + 1]) === "If a spell cast this way would be put into a graveyard, exile it instead" && ctx.activated) {
     return { effect: { type: "graveyardTurn", cast: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant and sorcery card" }, exileCast: true, topOnly: true }, next: si + 2 };
   }
-  return null;
+  // Round B243's sentences (oracle/laneb243.ts).
+  return roundB243Sentence(s, sentences, si, ctx);
 }

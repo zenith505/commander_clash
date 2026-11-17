@@ -820,6 +820,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pow = (id: string) => characteristics(s, s.objects[id]!).power;
       return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => pow(x) === pow(id)) === i).slice(0, pend.max) }];
     }
+    // "Cards with different names" from the library and graveyard (Ecological Appreciation): the best card of each name.
+    if (pend.kind === "searchLibrary" && pend.distinctNames) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      const named = (id: string) => defOf(s, obj(s, id)).name;
+      return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => sameName(named(x), named(id))) === i).slice(0, pend.max) }];
+    }
     // "With total mana value 4 or less" (Lively Dirge): the best-ranked cards that still fit.
     if (pend.kind === "searchLibrary" && pend.totalMv !== undefined) {
       const found: string[] = [];
@@ -2184,7 +2190,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const isLand = (id: ObjectId) => (defOf(s, s.objects[id]!).types.includes("Land") ? 0 : 1);
     if (pend.kind === "orderLibrary" && pend.owner !== undefined) return [{ type: "orderLibrary", player: pid, order: [...pend.cards].sort((a, b) => isLand(a) - isLand(b) || mv(s, b) - mv(s, a)) }];
     if (pend.kind === "orderLibrary") return [{ type: "orderLibrary", player: pid, order: pend.bottom ? pend.cards : [...pend.cards].sort((a, b) => mv(s, a) - mv(s, b)) }];
-    if (pend.kind === "mulligan") return [{ type: "mulligan", player: pid, keep: !pend.canMulligan || keepsHand(s, pid, pend.taken) }];
+    if (pend.kind === "mulligan") {
+      const keep = !pend.canMulligan || keepsHand(s, pid, pend.taken);
+      // Serum Powder (round B243): a new hand without counting a mulligan, better than one once the free one is used.
+      if (!keep && pend.taken >= 1 && pend.exileHandWith?.length) return [{ type: "exileOpeningHand", player: pid, objectId: pend.exileHandWith[0]! }];
+      return [{ type: "mulligan", player: pid, keep }];
+    }
     if (pend.kind === "bottomCards") return [{ type: "bottomCards", player: pid, objectIds: chooseBottom(s, pid, pend.count) }];
     if (pend.kind === "discardToHandSize") {
       const hand = [...player(s, pid).hand].sort((a, b) => mv(s, b) - mv(s, a));

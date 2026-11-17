@@ -1531,8 +1531,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const top = searchTop(s, p.id);
         const lib = libOf(p.id).library;
         let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard || e.andGraveyard ? p.graveyard : []), ...(e.andHand || e.orHand ? p.hand : [])].filter(fits);
-        // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
-        if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
+        // At most one of each name: cards with the same name in a library are alike, so one of each is offered. Searching
+        // the graveyard too (Ecological Appreciation, round B243), a card there isn't like one in the library: one of each name
+        // in each zone is offered, and no two with the same name can be found (`distinctNames`).
+        const zoneOf = (id: ObjectId) => obj(s, id).zone;
+        const manyZones = e.oneEach && new Set(cards.map(zoneOf)).size > 1;
+        if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => zoneOf(x) === zoneOf(id) && sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         if (e.totalMv !== undefined) cards = cards.filter((id) => defMv(defOf(s, obj(s, id))) <= e.totalMv!);
         // "Exactly two" (Burning-Rune Demon): with fewer to find, none can be found.
         const max = e.exactly && cards.length < n ? 0 : Math.min(n, cards.length);
@@ -1560,6 +1564,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(e.oneName ? { oneName: true as const } : {}),
           ...(e.exactly ? { exactly: true as const } : {}),
           ...(e.differentPowers ? { distinctPowers: true as const } : {}),
+          ...(manyZones ? { distinctNames: true as const } : {}),
           ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),
           ...(oneOfEach ? { oneOfEach } : {}),
           ...(e.away && agent === undefined ? { away: true as const } : {}),

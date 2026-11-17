@@ -11855,6 +11855,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0635ab65-fc1a-4e43-9e11-3a1ad3093830",
+  "name": "Ecological Appreciation",
+  "manaCost": "{X}{2}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library and graveyard for up to four creature cards with different names that each have mana value X or less and reveal them. An opponent chooses two of those cards. Shuffle the chosen cards into your library and put the rest onto the battlefield. Exile Ecological Appreciation.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "264efed9-65ab-40ad-877f-c6c25ca0281e",
   "name": "Edgar, King of Figaro",
   "manaCost": "{4}{U}{U}",
@@ -26559,6 +26585,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "62f4a2db-6d7c-487b-be37-22f06c1e779e",
+  "name": "Monastery Raid",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Freerunning {X}{R} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nExile the top two cards of your library. If this spell's freerunning cost was paid, exile the top X cards of your library instead. You may play the exiled cards until the end of your next turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Freerunning"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1b524149-340e-4f94-9520-6a5258fabb00",
   "name": "Monk's Fist",
   "manaCost": "{2}",
@@ -35463,6 +35517,31 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2023-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4e734493-9cb8-4409-8a30-cc15d519a27e",
+  "name": "Serum Powder",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\nAny time you could mulligan and this card is in your hand, you may exile all the cards from your hand, then draw that many cards. (You can do this in addition to taking mulligans.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "dst",
+  "releasedAt": "2004-02-06",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

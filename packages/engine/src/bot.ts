@@ -2148,6 +2148,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const most = [...pend.options].sort((a, b) => counts.get(b)! - counts.get(a)!)[0]!;
       return [{ type: "chooseOption", player: pid, choice: manaColorFor(s, pid, pend.options) ?? most }];
     }
+    // Charmed Pendant (round B239): the hybrid symbols' mana in the colors most of the cards in our hand have.
+    if (pend.kind === "chooseOption" && pend.what === "pendantMana") {
+      const counts = new Map<string, number>();
+      for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) counts.set(c, (counts.get(c) ?? 0) + 1);
+      const worth = (o: string) => [...o].reduce((a, m) => a + (counts.get(m) ?? 0), 0);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => worth(b) - worth(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "color" && s.resolving?.item.manaAbility) {
       const pick = manaColorFor(s, pid, pend.options);
       if (pick) return [{ type: "chooseOption", player: pid, choice: pick }];

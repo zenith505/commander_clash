@@ -7088,6 +7088,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "12469cb5-a383-47ab-84cd-414b9ced8a8c",
+  "name": "Charmed Pendant",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Mill a card: For each colored mana symbol in the milled card's mana cost, add one mana of that color. (Activate only as an instant. For example, if the card's mana cost is {3}{U}{U}{B}, you add {U}{U}{B}.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Mill"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9f50ec9f-78e6-403f-8f41-84d603fee0eb",
   "name": "Charred Foyer // Warped Space",
   "manaCost": "{3}{R} // {4}{R}{R}",
@@ -22251,6 +22282,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5470dcfa-4eff-43da-abf7-19922841f719",
+  "name": "Kitchen Finks",
+  "manaCost": "{1}{G/W}{G/W}",
+  "cmc": 3,
+  "typeLine": "Creature — Ouphe",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ouphe"
+  ],
+  "oracleText": "When this creature enters, you gain 2 life.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Persist"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2452be47-cc23-47f7-a3a1-fec900bb0119",
   "name": "Kitesail Larcenist",
   "manaCost": "{2}{U}",
@@ -35828,6 +35893,32 @@
   "set": "sld",
   "releasedAt": "2026-09-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5a074b0a-3a4d-4c6f-b161-5d1281f6136d",
+  "name": "Silhouette",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature. If a spell or ability that targets that creature would cause a source to deal damage to that creature this turn, prevent that damage.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

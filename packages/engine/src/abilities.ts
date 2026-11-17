@@ -135,6 +135,8 @@ export type Count =
   | { kind: "chosenNumber" }
   /** Shapeshifter: "the last chosen number": the number chosen for the object with the ability (GameObject.chosen), as it entered or later (Effect "choose" `onSource`); 0 when there's none (CR 107.2). */
   | { kind: "selfChosenNumber" }
+  /** Bell Borca, Spectral Sergeant (round B239): "the greatest number noted for it this turn": the greatest mana value its controller's ~ noted this turn as a card was put into exile while it was on the battlefield as this object (GameObject.exiledMvNoted); 0 with none, or off the battlefield (rulings). */
+  | { kind: "selfNotedExiledMv" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
   /** "The number of times that spell was kicked" (Rumbling Aftershocks): its kicker costs paid as it was cast, multikicker's each time (CR 702.33d). */
@@ -1870,7 +1872,7 @@ export interface DamageRuleSpec {
   /** The damage it applies to, by who'd be dealt it: players, permanents matching `objects`, or a target. Unset = any. */
   to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; target?: DamageRecipient };
   /** By which sources: matching `filter` (as the damage would be dealt), a source of your choice, a target spell or permanent. Unset = any. */
-  by?: { filter?: TargetSpec; /** Encircling Fissure: "by creatures target opponent controls": only sources that player (this ability's target `controllerTarget`) controls as the damage would be dealt. */ controllerTarget?: number; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number; /** "An instant or sorcery spell" (Aegis of Honor): only a spell. */ spellOnly?: true };
+  by?: { filter?: TargetSpec; /** Encircling Fissure: "by creatures target opponent controls": only sources that player (this ability's target `controllerTarget`) controls as the damage would be dealt. */ controllerTarget?: number; choose?: TargetSpec; /** With `choose`: "a creature of your choice" (Ajani's Aid): only a permanent, not a spell or a gone source. */ permanent?: true; target?: ObjRef; /** "That other creatures would deal" (Haze Frog): not the rule's own source, as the object it is now. */ notSelf?: true; /** "Creatures other than target creature" (Terrifying Presence): not that target, as the object it is as the rule begins. */ notTarget?: number; /** "An instant or sorcery spell" (Aegis of Honor): only a spell. */ spellOnly?: true; /** Silhouette (round B239): "if a spell or ability that targets that creature would cause a source to deal damage to that creature": only damage dealt as a spell or ability resolves that has the protected creature among its targets, whatever the source. */ targetingCause?: true };
   /** "Prevent the next N damage" (CR 615.7): a shield of N for all it applies to together. */
   n?: Amount;
   /** "The next time ... would deal damage": the next damage event only, however much (CR 615.8). */
@@ -7500,6 +7502,11 @@ export interface ActivatedAbility {
  * battlefield": the mana (or the one chosen color) that many times, counted as the ability resolves (CR 106.1, 605.3).
  */
 export type ManaProduce =
+  /**
+   * Charmed Pendant (round B239): "For each colored mana symbol in the milled card's mana cost, add one mana of that color":
+   * known only once its "Mill a card" cost is paid (CR 701.17c); a hybrid symbol gives one of its colors, chosen then (rulings).
+   */
+  | { kind: "milledSymbols" }
   | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
   /** Jeweled Amulet: "Add one mana of ~'s last noted type" (GameObject.notedMana); none if no type was noted (rulings). */
   | { kind: "noted" }
@@ -7613,6 +7620,8 @@ export interface ManaAbility {
   insteadIf?: { cond: StaticCondition; produces: ManaProduce };
   /** "Discard your hand" as part of the cost (Lion's Eye Diamond, CR 701.9a): never used by automatic payment. */
   discardHand?: true;
+  /** "Mill a card" as part of the cost (Charmed Pendant, round B239; CR 701.17b: not with an empty library). */
+  millCost?: true;
   /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
   instantOnly?: true;
   /** "Activate only as a sorcery" (Grinning Ignus): only when its controller could cast a sorcery (CR 307.1), so never while paying. */
@@ -8938,6 +8947,8 @@ export interface CompiledCard {
    * during each of your draw steps, you draw four cards instead." (CR 614.1a).
    */
   drawFourFirstOther?: true;
+  /** Bell Borca, Spectral Sergeant (round B239): "Note the mana value of each card as it's put into exile." (game.ts moveObject, GameObject.exiledMvNoted). */
+  notesExiledMv?: true;
   /**
    * Chains of Mephistopheles (round B237): "If a player would draw a card except the first one they draw in each of their draw
    * steps, that player discards a card instead. If the player discards a card this way, they draw a card. If the player doesn't

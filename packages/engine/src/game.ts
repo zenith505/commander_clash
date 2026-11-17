@@ -7988,6 +7988,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.hasteCast = paid.haste;
   o.commanderCountersCast = paid.commanderCounters;
   o.creatureCountersCast = paid.creatureCounters;
+  // Domri, Chaos Bringer: "If that mana is spent on a creature spell, it gains riot": the permanent it becomes has it too
+  // (CR 400.7a), one instance for each such mana (rulings), so it enters with a +1/+1 counter or gains haste (CR 702.136a).
+  for (const by of paid.riot ?? []) (o.spellGains ??= []).push({ mods: [{ kind: "addAbility", text: "Riot" }], timestamp: s.nextTimestamp++, controller: p.id, source: by, forever: true });
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
   // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings). "... to cast a red instant
   // or sorcery spell" (Pyromancer's Goggles): queued once the spell is on the stack, "that spell" being it.

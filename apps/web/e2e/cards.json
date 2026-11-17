@@ -11150,6 +11150,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2a5408ed-8b47-4896-97e4-aa102a4b85c9",
+  "name": "Domri, Chaos Bringer",
+  "manaCost": "{2}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Domri",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Domri"
+  ],
+  "oracleText": "+1: Add {R} or {G}. If that mana is spent on a creature spell, it gains riot. (It enters with your choice of a +1/+1 counter or haste.)\n−3: Look at the top four cards of your library. You may reveal up to two creature cards from among them and put them into your hand. Put the rest on the bottom of your library in a random order.\n−8: You get an emblem with \"At the beginning of each end step, create a 4/4 red and green Beast creature token with trample.\"",
+  "loyalty": "5",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a4ae71c8-ea1b-4fa4-9e47-cf00ab60c5ee",
   "name": "Don & Leo, Problem Solvers",
   "manaCost": "{3}{W/U}{W/U}",
@@ -25989,6 +26026,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad44cf74-b717-48fb-9fa2-77512024d76a",
+  "name": "Mind Rot",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player discards two cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c97361b5-af16-4a7b-af85-a429dbaf4ad2",
   "name": "Mind Stone",
   "manaCost": "{2}",
@@ -28176,6 +28239,39 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c235fda2-1a8d-4ac7-9a23-784529a520f0",
+  "name": "Nihilith",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horror"
+  ],
+  "oracleText": "Fear (This creature can't be blocked except by artifact creatures and/or black creatures.)\nSuspend 7—{1}{B} (Rather than cast this card from your hand, you may pay {1}{B} and exile it with seven time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost. It has haste.)\nWhenever a card is put into an opponent's graveyard from anywhere, if this card is suspended, you may remove a time counter from this card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Suspend",
+   "Fear"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

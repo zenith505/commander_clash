@@ -2605,6 +2605,8 @@ function countsSomething(st: StaticAbility): boolean {
     if (m.kind === "definePT" || m.kind === "linkedCreature") return true;
     if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
     if (m.kind === "setToughness" && isCounted(m.toughness)) return true;
+    // Ms. Marvel, Kamala Khan's granted "base power is equal to the number of cards in your hand" (round B244).
+    if (m.kind === "setPower" && isCounted(m.power)) return true;
     if (m.kind === "attackTax" && m.amount !== undefined && isCounted(m.amount)) return true;
   }
   return false;

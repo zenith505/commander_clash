@@ -859,6 +859,8 @@ export interface ManaLot {
   creatureCounter?: true | "multicolored" | "nonHuman";
   /** Boseiju, Who Shelters All: see ManaAbility.spentUncounterable. */
   uncounterableInstantSorcery?: true;
+  /** Domri, Chaos Bringer: "If that mana is spent on a creature spell, it gains riot": the source's name (Effect addMana `riot`). */
+  riot?: string;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */
   source?: string;
 }

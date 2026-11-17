@@ -839,7 +839,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Tapped for mana (Orcish Lumberjack): Mana Reflection's replacement multiplies it (CR 106.12b).
         const made = [...mix(k).matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType);
         const added = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made, s.resolving.item.manaAbility.instead) : made;
-        for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx) });
+        // Domri, Chaos Bringer: a creature spell it's spent on gains riot (ManaLot.riot).
+        for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx), ...(e.riot ? { riot: src } : {}) });
         log(s, `${p.name} adds ${added.map((m) => `{${m}}`).join("")}.`);
         return;
       }

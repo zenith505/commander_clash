@@ -2933,6 +2933,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Infesting Radroach: a card's ability that works in its owner's graveyard, there after the event, even if it was
     // milled in the same event (rulings).
     fromGraveyards((o, owner) => batchWatch(o, owner, compileCard(defOf(s, o)).triggers, false));
+    // Nihilith: a suspended card's ability, there in exile (CR 113.6, round B244).
+    fromExiled((o, owner) => batchWatch(o, owner, compileCard(defOf(s, o)).triggers, false));
     for (const m of ev.moves) {
       const w = s.objects[m.id];
       if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object

@@ -1812,7 +1812,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // "For as long as ~ remains tapped" (CR 611.2b): if that's already over, the effect does nothing. An activated
       // ability's source must not have untapped since it was activated (rulings on Rubinia Soulsinger, Preacher).
       let whileTapped: ContinuousEffect["whileTapped"];
-      if (e.duration === "whileTapped") {
+      if (e.duration === "whileTapped" && e.whileAffectedTapped) {
+        // Braided Net (round 402): "Its activated abilities can't be activated for as long as it remains tapped": the
+        // permanent affected, as it is now (CR 611.2b, 400.7), already tapped or tapped by this ability (rulings).
+        const it = affected.length === 1 ? obj(s, affected[0]!) : undefined;
+        whileTapped = it && { id: it.id, zc: it.zoneChanges ?? 0, untaps: it.untaps ?? 0 };
+        if (!whileTapped || !whileTappedHolds(s, whileTapped)) {
+          log(s, `${src}'s effect does nothing: that permanent isn't tapped.`);
+          return;
+        }
+      } else if (e.duration === "whileTapped") {
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         whileTapped = me && { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0, untaps: ctx.sourceUntaps ?? me.untaps ?? 0, ...(e.whileControlled ? { controller: ctx.controller } : {}) };
         if (!whileTapped || !whileTappedHolds(s, whileTapped)) {

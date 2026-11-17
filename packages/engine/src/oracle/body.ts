@@ -21,6 +21,7 @@ import { roundB166Sentence } from "./laneb166";
 import { roundB167Sentence } from "./laneb167";
 import { roundB170WholeText } from "./laneb170";
 import { round319WholeText } from "./round319";
+import { round402Text } from "./round402";
 import { round320WholeText } from "./round320";
 import { round370WholeText } from "./round370";
 
@@ -2409,7 +2410,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
 
 function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfAttacking?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; costTappedX?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean; /** See Ctx.discardBatch. */ discardBatch?: true; /** See Ctx.votesEvent. */ votesEvent?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
-  text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
+  // Duelist's Flame (round 402): its granted trigger's wording, read as The Key to the Vault's (oracle/round402.ts).
+  text = round402Text(differenceInHand(text)).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Ecstatic Beauty: "You may play those cards until end of turn." after an exile from the top: the usual wording.
     .replace(/^(Exile the top (?:two|three|four|five) cards of your library\. )You may play those cards until end of turn\./, "$1Until end of turn, you may play those cards.")
     // Hellcarver Demon: "sacrifice all other permanents you control and discard your hand": two instructions, in order.

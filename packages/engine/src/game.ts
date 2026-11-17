@@ -11667,6 +11667,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (pend.what === "chosenObject") {
       // Dauntless Bodyguard: that creature, as the object it is now (CR 400.7); no new one later (rulings).
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the creatures offered");
+      // Scheming Fence (round 402): "you may choose": nothing is chosen.
+      if (choice === "none") {
+        log(s, `${p.name} chooses nothing for ${pend.source}.`);
+        return;
+      }
       const c = obj(s, choice);
       // Phylactery Lich: the counter goes on it as ~ enters (CR 614.12); nothing is remembered (rulings).
       const counter = compileCard(defOf(s, o)).entersChooseObjectCounter;
@@ -12750,13 +12755,17 @@ function askEntersChoice(s: GameState): boolean {
       // "Choose another creature you control" (Dauntless Bodyguard): one already there, not one entering with it (rulings);
       // with none, nothing is chosen.
       const you = controllerOf(s, o);
-      const filter = compileCard(defOf(s, o)).entersChooseObject!;
-      const options = s.battlefield.filter((id) => id !== o.id && !c.together?.includes(id) && controllerOf(s, obj(s, id)) === you && objectMatches(s, filter, obj(s, id), you, false));
+      const printedO = compileCard(defOf(s, o));
+      const filter = printedO.entersChooseObject!;
+      // Scheming Fence (round 402): "a nonland permanent" is anyone's (its filter names no controller), and "you may"
+      // offers none.
+      const options = s.battlefield.filter((id) => id !== o.id && !c.together?.includes(id) && (!filter.controller || controllerOf(s, obj(s, id)) === you) && objectMatches(s, filter, obj(s, id), you, false));
       if (!options.length) {
         q.shift();
         continue;
       }
-      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "chosenObject", options, labels: options.map((id) => characteristics(s, obj(s, id)).name), objectId: o.id, prompt: `choose ${filter.text}` };
+      const optional = !!printedO.entersChooseObjectOptional;
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "chosenObject", options: optional ? [...options, "none"] : options, labels: [...options.map((id) => { const x = obj(s, id); const who = controllerOf(s, x); return filter.controller || who === you ? characteristics(s, x).name : `${characteristics(s, x).name} (${player(s, who).name})`; }), ...(optional ? ["Choose nothing"] : [])], objectId: o.id, prompt: `${optional ? "you may " : ""}choose ${filter.text}` };
       return true;
     }
     if (c.what === "protector") {

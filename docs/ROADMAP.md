@@ -323,7 +323,7 @@ line blocks.
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld (done in round 374), Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
-   Scheming Fence, Oath of Lieges (done in round B143), Helm of Obedience (done in round 373), Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
+   Scheming Fence (done in round 402), Oath of Lieges (done in round B143), Helm of Obedience (done in round 373), Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom (done in round B210), Soul-Scar Mage,
    Remembrance, Spy Network (done in round B186), Dimir Doppelganger (done in round 362), Jailbreak, Inverter of Truth (done in round 329), Immovable Rod (done in round B186), Hypergenesis (done in round B215), Soul
@@ -3415,7 +3415,7 @@ line blocks.
    compiled text of every other card is unchanged.
    Out after round 389 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with
    no target); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
-   Coil, Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame, Wizard's Spellbook and the rest above rank 15,000 (still
+   Coil, Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame (done in round 402), Wizard's Spellbook and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Round 390 went on down `npm run popular` and the "Out after round N" lists, most played first: Glimpse of Tomorrow's
    "Shuffle all permanents you own into your library, then reveal that many cards from the top of your library. Put all
@@ -3438,7 +3438,7 @@ line blocks.
    opponent and the three-way search, and Sanctuary Blade's color as it's equipped. +4, 31,546 of 31,936. The compiled text
    of every other card is unchanged.
    Out after round 390 (looked at, not done): Psychic Paper (still out: a name and a creature type chosen as it becomes
-   attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil, Supper for Spiders, Duelist's Flame,
+   attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil, Supper for Spiders, Duelist's Flame (done in round 402),
    Wizard's Spellbook, Lodestone Bauble and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 391 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards exiled in a
    face-down pile, shuffled, then manifested or cloaked, and every creature a player controls attacking during their next
@@ -3685,6 +3685,30 @@ line blocks.
    Out after round 401 (looked at, not done): Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree
    Vector, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their
    earlier lists).
+   Round 402 went on down `npm run popular`, most played first, to three cards left out before. Duelist's Flame's
+   "Until end of turn, target blocked creature you control gets +X/+0 and gains trample and "Whenever this creature deals
+   combat damage to a player, look at that many cards from the top of your library. Exile up to one nonland card from among
+   them and put the rest on the bottom of your library in a random order. You may cast the exiled card without paying its
+   mana cost."" (its granted trigger read as The Key to the Vault's "You may exile a nonland card from among them. Put the
+   rest on the bottom ...", oracle/round402.ts round402Text, a rewrite in body.ts: one card or none, the cast as the
+   trigger resolves, timing ignored, X as 0, rulings). Scheming Fence's "As this creature enters, you may choose a nonland
+   permanent." (CompiledCard.entersChooseObject with no controller, anyone's, and `entersChooseObjectOptional`: a "Choose
+   nothing" button, CR 614.12; the object it is then, Chosen.object, CR 400.7), "Activated abilities of the chosen
+   permanent can't be activated." (a static cantActivate on chosenObject, mana abilities too, CR 605.1a) and "This
+   creature has all activated abilities of the chosen permanent except for loyalty abilities. You may spend mana as though
+   it were mana of any color to activate those abilities." (CompiledCard.borrows `chosenObject` with `anyColor`, as Drana
+   and Linvala's, CR 613.1f, 609.4b; equip abilities aren't borrowed, as with every borrowing, though the card's rulings
+   say Fence has them and they do nothing). Braided Net's "Tap another target nonland permanent. Its activated abilities
+   can't be activated for as long as it remains tapped." (Effect continuous duration "whileTapped" with
+   `whileAffectedTapped`: the target, not the source, must stay tapped without untapping, CR 611.2b; already tapped
+   targets too; even abilities whose cost untaps it, rulings). Bots choose for Fence the permanent with the most activated
+   abilities, an opponent's first, or nothing; they no longer keep a permanent tapped for an effect on that permanent
+   itself. Browser tests click through Fence's choice (a permanent, and nothing) and the Net's activation. +3, 31,603 of
+   31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 402 (looked at, not done): Filigree Vector (two "any number of target" slots), Helm of Kaldra (which
+   Equipment "those Equipment" are with more than one of a name), Archelos, Lagoon Mystic, Pulmonic Sliver, Capricopian,
+   Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular`
+   above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5004,7 +5028,7 @@ line blocks.
    Prowl, Stoic Strategist and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
-   The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame; Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
+   The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
    life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
    Treasure Hunter (mana spent as any color for spells you don't own); Invasion Plans (done in round 378) (the attacking player declares
@@ -5387,7 +5411,7 @@ line blocks.
    Smaller gaps from round 161: craft takes one kind of material only ("craft with a creature", "with two creatures",
    "with an Island", "with artifact"); "one or more", "creatures that share a creature type" and the like stay out
    (Jade Seedstones also needs the mana value of the card used to craft it, Master's Guide-Mural an "activate only if"
-   condition, Dire Flail (both done in round 334), Spring-Loaded Sawblades and Braided Net their other lines). Bots craft only in their second
+   condition, Dire Flail (both done in round 334), Spring-Loaded Sawblades and Braided Net (done in round 402) their other lines). Bots craft only in their second
    main phase, with graveyard cards they have no use for or tokens worth 3 or less. "Tokens created with ~" (Faerie
    Artisans) are the tokens its own abilities created as they resolved, as that object (rulings).
    Smaller gaps from round 160: when Nemata, Primeval Warden and another "exile it instead" replacement both apply to a
@@ -10579,7 +10603,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   battlefield" for every way a land is put onto it) stay out.
 - Out after round B210 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with no
   target, a new choice in activation), Light Up the Night (done in round B213) (a flashback cost removing X loyalty counters from among your
-  planeswalkers), Duelist's Flame (its granted trigger: "look at that many cards", then an exiled card cast for free or left in
+  planeswalkers), Duelist's Flame (done in round 402) (its granted trigger: "look at that many cards", then an exiled card cast for free or left in
   exile), Elemental Resonance (still out: what a {2/W} symbol adds) and Divine Intervention (still out: who removed the last
   counter) stay out.
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its

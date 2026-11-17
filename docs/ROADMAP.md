@@ -1,6 +1,6 @@
 # Roadmap
 
-31,536 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,539 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4345,7 +4345,7 @@ line blocks.
    turn); Bruna, Light of Alabaster and Cass, Hand of Vengeance (Auras from several zones attached as it attacks or dies);
    Draugr Necromancer (cards with ice counters, snow mana as any color); Apple of Eden, Isu Relic; Radiant Performer,
    Agrus Kos, Eternal Soldier, Radiate, Exterminator Magmarch, Zevlor, Feather and Leori (a copy for each other legal
-   target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (any number of
+   target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (done in round B246) (any number of
    targets controlled by different players, counters when they return under your control); Metamorphic Alteration (an
    Aura's copy effect of a chosen creature); Nick Fury, Agent of S.H.I.E.L.D. (a double-faced card put onto the
    battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel (done in round B200); The Spot, Living Portal.
@@ -4378,7 +4378,7 @@ line blocks.
    card exiled from a graveyard by the damage dealt); Grip of Chaos and Psychic Battle (targets reselected at random).
    Out after round 284 (looked at, not done): Sin, Spira's Punishment (a token copy of a card exiled at random, repeated
    for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
-   Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (the
+   Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (done in round B246) (the
    Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
    Moon's Legacy (done in round 373) (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
    exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
@@ -9905,6 +9905,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   exiled from their hand, as for Lost Legacy). Browser tests for Caller's type, Reap Intellect's X, hand pick and search,
   and Deadly Cover-Up's evidence, graveyard pick and search. +3, 31,536 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B246 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Lagrella, the Magpie
+  (any number of other target creatures controlled by different players, CR 115.3, as Chaos Mutation's, none too, CR 115.6,
+  exiled until it leaves, nothing exiled if it has already left, CR 610.3b; the cards return together under their owners'
+  control, CR 610.3c-d; "When an exiled card enters under your control this way" is a delayed triggered ability made as the
+  exile resolves, rulings, CR 603.7a, controlled by that ability's controller, 603.7e: Effect exile `returnRider`, kept on
+  each UntilLeavesLink; it triggers once, CR 603.7b, so when two of your cards return at once, one controlled by an opponent,
+  you choose which one as it's put on the stack, PendingTrigger `subjectChoices`, the prompt "triggerSubject"; bots now pick at
+  most one target for each controller for "controlled by different players"). Cloudspire Coordinator ("the number of Mounts
+  and/or Vehicles that entered the battlefield under your control this turn", Count enteredThisTurn `anySubtype`; a changeling
+  entered as every creature type, a Mount or a Goblin, CR 702.73a, for every such count; the Pilots' "saddles Mounts and crews
+  Vehicles as though its power were 2 greater"). Sentinel of Lost Lore (targets "card you own in exile that has an Adventure"
+  and "card you don't own in exile that has an Adventure": any face-up exiled adventurer card with that owner, however it got
+  there, rulings, CR 715.4; with none, only the graveyard mode can be chosen, rulings, CR 700.2). Browser tests for Lagrella's
+  targets and the choice of the card, Sentinel's modes and exile targets, and Cloudspire's Pilots. +3, 31,539 of 31,936. The
+  compiled text of every other card is unchanged.
+- Out after round B246 (looked at, not done): the lists after round B245 stay out, and Hero of Bretagard (still out: "a spell
+  or ability you control exiles one or more permanents" needs who caused each exile, which a zone move doesn't record, and
+  whether an exile cost or a replacement counts) and Kraven the Hunter (still out, as before). Known gap: bots don't target
+  their own creatures with Lagrella for the counters.
 - Out after round B245 (looked at, not done): the lists after round B244 stay out, and Battlefield Thaumaturge (still
   out: its ruling "{1} per target creature, even if the spell targets a creature more than once" against Hinata,
   Dawn-Crowned's rulings, which count a twice-targeted object once), Jasmine Boreal of the Seven (still out: abilities
@@ -10412,7 +10431,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
   Steel and Oil (the chosen cards exiled at once), Jester's Mask (done in round B158), The Ruinous Wrecking Crew (done in round B187) (choose up to X).
 - Out after round B100 (looked at, not done): Necrotic Plague (done in round B215) (a target chosen by the dead creature's controller, not the
-  ability's), Nyla, Shirshu Sleuth (done in round B203) and Sentinel of Lost Lore (targeting cards in exile, linked or with an Adventure), Close
+  ability's), Nyla, Shirshu Sleuth (done in round B203) and Sentinel of Lost Lore (done in round B246) (targeting cards in exile, linked or with an Adventure), Close
   Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a
   card linked to the permanent), Torrent of Lava (an ability creatures have while it's on the stack), Speedball (new targets
   for a spell that targets it), Tetravus (done in round B171) (tokens created with it exiled to put counters back).

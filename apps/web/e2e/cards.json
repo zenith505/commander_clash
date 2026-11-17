@@ -5710,6 +5710,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bcd56fbf-fde3-41c2-83f5-9636e92d2893",
+  "name": "Bulwark Ox",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Ox Mount",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ox",
+   "Mount"
+  ],
+  "oracleText": "Whenever this creature attacks while saddled, put a +1/+1 counter on target creature.\nSacrifice this creature: Creatures you control with counters on them gain hexproof and indestructible until end of turn.\nSaddle 1 (Tap any number of other creatures you control with total power 1 or more: This Mount becomes saddled until end of turn. Saddle only as a sorcery.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Saddle"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "566b4dcc-b7d7-4443-b2d0-954f1fc33a11",
   "name": "Burn Trail",
   "manaCost": "{3}{R}",
@@ -7663,6 +7696,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "65d8b481-ebe9-4029-98a8-dd4693340bff",
+  "name": "Cloudspire Coordinator",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Pilot",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Pilot"
+  ],
+  "oracleText": "When this creature enters, scry 2.\n{T}: Create X 1/1 colorless Pilot creature tokens, where X is the number of Mounts and/or Vehicles that entered the battlefield under your control this turn. The tokens have \"This token saddles Mounts and crews Vehicles as though its power were 2 greater.\"",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2c6658c3-8c0e-46c9-8127-bc5b77eb0dab",
   "name": "Clutch of Currents",
   "manaCost": "{U}",
@@ -7923,6 +7991,39 @@
   "set": "xln",
   "releasedAt": "2017-09-29",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4cdf524a-1a99-4143-823b-d3c5c867c580",
+  "name": "Colossal Plow",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Whenever this Vehicle attacks, add {W}{W}{W} and you gain 3 life. Until end of turn, you don't lose this mana as steps and phases end.\nCrew 6 (Tap any number of creatures you control with total power 6 or more: This Vehicle becomes an artifact creature until end of turn.)",
+  "power": "6",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Crew"
+  ],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23148,6 +23249,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6a98b586-5187-48a1-bde3-f6141f3e9cb1",
+  "name": "Lagrella, the Magpie",
+  "manaCost": "{G}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "When Lagrella enters, exile any number of other target creatures controlled by different players until Lagrella leaves the battlefield. When an exiled card enters under your control this way, put two +1/+1 counters on it.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bdf476e5-1d57-4b17-b45b-d52fd75aadeb",
   "name": "Lake of the Dead",
   "manaCost": "",
@@ -35562,6 +35700,37 @@
   "commanderLegal": "legal",
   "set": "spe",
   "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "683775ac-481e-4c26-ab2f-5d2813af0268",
+  "name": "Sentinel of Lost Lore",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Knight"
+  ],
+  "oracleText": "When this creature enters, choose one or more —\n• Return target card you own in exile that has an Adventure to your hand.\n• Put target card you don't own in exile that has an Adventure on the bottom of its owner's library.\n• Exile target player's graveyard.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

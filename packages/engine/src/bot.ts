@@ -1895,6 +1895,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = [...pend.options].sort((a, b) => count(b) - count(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
     }
+    // Lagrella, the Magpie: the returned card that gets the counters: our most useful one.
+    if (pend.kind === "chooseOption" && pend.what === "triggerSubject") {
+      const best = [...pend.options].filter((id) => s.objects[id]).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
+    }
     // Juxtapose: the tied permanent we give away: our least useful one.
     if (pend.kind === "chooseOption" && pend.what === "greatestTie") {
       const least = [...pend.options].filter((id) => s.objects[id]).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
@@ -3180,8 +3185,29 @@ function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body:
 }
 
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
-  const out = pickTargets(s, pid, printed, forced, sourceId, x);
+  const out0 = pickTargets(s, pid, printed, forced, sourceId, x);
+  const out = out0 && oneEachController(s, printed, out0);
   return out && !forced ? withFlagbearer(s, pid, printed, out, sourceId) : out;
+}
+
+/**
+ * "Any number of target creatures controlled by different players" (TargetSpec.differentControllers: Chaos Mutation,
+ * Lagrella, the Magpie, round B246): of the picks, the first for each controller, the rest left out (CR 115.3).
+ */
+function oneEachController(s: GameState, printed: AbilityBody, out: TargetChoice[]): TargetChoice[] {
+  const i = manySlot(printed.targets);
+  if (i < 0 || !printed.targets[i]!.differentControllers) return out;
+  const n = out.length - printed.targets.length + 1;
+  const seen = new Set<PlayerId>();
+  const group = out.slice(i, i + n).filter((t) => {
+    if (t.kind !== "object" || !s.objects[t.id]) return false;
+    const c = controllerOf(s, obj(s, t.id));
+    if (seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+  if (group.length === out.slice(i, i + n).filter((t) => t.kind !== "none").length) return out;
+  return [...out.slice(0, i), ...group, ...Array.from({ length: n - group.length }, (): TargetChoice => ({ kind: "none" })), ...out.slice(i + n)];
 }
 
 /**

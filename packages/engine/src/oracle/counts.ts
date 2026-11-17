@@ -737,6 +737,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Geralf, the Fleshwright: "for each other Zombie that entered the battlefield under your control this turn", after
   // "Whenever a Zombie you control enters": all of them but the one whose entering triggered it (rulings).
   if (each && ctx?.subjectIt && (m = /^other ([A-Z][a-z]+) that entered the battlefield under your control this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "enteredThisTurn", subtype: m[1]!, notSubject: true });
+  // Cloudspire Coordinator: "the number of Mounts and/or Vehicles that entered the battlefield under your control this
+  // turn": each that entered as either (a creature type and an artifact type, CR 205.3m), wherever it is now.
+  if ((m = /^(?:the number of )?([A-Z][a-z]+)s or ([A-Z][a-z]+)s that entered the battlefield under your control this turn$/.exec(p)) && [m[1]!, m[2]!].every((t) => CREATURE_TYPES.has(t) || t === "Vehicle"))
+    return count({ kind: "enteredThisTurn", anySubtype: [m[1]!, m[2]!] });
   // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
     return count({ kind: "enteredThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { types: [capital(m[1]!)] }) });

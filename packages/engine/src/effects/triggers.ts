@@ -3107,6 +3107,17 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       continue;
     }
     const def = restingDef(s.cards[t.sourceCardId]!);
+    // Lagrella, the Magpie (round B246): a delayed trigger whose event happened to several objects at once triggers once,
+    // for the one its controller chooses (CR 603.7b), as it's put on the stack; one of them that's gone by now isn't offered.
+    if (t.subjectChoices) {
+      const still = t.subjectChoices.filter((c) => s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc);
+      if (still.length > 1) {
+        s.pending = { kind: "chooseOption", player: t.controller, source: def.name, what: "triggerSubject", options: still.map((c) => c.id), labels: still.map((c) => defOf(s, obj(s, c.id)).name), prompt: `choose the card its ability is about (${(t.body?.text ?? "").replace(/\.$/, "")})` };
+        return added;
+      }
+      t.subject = still[0] ?? t.subject;
+      t.subjectChoices = undefined;
+    }
     let printed = triggerBody(s, t);
     // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
     if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {

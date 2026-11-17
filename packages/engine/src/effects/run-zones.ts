@@ -2094,6 +2094,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       // Hofri Ghostforge: "exile it. If you do": only if it went to exile (not if it had left the graveyard, CR 400.7).
       if (e.setsDid && s.resolving) s.resolving.did = false;
+      // Lagrella, the Magpie: the delayed trigger made as this resolves (CR 603.7a), one for all the cards it exiles; its
+      // source is this ability's, as it was, and its controller this ability's controller (CR 603.7e).
+      const rider = e.returnRider && me ? { key: `r${s.nextId++}`, controller: ctx.controller, sourceId: me.id, sourceCardId: cardIdOf(me), sourceZc: me.zoneChanges ?? 0, body: e.returnRider } : undefined;
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "targetLeaves" && me ? ` until ${defOf(s, me).name} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
@@ -2106,7 +2109,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // A merged permanent's cards are all exiled with it, and found by what returns it (CR 730.3c).
         for (const l of newObjects(o)) {
           if (s.objects[l.id]?.zone !== "exile") continue;
-          if (me) (me.exiledUntilLeaves ??= []).push(l);
+          if (me) (me.exiledUntilLeaves ??= []).push(rider ? { ...l, rider } : l);
           monarch?.cards.push(l);
           // Linked to the source as it was when the ability triggered: if that object has already left, its
           // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).

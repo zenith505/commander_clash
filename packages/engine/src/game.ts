@@ -1154,6 +1154,7 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.kickedByControl = undefined;
+    o.castType = undefined;
     // Text changes end with the object, except a permanent spell's, which go on with the permanent (CR 400.7a).
     o.textChanges = undefined;
     o.colorsSpent = undefined;
@@ -1251,6 +1252,8 @@ export function moveObject(
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
+  // Caller of the Hunt (round B245): the type chosen as it was cast stays with the permanent it becomes (CR 400.7d, 607.2d).
+  if (o.castType) o.chosen = { type: o.castType };
   o.notedMana = undefined; // a new object (CR 400.7)
   o.protector = undefined;
   // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
@@ -7967,6 +7970,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = byControl ? [0] : choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.kickedByControl = byControl || undefined;
+  // Caller of the Hunt (round B245): a creature type chosen as an additional cost of a permanent spell is "the chosen type"
+  // of its abilities on the stack (CR 604.3) and on the battlefield (CR 400.7d, 607.2d).
+  o.castType = compileCard(d).castChooseType && !compileCard(d).spell && choices.creatureType ? choices.creatureType : undefined;
+  if (o.castType) o.chosen = { ...o.chosen, type: o.castType };
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   o.phyrexianLife = paid.phyrexianLife;
   o.convoked = convoke?.length ? convoke.map((c) => ({ id: c, zc: obj(s, c).zoneChanges ?? 0 })) : undefined;

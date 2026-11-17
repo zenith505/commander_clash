@@ -4684,6 +4684,28 @@ function botCastType(s: GameState, pid: PlayerId, id: ObjectId, body: AbilityBod
 }
 
 /**
+ * Caller of the Hunt (round B245): "~'s power and toughness are each equal to the number of creatures of the chosen type
+ * on the battlefield", the type chosen as it's cast: the one with the most creatures there, whoever controls them, the
+ * card itself counted for its own types once it's there (a changeling, or one with every type, counting for any).
+ */
+function botPermanentCastType(s: GameState, id: ObjectId): string | undefined {
+  const counts = new Map<string, number>();
+  let all = 0;
+  const add = (types: string[], every: boolean) => {
+    if (every) all++;
+    else for (const ty of new Set(types.filter((x) => CREATURE_TYPES.has(x)))) counts.set(ty, (counts.get(ty) ?? 0) + 1);
+  };
+  for (const b of s.battlefield) {
+    const c = characteristics(s, obj(s, b));
+    if (c.types.includes("Creature")) add(c.subtypes, !!c.allCreatureTypes);
+  }
+  const d = defOf(s, obj(s, id));
+  add(d.subtypes, d.keywords.includes("Changeling"));
+  const best = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return best ? best[0] : [...CREATURE_TYPES].sort()[0];
+}
+
+/**
  * Casting it with these modes. `gate`: the optional costs some of its targets depend on, all of them paid or none (an
  * undefined gate leaves them to the usual choices below).
  */
@@ -4694,7 +4716,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
   // Selective Snare, Aphetto Dredging: the creature type with the most creatures to aim at (an opponent's to bounce, our
   // own cards to return), chosen before the targets.
-  const castType = compileCard(castDef(s, id, alt)).castChooseType && printed ? botCastType(s, pid, id, printed) : undefined;
+  // Caller of the Hunt (round B245): a permanent spell's, the type with the most creatures on the battlefield.
+  const castType = compileCard(castDef(s, id, alt)).castChooseType ? (printed ? botCastType(s, pid, id, printed) : botPermanentCastType(s, id)) : undefined;
   if (compileCard(castDef(s, id, alt)).castChooseType && !castType) return null;
   // Avacyn's Judgment: cast for its madness cost as the madness ability resolves, its targets as that cost has them.
   const madnessNow = s.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.objectId === id && s.pending.player === pid;

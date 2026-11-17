@@ -1,6 +1,6 @@
 # Roadmap
 
-31,533 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,536 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -268,7 +268,7 @@ line blocks.
    Recruitment, Carrion Grub, Curse of Thirst).
    Out after round 179: Smoldering Egg (counters equal to the mana spent on another spell), Cryptic Spires (circled
    colors), Jadzi, Oracle of Arcavios, Oskar, Rubbish Reclaimer (done in round 336), Strict Proctor and Kadena's Silencer (done in round 339) (countering
-   triggered abilities), Alacrian Armory (done in round 358), Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
+   triggered abilities), Alacrian Armory (done in round 358), Deadly Cover-Up (done in round B245), Chandra, Fire Artisan (loyalty counters removed),
    Kusari-Gama (done in round 339), Reap (done in round 372) (X targets set by another target), Fearless Swashbuckler (done in round 299) ("a Pirate and a Vehicle attacked"),
    Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (done in round 304) (counters distributed
    among a target player's creatures), The Eagles Are Coming!, Thief of Blood (done in round 300), Eldrazi Mimic ("base power and
@@ -2350,7 +2350,7 @@ line blocks.
    activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (a redirection chosen for each
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
-   Caller of the Hunt, Enigmatic Incarnation (how it was cast); Don't Blink (entering from exile replaced by a shuffle);
+   Caller of the Hunt (done in round B245), Enigmatic Incarnation (how it was cast); Don't Blink (entering from exile replaced by a shuffle);
    Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River,
@@ -5112,7 +5112,7 @@ line blocks.
      shows only cards you've seen.
    - Still out: "if they can't" (Brain Pry), damage per revealed card (Thought Hemorrhage), "put all of them with that
      name into your hand" (Desperate Research, Wood Sage (done in round B137), Tamiyo), the chosen card
-     from a revealed hand (Lobotomy, Shimian Specter, Pick the Brain, Reap Intellect), Deadly Cover-Up, Deicide ("if the
+     from a revealed hand (Lobotomy, Shimian Specter, Pick the Brain, Reap Intellect (done in round B245)), Deadly Cover-Up (done in round B245), Deicide ("if the
      exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon (done in round B214), Skyseer's Chariot (done in round B187), Cheering Fanatic (done in round B158), Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
@@ -5992,7 +5992,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   that must also find its target); Kjeldoran Guard ("defending player" in multiplayer); Lifelace and the other Laces (a
   color change on a spell); Govern the Guildless (forecast and "monocolored"); Gaea's Liege (done in round B127) (a conditional
   characteristic-defining P/T); Orcish Farmer ("until its controller's next untap step"); Hatchet Bully and Wandering
-  Mage (a -1/-1 counter as a cost); Hint of Insanity, Haunting Echoes, Reap Intellect, Pick the Brain and Thought
+  Mage (a -1/-1 counter as a cost); Hint of Insanity, Haunting Echoes, Reap Intellect (done in round B245), Pick the Brain and Thought
   Hemorrhage (not looked at in depth).
 - Round B18 (harder skipped cards, least played first): "sacrifice it unless you ..." and other punishers as a may with
   an otherwise: exile a card from your graveyard (Rotting Giant, Treacherous Vampire), "pay its mana cost" (Pendrell
@@ -9890,6 +9890,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast it, as suspend's own does, rulings; batch triggers of cards in exile are now watched). Browser tests for Domri's +1,
   its color and the riot choice, and Nihilith's question for each discarded card. +3, 31,533 of 31,936. The compiled text
   of every other card is unchanged.
+- Round B245 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Caller of the Hunt
+  (a creature type chosen as an additional cost of a permanent spell, CR 601.2b, one existing type, CR 205.3m, as for
+  Selective Snare's; "the chosen type" of its characteristic-defining ability is that choice, CR 607.2d, counted on the
+  stack, CR 604.3, and on the battlefield, since the permanent can refer to the spell's costs, CR 400.7d: GameObject.castType;
+  a copy of the spell keeps it, CR 707.10, but a copy of the permanent doesn't, CR 707.2, nor does the card put onto the
+  battlefield without being cast, so it's 0/0 there; bots choose the type with the most creatures on the battlefield).
+  Reap Intellect (up to X nonland cards from the revealed hand exiled, none too, CR 107.1c; then one search of that
+  player's graveyard, hand and library for cards with any of those names, any number of them, CR 701.23b, as Haunting
+  Echoes' "for each card exiled this way" is one search; with none exiled there's no name to find, rulings). Deadly
+  Cover-Up (with evidence collected, CR 701.59c: after all creatures are destroyed, CR 608.2c, a card chosen from any
+  opponent's graveyard, a basic land too, not targeted, rulings: chooseFromGraveyard `opponentsYards`; then its owner's
+  zones searched for its name, PlayerRef yardChosenOwner and SameNameRef yardChosen, and that player draws one for each card
+  exiled from their hand, as for Lost Legacy). Browser tests for Caller's type, Reap Intellect's X, hand pick and search,
+  and Deadly Cover-Up's evidence, graveyard pick and search. +3, 31,536 of 31,936. The compiled text of every other card is
+  unchanged.
+- Out after round B245 (looked at, not done): the lists after round B244 stay out, and Battlefield Thaumaturge (still
+  out: its ruling "{1} per target creature, even if the spell targets a creature more than once" against Hinata,
+  Dawn-Crowned's rulings, which count a twice-targeted object once), Jasmine Boreal of the Seven (still out: abilities
+  given to a spell as it's cast are granted in several places, not all read as the mana is spent) and Lodestone Bauble
+  (still out: a player chosen as it's activated). Known gaps: bots cast Reap Intellect and Deadly Cover-Up by their usual
+  worth, without weighing which names to take.
 - Out after round B244 (looked at, not done): the lists after round B243 stay out. Known gap: bots don't plan around
   Domri's mana (they may add it with no creature spell to cast that turn).
 - Out after round B243 (looked at, not done): the lists after round B242 stay out, and Finale of Promise (still out: an
@@ -10049,7 +10070,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B212 (looked at, not done): Rain of Gore (whether lifelink damage from a spell is that spell causing
   the life gain), Kraven the Hunter (the greatest power as several creatures die at once) and Blood Scrivener (two draws
   and a life loss replacing one draw) stay out for the reasons in the earlier lists.
-- Out after round B211 (looked at, not done): Caller of the Hunt (a creature type chosen as an additional cost to cast it,
+- Out after round B211 (looked at, not done): Caller of the Hunt (done in round B245) (a creature type chosen as an additional cost to cast it,
   kept by the spell and then the permanent for its power and toughness; no cast-time choice of that kind yet), Mangara's
   Equity (damage to "you or a white creature you control" grouped per event), Worms of the Earth ("Lands can't enter the
   battlefield" for every way a land is put onto it) stay out.
@@ -10622,7 +10643,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
   evidence X" as a cost (Urgent Necropsy; Incinerator of the Guilty's done in round 313), "if evidence was collected, instead" (Analyze the Pollen,
   Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer (done in round B127), Lamplight Phoenix,
-  Memory Vampire (done in round B233), Tenth District Hero (done in round B200), Deadly Cover-Up).
+  Memory Vampire (done in round B233), Tenth District Hero (done in round B200), Deadly Cover-Up (done in round B245)).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
   "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't
   supported), Coin of Mastery (mana from an artifact source).

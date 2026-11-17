@@ -638,6 +638,12 @@ export interface GameObject {
   tapsThisTurn?: { turn: number; zc: number; n: number };
   /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
   kicked?: number[];
+  /**
+   * Caller of the Hunt (round B245): the creature type chosen as an additional cost as this permanent spell was cast
+   * (CostChoices.creatureType), "the chosen type" of its abilities (CR 607.2d) as a spell and as the permanent it becomes
+   * (CR 400.7d), and of a copy of the spell (CR 707.10); its Chosen.type is set from it.
+   */
+  castType?: string;
   /** With `kicked`: a Dragons of Tarkir spell's "controlled a Dragon as you cast it", which a copy doesn't get (rulings). */
   kickedByControl?: true;
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */

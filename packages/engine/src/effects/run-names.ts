@@ -29,6 +29,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const filter = { ...bindChosen(e.filter, ctx.chosen), ...(names ? { namedAny: names } : name !== undefined ? { named: name } : {}) };
       // No name (none was chosen, or the card was face down): the zones are searched, but nothing can be found (CR 701.23c).
       const match = (id: ObjectId) => name !== undefined && printedMatches(filter, defOf(s, obj(s, id)));
+      // Reap Intellect (round B245): several names, any of them.
+      const named = names && names.length > 1 ? names.join(" or ") : name;
       if (e.handOnly) {
         // Hour of Glory: the hand is revealed, so all of them, no choice (and no library to shuffle).
         // Legion's End: and from their graveyard, a public zone (CR 404.2), every one of them too.
@@ -47,7 +49,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const cards = [...(e.all ? [] : p.graveyard.filter(match)), ...p.hand.filter(match), ...lib.filter(match)];
         const max = Math.min(e.max ?? cards.length, cards.length);
         if (cards.length) {
-          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `cards named ${name}`, cards, min: 0, max, zonesOf: pid, ...(sc.forced.length ? { also: sc.forced } : {}) };
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `cards named ${named}`, cards, min: 0, max, zonesOf: pid, ...(sc.forced.length ? { also: sc.forced } : {}) };
           return "paused";
         }
         sc.found = [];
@@ -56,7 +58,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const fromHand = ids.filter((id) => obj(s, id).zone === "hand").length;
       for (const id of ids) moveObject(s, id, "exile");
       r.exiledFromHand = fromHand;
-      log(s, `${player(s, ctx.controller).name} searches ${p.name}'s graveyard, hand and library${name ? ` for cards named ${name}` : ""} and exiles ${ids.length || "none"}${ids.length ? ` (${fromHand} from their hand)` : ""}.`);
+      log(s, `${player(s, ctx.controller).name} searches ${p.name}'s graveyard, hand and library${named ? ` for cards named ${named}` : ""} and exiles ${ids.length || "none"}${ids.length ? ` (${fromHand} from their hand)` : ""}.`);
       shuffleLibrary(s, p);
       log(s, `${p.name} shuffles their library.`);
       return;
@@ -351,6 +353,12 @@ export function namesFrom(s: GameState, ref: SameNameRef, ctx: ResolveCtx): stri
   if ("chosenThisWay" in ref)
     // Clarion Ultimatum: the chosen permanents still on the battlefield, by their names now (a copy's copied name, rulings).
     return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is NonNullable<typeof o> => !!o && o.zone === "battlefield" && !o.faceDown).map((o) => characteristics(s, o).name);
+  // Deadly Cover-Up (round B245): the card exiled from an opponent's graveyard just before, still that card in exile.
+  if ("yardChosen" in ref) {
+    const c = s.resolving?.chosenFromYard;
+    const o = c ? s.objects[c.id] : undefined;
+    return o && o.zone === "exile" && (o.zoneChanges ?? 0) === c!.zc && !o.faceDown ? [defOf(s, o).name] : [];
+  }
   if ("yourGraveyard" in ref) return player(s, ctx.controller).graveyard.map((id) => defOf(s, obj(s, id)).name);
   // Assembly Hall: "that card", the one revealed from your hand, still there.
   if ("revealed" in ref) return (s.resolving?.revealedFromHandIds ?? []).filter((id) => s.objects[id]?.zone === "hand").map((id) => defOf(s, obj(s, id)).name);

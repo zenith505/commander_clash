@@ -77,6 +77,9 @@ export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId
   o.evidence = card.evidence;
   o.teamwork = card.teamwork;
   o.gift = card.gift;
+  // Caller of the Hunt (round B245): the creature type chosen as it was cast (CR 707.10).
+  o.castType = card.castType;
+  if (o.castType) o.chosen = { ...o.chosen, type: o.castType };
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
   const { castNth: _, castInMain: _main, kickedByControl: _byControl, ...rest } = structuredClone(orig);

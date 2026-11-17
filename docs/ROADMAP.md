@@ -1,6 +1,6 @@
 # Roadmap
 
-31,527 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,530 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -9861,6 +9861,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   their hand and, if they choose, their library for a Dragon permanent card, rulings, shuffling only after searching the
   library, CR 701.23: search `orHand`, the choice labelled "Hand and library" or "Hand only"). Browser tests for Last Light's
   two search choices. +3, 31,527 of 31,936. The compiled text of every other card is unchanged.
+- Round B243 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Monastery Raid
+  (freerunning {X}{R}, X announced as it's cast for that cost, CR 702.173a, 107.3a, as for an {X} foretell cost; "if this
+  spell's freerunning cost was paid" (SpellCondition altPaid `freerunning`, CR 118.9): one impulse of the top X cards, else of
+  the top two, played until the end of your next turn with the normal timing and costs, rulings). Ecological Appreciation
+  (the library and the graveyard searched together for up to four creature cards with different names and mana value X or
+  less, CR 701.23, `that each have mana value X or less` beside Uncage the Menagerie's exact X; one of each name in each zone
+  is offered and no two with the same name can be found, searchLibrary `distinctNames`, the search modal keeping the zones
+  apart; the opponent its caster chooses picks two to shuffle into the library, from either zone, all of them when two or
+  fewer were found, so none enters then, rulings; the rest enter together, then it exiles itself). Serum Powder (at a time
+  its owner would declare a mulligan, CR 103.5b, with it in their hand: Action exileOpeningHand exiles every card in the hand
+  for the rest of the game and draws that many, not a mulligan, rulings; then they declare, so once for each declaration;
+  the mulligan prompt's "Exile hand" button; bots use it rather than a mulligan that would count). Browser tests for
+  Monastery Raid's freerunning X, Ecological Appreciation's search and opponent, and Serum Powder's button. +3, 31,530 of
+  31,936. The compiled text of every other card is unchanged.
+- Out after round B243 (looked at, not done): the lists after round B242 stay out, and Finale of Promise (still out: an
+  instant and a sorcery cast as it resolves in the order its controller chooses, rulings, then each copied twice when X is
+  10 or more; casting targets one at a time in a fixed order is all there is). Known gaps: bots cast Monastery Raid for
+  freerunning with as big an X as they can pay, even 0 or 1 (fewer cards than its mana cost would exile); bots choose
+  Ecological Appreciation's cards by their usual worth, without weighing which two the opponent will send back.
 - Out after round B242 (looked at, not done): the lists after round B241 stay out, and Idris, Soul of the TARDIS (still out:
   "all activated and triggered abilities of the exiled card" needs every kind of triggered ability the card could have, and
   several, such as triggered mana abilities and upkeep costs, live outside a card's trigger list). Known gap: "nontoken" in

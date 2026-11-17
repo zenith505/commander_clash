@@ -224,7 +224,11 @@ function nextMulliganDecision(s: GameState) {
   if (pid !== undefined) {
     const taken = m.taken[pid] ?? 0;
     // Mulligans are allowed until the opening hand would be zero cards (CR 103.5).
-    s.pending = { kind: "mulligan", player: pid, taken, bottomIfKept: mulliganBottom(taken), canMulligan: OPENING_HAND - mulliganBottom(taken) > 0 };
+    const canMulligan = OPENING_HAND - mulliganBottom(taken) > 0;
+    // Serum Powder: "Any time you could mulligan and this card is in your hand, you may exile all the cards from your hand,
+    // then draw that many cards": at a time the player would declare (CR 103.5b); once it's done, they declare.
+    const powders = canMulligan ? player(s, pid).hand.filter((id) => compileCard(defOf(s, obj(s, id))).exileOpeningHand) : [];
+    s.pending = { kind: "mulligan", player: pid, taken, bottomIfKept: mulliganBottom(taken), canMulligan, ...(powders.length ? { exileHandWith: powders } : {}) };
     return;
   }
   if (m.going.length) {
@@ -251,6 +255,30 @@ function nextMulliganDecision(s: GameState) {
   if (player(s, s.activePlayer).lost) s.activePlayer = s.priority = nextLivingAfter(s, s.activePlayer);
   log(s, "Everyone has kept. The game begins.");
   startOpeningActions(s);
+}
+
+/**
+ * Serum Powder (round B243): at a time the player would declare whether they take a mulligan, they exile every card in
+ * their hand, for the rest of the game (rulings), and draw that many; then they declare (CR 103.5b), so not again before
+ * that. It isn't a mulligan: the number taken doesn't change (rulings).
+ */
+function exileOpeningHand(s: GameState, p: Player, id: ObjectId) {
+  const pend = s.pending;
+  const m = s.mulligans;
+  if (pend?.kind !== "mulligan" || pend.player !== p.id || !m) throw new RulesError("not deciding on a mulligan now");
+  if (!pend.exileHandWith?.includes(id) || !p.hand.includes(id)) throw new RulesError("that card can't exile your hand now");
+  const name = defOf(s, obj(s, id)).name;
+  const hand = [...p.hand];
+  for (const c of hand) moveObject(s, c, "exile");
+  draw(s, p.id, hand.length);
+  delete p.draws; // not draws of the game, as with a mulligan (CR 103.5)
+  delete p.firstWouldDraw;
+  delete p.firstOtherWouldDraw;
+  log(s, `${p.name} exiles their hand with ${name} (${hand.length} card${hand.length === 1 ? "" : "s"}) and draws ${hand.length === 1 ? "a card" : `${hand.length} cards`}.`);
+  invalidateCharacteristics(s);
+  // Then they declare (CR 103.5b): the same decision, without the exile.
+  const { exileHandWith: _, ...rest } = pend;
+  s.pending = rest;
 }
 
 function declareMulligan(s: GameState, p: Player, keep: boolean) {
@@ -445,6 +473,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "mulligan":
       declareMulligan(s, p, action.keep);
+      break;
+    case "exileOpeningHand":
+      exileOpeningHand(s, p, action.objectId);
       break;
     case "handToTop":
       chooseHandToTop(s, p, action.objectIds);
@@ -11370,6 +11401,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
+  if (pend.distinctNames && found.some((id, i) => found.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) !== i)) throw new RulesError("choose cards with different names");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.pairsPerYard && [...new Set(found.map((id) => obj(s, id).owner))].some((q) => found.filter((id) => obj(s, id).owner === q).length % 2)) throw new RulesError("choose two cards from a single graveyard for each age counter: an even number from each graveyard");
   if (pend.totalPower !== undefined && found.reduce((n, id) => n + characteristics(s, obj(s, id)).power, 0) > pend.totalPower) throw new RulesError(`choose cards with total power ${pend.totalPower} or less`);

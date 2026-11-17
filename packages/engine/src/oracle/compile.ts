@@ -85,6 +85,7 @@ import { roundB239Line } from "./laneb239";
 import { roundB240Line } from "./laneb240";
 import { roundB241Line } from "./laneb241";
 import { roundB242Line } from "./laneb242";
+import { roundB243Line } from "./laneb243";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2247,6 +2248,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB241Line(line, raw, out, isSpell)) continue;
     // Magnetic Web, Last Light of Durin's Day (round B242).
     if (roundB242Line(line, raw, out, isSpell)) continue;
+    // Serum Powder (round B243).
+    if (roundB243Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8355,7 +8358,7 @@ function checkCastingLinks(out: CompiledCard) {
   const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
-  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge"] as const) {
+  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge", "freerunning"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
     // Madness is a keyword, not an alternative cost of the card's own text (CR 702.35).
@@ -8401,7 +8404,9 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Or in an alternative cost: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (0 unless that cost was paid, CR 107.3a).
   const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => ("x" in c && c.x) || (c.kind === "sacrifice" && c.mvX)) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX
     // Lantern Flare: cast for "Cleave {X}{R}{W}", X is announced as it's cast (CR 107.3a, 601.2b): the cleaved text's X.
-    || (d.oracleId.endsWith("|cleaved") && !!out.altCosts?.some((a) => a.kind === "cleave" && parseManaCost(a.mana ?? "").hasX));
+    || (d.oracleId.endsWith("|cleaved") && !!out.altCosts?.some((a) => a.kind === "cleave" && parseManaCost(a.mana ?? "").hasX))
+    // Monastery Raid: "Freerunning {X}{R}", the same (round B243).
+    || !!out.altCosts?.some((a) => a.kind === "freerunning" && parseManaCost(a.mana ?? "").hasX);
   const bad = (what: string) => out.unsupported.push(what);
   // Glittering Lion: "~ loses "Prevent all damage ..."": one of its own printed static abilities, by its text.
   out.activated = out.activated.filter((a) => {

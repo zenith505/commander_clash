@@ -4451,11 +4451,18 @@ function LibrarySearch({
   const ZONE_ORDER = ["graveyard", "hand", "library"];
   // "Exile a card from a graveyard" (Cemetery Prowler): cards of one name in different graveyards stay apart, by owner.
   const owned = (id: string) => (pending.anyGraveyard ? `${s.objects[id]!.owner}\u0000` : "");
+  // A search of the library and the graveyard (and/or hand) together (Ecological Appreciation): cards of one name in
+  // different zones aren't alike, so they stay apart, each marked with its zone.
+  const zoneOf = (id: string) => s.objects[id]!.zone;
+  const mixed = !dig && !zones && !pending.anyGraveyard && !pending.fromHand && !pending.fromGraveyard && new Set(pending.cards.map(zoneOf)).size > 1;
+  const zoned = (id: string) => (mixed ? `${zoneOf(id)}\u0000` : "");
+  const others = mixed ? ["graveyard", "hand"].filter((z) => pending.cards.some((id) => zoneOf(id) === z)) : [];
+  const mixedZones = `library${others.length > 1 ? ", " : " and "}${others.join(" and ")}`;
   for (const id of dig ? [] : pending.cards) {
-    const name = zones ? s.objects[id]!.zone : owned(id) + cardOf(s, id).name;
+    const name = zones ? s.objects[id]!.zone : owned(id) + zoned(id) + cardOf(s, id).name;
     groups.set(name, [...(groups.get(name) ?? []), id]);
   }
-  const sorted = [...groups].sort((a, b) => (zones ? ZONE_ORDER.indexOf(a[0]) - ZONE_ORDER.indexOf(b[0]) : a[0].localeCompare(b[0])));
+  const sorted = [...groups].sort((a, b) => (zones ? ZONE_ORDER.indexOf(a[0]) - ZONE_ORDER.indexOf(b[0]) : mixed ? ZONE_ORDER.indexOf(zoneOf(b[1][0]!)) - ZONE_ORDER.indexOf(zoneOf(a[1][0]!)) || cardOf(s, a[1][0]!).name.localeCompare(cardOf(s, b[1][0]!).name) : a[0].localeCompare(b[0])));
   const whose = zones ? s.players[pending.zonesOf!]!.name : "";
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
@@ -4465,7 +4472,7 @@ function LibrarySearch({
   // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
   // "With total mana value 4 or less" (Lively Dirge): a card joins only if the total stays within it.
   // "With total power X or less" (Moorland Rescuer): likewise with the cards' powers.
-  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (pending.totalPower !== undefined && [...found, id].reduce((n, x) => n + powerOf(x), 0) > pending.totalPower) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneName && found.some((f) => !sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
+  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (pending.totalPower !== undefined && [...found, id].reduce((n, x) => n + powerOf(x), 0) > pending.totalPower) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.distinctNames && found.some((f) => sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneName && found.some((f) => !sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -4528,6 +4535,8 @@ function LibrarySearch({
                     ? `${pending.source}: search ${whose}'s graveyard, hand and library for ${pending.what} to exile`
                     : pending.controlling !== undefined
                     ? `${pending.source}: you control ${s.players[pending.controlling]!.name}'s search. Find ${pending.what} in their library`
+                    : mixed
+                    ? `${pending.source}: search your ${mixedZones} for ${pending.what}`
                     : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
@@ -4564,7 +4573,7 @@ function LibrarySearch({
                   ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.map((f) => f.text).join(" and ")}.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
-                    : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}`}
+                    : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.distinctNames ? " Each must have a different name." : ""}`}
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min || (!!pending.pairsPerYard && !evenPerYard(s, found)) || (!!pending.exactly && found.length > 0 && found.length !== pending.max) || (!!pending.cardTypes && found.length > 0 && cardTypesAmong(s, found) < pending.cardTypes)} onClick={() => onDone(found)}>
@@ -4629,7 +4638,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : mixed ? `Your ${mixedZones}` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {
@@ -4641,6 +4650,7 @@ function LibrarySearch({
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}
+                  {mixed && <span className="muted small" data-zone={zoneOf(ids[0]!)}>in your {zoneOf(ids[0]!)}</span>}
                   {pending.anyGraveyard && (
                     <span className="muted small" data-owner={s.objects[ids[0]!]!.owner}>
                       {s.objects[ids[0]!]!.owner === HUMAN ? "yours" : `${s.players[s.objects[ids[0]!]!.owner]!.name}'s`}
@@ -6175,6 +6185,15 @@ function Controls({
         >
           Mulligan
         </button>
+        {pending.exileHandWith?.length ? (
+          <button
+            className="ghost"
+            title={`Exile all ${s.players[HUMAN]!.hand.length} cards in your hand for the rest of the game and draw that many. It isn't a mulligan; you then keep or mulligan.`}
+            onClick={() => dispatch([{ type: "exileOpeningHand", player: HUMAN, objectId: pending.exileHandWith![0]! }])}
+          >
+            Exile hand ({cardOf(s, pending.exileHandWith[0]!).name})
+          </button>
+        ) : null}
       </div>
     );
   }

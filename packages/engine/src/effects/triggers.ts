@@ -881,6 +881,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "controlChanged") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
+    // Risky Move (round B241): "When you gain control of ~ from another player": its new controller's trigger.
+    if (o?.zone === "battlefield" && controllerOf(s, o) !== ev.from) add(o, controllerOf(s, o), (e) => e === "selfGainedControl");
     // Zidane, Tantalus Thief: "Whenever an opponent gains control of a permanent from you": the permanents of the player who
     // lost it, as they were controlled before this change (rulings: Zidane itself too, when it changes at the same time).
     if (o?.zone === "battlefield" && opponents(s, ev.from).includes(controllerOf(s, o)))
@@ -2851,6 +2853,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (!c || c.zone !== "hand" || o.chosen?.name === undefined || !hasName(defOf(s, c).name, o.chosen.name)) return false;
         }
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
+        if (t.draws.firstInDrawStep && !ev.firstInDrawStep) return false;
         if (t.draws.ownTurn && ev.player !== s.activePlayer) return false;
         // Keranos: the card revealed as it was drawn, a land or not (as it is in the hand).
         if (t.draws.revealed) {

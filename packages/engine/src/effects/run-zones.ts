@@ -281,7 +281,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     // Spirit-Sister's Call (round B220): sharing a card type with the target card as it is now (CR 205.2a), wherever it is.
     const kin = e.sharesCardTypeWithTarget !== undefined ? objects(s, { ref: "target", index: e.sharesCardTypeWithTarget }, ctx)[0] : undefined;
     const kinTypes = kin ? characteristics(s, kin).types : [];
-    const options = e.sharesCardTypeWithTarget === undefined ? options5 : options5.filter((id) => characteristics(s, obj(s, id)).types.some((ty) => kinTypes.includes(ty)));
+    const options6 = e.sharesCardTypeWithTarget === undefined ? options5 : options5.filter((id) => characteristics(s, obj(s, id)).types.some((ty) => kinTypes.includes(ty)));
+    // Frantic Scapegoat (round B241): only one that can become suspected (CR 701.60d, Airtight Alibi).
+    const options = e.suspectable ? options6.filter((id) => obj(s, id).suspected === undefined && !characteristics(s, obj(s, id)).cantBeSuspected) : options6;
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {

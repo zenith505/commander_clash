@@ -313,12 +313,23 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "suspect":
       // Only permanents can be suspected (CR 701.60b); a suspected one isn't suspected again (701.60d), so it keeps its
       // timestamp.
+      let became = false;
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "battlefield" || (o.suspected !== undefined) !== !!e.no) continue;
         // "Enchanted creature can't become suspected" (Airtight Alibi).
         if (!e.no && characteristics(s, o).cantBeSuspected) continue;
         o.suspected = e.no ? undefined : s.nextTimestamp++;
+        became = true;
         log(s, e.no ? `${defOf(s, o).name} is no longer suspected.` : `${src} suspects ${defOf(s, o).name}.`);
+      }
+      // Frantic Scapegoat (round B241): "If you do, ~ is no longer suspected": only when another creature became suspected
+      // this way (CR 608.2c), and only ~ as the object it is (CR 400.7).
+      if (e.fromSelf && became) {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && me.suspected !== undefined) {
+          me.suspected = undefined;
+          log(s, `${defOf(s, me).name} is no longer suspected.`);
+        }
       }
       invalidateCharacteristics(s);
       return;

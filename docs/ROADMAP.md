@@ -1,6 +1,6 @@
 # Roadmap
 
-31,520 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,524 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4370,7 +4370,7 @@ line blocks.
    game); Panglacial Wurm (cast from your library while searching it).
    Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
    the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
-   Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move ("When you gain
+   Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move (done in round B241) ("When you gain
    control of ~ from another player": no control-change event yet); Blaster, Combat DJ (granted modular, and moving X
    counters onto another artifact); Jetfire, Ingenious Scientist (done in round 372) (removing counters from among artifacts as a cost, mana
    for a target player); Sabertooth Cobra ("unless they pay {2} before that step"); Ranar the Ever-Watchful (the first
@@ -5242,7 +5242,7 @@ line blocks.
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
      (Caparocti Sunborn), "the mana value of the exiled card" (Ellie and Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
-   - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat), "as long as ~ remains on the
+   - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat (done in round B241)), "as long as ~ remains on the
      battlefield, that creature is also goaded" (Hot Pursuit, done in round 349).
    - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek, done in round 267).
    - Conditional flash still out: "five or more mana values among cards in your graveyard" (Graveyard Shift (done in round B105)), "two or more
@@ -5503,7 +5503,7 @@ line blocks.
    - Wills still out: Sakashima's, Kamahl's and Will of the Abzan (above).
    - "Each player may discard their hand and draw ..." works; Snort's "each opponent who discarded their hand this
      way" and Imposing Grandeur's "the greatest mana value of a commander they own" don't.
-   - Hideaway: Evercoat Ursine, Smuggler's Buggy, Rabble Rousing ("create that many"), Wiretapping.
+   - Hideaway: Evercoat Ursine, Smuggler's Buggy, Rabble Rousing ("create that many"), Wiretapping (done in round B241).
    Left from the teamwork/conspire/gift/tribute/hideaway/cipher round:
    - Tribute: Flame-Wreathed Phoenix's granted dies trigger, Oracle of Bones' free cast from hand. Cipher: Arcane
      Heist, Hidden Strings, Trait Doctoring, Undercity Plague. Conspire: Traitor's Roar ("it deals damage equal to its
@@ -9829,6 +9829,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   `cycled`). Browser tests for casting Lightning Bolt from the top of your graveyard after Bösium Strip's ability, and
   Hieroglyphic Illumination from your graveyard with Abandoned Sarcophagus. +3, 31,520 of 31,936. The compiled text of every
   other card is unchanged.
+- Round B241 (least played first, from the bottom of `npm run popular -- --least`, none of them in Lane A's open rounds):
+  Wiretapping (a draw trigger for the first card its controller draws during their own draw step, CR 504.1, the turn's
+  draw or, when a replacement such as dredge took that draw's place, the next card drawn in that step: draws.firstInDrawStep,
+  game.ts drewInDrawStep; then a draw, and with nine or more cards in hand the hideaway card may be played without paying its
+  mana cost, CR 702.75a). Frantic Scapegoat (a batch trigger for other creatures entering under its controller's control with
+  an intervening "if ~ is suspected", CR 603.4; one of those creatures still on the battlefield, not targeted, only one that
+  can become suspected, CR 701.60d, so choosing one suspects it and then ~ is no longer suspected, CR 608.2c: pick
+  `suspectable`, suspect `fromSelf`). Lucius the Eternal (its dies trigger has one target, so with that target gone it doesn't
+  resolve and Lucius stays in the graveyard, CR 608.2b, rulings; otherwise the card, still in the graveyard as that object, CR
+  400.7, is exiled, and a delayed trigger with no end, CR 603.7c, returns that card from exile under its owner's control when
+  the target as it was leaves the battlefield for any zone: Effect exileSelfUntilTargetLeaves). Risky Move ("When you gain
+  control of ~ from another player": TriggerEvent selfGainedControl, fired by game.ts syncControl for the new controller, CR
+  603.3a, never for entering under your control; a creature you control and an opponent chosen as it resolves, nothing
+  targeted, rulings; a coin flipped even with no creature, CR 705; a lost flip gives that creature to that opponent for good,
+  layer 2, rulings). Browser tests for Frantic Scapegoat's choice and declining it, Lucius's target and return, and Risky
+  Move's choice of creature and opponent at your upkeep. +4, 31,524 of 31,936. The compiled text of every other card is
+  unchanged.
+- Out after round B241 (looked at, not done): the lists after round B240 stay out. Known gaps: for a mutated Lucius, its dies trigger
+  exiles every card of the merged permanent (CR 730.3c), but the delayed trigger returns only the card the ability came from
+  (no ruling says whether "this card" finds the others); bots don't weigh which creature Lucius's trigger should watch (any opponent's creature) or which
+  creature Frantic Scapegoat should pass its suspicion to.
 - Out after round B240 (looked at, not done): the lists after round B239 stay out, and Chorus of the Conclave (still out: no
   ruling says whether a creature spell paid for with its extra mana still enters with the counters once Chorus has left the
   battlefield, the "if you do" being part of its static ability). Known gap: bots don't plan around Bösium Strip's permission.
@@ -10311,7 +10332,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B101 (looked at, not done): Kang Dynasty (chapter I and II delayed triggers on goaded creatures), The Bears
   of Littjara (damage from each creature with power 4 or greater), Founding the Third Path (done in round B193) and Helmut Zemo (casting with mana
   paid as something resolves), Jorn's Kaldring (playing a snow permanent card from a graveyard, entering tapped), Yannik (done in round B200),
-  Lucius the Eternal, Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
+  Lucius the Eternal (done in round B241), Cemetery Desecrator and The Spot, Crumbling Sanctuary (damage to players replaced by exiling cards),
   Ancient Hellkite (done in round B112) ("defending player" in an activated ability's target), Alluring Siren ("attacks you if able"), Dreams of
   Steel and Oil (the chosen cards exiled at once), Jester's Mask (done in round B158), The Ruinous Wrecking Crew (done in round B187) (choose up to X).
 - Out after round B100 (looked at, not done): Necrotic Plague (done in round B215) (a target chosen by the dead creature's controller, not the

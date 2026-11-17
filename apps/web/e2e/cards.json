@@ -13119,6 +13119,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9d105f83-583d-438b-8f26-b39e818ed295",
+  "name": "Essence of the Wild",
+  "manaCost": "{3}{G}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar"
+  ],
+  "oracleText": "Creatures you control enter as a copy of this creature.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0114f97f-b196-4af1-90aa-eba164cb8f22",
   "name": "Etchings of the Chosen",
   "manaCost": "{1}{W}{B}",
@@ -20346,6 +20376,36 @@
   "set": "sld",
   "releasedAt": "2022-06-14",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5bbcfb73-cccc-47b0-81ae-17eb7c33ff5e",
+  "name": "Infinite Reflection",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nWhen this Aura enters attached to a creature, each other nontoken creature you control becomes a copy of that creature.\nNontoken creatures you control enter as a copy of enchanted creature.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

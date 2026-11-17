@@ -310,6 +310,13 @@ export interface GameObject {
   /** When keyword counters of each kind were last put on it (CR 613.7c): their effect's timestamp in layer 6. */
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
+  /**
+   * Round B249, The Prismatic Piper and Faceless One: "If ~ is your commander, choose a color before the game begins. ~ is
+   * the chosen color.": the color chosen for this commander as the deck was built (CR 903.4b, PlayerSetup.commanderColor),
+   * which its characteristic-defining ability makes its color in every zone for the whole game (CR 604.3, 607.2p), and
+   * which is part of its color identity. Never on another object, a copy of it included (CR 607.2p, 707.2).
+   */
+  pregameColor?: Color;
   isToken: boolean;
   /** A token: the permanent whose ability created it, as that object ("tokens created with ~", Faerie Artisans). */
   createdWith?: { id: ObjectId; zc: number };
@@ -2578,7 +2585,7 @@ export interface GameState {
   pendantMana?: { player: PlayerId; combos: ManaType[][]; from: ManaOrigin[]; source: string; id: ObjectId };
   /** The replacement a player chose for the game loss they're about to have (CR 616.1): an option of loseReplacements. */
   loseChoice?: { player: PlayerId; choice: string };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; /** With "copyLast": what makes each option's copy (Essence of the Wild, Mystic Reflection). */ copySources?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,

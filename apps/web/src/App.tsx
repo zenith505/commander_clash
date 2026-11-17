@@ -5831,6 +5831,20 @@ function Controls({
     );
   }
   // Sutured Ghoul, Living Lore, Frankenstein's Monster: a card of your graveyard to exile as it enters, one at a time.
+  // Essence of the Wild, Infinite Reflection (round B249): which of several copy effects applies last, each option a copy's card.
+  if (pending?.kind === "chooseOption" && pending.what === "copyLast" && pending.player === HUMAN)
+    return (
+      <div className="controls copy-pick" data-copy-last>
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} onMouseEnter={() => s.cards[o] && onHover(s.cards[o]!)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && (pending.what === "copy" || pending.what === "copyOther" || pending.what === "exileFromYard") && pending.player === HUMAN)
     return (
       <div className="controls copy-pick">

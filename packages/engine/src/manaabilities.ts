@@ -2,7 +2,7 @@
 // whether it can be activated, and which one to use for a given mana.
 
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaSpend, type ManaTrigger } from "./abilities";
-import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
+import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, identityOf, lendersOf, objIsType } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
 import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, manaActivationTax, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -73,7 +73,7 @@ export function manaLifeTax(s: GameState, o: GameObject): number {
 /** Colors in the color identity of `pid`'s commander(s) (CR 903.4). */
 export function commanderIdentity(s: GameState, pid: PlayerId): ManaType[] {
   const ids = new Set<ManaType>();
-  for (const o of Object.values(s.objects)) if (o.isCommander && o.owner === pid) s.cards[o.cardId]?.colorIdentity.forEach((c) => ids.add(c));
+  for (const o of Object.values(s.objects)) if (o.isCommander && o.owner === pid) identityOf(s, o).forEach((c) => ids.add(c));
   return COLORS.filter((c) => ids.has(c));
 }
 

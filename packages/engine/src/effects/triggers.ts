@@ -805,11 +805,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
     // "if it was kicked" is an intervening if (CR 603.4), and that can't change by the time it resolves.
     // Evoke's sacrifice trigger only if the evoke cost was paid (CR 702.74a).
+    // Infinite Reflection (round B249): "When ~ enters attached to a creature": the creature it's attached to as it enters,
+    // that ability's "that creature" (its subject), even if the Aura is moved before it resolves (rulings).
+    const enteredOn = entering.attachedTo !== undefined ? s.objects[entering.attachedTo] : undefined;
+    const enteredOnCreature = enteredOn?.zone === "battlefield" && objIsType(s, enteredOn, "Creature") ? enteredOn : undefined;
+    const queuedBefore = s.triggerQueue.length;
     add(
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEscaped || !!entering.escaped) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifCastInMain || (!!entering.wasCast && !!entering.castInMain)) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && !(t.ifEnteredAttachedCreature && !enteredOnCreature) && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEscaped || !!entering.escaped) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifCastInMain || (!!entering.wasCast && !!entering.castInMain)) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -822,6 +827,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         : undefined,
       entering.colorsSpent?.length,
     );
+    if (enteredOnCreature) {
+      const own = abilitiesOf(s, entering).triggers;
+      for (const q of s.triggerQueue.slice(queuedBefore))
+        if (q.sourceId === entering.id && own[q.index]?.ifEnteredAttachedCreature) q.subject = { id: enteredOnCreature.id, zc: enteredOnCreature.zoneChanges ?? 0 };
+    }
     if (objIsType(s, entering, "Creature")) {
       const lki = { power: power(s, entering), toughness: toughness(s, entering) };
       for (const id of s.battlefield) {

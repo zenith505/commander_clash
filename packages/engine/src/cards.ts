@@ -100,6 +100,15 @@ const withDoors = (o: GameObject, key: string): string => (o.unlocked !== undefi
  */
 const ownId = (o: GameObject): string => o.melded ?? (o.face !== undefined ? faceKey(o.cardId, o.face) : o.cardId);
 
+/**
+ * The color identity of a card in the game (CR 903.4, 903.4a): its card's, plus the color chosen for it before the game
+ * began as a commander (GameObject.pregameColor, CR 903.4b). `d`: the definition to start from (its card's by default).
+ */
+export const identityOf = (s: GameState, o: GameObject, d: CardDef | undefined = s.cards[o.cardId]): Color[] => {
+  const own = d?.colorIdentity ?? [];
+  return o.pregameColor && !own.includes(o.pregameColor) ? [...own, o.pregameColor] : own;
+};
+
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
 /** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */
 const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";

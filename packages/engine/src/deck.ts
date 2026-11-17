@@ -1,4 +1,4 @@
-import type { CardDef } from "./types";
+import type { CardDef, Color } from "./types";
 import { stripReminder } from "./keywords";
 
 export interface DeckProblem {
@@ -49,9 +49,11 @@ export function commanderPairProblem(a: CardDef, b: CardDef): string | null {
 /**
  * Check a Commander deck against CR 903.5: 100 cards including the commander (or both commanders,
  * CR 702.124b), singleton except basic lands, and every card within the commanders' combined color
- * identity (702.124c). `banned` is a set of card names (from the card data's commander legality).
+ * identity (702.124c). `banned` is a set of card names (from the card data's commander legality). `colors`: the colors
+ * chosen for the commander and the second one with "choose a color before the game begins" (The Prismatic Piper), part of
+ * its color identity (CR 903.4b).
  */
-export function validateCommanderDeck(commander: CardDef, deck: CardDef[], banned: Set<string> = new Set(), second?: CardDef): DeckProblem[] {
+export function validateCommanderDeck(commander: CardDef, deck: CardDef[], banned: Set<string> = new Set(), second?: CardDef, colors: (Color | undefined)[] = []): DeckProblem[] {
   const out: DeckProblem[] = [];
   const commanders = second ? [commander, second] : [commander];
   // A legendary Background can be a commander only beside one that can choose a Background (CR 702.124k).
@@ -68,7 +70,12 @@ export function validateCommanderDeck(commander: CardDef, deck: CardDef[], banne
     const c = [...deck, ...commanders].find((x) => x.name === name)!;
     if (k > 1 && k > deckLimit(c)) out.push({ card: name, problem: deckLimit(c) === 1 ? `appears ${k} times (singleton)` : `appears ${k} times (at most ${deckLimit(c)})` });
   }
-  const ci = new Set(commanders.flatMap((c) => c.colorIdentity));
+  commanders.forEach((c, i) => {
+    const chooses = /choose a color before the game begins/i.test(c.oracleText ?? "");
+    if (chooses && !colors[i]) out.push({ card: c.name, problem: "needs its color chosen before the game begins (CR 903.4b)" });
+    else if (!chooses && colors[i]) out.push({ card: c.name, problem: "doesn't have a color chosen before the game begins" });
+  });
+  const ci = new Set<Color>([...commanders.flatMap((c) => c.colorIdentity), ...commanders.flatMap((c, i) => (colors[i] ? [colors[i]!] : []))]);
   for (const c of deck) {
     if (c.colorIdentity.some((col) => !ci.has(col))) out.push({ card: c.name, problem: "outside the commander's color identity" });
     if (banned.has(c.name)) out.push({ card: c.name, problem: "banned in Commander" });

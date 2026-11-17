@@ -1,6 +1,6 @@
 # Roadmap
 
-31,546 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,551 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,893 of
 9,979 (99%).
 
@@ -4307,7 +4307,7 @@ line blocks.
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
-   battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
+   battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
@@ -4382,7 +4382,7 @@ line blocks.
    Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
    Moon's Legacy (done in round 373) (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
    exiled card cast free only if it's an instant with mana value 2 or less, else into your hand); Meeting of the Five
-   (spells with exactly three colors, and mana only for them); Essence of the Wild (creatures entering as a copy of it,
+   (spells with exactly three colors, and mana only for them); Essence of the Wild (done in round B249) (creatures entering as a copy of it,
    ordered with other copy effects, CR 616.1); Ice Cave (done in round B214) (any other player may pay a spell's mana cost to counter it);
    Journey to the Lost City (done in round B204) (a d20 table over the four exiled cards); Ghastly Conscription (manifesting a shuffled
    face-down pile); Soulflayer (done in round B182) and Rayami, First of the Fallen (keywords of cards exiled by delve or with blood counters,
@@ -5406,7 +5406,7 @@ line blocks.
    - Reflexive spells still out: Ill-Timed Explosion (done in round 273; "the greatest mana value among cards discarded this way" carried
      into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
-   - "Triggers an additional time" still out: Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
+   - "Triggers an additional time" still out: Clara Oswald (done in round B249), Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
      of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All (done in round 274), The
      Masamune, Valiant Emberkin, Veyran, Virtue of Knowledge, Wayta, Windcrag Siege, Wizard's Staff.
    - Simplifications: amass with several Armies uses the one with the most +1/+1 counters (CR 701.47a lets you
@@ -9011,7 +9011,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   on it into your hand", one exiled earlier too with X 0, rulings). +5, 31,134 of 31,936 with B187, B188 and rounds 345 to
   347.
 - Out after round B189 (looked at, not done): Noxious Vapors ("chooses one card of each color": how a multicolored card
-  counts has no ruling), The Prismatic Piper and Faceless One (a color chosen before the game begins, before mulligans:
+  counts has no ruling), The Prismatic Piper (done in round B249) and Faceless One (done in round B249) (a color chosen before the game begins, before mulligans:
   no pre-game choice exists yet), A Killer Among Us (done in round B233) (a creature type chosen secretly, revealed as a cost after the
   sacrifice), Chorus of the Conclave (an extra mana payment of any amount added to every creature spell you cast), Essence
   of the Wild, Decaying Soil (done in round B234), Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal (done in round B248) stay out for the
@@ -9952,6 +9952,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   permanent spell. Browser tests for the replicate count (Djinn Illuminatus with Lightning Bolt, the copies aimed anew;
   Hatchery Sliver's own replicate and the given one asked one after the other). +4, 31,546 of 31,936. The compiled text of
   every other card is unchanged.
+- Round B249 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): creatures entering as
+  copies (CR 614.1c, 707.5), CompiledCard `creaturesEnterAsCopy`: Essence of the Wild ("Creatures you control enter as a copy
+  of ~.": its copiable values as it is now, none of its counters, Auras or other effects, rulings, CR 707.2; tokens too) and
+  Infinite Reflection ("Nontoken creatures you control enter as a copy of enchanted creature.", and "When ~ enters attached
+  to a creature, each other nontoken creature you control becomes a copy of that creature": TriggeredAbility
+  `ifEnteredAttachedCreature`, that creature the trigger's subject even if the Aura is moved before it resolves, rulings).
+  For a creature as it would enter (CR 614.12), under the permanent's controller's control, after control-changing
+  replacements (Xantcha is asked its opponent first) and before every other one (CR 616.1, rulings), so the entering
+  creature's own "enters" replacements (counters, entering tapped, the Volvers' kicked abilities) and triggers don't apply
+  and the copied creature's do; a Clone ends up a copy of it whatever the order (rulings). Mystic Reflection's copy now goes
+  the same way (it used to keep the entering creature's own "enters with" counters). With several copy effects that
+  differ, its controller chooses which applies last (CR 616.1, rulings): the "copyLast" prompt; bots take the copy with the
+  highest mana value. The Prismatic Piper, Faceless One and Clara Oswald ("If ~ is your commander, choose a color before the
+  game begins. ~ is the chosen color."): the color is chosen as the deck is built (CR 903.4b), PlayerSetup
+  `commanderColor`/`secondCommanderColor` (createGame refuses a game without it), GameObject `pregameColor`; its
+  characteristic-defining ability makes it that color in every zone (CR 604.3, 607.2p), not a copy of it or a card that
+  isn't a commander, and the color is part of its color identity (validateCommanderDeck's `colors`, commanderIdentity for
+  Command Tower and the like, `identityOf`). A browser test for the copy prompt. +5, 31,551 of 31,936. The compiled text of
+  every other card is unchanged.
+- Out after round B249 (looked at, not done): the lists after round B248 stay out. Known gaps: two Mystic Reflections
+  still apply in timestamp order rather than asking (only different kinds of copy effect are asked); the app's decks have
+  no way to choose a color for a commander like The Prismatic Piper yet (no sample deck has one).
 - Out after round B248 (looked at, not done): the lists after round B247 stay out, and Zinnia, Valley's Voice and Ashling, the
   Limitless (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
   its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
@@ -10065,8 +10087,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
   would have to keep apart), Jasmine Boreal of the Seven (a creature spell with no abilities, counting abilities other
   permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth ("Lands can't
-  enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper,
-  Faceless One and Clara Oswald (a color chosen before the game that changes the commander's color identity for deck
+  enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper (done in round B249),
+  Faceless One (done in round B249) and Clara Oswald (done in round B249) (a color chosen before the game that changes the commander's color identity for deck
   building, CR 903.4b), Ranar the Ever-Watchful (its exile trigger, still out; its free first foretell would use Cosmos
   Charger's foretellActionCost) and the lists after round B225 stay out.
 - Out after round B225 (looked at, not done): Cultivator Drone (its mana pays "a cost that contains {C}", a trigger's
@@ -10123,7 +10145,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Sacred Ground (what caused a land to go to the graveyard) and Over the Top (every player's permanent cards entering at
   once, Auras among them) stay out.
 - Out after round B214 (looked at, not done): Decaying Soil (done in round B234) (a threshold-granted dies trigger that looks back, CR 603.10a),
-  Silhouette (done in round B239) (damage from a source whose spell or ability targets the creature), Essence of the Wild (a copy replacement
+  Silhouette (done in round B239) (damage from a source whose spell or ability targets the creature), Essence of the Wild (done in round B249) (a copy replacement
   applied before other enters replacements) stay out for the reasons in the earlier lists. Known gap: the engine still
   orders each player's own simultaneous triggers itself (CR 603.3b) rather than asking.
 - Out after round B213 (looked at, not done): a bot picking the land for Desolation's sacrifice isn't told that a Plains
@@ -10185,7 +10207,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B179 (looked at, not done): Soul Burn (done in round B234) ("not more than the amount of {B} spent on X": which of the black
   mana went to X and which to the {2} is the payer's, not tracked), Emblazoned Golem (one mana of each color on its kicker
   X), Kaya, Ghost Assassin (done in round B206) ("Exile ~ or up to one target creature": which one chosen as it resolves), Sigardian Zealot (done in round B187)
-  ("any number of creatures with different powers"), Faceless One (a color chosen before the game begins), Peace Talks,
+  ("any number of creatures with different powers"), Faceless One (done in round B249) (a color chosen before the game begins), Peace Talks,
   Wall of Shadows (done in round B199) and Fishing Pole stay out for the reasons in the earlier lists. Drain Life and Consume Spirit's
   black X is paid as black symbols, so delve or improvise given to them couldn't pay X's part.
 - Out after round B178 (looked at, not done): Peace Talks ("players and permanents can't be the targets of spells or activated
@@ -10249,7 +10271,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   reflexive trigger's targets limited by the chosen player), Goblin Maskmaker (done in round B198) (face-down spells as a cost reduction's
   filter), Lantern Flare (a cleave cost with {X} on a card whose mana cost has none, X defined by its text otherwise),
   Saproling Burst (a token's power and toughness from the counters on the permanent that made it), Mana Cache (any player
-  activating a mana ability of a permanent they don't control), Essence of the Wild (creatures entering as a copy of it,
+  activating a mana ability of a permanent they don't control), Essence of the Wild (done in round B249) (creatures entering as a copy of it,
   a copy replacement applied before other enters replacements, rulings), Sunglasses of Urza (white mana spent as though
   it were red).
 - Out after round B162 (looked at, not done): Synthesis Pod (reveal until a card with mana value one more than the exiled
@@ -10747,7 +10769,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   attacker's among several blockers.
 - Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, done in round 312);
   granted trigger Breathkeeper Seraph's "at the beginning of your next upkeep".
-- Faceless One ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
+- Faceless One (done in round B249) ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
   in the engine and `sample-decks.json` (`secondCommander`) but no sample deck uses them yet.
 - Split second conditional on a kicker (Molten Disaster's "if it was kicked", done in round 324); Shadow the Hedgehog's "if mana from an
   artifact was spent" works.
@@ -10761,7 +10783,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
   Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man,
-  Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection; planeswalkers (Saheeli,
+  Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection (done in round B249); planeswalkers (Saheeli,
   Oko, Kaya).
 - Madness: "if its madness cost was paid" (Grave Scrabbler), X or non-mana madness costs, granting madness (Falkenrath
   Gorger), "whenever you discard a card, if it has madness" (Anje Falkenrath). A madness or suspended commander is

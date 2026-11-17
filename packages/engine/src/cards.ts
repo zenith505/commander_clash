@@ -568,6 +568,12 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
             out.cardIds.push(card.id);
           }
         }
+    } else if (b.chosenObject) {
+      // Scheming Fence (round 402): the permanent chosen as it entered, while it's still that object (CR 400.7), whoever
+      // controls it; its abilities as it has them now (CR 613.1f).
+      const ch = o.chosen?.object;
+      const x = ch && s.objects[ch.id];
+      if (x && x.zone === "battlefield" && (x.zoneChanges ?? 0) === ch.zc && x.id !== o.id && objectMatches(s, b.filter, x, c.controller, false)) out.objects.push(x);
     } else if (b.top) {
       const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
       if (top && printedMatches(b.filter, defOf(s, top))) out.cards.push(defOf(s, top));

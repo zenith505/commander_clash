@@ -3196,6 +3196,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Melting: "All lands are no longer snow": the supertype goes in layer 4 (CR 205.4a), lands that become snow later too.
   if (/^All lands are no longer snow$/.test(text)) return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "loseTypes", types: ["Snow"] }], text: line };
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
+  // Scheming Fence (round 402): "Activated abilities of the chosen permanent can't be activated": the permanent chosen as
+  // it entered, while it's that object (CR 400.7), mana abilities too (CR 605.1a).
+  if (text === "Activated abilities of the chosen permanent can't be activated") return { affects: { kind: "chosenObject" }, mods: [{ kind: "cantActivate" }], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);
   if (silenced) {

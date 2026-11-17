@@ -137,6 +137,7 @@ import { round398Line } from "./round398";
 import { round399Line } from "./round399";
 import { round400Line } from "./round400";
 import { round401Line } from "./round401";
+import { round402Line } from "./round402";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1020,6 +1021,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Scheming Fence (round 402): its chosen permanent (oracle/round402.ts), before the generic borrowing below.
+    if ((line === "As ~ enters, you may choose a nonland permanent." || line.startsWith("~ has all activated abilities of the chosen permanent")) && round402Line(line, raw, out, isSpell)) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
     const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
     // Conspicuous Snoop: "As long as the top card of your library is a Goblin card, ~ has all activated abilities of that

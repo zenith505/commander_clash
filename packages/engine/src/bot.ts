@@ -1051,7 +1051,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "band") return [{ type: "pickPermanents", player: pid, ids: [] }];
     // Exert (CR 701.43d): for its "when you do" bonus, while there's life to spare for it not untapping.
     if (pend.kind === "pickPermanents" && pend.action === "exert") return [{ type: "pickPermanents", player: pid, ids: chooseExert(s, pid, pend.options) }];
-    // "You may choose not to untap ~": keep it tapped while one of its "for as long as ~ remains tapped" effects lasts.
+    // "You may choose not to untap ~": keep it tapped while one of its "for as long as ~ remains tapped" effects lasts (not
+    // one on the permanent itself, as Braided Net's, round 402).
     // Keep tapped what an effect lasts for while it's tapped, and a storage land saving up (Bottomless Vault gets a counter
     // at upkeep while tapped) until it has three.
     if (pend.kind === "pickPermanents" && pend.action === "keepTapped") {
@@ -1060,7 +1061,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const guarding = (id: string) => (s.delayed ?? []).some((d) => d.when === "lostControl" && d.orUntaps && d.subject.id === id && !!d.about && s.objects[d.about.id]?.zone === "battlefield");
       // The Pandorica (round 389): kept tapped while an opponent's permanent it phased out can't phase in.
       const locking = (id: string) => (s.phasedOut ?? []).some((x) => s.objects[x]!.phased?.lockWhileTapped?.id === id && s.objects[x]!.phased!.by !== pid);
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id) || guarding(id) || locking(id)) }];
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id && !e.affected.includes(id)) || saving(id) || guarding(id) || locking(id)) }];
     }
     // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
     if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
@@ -1597,6 +1598,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Dauntless Bodyguard, Tyrannical Pitlord: our most valuable other creature, the one most worth protecting or pumping.
     if (pend.kind === "chooseOption" && pend.what === "chosenObject") {
+      // Scheming Fence (round 402): the permanent with the most activated abilities to borrow (and shut off), an
+      // opponent's before ours; none when nothing has any.
+      if (pend.options.includes("none")) {
+        const score = (id: string) => {
+          const o = obj(s, id);
+          const c = abilitiesOf(s, o);
+          const n = c.activated.filter((a) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX).length + c.mana.length;
+          return n ? n * 10 + (controllerOf(s, o) !== pid ? 5 : 0) + mv(s, id) : 0;
+        };
+        const best = pend.options.filter((x) => x !== "none").sort((a, b) => score(b) - score(a))[0];
+        return [{ type: "chooseOption", player: pid, choice: best && score(best) > 0 ? best : "none" }];
+      }
       const pick = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!;
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }

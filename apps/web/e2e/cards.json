@@ -5580,6 +5580,72 @@
   "gameChanger": false
  },
  {
+  "oracleId": "86ef06b3-2049-494d-9ecb-ca14766d3b68",
+  "name": "Braided Net // Braided Quipu",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact // Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters with three net counters on it.\n{T}, Remove a net counter from this artifact: Tap another target nonland permanent. Its activated abilities can't be activated for as long as it remains tapped.\nCraft with artifact {1}{U}",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Craft",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Braided Net",
+    "manaCost": "{2}{U}",
+    "typeLine": "Artifact",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "This artifact enters with three net counters on it.\n{T}, Remove a net counter from this artifact: Tap another target nonland permanent. Its activated abilities can't be activated for as long as it remains tapped.\nCraft with artifact {1}{U}",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/c/8/c8157978-259e-4af1-890e-ea56a55a9997.jpg?1783913690",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/c/8/c8157978-259e-4af1-890e-ea56a55a9997.jpg?1783913690"
+   },
+   {
+    "name": "Braided Quipu",
+    "manaCost": "",
+    "typeLine": "Artifact",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "{3}{U}, {T}: Draw a card for each artifact you control, then put this artifact into its owner's library third from the top.",
+    "colors": [
+     "U"
+    ],
+    "colorIndicator": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/c/8/c8157978-259e-4af1-890e-ea56a55a9997.jpg?1783913690",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/c/8/c8157978-259e-4af1-890e-ea56a55a9997.jpg?1783913690"
+   }
+  ]
+ },
+ {
   "oracleId": "9908e597-9470-4c13-8387-39431b380138",
   "name": "Braingeyser",
   "manaCost": "{X}{U}{U}",
@@ -37436,6 +37502,39 @@
   "set": "uds",
   "releasedAt": "1999-06-07",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cef87a98-61a0-4a88-950f-867144f685e3",
+  "name": "Scheming Fence",
+  "manaCost": "{W}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Citizen",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Citizen"
+  ],
+  "oracleText": "As this creature enters, you may choose a nonland permanent.\nActivated abilities of the chosen permanent can't be activated.\nThis creature has all activated abilities of the chosen permanent except for loyalty abilities. You may spend mana as though it were mana of any color to activate those abilities.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

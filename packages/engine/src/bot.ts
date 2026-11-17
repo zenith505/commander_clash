@@ -45,6 +45,7 @@ import {
   attackLifeCost,
   attackYouLimit,
   attackAllIfOne,
+  webCounterKinds,
   attackRequirementImprovement,
   attackWithOneOptions,
   attackWithOneRequired,
@@ -290,7 +291,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pile = pileOpts.find((k) => pileCards(s, k.slice("pthoughts:".length)).length > 0) ?? (!player(s, pid).library.length ? pileOpts[0] : undefined);
       // Forbidden Crypt with an empty graveyard loses the game: anything else first.
       const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("archive") ?? pile ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
+      // Reed Richards (round B237): its four cards before the Archive's two (once the Archive applies, Reed's first time is gone).
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("reed") ?? has("archive") ?? pile ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -308,6 +310,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
     if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
+    // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
+    if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
@@ -875,6 +879,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pow = (id: string) => characteristics(s, s.objects[id]!).power;
       return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => pow(x) === pow(id)) === i).slice(0, pend.max) }];
     }
+    // "Cards with different names" from the library and graveyard (Ecological Appreciation): the best card of each name.
+    if (pend.kind === "searchLibrary" && pend.distinctNames) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      const named = (id: string) => defOf(s, obj(s, id)).name;
+      return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => sameName(named(x), named(id))) === i).slice(0, pend.max) }];
+    }
     // "With total mana value 4 or less" (Lively Dirge): the best-ranked cards that still fit.
     if (pend.kind === "searchLibrary" && pend.totalMv !== undefined) {
       const found: string[] = [];
@@ -1003,6 +1013,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Fortunate Few: we can't spare our own, so we spare the least of the others' permanents.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving?.body.effects[s.resolving.next]?.type === "othersChooseDestroyRest")
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
+    // Infernal Denizen (round B238): the best of the creatures we may gain control of (pick, then a control effect for us).
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.options.length && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "continuous" && e.what.ref === "created" && e.giveTo?.ref === "chosenPlayer" && e.whileOnBattlefield && e.mods.some((m) => m.kind === "control")))
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     // Order of Succession: the best of the creatures we gain control of.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl"))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
@@ -1965,6 +1978,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = [...pend.options].sort((a, b) => count(b) - count(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
     }
+    // Lagrella, the Magpie: the returned card that gets the counters: our most useful one.
+    if (pend.kind === "chooseOption" && pend.what === "triggerSubject") {
+      const best = [...pend.options].filter((id) => s.objects[id]).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
+    }
     // Juxtapose: the tied permanent we give away: our least useful one.
     if (pend.kind === "chooseOption" && pend.what === "greatestTie") {
       const least = [...pend.options].filter((id) => s.objects[id]).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
@@ -2252,6 +2270,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const most = [...pend.options].sort((a, b) => counts.get(b)! - counts.get(a)!)[0]!;
       return [{ type: "chooseOption", player: pid, choice: manaColorFor(s, pid, pend.options) ?? most }];
     }
+    // Charmed Pendant (round B239): the hybrid symbols' mana in the colors most of the cards in our hand have.
+    if (pend.kind === "chooseOption" && pend.what === "pendantMana") {
+      const counts = new Map<string, number>();
+      for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) counts.set(c, (counts.get(c) ?? 0) + 1);
+      const worth = (o: string) => [...o].reduce((a, m) => a + (counts.get(m) ?? 0), 0);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => worth(b) - worth(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "color" && s.resolving?.item.manaAbility) {
       const pick = manaColorFor(s, pid, pend.options);
       if (pick) return [{ type: "chooseOption", player: pid, choice: pick }];
@@ -2280,7 +2305,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const isLand = (id: ObjectId) => (defOf(s, s.objects[id]!).types.includes("Land") ? 0 : 1);
     if (pend.kind === "orderLibrary" && pend.owner !== undefined) return [{ type: "orderLibrary", player: pid, order: [...pend.cards].sort((a, b) => isLand(a) - isLand(b) || mv(s, b) - mv(s, a)) }];
     if (pend.kind === "orderLibrary") return [{ type: "orderLibrary", player: pid, order: pend.bottom ? pend.cards : [...pend.cards].sort((a, b) => mv(s, a) - mv(s, b)) }];
-    if (pend.kind === "mulligan") return [{ type: "mulligan", player: pid, keep: !pend.canMulligan || keepsHand(s, pid, pend.taken) }];
+    if (pend.kind === "mulligan") {
+      const keep = !pend.canMulligan || keepsHand(s, pid, pend.taken);
+      // Serum Powder (round B243): a new hand without counting a mulligan, better than one once the free one is used.
+      if (!keep && pend.taken >= 1 && pend.exileHandWith?.length) return [{ type: "exileOpeningHand", player: pid, objectId: pend.exileHandWith[0]! }];
+      return [{ type: "mulligan", player: pid, keep }];
+    }
     if (pend.kind === "bottomCards") return [{ type: "bottomCards", player: pid, objectIds: chooseBottom(s, pid, pend.count) }];
     if (pend.kind === "discardToHandSize") {
       const hand = [...player(s, pid).hand].sort((a, b) => mv(s, b) - mv(s, a));
@@ -3281,8 +3311,29 @@ function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body:
 }
 
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
-  const out = pickTargets(s, pid, printed, forced, sourceId, x);
+  const out0 = pickTargets(s, pid, printed, forced, sourceId, x);
+  const out = out0 && oneEachController(s, printed, out0);
   return out && !forced ? withFlagbearer(s, pid, printed, out, sourceId) : out;
+}
+
+/**
+ * "Any number of target creatures controlled by different players" (TargetSpec.differentControllers: Chaos Mutation,
+ * Lagrella, the Magpie, round B246): of the picks, the first for each controller, the rest left out (CR 115.3).
+ */
+function oneEachController(s: GameState, printed: AbilityBody, out: TargetChoice[]): TargetChoice[] {
+  const i = manySlot(printed.targets);
+  if (i < 0 || !printed.targets[i]!.differentControllers) return out;
+  const n = out.length - printed.targets.length + 1;
+  const seen = new Set<PlayerId>();
+  const group = out.slice(i, i + n).filter((t) => {
+    if (t.kind !== "object" || !s.objects[t.id]) return false;
+    const c = controllerOf(s, obj(s, t.id));
+    if (seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+  if (group.length === out.slice(i, i + n).filter((t) => t.kind !== "none").length) return out;
+  return [...out.slice(0, i), ...group, ...Array.from({ length: n - group.length }, (): TargetChoice => ({ kind: "none" })), ...out.slice(i + n)];
 }
 
 /**
@@ -4851,6 +4902,28 @@ function botCastType(s: GameState, pid: PlayerId, id: ObjectId, body: AbilityBod
 }
 
 /**
+ * Caller of the Hunt (round B245): "~'s power and toughness are each equal to the number of creatures of the chosen type
+ * on the battlefield", the type chosen as it's cast: the one with the most creatures there, whoever controls them, the
+ * card itself counted for its own types once it's there (a changeling, or one with every type, counting for any).
+ */
+function botPermanentCastType(s: GameState, id: ObjectId): string | undefined {
+  const counts = new Map<string, number>();
+  let all = 0;
+  const add = (types: string[], every: boolean) => {
+    if (every) all++;
+    else for (const ty of new Set(types.filter((x) => CREATURE_TYPES.has(x)))) counts.set(ty, (counts.get(ty) ?? 0) + 1);
+  };
+  for (const b of s.battlefield) {
+    const c = characteristics(s, obj(s, b));
+    if (c.types.includes("Creature")) add(c.subtypes, !!c.allCreatureTypes);
+  }
+  const d = defOf(s, obj(s, id));
+  add(d.subtypes, d.keywords.includes("Changeling"));
+  const best = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return best ? best[0] : [...CREATURE_TYPES].sort()[0];
+}
+
+/**
  * Casting it with these modes. `gate`: the optional costs some of its targets depend on, all of them paid or none (an
  * undefined gate leaves them to the usual choices below).
  */
@@ -4861,7 +4934,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
   // Selective Snare, Aphetto Dredging: the creature type with the most creatures to aim at (an opponent's to bounce, our
   // own cards to return), chosen before the targets.
-  const castType = compileCard(castDef(s, id, alt)).castChooseType && printed ? botCastType(s, pid, id, printed) : undefined;
+  // Caller of the Hunt (round B245): a permanent spell's, the type with the most creatures on the battlefield.
+  const castType = compileCard(castDef(s, id, alt)).castChooseType ? (printed ? botCastType(s, pid, id, printed) : botPermanentCastType(s, id)) : undefined;
   if (compileCard(castDef(s, id, alt)).castChooseType && !castType) return null;
   // Avacyn's Judgment: cast for its madness cost as the madness ability resolves, its targets as that cost has them.
   const madnessNow = s.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.objectId === id && s.pending.player === pid;
@@ -9136,8 +9210,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Viashino Bey: with it attacking, all the others that can join it (CR 508.1d); Ekundu Cyclops joins any attack.
   if (attacks.length) {
     const bey = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+    // Magnetic Web: with one attacking, the others with that kind of counter join (CR 508.1d).
+    const web = webCounterKinds(s).filter((kind) => attacks.some((a) => (obj(s, a.attacker).counters[kind] ?? 0) > 0));
     for (const o of potentialAttackers(s, pid)) {
-      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id) || !(bey || abilitiesOf(s, o).attacksIfOneAttacks)) continue;
+      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id) || !(bey || abilitiesOf(s, o).attacksIfOneAttacks || web.some((kind) => (o.counters[kind] ?? 0) > 0))) continue;
       const d = !attackProblem(s, o, target) ? target : opps.find((x) => !attackProblem(s, o, x));
       if (d !== undefined) attacks.push({ attacker: o.id, defender: d });
     }

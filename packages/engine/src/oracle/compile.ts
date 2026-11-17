@@ -80,6 +80,16 @@ import { roundB233Line } from "./laneb233";
 import { roundB234Line } from "./laneb234";
 import { roundB235Line } from "./laneb235";
 import { roundB236Line } from "./laneb236";
+import { roundB237Line } from "./laneb237";
+import { roundB238Line } from "./laneb238";
+import { roundB239Line } from "./laneb239";
+import { roundB240Line } from "./laneb240";
+import { roundB241Line } from "./laneb241";
+import { roundB242Line } from "./laneb242";
+import { roundB243Line } from "./laneb243";
+import { roundB244Line, roundB244Loyalty } from "./laneb244";
+import { roundB245Line, roundB245Spell } from "./laneb245";
+import { roundB246Line } from "./laneb246";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -1226,6 +1236,8 @@ export function compile(d: CardDef): CompiledCard {
     if (d.types.includes("Planeswalker") && roundB219Line(line, raw, out, isSpell)) continue;
     // Oko, Lorwyn Liege's +2 and Oko, Shadowmoor Scion's −6 (round 387).
     if (d.types.includes("Planeswalker") && round387Line(line, raw, out, isSpell)) continue;
+    // Domri, Chaos Bringer's +1 (round B244).
+    if (d.types.includes("Planeswalker") && !isSpell && roundB244Loyalty(line, raw, out)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
     if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
@@ -2273,6 +2285,26 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB235Line(line, raw, out, isSpell)) continue;
     // Primitive Justice, Enduring Renewal, Diabolic Servitude, Mana Cache (round B236).
     if (roundB236Line(line, raw, out, isSpell)) continue;
+    // Reed Richards, Smartest Man, Chains of Mephistopheles, Zur's Weirding (round B237).
+    if (roundB237Line(line, raw, out, isSpell)) continue;
+    // Captured by the Consulate, Infernal Denizen (round B238).
+    if (roundB238Line(line, raw, out, isSpell)) continue;
+    // Bell Borca, Spectral Sergeant (round B239).
+    if (roundB239Line(line, raw, out, isSpell)) continue;
+    // Abandoned Sarcophagus (round B240).
+    if (roundB240Line(line, raw, out, isSpell)) continue;
+    // Frantic Scapegoat, Lucius the Eternal, Risky Move (round B241).
+    if (roundB241Line(line, raw, out, isSpell)) continue;
+    // Magnetic Web, Last Light of Durin's Day (round B242).
+    if (roundB242Line(line, raw, out, isSpell)) continue;
+    // Serum Powder (round B243).
+    if (roundB243Line(line, out, isSpell)) continue;
+    // Ms. Marvel, Kamala Khan's granted ability (round B244).
+    if (roundB244Line(line, out, isSpell)) continue;
+    // Caller of the Hunt (round B245).
+    if (roundB245Line(line, out, isSpell)) continue;
+    // Lagrella, the Magpie (round B246).
+    if (roundB246Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7399,7 +7431,7 @@ export function compile(d: CardDef): CompiledCard {
     const typeChoice = !floatingFirst && tail === undefined && spellLines.length === 1 && spellLines[0]!.split(ofYourChoice).length === 2 && /\btarget creatures?(?: cards?)?$/.test(spellLines[0]!.split(ofYourChoice)[0]!) && !spellLines[0]!.includes("•");
     // Round B191 (Multiple Choice): a whole spell read at once.
     // Round B194 (Farsight Ritual): the same.
-    const b191 = !floatingFirst && tail === undefined ? ((t) => { const r = roundB191Spell(t); return r !== undefined ? r : roundB194Spell(t); })(spellLines.join(" ")) : undefined;
+    const b191 = !floatingFirst && tail === undefined ? ((t) => { const r = roundB191Spell(t); if (r !== undefined) return r; const r194 = roundB194Spell(t); return r194 !== undefined ? r194 : roundB245Spell(t); })(spellLines.join(" ")) : undefined;
     const body0 = b191 !== undefined ? b191 : floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
     // "Up to three target creature cards" is three target specs alike: each one of that type.
     const typed = typeChoice && body0 && !body0.modal && body0.targets.length > 0 && body0.targets.every((t) => (t.kind === "object" || t.kind === "card") && !t.chosen && t.types?.length === 1 && t.types[0] === "Creature" && !t.subtypes?.length && t.text === body0.targets[0]!.text);
@@ -8463,7 +8495,7 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   const masteryMana = /\b[Ii]f the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
-  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge"] as const) {
+  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge", "freerunning"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
     // Madness is a keyword, not an alternative cost of the card's own text (CR 702.35).
@@ -8509,7 +8541,9 @@ function checkX(d: CardDef, out: CompiledCard) {
   // Or in an alternative cost: "Foretell {X}{X}{W}", "Madness {X}{B}{B}" (0 unless that cost was paid, CR 107.3a).
   const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => ("x" in c && c.x) || (c.kind === "sacrifice" && c.mvX)) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX) || parseManaCost(out.foretell ?? "").hasX || parseManaCost(out.madness ?? "").hasX
     // Lantern Flare: cast for "Cleave {X}{R}{W}", X is announced as it's cast (CR 107.3a, 601.2b): the cleaved text's X.
-    || (d.oracleId.endsWith("|cleaved") && !!out.altCosts?.some((a) => a.kind === "cleave" && parseManaCost(a.mana ?? "").hasX));
+    || (d.oracleId.endsWith("|cleaved") && !!out.altCosts?.some((a) => a.kind === "cleave" && parseManaCost(a.mana ?? "").hasX))
+    // Monastery Raid: "Freerunning {X}{R}", the same (round B243).
+    || !!out.altCosts?.some((a) => a.kind === "freerunning" && parseManaCost(a.mana ?? "").hasX);
   const bad = (what: string) => out.unsupported.push(what);
   // Glittering Lion: "~ loses "Prevent all damage ..."": one of its own printed static abilities, by its text.
   out.activated = out.activated.filter((a) => {

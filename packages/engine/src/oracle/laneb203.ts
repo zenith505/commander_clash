@@ -3,6 +3,7 @@ import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parsePlayer } from "./targets";
+import { roundB240Sentence } from "./laneb240";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -26,5 +27,6 @@ export function roundB203Sentence(s: string, sentences: string[], si: number, ct
     effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "bottom", who, yours: true, remember: true });
     return { effect: { type: "loseLife", who: { ref: "you" }, n: { count: { kind: "manaValue", of: { ref: "created" } } } }, next: si + 3 };
   }
-  return null;
+  // Round B240's sentences (oracle/laneb240.ts).
+  return roundB240Sentence(s, sentences, si, ctx, effects);
 }

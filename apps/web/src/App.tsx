@@ -4490,11 +4490,18 @@ function LibrarySearch({
   const ZONE_ORDER = ["graveyard", "hand", "library"];
   // "Exile a card from a graveyard" (Cemetery Prowler): cards of one name in different graveyards stay apart, by owner.
   const owned = (id: string) => (pending.anyGraveyard ? `${s.objects[id]!.owner}\u0000` : "");
+  // A search of the library and the graveyard (and/or hand) together (Ecological Appreciation): cards of one name in
+  // different zones aren't alike, so they stay apart, each marked with its zone.
+  const zoneOf = (id: string) => s.objects[id]!.zone;
+  const mixed = !dig && !zones && !pending.anyGraveyard && !pending.fromHand && !pending.fromGraveyard && new Set(pending.cards.map(zoneOf)).size > 1;
+  const zoned = (id: string) => (mixed ? `${zoneOf(id)}\u0000` : "");
+  const others = mixed ? ["graveyard", "hand"].filter((z) => pending.cards.some((id) => zoneOf(id) === z)) : [];
+  const mixedZones = `library${others.length > 1 ? ", " : " and "}${others.join(" and ")}`;
   for (const id of dig ? [] : pending.cards) {
-    const name = zones ? s.objects[id]!.zone : owned(id) + cardOf(s, id).name;
+    const name = zones ? s.objects[id]!.zone : owned(id) + zoned(id) + cardOf(s, id).name;
     groups.set(name, [...(groups.get(name) ?? []), id]);
   }
-  const sorted = [...groups].sort((a, b) => (zones ? ZONE_ORDER.indexOf(a[0]) - ZONE_ORDER.indexOf(b[0]) : a[0].localeCompare(b[0])));
+  const sorted = [...groups].sort((a, b) => (zones ? ZONE_ORDER.indexOf(a[0]) - ZONE_ORDER.indexOf(b[0]) : mixed ? ZONE_ORDER.indexOf(zoneOf(b[1][0]!)) - ZONE_ORDER.indexOf(zoneOf(a[1][0]!)) || cardOf(s, a[1][0]!).name.localeCompare(cardOf(s, b[1][0]!).name) : a[0].localeCompare(b[0])));
   const whose = zones ? s.players[pending.zonesOf!]!.name : "";
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
@@ -4504,7 +4511,7 @@ function LibrarySearch({
   // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
   // "With total mana value 4 or less" (Lively Dirge): a card joins only if the total stays within it.
   // "With total power X or less" (Moorland Rescuer): likewise with the cards' powers.
-  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (pending.totalPower !== undefined && [...found, id].reduce((n, x) => n + powerOf(x), 0) > pending.totalPower) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneName && found.some((f) => !sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
+  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (pending.totalPower !== undefined && [...found, id].reduce((n, x) => n + powerOf(x), 0) > pending.totalPower) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.distinctPowers && found.some((f) => powerOf(f) === powerOf(id))) || (!!pending.distinctNames && found.some((f) => sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneName && found.some((f) => !sameName(cardOf(s, f).name, cardOf(s, id).name))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -4570,6 +4577,8 @@ function LibrarySearch({
                     ? `${pending.source}: search ${whose}'s graveyard, hand and library for ${pending.what} to exile`
                     : pending.controlling !== undefined
                     ? `${pending.source}: you control ${s.players[pending.controlling]!.name}'s search. Find ${pending.what} in their library`
+                    : mixed
+                    ? `${pending.source}: search your ${mixedZones} for ${pending.what}`
                     : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
@@ -4608,7 +4617,7 @@ function LibrarySearch({
                   ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.map((f) => f.text).join(" and ")}.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
-                    : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}`}
+                    : `Found ${found.length} of ${pending.max}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.distinctNames ? " Each must have a different name." : ""}`}
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min || (!!pending.pairsPerYard && !evenPerYard(s, found)) || (!!pending.exactly && found.length > 0 && found.length !== pending.max) || (!!pending.cardTypes && found.length > 0 && cardTypesAmong(s, found) < pending.cardTypes)} onClick={() => onDone(found)}>
@@ -4673,7 +4682,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : mixed ? `Your ${mixedZones}` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {
@@ -4685,6 +4694,7 @@ function LibrarySearch({
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}
+                  {mixed && <span className="muted small" data-zone={zoneOf(ids[0]!)}>in your {zoneOf(ids[0]!)}</span>}
                   {pending.anyGraveyard && (
                     <span className="muted small" data-owner={s.objects[ids[0]!]!.owner}>
                       {s.objects[ids[0]!]!.owner === HUMAN ? "yours" : `${s.players[s.objects[ids[0]!]!.owner]!.name}'s`}
@@ -4830,7 +4840,7 @@ function ModeMenu({
  * also be tapped removing no counters, to start storing them (Bottomless Vault).
  */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead) !== null);
+  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0 || x.mills) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead) !== null);
 }
 
 function AbilityMenu({
@@ -5199,7 +5209,7 @@ function AbilityMenu({
           const button = (
             <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}-${x.instead ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
-              {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
+              {x.mills ? "add one mana for each colored mana symbol in the milled card's mana cost" : x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>
           );
@@ -5711,7 +5721,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "spellDamageBack" || pending.what === "mireLand" || pending.what === "curseMove" || pending.what === "aegisCopy" || pending.what === "kohCard" || pending.what === "secretType" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "toyNumber" || pending.what === "toyGuess" || pending.what === "liarGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || pending.what === "redistribute" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "spellDamageBack" || pending.what === "mireLand" || pending.what === "curseMove" || pending.what === "aegisCopy" || pending.what === "kohCard" || pending.what === "secretType" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "toyNumber" || pending.what === "toyGuess" || pending.what === "liarGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "triggerSubject" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || pending.what === "redistribute" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -6082,6 +6092,20 @@ function Controls({
       </div>
     );
   }
+  // Charmed Pendant (round B239): the mana its milled card's hybrid symbols add, one button for each result.
+  if (pending?.kind === "chooseOption" && pending.what === "pendantMana" && pending.player === HUMAN)
+    return (
+      <div className="controls pendant-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" data-mana={o} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            add <ManaCost cost={[...o].map((m) => `{${m}}`).join("")} size="sm" />
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "endure" && pending.player === HUMAN)
     return (
       <div className="controls">
@@ -6266,6 +6290,15 @@ function Controls({
         >
           Mulligan
         </button>
+        {pending.exileHandWith?.length ? (
+          <button
+            className="ghost"
+            title={`Exile all ${s.players[HUMAN]!.hand.length} cards in your hand for the rest of the game and draw that many. It isn't a mulligan; you then keep or mulligan.`}
+            onClick={() => dispatch([{ type: "exileOpeningHand", player: HUMAN, objectId: pending.exileHandWith![0]! }])}
+          >
+            Exile hand ({cardOf(s, pending.exileHandWith[0]!).name})
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -6336,7 +6369,8 @@ function Controls({
           {pending.kind === "discard" ? <strong>{pending.source}: </strong> : "Hand size: "}
           click {pending.kind === "discard" && pending.upTo ? "up to " : ""}
           {pending.count} {pending.kind === "discard" && pending.filter ? pending.filter.text.replace(/^(?:an? )/, "") : "card"}
-          {pending.count === 1 ? "" : "s"} {pending.kind === "discard" && pending.among && !pending.exile ? `of the ones you just drew (${pending.among.map((id) => cardOf(s, id).name).join(", ")})` : "in your hand"} to {pending.kind === "discard" && pending.keep ? "keep (the rest are shuffled into your library)" : pending.kind === "discard" && pending.exile ? "exile" : "discard"}.
+          {pending.count === 1 ? "" : "s"} {pending.kind === "discard" && pending.among && !pending.exile ? `of the ones you just drew (${pending.among.map((id) => cardOf(s, id).name).join(", ")})` : "in your hand"} to {pending.kind === "discard" && pending.keep ? "keep (the rest are shuffled into your library)" : pending.kind === "discard" && pending.exile ? "exile" : "discard"}
+          {pending.kind === "discard" && pending.thenDraw ? " instead of drawing; then you draw a card" : ""}.
         </span>
         <button
           disabled={(pending.kind === "discard" && pending.upTo ? discards.length > pending.count : discards.length !== pending.count) || (pending.kind === "discard" && !!pending.filter && discards.some((id) => !printedMatches(pending.filter!, cardOf(s, id)))) || (pending.kind === "discard" && !!pending.among && discards.some((id) => !pending.among!.includes(id)))}

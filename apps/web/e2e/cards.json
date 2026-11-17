@@ -119,6 +119,28 @@
   ]
  },
  {
+  "oracleId": "a051dee0-60c8-4f58-84cb-55460c097115",
+  "name": "Abandoned Sarcophagus",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast spells that have a cycling ability from your graveyard.\nIf a card that has a cycling ability would be put into your graveyard from anywhere and it wasn't cycled, exile it instead.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hou",
+  "releasedAt": "2017-07-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cab092f9-b7ff-43b9-935f-310869a4daf8",
   "name": "Abdel Adrian, Gorion's Ward",
   "manaCost": "{4}{W}",
@@ -6172,6 +6194,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bcd56fbf-fde3-41c2-83f5-9636e92d2893",
+  "name": "Bulwark Ox",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Ox Mount",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ox",
+   "Mount"
+  ],
+  "oracleText": "Whenever this creature attacks while saddled, put a +1/+1 counter on target creature.\nSacrifice this creature: Creatures you control with counters on them gain hexproof and indestructible until end of turn.\nSaddle 1 (Tap any number of other creatures you control with total power 1 or more: This Mount becomes saddled until end of turn. Saddle only as a sorcery.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Saddle"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "566b4dcc-b7d7-4443-b2d0-954f1fc33a11",
   "name": "Burn Trail",
   "manaCost": "{3}{R}",
@@ -6367,6 +6422,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2fa6f1b1-00af-433f-b8e1-36db99cd9bba",
+  "name": "Bösium Strip",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Until end of turn, you may cast instant and sorcery spells from the top of your graveyard. If a spell cast this way would be put into a graveyard, exile it instead.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fbb0f73b-5e30-4632-99c1-e49582e41f8d",
   "name": "Cadaverous Bloom",
   "manaCost": "{3}{B}{G}",
@@ -6476,6 +6553,36 @@
   "commanderLegal": "legal",
   "set": "clb",
   "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2ad60059-7a29-40a8-b595-3932f1222d33",
+  "name": "Caller of the Hunt",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Human",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human"
+  ],
+  "oracleText": "As an additional cost to cast this spell, choose a creature type.\nCaller of the Hunt's power and toughness are each equal to the number of creatures of the chosen type on the battlefield.",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -6724,6 +6831,36 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "da164485-c985-42fa-819e-42f0d33237c5",
+  "name": "Captured by the Consulate",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature you don't control\nEnchanted creature can't attack.\nWhenever an opponent casts a spell, if it has a single target, change the target to enchanted creature if able.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -7182,6 +7319,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "eae87919-6322-4bd2-ae9c-b1ce25d686da",
+  "name": "Chains of Mephistopheles",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a player would draw a card except the first one they draw in each of their draw steps, that player discards a card instead. If the player discards a card this way, they draw a card. If the player doesn't discard a card this way, they mill a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9cb7f23f-322d-4a87-b6c6-15b9d446aef3",
   "name": "Champions of the Perfect",
   "manaCost": "{3}{G}",
@@ -7535,6 +7700,37 @@
   "commanderLegal": "legal",
   "set": "dmu",
   "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "12469cb5-a383-47ab-84cd-414b9ced8a8c",
+  "name": "Charmed Pendant",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Mill a card: For each colored mana symbol in the milled card's mana cost, add one mana of that color. (Activate only as an instant. For example, if the card's mana cost is {3}{U}{U}{B}, you add {U}{U}{B}.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Mill"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -8010,6 +8206,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "65d8b481-ebe9-4029-98a8-dd4693340bff",
+  "name": "Cloudspire Coordinator",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Pilot",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Pilot"
+  ],
+  "oracleText": "When this creature enters, scry 2.\n{T}: Create X 1/1 colorless Pilot creature tokens, where X is the number of Mounts and/or Vehicles that entered the battlefield under your control this turn. The tokens have \"This token saddles Mounts and crews Vehicles as though its power were 2 greater.\"",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2c6658c3-8c0e-46c9-8127-bc5b77eb0dab",
   "name": "Clutch of Currents",
   "manaCost": "{U}",
@@ -8270,6 +8501,39 @@
   "set": "xln",
   "releasedAt": "2017-09-29",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4cdf524a-1a99-4143-823b-d3c5c867c580",
+  "name": "Colossal Plow",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Whenever this Vehicle attacks, add {W}{W}{W} and you gain 3 life. Until end of turn, you don't lose this mana as steps and phases end.\nCrew 6 (Tap any number of creatures you control with total power 6 or more: This Vehicle becomes an artifact creature until end of turn.)",
+  "power": "6",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Crew"
+  ],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10475,6 +10739,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "04e2afbe-0c08-42bc-93e6-662066a958bf",
+  "name": "Deadly Cover-Up",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may collect evidence 6.\nDestroy all creatures. If evidence was collected, exile a card from an opponent's graveyard. Then search its owner's graveyard, hand, and library for any number of cards with that name and exile them. That player shuffles, then draws a card for each card exiled from their hand this way.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Collect evidence"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4b96c22a-0d5b-44fd-b326-5f3ffcc3917b",
   "name": "Deadpool, Trading Card",
   "manaCost": "{2}{B}{R}",
@@ -11729,6 +12021,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2a5408ed-8b47-4896-97e4-aa102a4b85c9",
+  "name": "Domri, Chaos Bringer",
+  "manaCost": "{2}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Domri",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Domri"
+  ],
+  "oracleText": "+1: Add {R} or {G}. If that mana is spent on a creature spell, it gains riot. (It enters with your choice of a +1/+1 counter or haste.)\n−3: Look at the top four cards of your library. You may reveal up to two creature cards from among them and put them into your hand. Put the rest on the bottom of your library in a random order.\n−8: You get an emblem with \"At the beginning of each end step, create a 4/4 red and green Beast creature token with trample.\"",
+  "loyalty": "5",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a4ae71c8-ea1b-4fa4-9e47-cf00ab60c5ee",
   "name": "Don & Leo, Problem Solvers",
   "manaCost": "{3}{W/U}{W/U}",
@@ -12522,6 +12851,32 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0635ab65-fc1a-4e43-9e11-3a1ad3093830",
+  "name": "Ecological Appreciation",
+  "manaCost": "{X}{2}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library and graveyard for up to four creature cards with different names that each have mana value X or less and reveal them. An opponent chooses two of those cards. Shuffle the chosen cards into your library and put the rest onto the battlefield. Exile Ecological Appreciation.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -16132,6 +16487,39 @@
   "set": "drk",
   "releasedAt": "1994-08-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d181310f-404b-4f26-8024-b7b537d1fd90",
+  "name": "Frantic Scapegoat",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goat"
+  ],
+  "oracleText": "Haste\nWhen this creature enters, suspect it. (It has menace and can't block.)\nWhenever one or more other creatures you control enter, if this creature is suspected, you may suspect one of the other creatures. If you do, this creature is no longer suspected.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Suspect",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20243,6 +20631,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "60e358ec-eb11-4a16-a0ae-b7c064a8ea6c",
+  "name": "Hieroglyphic Illumination",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw two cards.\nCycling {U} ({U}, Discard this card: Draw a card.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "akh",
+  "releasedAt": "2017-04-28",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f334c57b-0a57-4fbd-8798-948371d6589d",
   "name": "Hierophant Bio-Titan",
   "manaCost": "{10}{G}{G}",
@@ -21185,6 +21601,36 @@
   "commanderLegal": "legal",
   "set": "m15",
   "releasedAt": "2014-07-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2f33aced-c737-4b3c-ba25-aff7b340c2d7",
+  "name": "Infernal Denizen",
+  "manaCost": "{7}{B}",
+  "cmc": 8,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "At the beginning of your upkeep, sacrifice two Swamps. If you can't, tap this creature, and an opponent may gain control of a creature you control of their choice for as long as this creature remains on the battlefield.\n{T}: Gain control of target creature for as long as this creature remains on the battlefield.",
+  "power": "5",
+  "toughness": "7",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -23750,6 +24196,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5470dcfa-4eff-43da-abf7-19922841f719",
+  "name": "Kitchen Finks",
+  "manaCost": "{1}{G/W}{G/W}",
+  "cmc": 3,
+  "typeLine": "Creature — Ouphe",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ouphe"
+  ],
+  "oracleText": "When this creature enters, you gain 2 life.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Persist"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2452be47-cc23-47f7-a3a1-fec900bb0119",
   "name": "Kitesail Larcenist",
   "manaCost": "{2}{U}",
@@ -24462,6 +24942,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6a98b586-5187-48a1-bde3-f6141f3e9cb1",
+  "name": "Lagrella, the Magpie",
+  "manaCost": "{G}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "When Lagrella enters, exile any number of other target creatures controlled by different players until Lagrella leaves the battlefield. When an exiled card enters under your control this way, put two +1/+1 counters on it.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bdf476e5-1d57-4b17-b45b-d52fd75aadeb",
   "name": "Lake of the Dead",
   "manaCost": "",
@@ -24537,6 +25054,37 @@
   "set": "pls",
   "releasedAt": "2001-02-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "539583f4-21c8-4b61-a2c5-f612fadc3ffa",
+  "name": "Last Light of Durin's Day",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a Mountain you control enters, put a quest counter on this enchantment. If it has six or more quest counters on it, sacrifice it. If you do, search your hand and/or library for a Dragon card and put it onto the battlefield. If you search your library this way, shuffle.\nMountaincycling {2} ({2}, Discard this card: Search your library for a Mountain card, reveal it, put it into your hand, then shuffle.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Mountaincycling",
+   "Landcycling",
+   "Typecycling",
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -26039,6 +26587,44 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2022-11-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fa726aac-f4ae-4e34-ac08-36c1f50215f3",
+  "name": "Lucius the Eternal",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Astartes Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Astartes",
+   "Warrior"
+  ],
+  "oracleText": "Haste\nArmour of Shrieking Souls — When Lucius the Eternal dies, exile it and choose target creature an opponent controls. When that creature leaves the battlefield, return this card from exile to the battlefield under its owner's control.",
+  "power": "5",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Armour of Shrieking Souls",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -27622,6 +28208,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad44cf74-b717-48fb-9fa2-77512024d76a",
+  "name": "Mind Rot",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player discards two cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c97361b5-af16-4a7b-af85-a429dbaf4ad2",
   "name": "Mind Stone",
   "manaCost": "{2}",
@@ -28245,6 +28857,34 @@
   "set": "tdm",
   "releasedAt": "2025-04-11",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "62f4a2db-6d7c-487b-be37-22f06c1e779e",
+  "name": "Monastery Raid",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Freerunning {X}{R} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nExile the top two cards of your library. If this spell's freerunning cost was paid, exile the top X cards of your library instead. You may play the exiled cards until the end of your next turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Freerunning"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -29812,6 +30452,39 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c235fda2-1a8d-4ac7-9a23-784529a520f0",
+  "name": "Nihilith",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horror"
+  ],
+  "oracleText": "Fear (This creature can't be blocked except by artifact creatures and/or black creatures.)\nSuspend 7—{1}{B} (Rather than cast this card from your hand, you may pay {1}{B} and exile it with seven time counters on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost. It has haste.)\nWhenever a card is put into an opponent's graveyard from anywhere, if this card is suspended, you may remove a time counter from this card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Suspend",
+   "Fear"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32513,6 +33186,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "131acf69-fa5c-4ce7-9e39-2677af4f8907",
+  "name": "Piracy",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, you may tap lands you don't control for mana. Spend this mana only to cast spells.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a188fe7e-68de-4c7c-806c-bfe8fc7b44bf",
   "name": "Pithing Needle",
   "manaCost": "{1}",
@@ -34399,6 +35098,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "aa97eb3d-8b8d-418b-8615-839812d60fe0",
+  "name": "Reap Intellect",
+  "manaCost": "{X}{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You choose up to X nonland cards from it and exile them. For each card exiled this way, search that player's graveyard, hand, and library for any number of cards with the same name as that card and exile them. Then that player shuffles.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dgm",
+  "releasedAt": "2013-05-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4fb83127-00cf-4ce7-aedf-cb0b2740c66f",
   "name": "Reckless Bushwhacker",
   "manaCost": "{2}{R}",
@@ -34457,6 +35184,42 @@
   "commanderLegal": "legal",
   "set": "afc",
   "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "51f55021-04e0-49bf-8f1f-de2a578c95fc",
+  "name": "Reed Richards, Smartest Man",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Scientist Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scientist",
+   "Hero"
+  ],
+  "oracleText": "Reach\nYou have no maximum hand size.\nThe first time you would draw a card each turn except the first card you draw during each of your draw steps, you draw four cards instead.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -35620,6 +36383,32 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a4c03ab-519a-4840-893a-769dfc5cf161",
+  "name": "Risky Move",
+  "manaCost": "{3}{R}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player gains control of this enchantment.\nWhen you gain control of this enchantment from another player, choose a creature you control and an opponent. Flip a coin. If you lose the flip, that opponent gains control of that creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -37353,6 +38142,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "683775ac-481e-4c26-ab2f-5d2813af0268",
+  "name": "Sentinel of Lost Lore",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Knight"
+  ],
+  "oracleText": "When this creature enters, choose one or more —\n• Return target card you own in exile that has an Adventure to your hand.\n• Put target card you don't own in exile that has an Adventure on the bottom of its owner's library.\n• Exile target player's graveyard.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bf2dc318-7b51-451e-ac4d-0f1b756dc860",
   "name": "Senu, Keen-Eyed Protector",
   "manaCost": "{1}{W}",
@@ -37485,6 +38305,31 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2023-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4e734493-9cb8-4409-8a30-cc15d519a27e",
+  "name": "Serum Powder",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\nAny time you could mulligan and this card is in your hand, you may exile all the cards from your hand, then draw that many cards. (You can do this in addition to taking mulligans.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "dst",
+  "releasedAt": "2004-02-06",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -38115,6 +38960,32 @@
   "set": "sld",
   "releasedAt": "2026-09-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5a074b0a-3a4d-4c6f-b161-5d1281f6136d",
+  "name": "Silhouette",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature. If a spell or ability that targets that creature would cause a source to deal damage to that creature this turn, prevent that damage.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -45821,6 +46692,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "837182db-1bf3-4a2c-bd01-1af9d9873561",
+  "name": "Unsummon",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature to its owner's hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4b1da9aa-a30c-44b8-a10e-f9dc3fe70b6f",
   "name": "Urabrask // The Great Work",
   "manaCost": "{2}{R}{R}",
@@ -49927,6 +50824,32 @@
   "commanderLegal": "legal",
   "set": "snc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c6eaa147-3566-43a9-999a-d58b877496f5",
+  "name": "Zur's Weirding",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Players play with their hands revealed.\nIf a player would draw a card, they reveal it instead. Then any other player may pay 2 life. If a player does, put that card into its owner's graveyard. Otherwise, that player draws a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

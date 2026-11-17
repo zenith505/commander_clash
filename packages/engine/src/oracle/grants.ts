@@ -321,6 +321,16 @@ export function parseGrants(text0: string): Modification[] | null {
       out.push({ kind: "addAbility", text: `Fabricate ${/\d+/.exec(w)![0]}` });
       continue;
     }
+    // Modular N (CR 702.43a): "Other nontoken artifact creatures and Vehicles you control have modular 1" (Blaster, Combat
+    // DJ, round B242). Its "enters with N +1/+1 counters" applies as the permanent enters only if it has the ability then,
+    // from an effect already applying (CR 614.12, rulings: not one entering at the same time as Blaster), and as an
+    // additional N, as each instance adds its own (CR 702.43b); its dies trigger looks back (CR 603.10a), so one dying with
+    // Blaster still triggers (rulings). See cards.ts withGranted.
+    if (/^modular \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Modular ${/\d+/.exec(w)![0]}` });
+      kws.push("Modular");
+      continue;
+    }
     // Afterlife N is one too (CR 702.135a), each instance on its own (702.135b): "Enchanted creature gets +1/+1 and has
     // afterlife 1" (Indebted Spirit). The creature had it as it last existed, with the Aura still attached (CR 603.10a).
     if (/^afterlife \d+$/i.test(w)) {

@@ -893,6 +893,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "controlChanged") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
+    // Risky Move (round B241): "When you gain control of ~ from another player": its new controller's trigger.
+    if (o?.zone === "battlefield" && controllerOf(s, o) !== ev.from) add(o, controllerOf(s, o), (e) => e === "selfGainedControl");
     // Zidane, Tantalus Thief: "Whenever an opponent gains control of a permanent from you": the permanents of the player who
     // lost it, as they were controlled before this change (rulings: Zidane itself too, when it changes at the same time).
     if (o?.zone === "battlefield" && opponents(s, ev.from).includes(controllerOf(s, o)))
@@ -2746,6 +2748,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const moved = card && s.zoneBatch?.find((m) => m.id === ev.id && m.zc === (card.zoneChanges ?? 0));
     if (moved) moved.discardedBy = ev.player;
     else if (card) (s.zoneBatch ??= []).push({ id: ev.id, zc: card.zoneChanges ?? 0, from: "hand", to: card.zone, owner: card.owner, card: card.cardId, discardedBy: ev.player });
+    // Pure Intentions (round B240): the controller of the spell or ability that made them discard (none for a cost).
+    const batched = card && s.zoneBatch?.find((m) => m.id === ev.id && m.zc === (card.zoneChanges ?? 0));
+    if (batched && ev.cause !== undefined) batched.discardCause = ev.cause;
     // "Whenever you discard a card", "whenever a player cycles a card": once for each card (CR 603.2c). "That player" is
     // the one who discarded.
     for (const id of s.battlefield) {
@@ -2874,6 +2879,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (!c || c.zone !== "hand" || o.chosen?.name === undefined || !hasName(defOf(s, c).name, o.chosen.name)) return false;
         }
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
+        if (t.draws.firstInDrawStep && !ev.firstInDrawStep) return false;
         if (t.draws.ownTurn && ev.player !== s.activePlayer) return false;
         // Keranos: the card revealed as it was drawn, a land or not (as it is in the hand).
         if (t.draws.revealed) {
@@ -2953,6 +2959,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Infesting Radroach: a card's ability that works in its owner's graveyard, there after the event, even if it was
     // milled in the same event (rulings).
     fromGraveyards((o, owner) => batchWatch(o, owner, compileCard(defOf(s, o)).triggers, false));
+    // Nihilith: a suspended card's ability, there in exile (CR 113.6, round B244).
+    fromExiled((o, owner) => batchWatch(o, owner, compileCard(defOf(s, o)).triggers, false));
     for (const m of ev.moves) {
       const w = s.objects[m.id];
       if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object
@@ -3125,6 +3133,17 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       continue;
     }
     const def = restingDef(s.cards[t.sourceCardId]!);
+    // Lagrella, the Magpie (round B246): a delayed trigger whose event happened to several objects at once triggers once,
+    // for the one its controller chooses (CR 603.7b), as it's put on the stack; one of them that's gone by now isn't offered.
+    if (t.subjectChoices) {
+      const still = t.subjectChoices.filter((c) => s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc);
+      if (still.length > 1) {
+        s.pending = { kind: "chooseOption", player: t.controller, source: def.name, what: "triggerSubject", options: still.map((c) => c.id), labels: still.map((c) => defOf(s, obj(s, c.id)).name), prompt: `choose the card its ability is about (${(t.body?.text ?? "").replace(/\.$/, "")})` };
+        return added;
+      }
+      t.subject = still[0] ?? t.subject;
+      t.subjectChoices = undefined;
+    }
     let printed = triggerBody(s, t);
     // Bumi, King of Three Trials: "choose up to X": X counted now (CR 603.3c), kept for the answer (see triggerBody).
     if (printed.modal?.maxCount && !t.modes && t.maxModes === undefined) {
@@ -3559,6 +3578,8 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   // at the same time, or is the card, doesn't stop them (rulings).
   if (b.what === "toGraveyard" && m.from === "battlefield" && m.to === "graveyard" && m.chars?.types.includes("Creature") && dyingLocked(s, false)) return false;
   if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : b.from === "handOrLibrary" ? m.from === "hand" || m.from === "library" : m.from === b.from));
+  // Pure Intentions: "a spell or ability an opponent controls causes you to discard cards" (rulings: whoever chose them).
+  if (b.byOpponent && (m.discardCause === undefined || m.discardCause === you)) return false;
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }
 

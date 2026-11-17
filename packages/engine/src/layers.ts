@@ -2610,6 +2610,8 @@ function countsSomething(st: StaticAbility): boolean {
     if (m.kind === "definePT" || m.kind === "linkedCreature") return true;
     if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
     if (m.kind === "setToughness" && isCounted(m.toughness)) return true;
+    // Ms. Marvel, Kamala Khan's granted "base power is equal to the number of cards in your hand" (round B244).
+    if (m.kind === "setPower" && isCounted(m.power)) return true;
     if (m.kind === "attackTax" && m.amount !== undefined && isCounted(m.amount)) return true;
   }
   return false;
@@ -2824,7 +2826,8 @@ export function offFieldDefinedPT(s: GameState, o: GameObject, d: CardDef): Card
   if (!def) return d;
   definingPT.add(o.id);
   try {
-    const ctx = { controller: o.zone === "stack" ? o.controller : o.owner, sourceId: o.id };
+    // Caller of the Hunt (round B245): "the chosen type" of a permanent spell, chosen as it was cast (GameObject.castType).
+    const ctx = { controller: o.zone === "stack" ? o.controller : o.owner, sourceId: o.id, ...(o.chosen ? { chosen: o.chosen } : {}) };
     const pt = (key: "power" | "toughness") => {
       const a = def[key];
       return /^-?\d+$/.test(d[key] ?? "0") || a === undefined ? d[key] : String(evalAmount(s, a, ctx));

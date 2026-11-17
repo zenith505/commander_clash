@@ -11,7 +11,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
@@ -75,6 +75,7 @@ import {
   type DeferredAct,
   type DrawAfter,
   type CopyWhile,
+  type UntilLeavesLink,
 } from "./types";
 
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
@@ -161,7 +162,8 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   for (const p of s.players) draw(s, p.id, 7);
   s.handAsTurnBegan = s.players.map((p) => p.hand.length);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
-  for (const p of s.players) delete p.draws;
+  // Nor is the first time each would draw a card this turn (Scion of Halaster, Reed Richards: round B237).
+  for (const p of s.players) delete p.draws, delete p.firstWouldDraw, delete p.firstOtherWouldDraw;
   log(s, `Game start. ${s.players[first]!.name} goes first.`);
   if (opts.mulligans) {
     s.mulligans = { taken: {}, kept: [], toDeclare: turnOrderFrom(s, first), going: [] };
@@ -229,7 +231,11 @@ function nextMulliganDecision(s: GameState) {
   if (pid !== undefined) {
     const taken = m.taken[pid] ?? 0;
     // Mulligans are allowed until the opening hand would be zero cards (CR 103.5).
-    s.pending = { kind: "mulligan", player: pid, taken, bottomIfKept: mulliganBottom(taken), canMulligan: OPENING_HAND - mulliganBottom(taken) > 0 };
+    const canMulligan = OPENING_HAND - mulliganBottom(taken) > 0;
+    // Serum Powder: "Any time you could mulligan and this card is in your hand, you may exile all the cards from your hand,
+    // then draw that many cards": at a time the player would declare (CR 103.5b); once it's done, they declare.
+    const powders = canMulligan ? player(s, pid).hand.filter((id) => compileCard(defOf(s, obj(s, id))).exileOpeningHand) : [];
+    s.pending = { kind: "mulligan", player: pid, taken, bottomIfKept: mulliganBottom(taken), canMulligan, ...(powders.length ? { exileHandWith: powders } : {}) };
     return;
   }
   if (m.going.length) {
@@ -242,6 +248,8 @@ function nextMulliganDecision(s: GameState) {
       shuffleLibrary(s, p);
       draw(s, g, OPENING_HAND);
       delete p.draws; // CR 103.5, as above
+      delete p.firstWouldDraw;
+      delete p.firstOtherWouldDraw;
       m.taken[g] = (m.taken[g] ?? 0) + 1;
     }
     m.going = [];
@@ -254,6 +262,30 @@ function nextMulliganDecision(s: GameState) {
   if (player(s, s.activePlayer).lost) s.activePlayer = s.priority = nextLivingAfter(s, s.activePlayer);
   log(s, "Everyone has kept. The game begins.");
   startOpeningActions(s);
+}
+
+/**
+ * Serum Powder (round B243): at a time the player would declare whether they take a mulligan, they exile every card in
+ * their hand, for the rest of the game (rulings), and draw that many; then they declare (CR 103.5b), so not again before
+ * that. It isn't a mulligan: the number taken doesn't change (rulings).
+ */
+function exileOpeningHand(s: GameState, p: Player, id: ObjectId) {
+  const pend = s.pending;
+  const m = s.mulligans;
+  if (pend?.kind !== "mulligan" || pend.player !== p.id || !m) throw new RulesError("not deciding on a mulligan now");
+  if (!pend.exileHandWith?.includes(id) || !p.hand.includes(id)) throw new RulesError("that card can't exile your hand now");
+  const name = defOf(s, obj(s, id)).name;
+  const hand = [...p.hand];
+  for (const c of hand) moveObject(s, c, "exile");
+  draw(s, p.id, hand.length);
+  delete p.draws; // not draws of the game, as with a mulligan (CR 103.5)
+  delete p.firstWouldDraw;
+  delete p.firstOtherWouldDraw;
+  log(s, `${p.name} exiles their hand with ${name} (${hand.length} card${hand.length === 1 ? "" : "s"}) and draws ${hand.length === 1 ? "a card" : `${hand.length} cards`}.`);
+  invalidateCharacteristics(s);
+  // Then they declare (CR 103.5b): the same decision, without the exile.
+  const { exileHandWith: _, ...rest } = pend;
+  s.pending = rest;
 }
 
 function declareMulligan(s: GameState, p: Player, keep: boolean) {
@@ -451,6 +483,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "mulligan":
       declareMulligan(s, p, action.keep);
+      break;
+    case "exileOpeningHand":
+      exileOpeningHand(s, p, action.objectId);
       break;
     case "handToTop":
       chooseHandToTop(s, p, action.objectIds);
@@ -801,6 +836,8 @@ export function moveObject(
     emerged?: true;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
+    /** Discarded to pay a cycling cost (CR 702.29a): Abandoned Sarcophagus's "and it wasn't cycled" (round B240). */
+    cycled?: true;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[]; name?: string; ability?: string };
     /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
@@ -986,7 +1023,7 @@ export function moveObject(
   // Rest in Peace, Leyline of the Void, Dauthi Voidwalker: "If a card would be put into an opponent's graveyard from
   // anywhere, exile it instead" (CR 614.1a), from a permanent on the battlefield, or one leaving it at the same time
   // (rulings on Rest in Peace: destroyed by a spell, it's exiled, and the spell goes to the graveyard).
-  const yardExile = to === "graveyard" ? graveyardExileFor(s, o, fromZone) : undefined;
+  const yardExile = to === "graveyard" ? graveyardExileFor(s, o, fromZone, !!opts.cycled) : undefined;
   if (yardExile) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard (${yardExile.source}).`);
@@ -1136,6 +1173,7 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.kickedByControl = undefined;
+    o.castType = undefined;
     // Text changes end with the object, except a permanent spell's, which go on with the permanent (CR 400.7a).
     o.textChanges = undefined;
     o.colorsSpent = undefined;
@@ -1234,6 +1272,8 @@ export function moveObject(
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
+  // Caller of the Hunt (round B245): the type chosen as it was cast stays with the permanent it becomes (CR 400.7d, 607.2d).
+  if (o.castType) o.chosen = { type: o.castType };
   o.notedMana = undefined; // a new object (CR 400.7)
   o.protector = undefined;
   // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
@@ -1466,6 +1506,9 @@ export function moveObject(
   if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o))) noteDescended(s, o.owner);
   // Ennis, Debate Moderator: a card put into exile from anywhere, so not a token or a copy of a spell (rulings).
   if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) (s.turnLog ??= {}).cardExiled = true;
+  // Bell Borca, Spectral Sergeant (round B239): each Bell Borca on the battlefield now notes the mana value of the card as it
+  // is in exile (rulings: X is 0, CR 107.3; a face-down card's is 0, CR 708.2), a card only (not a token or a copy of a spell).
+  if (to === "exile" && o.zone === "exile" && fromZone !== "exile" && !o.isToken && !o.spellCopy) noteExiledMv(s, o);
   // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
   if (to === "graveyard" && !o.isToken && !o.spellCopy) {
     const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
@@ -1814,7 +1857,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
  * the source leave is over (askAuraReturns), since a choice can't be asked partway through one. It can't enchant
  * anything that returned at the same time, and with nothing it can enchant it stays in exile (CR 303.4g).
  */
-export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string, why = `${source} left`, /** Who puts them back (GameObject.putter): the exile effect's controller, its source's as it left. */ by?: PlayerId) {
+export function returnUntilLeaves(s: GameState, links: UntilLeavesLink[], source: string, why = `${source} left`, /** Who puts them back (GameObject.putter): the exile effect's controller, its source's as it left. */ by?: PlayerId) {
   const back = links.filter((l) => {
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
@@ -1845,6 +1888,26 @@ export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: numbe
       r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
     }
   });
+  returnRiders(s, back);
+}
+
+/**
+ * Lagrella, the Magpie: "When an exiled card enters under your control this way, ...": each delayed trigger (UntilLeavesLink
+ * `rider`) triggers once, for a card that returned to the battlefield under its controller's control this way (CR 603.7b);
+ * when several did at the same time, its controller chooses which one as it's put on the stack (PendingTrigger
+ * `subjectChoices`).
+ */
+function returnRiders(s: GameState, back: UntilLeavesLink[]) {
+  const keys = [...new Set(back.flatMap((l) => (l.rider ? [l.rider.key] : [])))];
+  for (const key of keys) {
+    const rider = back.find((l) => l.rider?.key === key)!.rider!;
+    const entered = back.filter((l) => l.rider?.key === key).flatMap((l) => {
+      const c = s.objects[l.id];
+      return c && c.zone === "battlefield" && controllerOf(s, c) === rider.controller ? [{ id: c.id, zc: c.zoneChanges ?? 0 }] : [];
+    });
+    if (!entered.length) continue;
+    s.triggerQueue.push({ sourceId: rider.sourceId, sourceCardId: rider.sourceCardId, sourceZc: rider.sourceZc, controller: rider.controller, index: -1, body: rider.body, subject: entered[0]!, ...(entered.length > 1 ? { subjectChoices: entered } : {}) });
+  }
 }
 
 /**
@@ -2376,7 +2439,7 @@ export function simultaneousLifeLoss<T>(s: GameState, fn: () => T): T {
  * graveyardExile) that applies to `o` going to its owner's graveyard, if one does: the name of its source, and the
  * counter it's exiled with.
  */
-function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { source: string; counter?: CounterKind; linkTo?: ObjectId } | undefined {
+function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName, cycled = false): { source: string; counter?: CounterKind; linkTo?: ObjectId } | undefined {
   // Who controlled it: as a permanent or spell, its controller; anywhere else, its owner (CR 108.4a).
   const item = fromZone === "stack" ? s.stack.find((x) => x.objectId === o.id) : undefined;
   const controlled = fromZone === "battlefield" ? controllerOf(s, o) : fromZone === "stack" ? (item?.controller ?? o.controller) : o.owner;
@@ -2386,8 +2449,12 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   // Anafenza, the Foremost: its card types the same way (rulings: an animated land dies as a creature; a bestowed Aura
   // isn't one, CR 702.103b).
   const typesNow = fromZone === "battlefield" ? characteristics(s, o).types : defOf(s, o).types;
+  // Abandoned Sarcophagus (round B240): "a card that has a cycling ability" as it is in the zone it's leaving (a permanent's
+  // from the layers: one that lost it goes to the graveyard, rulings; the card data lists "Cycling" with typecycling, CR
+  // 702.29e), "and it wasn't cycled": not discarded to pay a cycling cost.
+  const hasCyclingNow = () => (fromZone === "battlefield" ? objHasKeyword(s, o, "Cycling") : (defOf(s, o).keywords ?? []).includes("Cycling"));
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c))) && (!x.typesNow || typesNow.some((t) => x.typesNow!.includes(t)));
+    !!x && (!x.cyclingNotCycled || (!cycled && hasCyclingNow())) && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c))) && (!x.typesNow || typesNow.some((t) => x.typesNow!.includes(t)));
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;
@@ -2888,6 +2955,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
     // chooses which applies (CR 616.1, the Words' and Notion Thief's rulings); a shield not chosen waits for the next draw.
     const fromMade = made.length > 0;
     const choices = drawReplacementChoices(s, pid, fromMade ? archivesOfMade(made[0]!) : undefined, fromMade ? scrivsOfMade(made[0]!) : 0);
+    // Reed Richards (round B237): this instruction's draw was the turn's first but the draw step's first card, whatever
+    // replaces it (another replacement chosen first takes the place of "the first time", as for Scion of Halaster's look).
+    if (!fromMade && !(s.step === "draw" && s.activePlayer === pid && player(s, pid).drewInDrawStep !== s.turn)) player(s, pid).firstOtherWouldDraw = s.turn;
     if (choices) {
       const entry = fromMade ? made.shift()! : 0;
       const archives = archivesOfMade(entry);
@@ -3098,7 +3168,8 @@ function drawWithoutAsking(s: GameState, pid: PlayerId) {
   if (portal) return skipDraw(s, pid, portal);
   const p = player(s, pid);
   const asks = dredgeOptions(s, pid).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook));
-  if (!asks) draw(s, pid, 1, undefined, [], true);
+  // Reed Richards (round B237) replaces this draw too, as an ordinary one.
+  if (!asks || reedRichards(s, pid)) draw(s, pid, 1, undefined, [], true);
   else if (!notionThief(s, pid)) drawOne(s, pid);
   else draw(s, pid, 1, undefined, [], true);
 }
@@ -3274,9 +3345,14 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
 const SCRIVENER_UNIT = 1000;
 /**
  * Enduring Renewal (round B236): the Scriveners' number (the pendings' `scriv`) also counts the Enduring Renewals that already
- * replaced a draw this one was made of, this many to one (CR 614.5), so it travels with the draw unchanged.
+ * replaced a draw this one was made of (CR 614.5), so it travels with the draw unchanged; round B237 adds Chains of
+ * Mephistopheles and Zur's Weirding. Each kind is one base-100 digit of it: Scriveners, Renewals, Chains, Weirdings.
  */
-const RENEWAL_UNIT = 1000;
+const RENEWAL_UNIT = 100;
+const CHAINS_UNIT = 10_000;
+const WEIRDING_UNIT = 1_000_000;
+/** How many of one kind (its unit above, 1 for Blood Scriveners) already replaced a draw this one was made of. */
+const appliedOf = (scriv: number, unit: number) => Math.floor(scriv / unit) % 100;
 const madeEntry = (archives: number, scrivs: number) => archives + SCRIVENER_UNIT * scrivs;
 const archivesOfMade = (entry: number) => entry % SCRIVENER_UNIT;
 const scrivsOfMade = (entry: number) => Math.floor(entry / SCRIVENER_UNIT);
@@ -3602,10 +3678,19 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const p = player(s, pid);
   // Blood Scrivener (round B235): "If you would draw a card while you have no cards in hand", mandatory; those that haven't
   // replaced a draw this one was made of yet (CR 614.5). All of them do the same, so one choice stands for them.
-  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - (madeScriv % RENEWAL_UNIT) : 0;
+  const scriveners = p.hand.length === 0 ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoLoseLifeEmptyHand).length - appliedOf(madeScriv, 1) : 0;
   // Enduring Renewal (round B236): mandatory, those of its controller's that haven't replaced a draw this one was made of
   // (CR 614.5). All of them do the same, so one choice stands for them.
-  const renewals = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard).length - Math.floor(madeScriv / RENEWAL_UNIT);
+  const renewals = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawRevealCreatureToYard).length - appliedOf(madeScriv, RENEWAL_UNIT);
+  // Chains of Mephistopheles and Zur's Weirding (round B237): anyone's, for every player's draws, mandatory; those that haven't
+  // replaced a draw this one was made of (CR 614.5). Each kind's do the same, so one choice stands for them. Chains doesn't
+  // apply to the first card its player draws in their own draw step (one actually drawn, CR 614.6, as for Notion Thief).
+  const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
+  const chains = firstInDrawStep ? 0 : s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawChains).length - appliedOf(madeScriv, CHAINS_UNIT);
+  const weirdings = s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawWeirding).length - appliedOf(madeScriv, WEIRDING_UNIT);
+  // Reed Richards (round B237): an instruction's draw (not one a replacement made, as for Scion of Halaster's look), the turn's
+  // first one but the first card drawn in its player's own draw step.
+  const reed = madeArchives === undefined ? reedRichards(s, pid) : undefined;
   const shields = drawShields(s, pid);
   const thief = notionThief(s, pid);
   const mine = (f: (a: CompiledCard) => unknown) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && f(abilitiesOf(s, obj(s, id))));
@@ -3631,8 +3716,11 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
   // Parallel Thoughts (round 386): optional, each with its own pile (two of them are two different replacements).
   const piles = mine((a) => a.drawFromPile);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0) return undefined;
+  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
   const out = [...shields];
+  if (reed !== undefined) out.push({ key: "reed", label: `Draw four cards instead (${nameOf(s, reed)})` });
+  if (chains > 0) out.push({ key: "chains", label: "Discard a card instead, then draw a card; with no card in hand, mill a card (Chains of Mephistopheles)" });
+  if (weirdings > 0) out.push({ key: "weirding", label: "Reveal the card instead; any other player may pay 2 life to put it into your graveyard, otherwise you draw it (Zur's Weirding)" });
   if (scriveners > 0) out.push({ key: "scrivener", label: "Draw two cards and lose 1 life instead (Blood Scrivener)" });
   if (renewals > 0) out.push({ key: "renewal", label: "Reveal the top card of your library instead: a creature card goes into your graveyard, any other card is drawn (Enduring Renewal)" });
   for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
@@ -3662,7 +3750,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   }
   for (const id of piles) out.push({ key: `pthoughts:${id}`, label: pileDrawLabel(s, id) });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && digs.length < 2 && out.length < 2) return undefined;
+  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge, Parallel Thoughts): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter|pthoughts):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -3764,6 +3852,17 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
     made.unshift(madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + RENEWAL_UNIT));
     return;
   }
+  if (key === "reed") {
+    // Reed Richards (round B237): four draws instead (CR 614.1a), new events it doesn't replace again (once each turn); the
+    // Archives that could replace this draw and the rest can replace each of them, as for Blood Scrivener.
+    log(s, `${p.name} draws four cards instead of one (${nameOf(s, reedRichards(s, pid, true)!)}).`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    const n = madeArchives ?? archivesFor(s, pid);
+    made.unshift(...Array<number>(4).fill(madeEntry(n, madeScriv)));
+    return;
+  }
+  if (key === "chains") return chainsInstead(s, pid, left, after, made, madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + CHAINS_UNIT));
+  if (key === "weirding") return weirdingInstead(s, pid, left, after, made, madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + WEIRDING_UNIT));
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made, madeArchives, madeScriv);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
@@ -3940,6 +4039,109 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
 export function continueDraws(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[]) {
   if (!draw(s, pid, left, after, made, true)) return;
   drawsDone(s, after);
+}
+
+/**
+ * Reed Richards, Smartest Man (round B237): one `pid` controls whose "the first time you would draw a card each turn except the
+ * first card you draw during each of your draw steps" applies to their next instruction's draw (`used`: the one that applied
+ * to the draw just marked). Two of them are the same first time, so the first replaces it (as for Scion of Halaster).
+ */
+function reedRichards(s: GameState, pid: PlayerId, used = false): ObjectId | undefined {
+  const p = player(s, pid);
+  if (!used && (p.firstOtherWouldDraw === s.turn || (s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn))) return undefined;
+  return s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawFourFirstOther);
+}
+
+/**
+ * Chains of Mephistopheles (round B237) instead of a draw (CR 614.1a): `pid` discards a card of their choice (CR 701.9b), and
+ * if they do (a madness card exiled is still discarded, CR 702.35a), draws a card: `entry`, a new draw this Chains doesn't
+ * replace again (CR 614.5) but another one does, and so do the Archives and the rest (rulings: each Chains in turn, a discard
+ * each, until one finds no card to discard). With an empty hand they mill a card instead (CR 701.17), and don't draw (rulings).
+ * `left` and `made` are the draws after it.
+ */
+function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], entry: number): "paused" | void {
+  const p = player(s, pid);
+  const src = nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawChains)!);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  if (!p.hand.length) {
+    const ids = p.library.slice(0, millCount(s, pid, 1));
+    for (const id of ids) moveObject(s, id, "graveyard", { milled: true });
+    log(s, `${p.name} has no card to discard instead of drawing, and mills ${ids.length === 1 ? nameOf(s, ids[0]!) : `${ids.length} cards`} (${src}).`);
+    return;
+  }
+  if (p.hand.length === 1) {
+    chainsDiscard(s, pid, p.hand[0]!, src);
+    made.unshift(entry);
+    return;
+  }
+  s.pending = { kind: "discard", player: pid, count: 1, source: src, thenDraw: { left, made: [entry, ...made], ...(after ? { after } : {}) } };
+  return "paused";
+}
+
+/**
+ * The card discarded for Chains of Mephistopheles: by its controller's effect (Obstinate Baloth's "an opponent" counts it), not
+ * part of what's resolving ("discarded this way" means that spell's own discards).
+ */
+function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string) {
+  const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
+  const r = s.resolving;
+  s.resolving = null;
+  try {
+    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined);
+  } finally {
+    s.resolving = r;
+  }
+}
+
+/**
+ * Zur's Weirding (round B237) instead of a draw (CR 614.1a): `pid` reveals the top card of their library (CR 701.20a), then each
+ * other player in turn order from the active player (CR 101.4) who can pay 2 life (CR 119.4) may, until one does: then that
+ * card goes into its owner's graveyard straight from the library (rulings: it was never drawn). With no one paying, `pid` draws
+ * a card, `entry`: a new draw this Weirding doesn't replace again (CR 614.5), but dredge and the rest can (rulings).
+ */
+function weirdingInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], entry: number): "paused" | void {
+  const p = player(s, pid);
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+  const top = p.library[0];
+  const src = nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawWeirding)!);
+  log(s, top !== undefined ? `${p.name} reveals ${nameOf(s, top)} instead of drawing it (${src}).` : `${p.name} would draw from an empty library, and reveals no card instead (${src}).`);
+  const seat = (x: PlayerId) => (s.turnOrder.indexOf(x) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  const others = s.turnOrder.filter((x) => x !== pid && !player(s, x).lost).sort((a, b) => seat(a) - seat(b));
+  return askWeirding(s, { drawer: pid, remaining: others, left, made, ...(after ? { after } : {}), entry }, src);
+}
+
+/** Zur's Weirding's offer to the next player in `w.remaining` who can pay 2 life; with none left, the draw it leads to. */
+function askWeirding(s: GameState, w: NonNullable<Extract<PendingDecision, { kind: "chooseMay" }>["weirding"]>, src: string): "paused" | void {
+  const top = player(s, w.drawer).library[0];
+  const remaining = [...w.remaining];
+  while (remaining.length) {
+    const q = remaining.shift()!;
+    if (payableLife(s, q) < 2) continue;
+    const what = top !== undefined ? nameOf(s, top) : "no card (their library is empty)";
+    s.pending = { kind: "chooseMay", player: q, source: src, prompt: `pay 2 life to put ${what} into ${player(s, w.drawer).name}'s graveyard instead of ${player(s, w.drawer).name} drawing it`, ...(top !== undefined ? { card: top } : {}), pay: { life: 2 }, weirding: { ...w, remaining } };
+    return "paused";
+  }
+  w.made.unshift(w.entry);
+}
+
+/** Answers Zur's Weirding's offer (askWeirding); then the draws go on. */
+function answerWeirding(s: GameState, p: Player, yes: boolean) {
+  const pend = s.pending;
+  if (pend?.kind !== "chooseMay" || !pend.weirding) throw new RulesError("nothing to decide");
+  const w = pend.weirding;
+  if (yes && payableLife(s, p.id) < 2) throw new RulesError("you can't pay 2 life"); // CR 119.4
+  s.pending = null;
+  const made = [...w.made];
+  if (yes) {
+    payLife(s, p.id, 2);
+    const top = player(s, w.drawer).library[0];
+    if (top !== undefined && top === pend.card) moveObject(s, top, "graveyard");
+    log(s, `${p.name} pays 2 life${top !== undefined ? `, and ${nameOf(s, top)} goes into ${player(s, w.drawer).name}'s graveyard` : ""} (${pend.source}).`);
+  } else {
+    log(s, `${p.name} doesn't pay 2 life (${pend.source}).`);
+    if (askWeirding(s, { ...w, made }, pend.source) === "paused") return;
+  }
+  continueDraws(s, w.drawer, w.left, w.after, made);
 }
 
 /**
@@ -4181,7 +4383,7 @@ function advanceStep(s: GameState): void {
       }
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
-    for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
+    for (const id of s.battlefield) clearProvokedAlso(s, obj(s, id));
     s.unblockedChoice = undefined; // made for this combat's damage steps
     s.creatureDamageChoice = undefined;
     s.blockLimits = undefined;
@@ -4232,7 +4434,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.thatCombat = undefined;
   for (const o of attackersAndBlockers(s)) clearCombat(o);
   for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
-  for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
+  for (const id of s.battlefield) clearProvokedAlso(s, obj(s, id));
   s.unblockedChoice = undefined;
   s.creatureDamageChoice = undefined;
   s.blockLimits = undefined;
@@ -6012,6 +6214,20 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }
 
+/** Bell Borca: the greatest mana value each one on the battlefield noted for it this turn, as the object it is. */
+function noteExiledMv(s: GameState, card: GameObject) {
+  const borcas = s.battlefield.filter((b) => b !== card.id && abilitiesOf(s, obj(s, b)).notesExiledMv);
+  if (!borcas.length) return;
+  const mv = characteristics(s, card).manaValue;
+  for (const b of borcas) {
+    const o = obj(s, b);
+    const zc = o.zoneChanges ?? 0;
+    const was = o.exiledMvNoted && o.exiledMvNoted.turn === s.turn && o.exiledMvNoted.zc === zc ? o.exiledMvNoted.max : -1;
+    o.exiledMvNoted = { turn: s.turn, zc, max: Math.max(was, mv) };
+  }
+  invalidateCharacteristics(s);
+}
+
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
 function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
   if (rc.n <= 0) return;
@@ -6046,6 +6262,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const ab = manaAbilitiesOn(s, o)[i]!;
   const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
   if (problem) throw new RulesError(problem);
+  // Piracy (round B238): mana from a land another player controls can be spent only to cast spells (CR 106.6), told as
+  // it's activated, before its costs move it.
+  const pirated = !ab.anyPlayer && controllerOf(s, o) !== p.id;
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
   // Victory Chimes: the player chosen as it's activated, any player still in the game.
   if (to !== undefined && to !== p.id && (!ab.toChosenPlayer || !s.players[to] || s.players[to]!.lost)) throw new RulesError(`${name}'s mana can't go to that player`);
@@ -6057,7 +6276,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // A color chosen for a replacement that lets the player tapping it choose (round B224): one it offers.
   if (instead !== undefined && !(ab.tap && insteadChoices(s, p.id, o).includes(instead))) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
-  const adds = manaProduced(s, o, ab, mana, combo, instead);
+  let adds = manaProduced(s, o, ab, mana, combo, instead);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -6079,9 +6298,20 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   }, true);
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
+  if (pirated) log(s, `${p.name} taps ${player(s, controllerOf(s, o)).name}'s ${name} for ${adds.map((m) => `{${m}}`).join("")}, to spend only on spells.`);
   if (ab.lifeCost) payLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
   if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
+  // Charmed Pendant (round B239): "Mill a card" (CR 701.17a), then what it adds is read from that card where it went, a public
+  // zone (CR 701.17c); with a hybrid symbol, its controller chooses the colors below, once the rest is done.
+  let milledCombos: ManaType[][] | undefined;
+  if (ab.millCost) {
+    const top = p.library.slice(0, millCount(s, p.id, 1));
+    for (const c of top) moveObject(s, c, "graveyard", { milled: true });
+    const card = top[0] ? obj(s, top[0]) : undefined;
+    log(s, `${p.name} mills ${card ? nameOf(s, card.id) : "no card"} for ${name}.`);
+    if (ab.produces.kind === "milledSymbols") milledCombos = card && (card.zone === "graveyard" || (card.zone === "exile" && !card.faceDown)) ? milledSymbolCombos(s, card) : [[]];
+  }
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.produces.kind === "removeX") {
     const n = combos![combo!]!.length - (ab.produces.base ?? 0);
@@ -6123,7 +6353,16 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Spectral Searchlight: another player chooses the color of the mana they add (CR 605.3b, 608.2d): asked below, once the
   // rest of the ability is done; the activator's pick only says how much (Mana Reflection's doubling, CR 106.12b).
   const theyChoose = ab.getterChooses && getter !== p.id;
-  if (!theyChoose) addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  if (milledCombos) {
+    // One result: added now, with what replaces tapping it for mana (Mana Reflection's doubling, CR 106.12b).
+    if (milledCombos.length === 1) {
+      adds = tappedForMana(s, p.id, o, milledCombos[0]!);
+      if (adds.length) addMana(s, getter, adds, { from });
+      log(s, adds.length ? `${p.name} adds ${adds.map((m) => `{${m}}`).join("")} (${name}).` : `${name} adds no mana.`);
+    } else adds = milledCombos[0]!;
+    if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+  }
+  else if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
   if (o.zone === "battlefield") fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -6157,6 +6396,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (theyChoose && adds.length && !player(s, getter).lost) {
     s.manaColorFor = { player: getter, n: adds.length, from, source: name };
     s.pending = { kind: "chooseOption", player: getter, source: name, what: "manaColorFor", options: COLORS.map((c) => COLOR_NAMES[c]), prompt: `${p.name} tapped ${name}: choose the color of the ${adds.length === 1 ? "mana" : `${adds.length} mana`} you add` };
+  }
+  // Charmed Pendant: the colors of its hybrid symbols, chosen once the card is milled (rulings), as the ability resolves (CR 605.3b).
+  if (milledCombos && milledCombos.length > 1) {
+    s.pendantMana = { player: p.id, combos: milledCombos, from, source: name, id: o.id };
+    s.pending = { kind: "chooseOption", player: p.id, source: name, what: "pendantMana", options: milledCombos.map((c) => c.join("")), labels: milledCombos.map((c) => `Add ${c.map((m) => `{${m}}`).join("")}`), prompt: `${name}: choose the mana its milled card's hybrid symbols add` };
   }
 }
 
@@ -7920,6 +8164,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = byControl ? [0] : choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.kickedByControl = byControl || undefined;
+  // Caller of the Hunt (round B245): a creature type chosen as an additional cost of a permanent spell is "the chosen type"
+  // of its abilities on the stack (CR 604.3) and on the battlefield (CR 400.7d, 607.2d).
+  o.castType = compileCard(d).castChooseType && !compileCard(d).spell && choices.creatureType ? choices.creatureType : undefined;
+  if (o.castType) o.chosen = { ...o.chosen, type: o.castType };
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   o.phyrexianLife = paid.phyrexianLife;
   o.convoked = convoke?.length ? convoke.map((c) => ({ id: c, zc: obj(s, c).zoneChanges ?? 0 })) : undefined;
@@ -7941,6 +8189,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.hasteCast = paid.haste;
   o.commanderCountersCast = paid.commanderCounters;
   o.creatureCountersCast = paid.creatureCounters;
+  // Domri, Chaos Bringer: "If that mana is spent on a creature spell, it gains riot": the permanent it becomes has it too
+  // (CR 400.7a), one instance for each such mana (rulings), so it enters with a +1/+1 counter or gains haste (CR 702.136a).
+  for (const by of paid.riot ?? []) (o.spellGains ??= []).push({ mods: [{ kind: "addAbility", text: "Riot" }], timestamp: s.nextTimestamp++, controller: p.id, source: by, forever: true });
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
   // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings). "... to cast a red instant
   // or sorcery spell" (Pyromancer's Goggles): queued once the spell is on the stack, "that spell" being it.
@@ -8506,7 +8757,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
   // Its caster would choose it over a permission that exiles the spell afterwards (Vohar's).
-  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.costs && !g.entersWith && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.topOnly && !g.costs && !g.entersWith && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
     const i = out.findIndex((w) => w.kind === "permission");
     if (i >= 0) out.splice(i, 1);
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
@@ -8514,12 +8765,19 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // Osteomancer Adept: "Until end of turn, you may cast creature spells from your graveyard by foraging in addition to
   // paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it.": when no
   // other permission lets it be cast from there (its caster would pick one without the cost).
-  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && (!!g.costs || !!g.entersWith) && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && !g.topOnly && (!!g.costs || !!g.entersWith) && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
   if (costly && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: costly.costs ?? [], exile: false, ...(costly.entersWith ? { entersWith: costly.entersWith } : {}) });
   // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
   // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
   const any = d.manaCost ? s.graveyardTurn?.find((g) => g.anyGraveyard && g.player === caster && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
   if (any && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, anyOwner: true, ...(any.exileCast ? { exileIfToGraveyard: true as const } : {}) });
+  // Bösium Strip (round B240): "Until end of turn, you may cast instant and sorcery spells from the top of your graveyard. If
+  // a spell cast this way would be put into a graveyard, exile it instead.": only the card on top of its owner's graveyard
+  // (CR 404.1-2; the top is the last one in Player.graveyard) as it's cast, paying its mana cost with the usual timing; once
+  // it's on the stack (CR 601.2a) the card under it is the top one. Its caster would choose a permission that doesn't exile
+  // the spell afterwards over this one.
+  const top = d.manaCost && player(s, o.owner).graveyard.at(-1) === o.id ? s.graveyardTurn?.find((g) => g.topOnly && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  if (top && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, exileIfToGraveyard: true });
   // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
   // the once-each-turn permissions (rulings: each activation is a permission of its own).
   const used = s.turnLog?.gravePermits ?? [];
@@ -11062,6 +11320,14 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   if (pend?.kind === "discard" && pend.waste) return chooseWasteDiscard(s, p, ids);
   const r = s.resolving;
+  if (pend?.kind === "discard" && pend.player === p.id && pend.thenDraw) {
+    // Chains of Mephistopheles (round B237): the card discarded instead of a draw, then the draws go on.
+    if (ids.length !== 1 || !p.hand.includes(ids[0]!)) throw new RulesError("choose a card from your hand");
+    s.pending = null;
+    chainsDiscard(s, p.id, ids[0]!, pend.source);
+    continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, [...pend.thenDraw.made]);
+    return;
+  }
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
@@ -11390,6 +11656,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
   if (pend.distinctPowers && new Set(found.map((id) => characteristics(s, obj(s, id)).power)).size !== found.length) throw new RulesError("choose cards with different powers");
+  if (pend.distinctNames && found.some((id, i) => found.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) !== i)) throw new RulesError("choose cards with different names");
   if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.pairsPerYard && [...new Set(found.map((id) => obj(s, id).owner))].some((q) => found.filter((id) => obj(s, id).owner === q).length % 2)) throw new RulesError("choose two cards from a single graveyard for each age counter: an even number from each graveyard");
   if (pend.totalPower !== undefined && found.reduce((n, id) => n + characteristics(s, obj(s, id)).power, 0) > pend.totalPower) throw new RulesError(`choose cards with total power ${pend.totalPower} or less`);
@@ -11442,6 +11709,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // A spell's or activated ability's (askChoosers): that opponent chooses it next, as it's cast or activated.
     const prev = chooserChoices(pend.deferred.act.type === "castSpell" ? pend.deferred.act : pend.deferred.act.costs).choosers;
     resumeDeferred(s, pend.deferred, { targetChoosers: [...prev, Number(choice)] });
+    return;
+  }
+  if (pend.what === "triggerSubject") {
+    // Lagrella, the Magpie: which of the cards the delayed trigger is about (CR 603.7b), as it's put on the stack.
+    const t = s.triggerQueue[0];
+    const pick = t?.subjectChoices?.find((c) => c.id === choice);
+    if (!t || !pick) throw new RulesError("choose one of the cards");
+    t.subject = pick;
+    t.subjectChoices = undefined;
+    log(s, `${p.name} chooses ${defOf(s, obj(s, pick.id)).name} (${pend.source}).`);
     return;
   }
   if (pend.what === "targetChooser") {
@@ -11520,6 +11797,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "loseReplacement") {
     // Kept for the game loss about to happen as the state-based actions are performed (playerLoses).
     s.loseChoice = { player: p.id, choice };
+    return;
+  }
+  if (pend.what === "pendantMana") {
+    // Charmed Pendant: the mana chosen for the milled card's hybrid symbols, with what replaces tapping it for mana.
+    const m = s.pendantMana;
+    const combo = m?.combos.find((c) => c.join("") === choice);
+    if (!m || m.player !== p.id || !combo) throw new RulesError("no mana is waiting for its colors");
+    s.pendantMana = undefined;
+    const adds = tappedForMana(s, p.id, s.objects[m.id], combo);
+    addMana(s, p.id, adds, { from: m.from });
+    log(s, `${p.name} adds ${adds.map((x) => `{${x}}`).join("")} (${m.source}).`);
     return;
   }
   if (pend.what === "manaColorFor") {
@@ -13048,6 +13336,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     continueResolution(s);
     return;
   }
+  if (pend?.kind === "chooseMay" && pend.player === p.id && pend.weirding) return answerWeirding(s, p, yes);
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.skipDraw) {
     const { from, declined } = pend.skipDraw;
     s.pending = null;
@@ -14007,6 +14296,13 @@ export function attackDeclarationProblem(s: GameState, pid: PlayerId, attacks: {
     if (bey && idle) return `${defOf(s, idle).name} has to attack too: all creatures ${player(s, pid).name} controls attack if able once ${nameOf(s, bey.attacker)} does`;
     const cyclops = potentialAttackers(s, pid).find((o) => abilitiesOf(s, o).attacksIfOneAttacks && idleOk(o));
     if (cyclops) return `${defOf(s, cyclops).name} has to attack too: it attacks if able once a creature ${player(s, pid).name} controls does`;
+    // Magnetic Web (round B242): once a creature with a magnet counter attacks, all creatures with magnet counters attack
+    // if able (CR 508.1d), the attacking player's (CR 508.1a).
+    for (const kind of webCounterKinds(s)) {
+      if (!attacks.some((a) => (obj(s, a.attacker).counters[kind] ?? 0) > 0)) continue;
+      const idleWeb = potentialAttackers(s, pid).find((o) => (o.counters[kind] ?? 0) > 0 && idleOk(o));
+      if (idleWeb) return `${defOf(s, idleWeb).name} has to attack too: all creatures with ${kind} counters on them attack if able once one does`;
+    }
   }
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
@@ -14190,9 +14486,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // (Trove of Temptation, rulings).
   const tollNow = attacks.length ? attackAllIfOne(s, p.id) : undefined;
   const beyNow = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+  const webNow = webCounterKinds(s).filter((kind) => attacks.some((a) => (obj(s, a.attacker).counters[kind] ?? 0) > 0));
   const hadTo = attacks.filter((a) => {
     const o = obj(s, a.attacker);
-    return tollNow || beyNow || attacksIfAbleNow(s, o) || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
+    return tollNow || beyNow || webNow.some((kind) => (o.counters[kind] ?? 0) > 0) || attacksIfAbleNow(s, o) || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
   });
   if (hadTo.length) s.hadToAttack = { turn: s.turn, combat: s.combatsThisTurn ?? 0, keys: hadTo.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`) };
   else delete s.hadToAttack;
@@ -14740,6 +15037,16 @@ export function lureBinds(s: GameState, at: GameObject, b: GameObject): boolean 
   return !!by?.some((f) => objectMatches(s, f, b, controllerOf(s, at), false));
 }
 
+/** Magnetic Web (round B242): the kinds of counters whose creatures all attack if able once one of them does (CR 508.1d). */
+export function webCounterKinds(s: GameState): CounterKind[] {
+  const kinds = new Set<CounterKind>();
+  for (const id of s.battlefield) {
+    const k = abilitiesOf(s, obj(s, id)).allAttackIfOneWithCounter;
+    if (k) kinds.add(k);
+  }
+  return [...kinds];
+}
+
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
 export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
   return provokersOf(s, b)[0];
@@ -14752,7 +15059,13 @@ export function provokersOf(s: GameState, b: GameObject): GameObject[] {
     return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === p.zc && at.attacking === controllerOf(s, b) ? [at] : [];
   };
   const first = b.provokedBy && (b.provokedBy.turn === undefined || b.provokedBy.turn === s.turn) ? live(b.provokedBy) : [];
-  return [...first, ...(b.provokedAlso ?? []).flatMap(live).filter((at) => !first.includes(at))];
+  return [...first, ...(b.provokedAlso ?? []).filter((p) => p.turn === undefined || p.turn === s.turn).flatMap(live).filter((at) => !first.includes(at))];
+}
+
+/** At end of combat: the "this combat" requirements go; the "this turn" ones (Magnetic Web, round B242) stay for that turn. */
+function clearProvokedAlso(s: GameState, o: GameObject) {
+  const kept = o.provokedAlso?.filter((p) => p.turn === s.turn);
+  o.provokedAlso = kept?.length ? kept : undefined;
 }
 
 /**

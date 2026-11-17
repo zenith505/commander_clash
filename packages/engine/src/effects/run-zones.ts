@@ -281,7 +281,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     // Spirit-Sister's Call (round B220): sharing a card type with the target card as it is now (CR 205.2a), wherever it is.
     const kin = e.sharesCardTypeWithTarget !== undefined ? objects(s, { ref: "target", index: e.sharesCardTypeWithTarget }, ctx)[0] : undefined;
     const kinTypes = kin ? characteristics(s, kin).types : [];
-    const options = e.sharesCardTypeWithTarget === undefined ? options5 : options5.filter((id) => characteristics(s, obj(s, id)).types.some((ty) => kinTypes.includes(ty)));
+    const options6 = e.sharesCardTypeWithTarget === undefined ? options5 : options5.filter((id) => characteristics(s, obj(s, id)).types.some((ty) => kinTypes.includes(ty)));
+    // Frantic Scapegoat (round B241): only one that can become suspected (CR 701.60d, Airtight Alibi).
+    const options = e.suspectable ? options6.filter((id) => obj(s, id).suspected === undefined && !characteristics(s, obj(s, id)).cantBeSuspected) : options6;
     // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
     if (e.anyNumber) {
       if (!options.length) {
@@ -2096,6 +2098,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       // Hofri Ghostforge: "exile it. If you do": only if it went to exile (not if it had left the graveyard, CR 400.7).
       if (e.setsDid && s.resolving) s.resolving.did = false;
+      // Lagrella, the Magpie: the delayed trigger made as this resolves (CR 603.7a), one for all the cards it exiles; its
+      // source is this ability's, as it was, and its controller this ability's controller (CR 603.7e).
+      const rider = e.returnRider && me ? { key: `r${s.nextId++}`, controller: ctx.controller, sourceId: me.id, sourceCardId: cardIdOf(me), sourceZc: me.zoneChanges ?? 0, body: e.returnRider } : undefined;
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "targetLeaves" && me ? ` until ${defOf(s, me).name} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
@@ -2108,7 +2113,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // A merged permanent's cards are all exiled with it, and found by what returns it (CR 730.3c).
         for (const l of newObjects(o)) {
           if (s.objects[l.id]?.zone !== "exile") continue;
-          if (me) (me.exiledUntilLeaves ??= []).push(l);
+          if (me) (me.exiledUntilLeaves ??= []).push(rider ? { ...l, rider } : l);
           monarch?.cards.push(l);
           // Linked to the source as it was when the ability triggered: if that object has already left, its
           // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
@@ -3592,7 +3597,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const yards = () =>
           e.milled
             ? [...(s.resolving!.milled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "graveyard"), ...(e.milledInYard ? [] : (s.resolving!.milledExiled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "exile"))].map((m) => m.id).filter(fits)
-            : livingPlayers(s).flatMap((pid) => player(s, pid).graveyard).filter(fits);
+            : livingPlayers(s).filter((pid) => !e.opponentsYards || opponents(s, ctx.controller).includes(pid)).flatMap((pid) => player(s, pid).graveyard).filter(fits);
         if (!sc.found) {
           const cards = yards();
           if (!cards.length) return;

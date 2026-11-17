@@ -162,6 +162,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     rule.srcController = pid;
   }
   if (spec.by?.spellOnly) rule.by = { ...rule.by, spellOnly: true };
+  if (spec.by?.targetingCause) rule.by = { ...rule.by, targetingCause: true };
   if (spec.by?.notSelf && ctx.sourceId) rule.by = { ...rule.by, not: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 } };
   // Terrifying Presence: every creature's combat damage but that target's.
   if (spec.by?.notTarget !== undefined) {

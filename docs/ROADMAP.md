@@ -3754,7 +3754,9 @@ line blocks.
    Aura's mana value, gain control of that permanent for as long as that Aura is attached to it." (trigger event
    `auraAttachedToOpponents`, the Aura entering attached or moved; ContinuousEffect `whileAttached`, CR 611.2b; nothing if
    the Aura isn't attached to it as the ability resolves, rulings; Eriette leaving doesn't end it). Browser tests click
-   through Ranar's {0} foretelling and Eriette's Pacifism. +4, 31,644 of 31,936 on this stacked branch. The compiled text of
+   through Ranar's {0} foretelling and Eriette's Pacifism. Review follow-up 17: round 384's Toymaker's Trap browser tests
+   no longer race the draw step (mana floats in your pool so the page holds priority in the upkeep, and the poll waits for
+   that upkeep, as round 401's Jon Irenicus). +4, 31,644 of 31,936 on this stacked branch. The compiled text of
    every other card is unchanged.
    Out after round 404 (looked at, not done): Jasmine Boreal of the Seven ("Spend this mana only to cast creature spells
    with no abilities": abilities given to a spell, such as a granted convoke, cascade or offspring, count, rulings, and the

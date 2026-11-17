@@ -12,6 +12,10 @@ test("The Toymaker's Trap: on your upkeep you secretly choose 3, then choose Ana
   const s0 = scene({ board: ["The Toymaker's Trap"] });
   const trap = one(s0, "The Toymaker's Trap");
   const s = playUntil(s0, asked("toyNumber"));
+  // Mana in your pool keeps the page from passing your upkeep once the Trap's ability resolves (useGame.ts
+  // shouldAutoPass): otherwise your draw step can come before the state below is read (follow-up 17, as round 401's Jon
+  // Irenicus).
+  s.players[0]!.manaPool.C = 1;
   const hand = s.players[0]!.hand.length;
   await open(page, s);
   const bar = controls(page);
@@ -22,7 +26,7 @@ test("The Toymaker's Trap: on your upkeep you secretly choose 3, then choose Ana
   await expect(bar).toContainText("choose an opponent to guess the number");
   await bar.getByRole("button", { name: "Ana", exact: true }).click();
   // Ana guesses at random; then the number is revealed.
-  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.log.some((l) => /^Ana guesses [1-5]; You reveals 3/.test(l.text)));
+  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.step === "upkeep" && st.activePlayer === 0 && st.log.some((l) => /^Ana guesses [1-5]; You reveals 3/.test(l.text)));
   const guess = Number(/^Ana guesses ([1-5])/.exec(after.log.find((l) => /^Ana guesses/.test(l.text))!.text)![1]);
   expect(after.numbersChosenFor?.[`${trap}@0`]).toEqual([3]);
   if (guess === 3) expect(after.objects[trap]!.zone).toBe("graveyard");
@@ -40,13 +44,16 @@ test("The Toymaker's Trap: Ana's Trap picks you to guess; you guess 1", async ({
   let s = playUntil(s0, asked("opponent", 1));
   s = applyAction(s, { type: "chooseOption", player: 1, choice: "0" });
   s = playUntil(s, asked("toyGuess"));
+  // Mana in your pool keeps the page holding your priority in Ana's upkeep after the ability resolves, before her draw
+  // step (follow-up 17).
+  s.players[0]!.manaPool.C = 1;
   const [life, anaHand] = [s.players[0]!.life, s.players[1]!.hand.length];
   await open(page, s);
   const bar = controls(page);
   await expect(bar).toContainText("The Toymaker's Trap: guess which number Ana chose");
   for (const n of ["2", "3", "4", "5"]) await expect(bar.getByRole("button", { name: n, exact: true })).toBeVisible();
   await bar.getByRole("button", { name: "1", exact: true }).click();
-  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.log.some((l) => /^You guesses 1; Ana reveals [1-5]/.test(l.text)));
+  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.step === "upkeep" && st.activePlayer === 1 && st.log.some((l) => /^You guesses 1; Ana reveals [1-5]/.test(l.text)));
   const picked = after.numbersChosenFor![`${trap}@0`]![0];
   if (picked === 1) expect(after.objects[trap]!.zone).toBe("graveyard");
   else {

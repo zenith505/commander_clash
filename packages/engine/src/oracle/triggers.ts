@@ -2889,6 +2889,14 @@ function parseDrawTrigger(line0: string): TriggeredAbility | "fail" | null {
     const body = parseBody(theyAreThatPlayer(trap[1]!), { eventPlayer: true });
     return body ? { event: "playerDraws", draws: { by: "chosenPlayer", chosenName: true }, body } : "fail";
   }
+  // Wiretapping (round B241): "Whenever you draw your first card during each of your draw steps, ...": the first card you
+  // draw during your own draw step (CR 504.1), the turn-based draw or, if a replacement such as dredge took that draw's
+  // place, the next card you draw in that step (CR 121.2); not one drawn in another step.
+  const drawStep = /^Whenever you draw your first card during each of your draw steps, (.+)$/.exec(line0);
+  if (drawStep) {
+    const body = parseBody(drawStep[1]!, { eventPlayer: true });
+    return body ? { event: "playerDraws", draws: { by: "you", firstInDrawStep: true }, body } : "fail";
+  }
   // Sneaky Snacker: "When you draw your third card in a turn, ...": the same event as "each turn" (CR 121.2).
   const line = line0.replace(/^When (you draw your|an opponent draws their|a player draws their) (first|second|third|fourth|fifth) card in a turn, /, "Whenever $1 $2 card each turn, ");
   // "Whenever a player draws their second card during their turn" (The Council of Four): only cards drawn in their own

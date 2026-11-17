@@ -80,6 +80,7 @@ import { runLaneB234Effect } from "./run-laneb234";
 import { runLaneB235Effect } from "./run-laneb235";
 import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB238Effect } from "./run-laneb238";
+import { runLaneB241Effect } from "./run-laneb241";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -2024,6 +2025,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "consulateRedirect":
     case "piracy":
       return runLaneB238Effect(s, e, ctx, src);
+    case "exileSelfUntilTargetLeaves":
+      return runLaneB241Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

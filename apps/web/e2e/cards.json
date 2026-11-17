@@ -15245,6 +15245,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d181310f-404b-4f26-8024-b7b537d1fd90",
+  "name": "Frantic Scapegoat",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goat"
+  ],
+  "oracleText": "Haste\nWhen this creature enters, suspect it. (It has menace and can't block.)\nWhenever one or more other creatures you control enter, if this creature is suspected, you may suspect one of the other creatures. If you do, this creature is no longer suspected.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Suspect",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b69d2bd6-3e99-4c51-89af-0acedd48739e",
   "name": "Fraying Line",
   "manaCost": "{4}",
@@ -24488,6 +24521,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fa726aac-f4ae-4e34-ac08-36c1f50215f3",
+  "name": "Lucius the Eternal",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Astartes Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Astartes",
+   "Warrior"
+  ],
+  "oracleText": "Haste\nArmour of Shrieking Souls — When Lucius the Eternal dies, exile it and choose target creature an opponent controls. When that creature leaves the battlefield, return this card from exile to the battlefield under its owner's control.",
+  "power": "5",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Armour of Shrieking Souls",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dcf7d099-a726-4388-9744-70d37c5ea860",
   "name": "Lumbering Battlement",
   "manaCost": "{4}{W}",
@@ -33563,6 +33634,32 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a4c03ab-519a-4840-893a-769dfc5cf161",
+  "name": "Risky Move",
+  "manaCost": "{3}{R}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of each player's upkeep, that player gains control of this enchantment.\nWhen you gain control of this enchantment from another player, choose a creature you control and an opponent. Flip a coin. If you lose the flip, that opponent gains control of that creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -43199,6 +43296,32 @@
   "commanderLegal": "legal",
   "set": "tdm",
   "releasedAt": "2025-04-11",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "837182db-1bf3-4a2c-bd01-1af9d9873561",
+  "name": "Unsummon",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature to its owner's hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

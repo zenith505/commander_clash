@@ -724,6 +724,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^player who discarded a card this turn$/i.test(p)) return count({ kind: "players", discardedThisTurn: true });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
+  // Impact Resonance (round 395): "the greatest amount of damage dealt by a source to a permanent or player this turn": the
+  // most one source dealt to one permanent or player over the whole turn (rulings), each as the object it was (CR 400.7).
+  if (!each && /^the greatest amount of damage dealt by a source to a permanent or player this turn$/.test(p)) return count({ kind: "greatestDamageThisTurn" });
   // Caller of the Claw: "for each nontoken creature put into your graveyard from the battlefield this turn".
   if (/^artifacts that were put into graveyards from the battlefield this turn$/i.test(p)) return count({ kind: "artifactsToGraveyardThisTurn" });
   if ((m = /^(nontoken )?creatures? put into your graveyard from the battlefield this turn$/i.exec(p))) return count({ kind: "creaturesToYourGraveyard", ...(m[1] ? { nontoken: true as const } : {}) });
@@ -856,7 +859,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^[Cc]ards? named (~|[A-Z][\w'-]*(?: (?:[A-Z][\w'-]*|of|the|a))*) in (your|all|each) graveyards?$/.exec(p)))
     return count({ kind: "cardsInGraveyard", who: { ref: m[2] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: m[1]!, text: `card named ${m[1]}` } });
   // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
-  if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
+  // Coram, the Undertaker (round 381): "... in all graveyards", each card's power there, a characteristic-defining one too
+  // (CR 604.3).
+  if (!each && (m = /^the greatest power among creature cards in (your graveyard|all graveyards)$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: m[1] === "your graveyard" ? "you" : "eachPlayer" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // Revivify: "the number of creature cards in your graveyard that were put there from the battlefield this turn".
   // Wreck Hunter: "for each nonland card in that player's graveyard that was put there from the battlefield this turn".

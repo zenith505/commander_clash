@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { seatOrder, turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
+import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
@@ -637,6 +637,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
             if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lockWhile = { id: me.id, zc: me.zoneChanges ?? 0, controller: ctx.controller };
           }
       }
+      // The Pandorica (round 389): "It can't phase in for as long as ~ remains tapped": only if it's tapped now; otherwise
+      // the duration never begins (CR 611.2b) and it phases in at its controller's next untap step as usual (CR 702.26a).
+      if (e.lockWhileSourceTapped) {
+        const me = objects(s, { ref: "self" }, ctx)[0];
+        if (me?.tapped)
+          for (const id of ids) {
+            const p = s.objects[id]!.phased;
+            if (s.objects[id]!.zone === "phasedOut" && p && !p.indirect) p.lockWhileTapped = { id: me.id, zc: me.zoneChanges ?? 0, untaps: me.untaps ?? 0 };
+          }
+      }
       return;
     }
     case "earthbend": {
@@ -901,9 +911,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!armies().length) {
         const army: TokenSpec = { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] };
         enterTogether(s, () => {
-          const { same, extra } = tokenBatch(s, pid, army, 1);
-          for (let i = same; i > 0; i--) createToken(s, pid, army);
-          createExtraTokens(s, pid, extra);
+          const { pid: by, same, extra } = tokenBatch(s, pid, army, 1);
+          for (let i = same; i > 0; i--) createToken(s, by, army);
+          createExtraTokens(s, by, extra);
         });
       }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
@@ -960,11 +970,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (e.type === "recruit") {
         if (!nonland) return;
         const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };
-        const { same: k, extra } = tokenBatch(s, pid, soldier, 1);
+        const { pid: by, same: k, extra } = tokenBatch(s, pid, soldier, 1);
         enterTogether(s, () => {
-          for (let i = 0; i < k; i++) createToken(s, pid, soldier);
-          if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
-          createExtraTokens(s, pid, extra);
+          for (let i = 0; i < k; i++) createToken(s, by, soldier);
+          if (k) log(s, `${player(s, by).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
+          createExtraTokens(s, by, extra);
         });
         return;
       }
@@ -1271,10 +1281,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const spirit: TokenSpec = { name: "Spirit", power: n, toughness: n, colors: ["W"], types: ["Creature"], subtypes: ["Spirit"], keywords: [] };
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
-        const { same, extra } = tokenBatch(s, who, spirit, 1);
-        for (let i = same; i > 0; i--) createToken(s, who, spirit);
-        if (same) log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
-        createExtraTokens(s, who, extra);
+        const { pid: by, same, extra } = tokenBatch(s, who, spirit, 1);
+        for (let i = same; i > 0; i--) createToken(s, by, spirit);
+        if (same) log(s, `${src} endures ${n}: ${player(s, by).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
+        createExtraTokens(s, by, extra);
       });
       return;
     }
@@ -1815,7 +1825,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // "For as long as ~ remains tapped" (CR 611.2b): if that's already over, the effect does nothing. An activated
       // ability's source must not have untapped since it was activated (rulings on Rubinia Soulsinger, Preacher).
       let whileTapped: ContinuousEffect["whileTapped"];
-      if (e.duration === "whileTapped") {
+      if (e.duration === "whileTapped" && e.whileAffectedTapped) {
+        // Braided Net (round 402): "Its activated abilities can't be activated for as long as it remains tapped": the
+        // permanent affected, as it is now (CR 611.2b, 400.7), already tapped or tapped by this ability (rulings).
+        const it = affected.length === 1 ? obj(s, affected[0]!) : undefined;
+        whileTapped = it && { id: it.id, zc: it.zoneChanges ?? 0, untaps: it.untaps ?? 0 };
+        if (!whileTapped || !whileTappedHolds(s, whileTapped)) {
+          log(s, `${src}'s effect does nothing: that permanent isn't tapped.`);
+          return;
+        }
+      } else if (e.duration === "whileTapped") {
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         whileTapped = me && { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0, untaps: ctx.sourceUntaps ?? me.untaps ?? 0, ...(e.whileControlled ? { controller: ctx.controller } : {}) };
         if (!whileTapped || !whileTappedHolds(s, whileTapped)) {
@@ -1835,6 +1854,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           log(s, `${src}'s effect does nothing: ${e.whileOnBattlefield ? "it left the battlefield" : "its controller no longer controls it"}.`);
           return;
         }
+      }
+      // Garland, Royal Kidnapper: "for as long as they're the monarch": over already if that player stopped being the
+      // monarch before this resolved, so it does nothing (rulings, CR 611.2b).
+      const whileMonarch = e.whileMonarch ? players(s, e.whileMonarch, ctx)[0] : undefined;
+      if (e.whileMonarch && (whileMonarch === undefined || s.monarch !== whileMonarch)) {
+        log(s, `${src}'s effect does nothing: that player isn't the monarch.`);
+        return;
       }
       // "Until ~ is cast from exile" (Shattered Seraph): the card its cost exiled, while it's still that object in exile; gone
       // from exile some other way already, it never ends (rulings).
@@ -1875,6 +1901,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           ...(whileTapped && e.whilePowerAtMostSource ? { powerAtMost: { id: whileTapped.id, zc: whileTapped.zc } } : {}),
           ...(whileControlled ? { whileControlled } : {}),
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
+          ...(whileMonarch !== undefined ? { whileMonarch } : {}),
           ...(e.whileEnchanted ? { whileEnchanted: true as const } : {}),
           ...(untilCast ? { untilCast } : {}),
           ...(e.untilCreatureSpellCast ? { untilCreatureSpell: true as const } : {}),
@@ -1882,7 +1909,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           mods: groupMods,
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
-        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : whileMonarch !== undefined ? ` for as long as ${player(s, whileMonarch).name} is the monarch` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
       }
       if (e.setsDid && giveTo !== undefined && s.resolving) {
         invalidateCharacteristics(s);
@@ -2219,8 +2246,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "attackYouNextTurn": {
       for (const pid of players(s, e.who, ctx)) {
-        (s.attackPlayerNextTurn ??= []).push({ player: pid, attack: ctx.controller, since: s.turn });
-        log(s, `During ${player(s, pid).name}'s next turn, creatures they control attack ${player(s, ctx.controller).name} if able.`);
+        (s.attackPlayerNextTurn ??= []).push({ player: pid, attack: ctx.controller, since: s.turn, ...(e.anyone ? { anyone: true as const } : {}) });
+        log(s, `During ${player(s, pid).name}'s next turn, ${e.anyone ? "each creature they control attacks if able" : `creatures they control attack ${player(s, ctx.controller).name} if able`}.`);
       }
       return;
     }
@@ -2744,6 +2771,8 @@ export function attachTo(s: GameState, me: GameObject, host: GameObject, asCreat
   if (was) fireEvent(s, { type: "unattached", id: me.id, host: was });
   invalidateCharacteristics(s); // reconfigure: it stops being a creature (CR 702.151b)
   log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+  // Sanctuary Blade: "As ~ becomes attached to a creature, choose a color" (round 390).
+  askAttachColor(s, me);
   fireEvent(s, { type: "attached", id: me.id, host: host.id });
 }
 

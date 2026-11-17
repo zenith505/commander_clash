@@ -223,7 +223,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   if (spec.reflect) {
     const item = s.resolving?.item;
     const from = ctx.sourceId ?? (item?.kind === "spell" ? item.objectId : undefined);
-    rule.reflect = { body: spec.reflect, ...(from && s.objects[from] ? { source: { id: from, zc: s.objects[from]!.zoneChanges ?? 0 } } : {}) };
+    rule.reflect = { body: spec.reflect, ...(from && s.objects[from] ? { source: { id: from, zc: s.objects[from]!.zoneChanges ?? 0 } } : {}), ...(spec.reflectEachCreature ? { eachCreature: true as const } : {}) };
   }
   if (spec.tokens) rule.tokens = spec.tokens;
   if (spec.dealTo) {

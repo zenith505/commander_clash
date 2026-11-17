@@ -1,9 +1,9 @@
 import type { Effect, ObjRef } from "../abilities";
 import { defOf } from "../cards";
 import { restingDef } from "../faces";
-import { log, player } from "../game";
+import { copyWhileHolds, log, player } from "../game";
 import { addCopyEffect, copiableDef, copyKey, exceptFor } from "../copies";
-import type { CardDef, GameState } from "../types";
+import type { CardDef, CopyWhile, GameState } from "../types";
 import { ResolveCtx, objects } from "./resolve";
 
 /**
@@ -67,6 +67,7 @@ export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paus
   if (e.type !== "becomeCopy") return;
   const base = copiedValues(s, e.of, ctx);
   if (!base) return;
+  if (e.duration === "whileTargetTapped" || e.duration === "whileSourceAttached") return becomeCopyWhile(s, e, base, ctx);
   const until = e.duration === "endOfTurn" ? "endOfTurn" : e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : undefined;
   const changing = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
   // Each copies the same values, worked out before any of them changes (CR 608.2h).
@@ -75,5 +76,29 @@ export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paus
     const was = defOf(s, o).name;
     addCopyEffect(s, o, keys[i]!, until);
     log(s, `${was} becomes a copy of ${base.name}${until === "endOfTurn" ? " until end of turn" : until ? ` until ${player(s, ctx.controller).name}'s next turn` : ""}.`);
+  });
+}
+
+/**
+ * Round 396's "for as long as" copy effects (CR 611.2b): Zygon Infiltrator's "for as long as that creature remains tapped"
+ * (the target, `of`) and Blade of Shared Souls' "for as long as ~ remains attached to it" (`what`). If that isn't so as
+ * the effect would begin, it does nothing; once it stops, it's over for good (game.ts endWhileTapped).
+ */
+export function becomeCopyWhile(s: GameState, e: Extract<Effect, { type: "becomeCopy" }>, base: CardDef, ctx: ResolveCtx) {
+  const changing = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
+  const keys = changing.map((o) => copyKey(s, base, exceptFor(s, o, e.except, ctx.sourceDef.name)));
+  const tracked = e.duration === "whileTargetTapped" ? objects(s, e.of, ctx).find((o) => o.zone === "battlefield") : undefined;
+  changing.forEach((o, i) => {
+    const w: CopyWhile =
+      tracked
+        ? { whileTapped: { id: tracked.id, zc: tracked.zoneChanges ?? 0, untaps: tracked.untaps ?? 0 } }
+        : { whileAttached: { id: ctx.sourceId ?? "", zc: ctx.sourceZc ?? 0, host: o.id, hostZc: o.zoneChanges ?? 0 } };
+    const was = defOf(s, o).name;
+    if ((e.duration === "whileTargetTapped" && !tracked) || !copyWhileHolds(s, w)) {
+      log(s, `${was} doesn't become a copy of ${base.name}: ${e.duration === "whileTargetTapped" ? "that creature isn't tapped" : `${ctx.sourceDef.name} isn't attached to it`}.`);
+      return;
+    }
+    addCopyEffect(s, o, keys[i]!, w);
+    log(s, `${was} becomes a copy of ${base.name} for as long as ${e.duration === "whileTargetTapped" ? `${defOf(s, tracked!).name} remains tapped` : `${ctx.sourceDef.name} remains attached to it`}.`);
   });
 }

@@ -1221,6 +1221,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const h = s.hadToAttack;
       return subjectId !== undefined && !!h && h.turn === s.turn && h.combat === (s.combatsThisTurn ?? 0) && h.keys.includes(`${subjectId}@${subjectZc ?? 0}`);
     }
+    case "subjectEnlisted": {
+      // Aradesh, the Founder (round 384): as that object (CR 400.7), in the combat going on now (CR 702.154a).
+      const en = s.enlistedThisCombat;
+      return subjectId !== undefined && !!en && en.turn === s.turn && en.combat === (s.combatsThisTurn ?? 0) && en.keys.includes(`${subjectId}@${subjectZc ?? 0}`);
+    }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
     case "opponentsDealtExcess":

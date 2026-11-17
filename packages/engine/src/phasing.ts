@@ -1,7 +1,7 @@
 // Phasing (CR 702.26): a phased-out permanent is treated as though it doesn't exist, without changing zones.
 
 import { abilitiesOf, objHasKeyword } from "./cards";
-import { clearCombat, log, nameOf, obj, removeFromCombat, whileControlledHolds } from "./game";
+import { clearCombat, endCopyWhile, log, nameOf, obj, removeFromCombat, whileControlledHolds, whileTappedHolds } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import { pairedWith } from "./cards";
 import type { GameState, ObjectId, PlayerId } from "./types";
@@ -52,6 +52,8 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
   }
   log(s, `${all.map((id) => nameOf(s, id)).join(", ")} phase${all.length === 1 ? "s" : ""} out.`);
   invalidateCharacteristics(s);
+  // Round 396: a "for as long as" copy effect that tracks one of them ends now, as it can't see it (CR 702.26f).
+  endCopyWhile(s);
 }
 
 /**
@@ -100,8 +102,11 @@ export const cantPhaseIn = (s: GameState): boolean => s.battlefield.some((id) =>
  * still controls that object (CR 400.7, 611.2b); a phased-out ~ isn't controlled by anyone (CR 702.26b, rulings).
  */
 export function phaseLockedWhile(s: GameState, id: ObjectId): boolean {
-  const w = s.objects[id]?.phased?.lockWhile;
-  return !!w && whileControlledHolds(s, w);
+  const p = s.objects[id]?.phased;
+  const w = p?.lockWhile;
+  // The Pandorica (round 389): "It can't phase in for as long as ~ remains tapped": while that object is on the battlefield,
+  // tapped, and hasn't untapped since; a phased-out Pandorica is treated as though it doesn't exist (CR 702.26b, rulings).
+  return (!!w && whileControlledHolds(s, w)) || (!!p?.lockWhileTapped && whileTappedHolds(s, p.lockWhileTapped));
 }
 
 /**

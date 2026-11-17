@@ -7,7 +7,7 @@ import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
+import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, playerProtectedFrom, printedMatches, spellManaValue } from "./targeting";
 import { phaseOut } from "../phasing";
 import { ResolveCtx, apnap, startingWith, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
@@ -1536,6 +1536,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       // Jace, Architect of Thought: the cards its searches exiled this resolution (see searchEachExile).
       if (!sc.castAmong && e.fromSearched) sc.castAmong = { ids: (s.resolving!.searchedExiled ?? []).filter((x) => (obj(s, x.id).zoneChanges ?? 0) === x.zc && obj(s, x.id).zone === "exile"), declined: [] };
+      // Emergent Ultimatum: the cards this resolution's search exiled, those still in exile now (one shuffled back isn't).
+      if (!sc.castAmong && e.fromExiledThisWay) sc.castAmong = { ids: [...new Set(s.resolving!.exiledCards ?? [])].filter((id) => s.objects[id]?.zone === "exile").map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       if (!sc.castAmong && e.pushLuck !== undefined) {
         // Dance with Calamity: one card at a time, looked at before deciding to go on (rulings), a card's mana value with
         // X as 0 (CR 202.3e). Over the limit, none can be cast and they all stay exiled.
@@ -1821,6 +1823,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (st.budget !== undefined) st.budget -= cast ? spellManaValue(s, cast) : mvOf(st.casting);
           // Bilbo: only an instant or sorcery spell, its types as it was cast (an Adventure's, CR 715.3).
           if (e.exileCast && s.objects[st.casting]?.zone === "stack" && (!e.exileCastTypes || e.exileCastTypes.some((ty) => objIsType(s, obj(s, st.casting!), ty)))) s.objects[st.casting]!.exileIfToGraveyard = true;
+          // Kylox's Voltstrider (round 401): "put it on the bottom of its owner's library instead" (CR 614.1a).
+          if (e.bottomCast && s.objects[st.casting]?.zone === "stack") s.objects[st.casting]!.bottomIfToGraveyard = true;
           st.cast = (st.cast ?? 0) + 1;
           // Jetsam: one spell from each graveyard, so none more from this one's owner's.
           if (e.onePerOwner) (st.ownersCast ??= []).push(obj(s, st.casting).owner);
@@ -3004,7 +3008,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || (!e.anyOwner && o.owner !== ctx.controller))) return;
         if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
         sc.castNow = { id: o.id };
-        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}) };
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}), ...(e.addedMana ? { addedMana: e.addedMana } : {}) };
         // Mana abilities can still be activated to pay for it (CR 601.2g), so only the mana in the pool may be short.
         const problem = castProblem(s, ctx.controller, o.id);
         if (problem === null || /^not enough mana/.test(problem)) return "paused";
@@ -3019,6 +3023,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.castNow = undefined;
       s.resolving!.did = cast;
       if (cast && e.exileAfter) o.exileIfToGraveyard = true;
+      // Ogre Battlecaster (round 401): "that spell's mana value", as it was cast (CR 202.3).
+      if (cast && e.addedMana) {
+        const item = s.stack.find((x) => x.objectId === o.id);
+        s.resolving!.castThisWayMv = item ? spellManaValue(s, item) : characteristics(s, o).manaValue;
+      }
       // "Do this only once each turn": done (CR 603.2h).
       const source = cast && e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);
@@ -3253,6 +3262,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const toPlayer = e.under ? players(s, e.under, ctx).find((p) => !player(s, p).lost) : undefined;
       if (e.under && toPlayer === undefined) return;
       const under = (o: GameObject) => (toPlayer !== undefined ? toPlayer : e.owner ? o.owner : ctx.controller);
+      // Endless Whispers: "that player puts ~ ... onto the battlefield under their control": they put it there (GameObject.putter).
+      const putter = e.putByUnder && toPlayer !== undefined ? toPlayer : ctx.controller;
       if (e.faceDown) {
         // Yedora: face down as a Forest land, whatever the card is (CR 708.2a); not an Aura there, so it enchants nothing.
         // The Cyber-Controller: face down as 2/2 Cyberman artifact creatures, all at once; which cards they are is hidden
@@ -3261,7 +3272,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         enterTogether(s, () => {
           for (const o of list) {
             log(s, e.faceDown === "cyberman" ? `${src} puts a card onto the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : e.faceDown === "plain" ? `${src} returns a card to the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
           }
         });
@@ -3298,7 +3309,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       // One Last Job: an Aura only onto a creature you control (CR 303.4f), chosen as it resolves (rulings).
       if (e.attachToYours) kin = (h) => objIsType(s, h, "Creature") && controllerOf(s, h) === ctx.controller;
-      const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
+      const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToYou || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
       // One Last Job: an Equipment onto a creature you control it could be attached to, chosen as it resolves (not
       // targeted); with none it enters unattached (rulings, CR 301.5c).
@@ -3321,7 +3332,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
               continue;
             }
             log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, ...(face ? { face } : {}), ...host });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(face ? { face } : {}), ...host });
+            continue;
+          }
+          if (e.attachToYou) {
+            // Lynde, Cheerful Tormentor (round 394): "return it to the battlefield attached to you": an Aura that could
+            // enchant you as it enters (CR 303.4f; not with protection from it, 702.16c), else it stays where it is (303.4g).
+            const me = ctx.controller;
+            const host = d.subtypes.includes("Aura") ? asFace(s, o, face, () => auraHostOptions(s, o, under(o))).find((h) => "attachToPlayer" in h && h.attachToPlayer === me) : undefined;
+            const ch = asFace(s, o, face, () => ({ name: d.name, colors: [...d.colors], types: [...d.types], subtypes: [...d.subtypes], controller: under(o) }));
+            if (!host || playerProtectedFrom(s, me, under(o), ch)) {
+              log(s, `${d.name} can't be attached to ${player(s, me).name}, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield attached to ${player(s, me).name}.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(face ? { face } : {}), ...host });
             continue;
           }
           if (e.attachToEnchanted) {
@@ -3370,7 +3395,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (equipHosts?.has(o.id)) {
             const host = equipHosts.get(o.id)!;
             log(s, `${src} returns ${d.name} to the battlefield${host ? ` attached to ${defOf(s, obj(s, host)).name}` : ", unattached"}.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, ...(host ? { attachTo: host } : {}) });
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(host ? { attachTo: host } : {}) });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }
@@ -3411,7 +3436,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Vehicle or a creature card is what the card is as it's put there.
           const also = e.alsoMods && (!e.alsoModsIfSubtype || characteristics(s, o).subtypes.includes(e.alsoModsIfSubtype)) && (!e.alsoModsIfCreature || objIsType(s, o, "Creature")) ? e.alsoMods : undefined;
           const entersAs = [...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? e.entersAs.mods : []), ...(also ?? [])];
-          moveObject(s, o.id, "battlefield", { controller: under(o), putBy: ctx.controller, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(entersAs.length ? { entersAs, ...(also ? { entersAsBy: { controller: ctx.controller, source: src, ...(e.alsoModsWhileCounter ? { whileCounter: e.alsoModsWhileCounter } : {}) } } : {}) } : {}), ...(e.counters ? e.countersIfSubtype ? { countersIfSubtype: { subtype: e.countersIfSubtype, counters: e.counters } } : { [e.countersIfCreature ? "countersIfCreature" : "counters"]: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(e.countersAmount ? { counters: { [e.countersAmount.kind]: Math.max(0, amountNow(s, e.countersAmount.n, ctx)) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // Attacking as it enters, before its enters abilities trigger (CR 508.4).
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = attack!.player;
@@ -4146,6 +4171,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const todo = objects(s, e.what, ctx).filter((o) => o.zone !== "library");
       if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));
       const moved: Record<number, { id: ObjectId; zc: number }[]> = {};
+      if (e.setsDid) s.resolving!.did = false;
       for (const o of todo) {
         let position = e.position;
         if (position === "ownersChoice" || position === "ownersChoiceSecond" || position === "yourChoice") {
@@ -4184,6 +4210,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
         moveObject(s, o.id, "library", { top: position === "top" });
         if (o.zone === "library" && !o.isToken) (moved[o.owner] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        // The Spot, Living Portal: "If you do": the card is in that library now (a commander may have gone elsewhere).
+        if (e.setsDid && o.zone === "library" && !o.isToken) s.resolving!.did = true;
       }
       // Two or more cards put on top (or the bottom) of a library at once: their owner arranges them (CR 401.4), as the
       // instruction ends.
@@ -4786,7 +4814,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
         if (all.length && (e.ownersPlay || e.ownAndLesser)) {
           const playable = all.filter((id) => obj(s, id).mayPlay);
-          log(s, `Each player exiles the top card of their library: ${all.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, obj(s, id).owner).name})`).join(", ")}. ${e.ownersPlay ? `Until ${p.name}'s next end step, each player may play the card they exiled` : playable.length ? `${p.name} may play ${playable.map((id) => defOf(s, obj(s, id)).name).join(", ")} without paying their mana costs this turn` : `${p.name} may play none of them`}.`);
+          log(s, `Each player exiles the top ${typeof e.n === "number" && e.n > 1 ? `${e.n} cards` : "card"} of their library: ${all.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, obj(s, id).owner).name})`).join(", ")}. ${e.ownersPlay ? `Until ${p.name}'s next ${e.until === "yourNextTurn" ? "turn" : "end step"}, each player may play the ${typeof e.n === "number" && e.n > 1 ? "cards" : "card"} they exiled` : playable.length ? `${p.name} may play ${playable.map((id) => defOf(s, obj(s, id)).name).join(", ")} without paying their mana costs this turn` : `${p.name} may play none of them`}.`);
           return;
         }
         if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? (e.who.ref === "target" ? `${players(s, e.who, ctx).map((pid) => player(s, pid).name).join("")}'s graveyard` : "each opponent's graveyard") : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.free ? " without paying their mana costs" : ""}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "exiled" ? " for as long as they remain exiled" : ""}.`);

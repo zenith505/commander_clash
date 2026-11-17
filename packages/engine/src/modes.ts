@@ -299,6 +299,13 @@ function spreadRefs<T>(x: T, i: number, n: number): T {
     else if (o.index < i && typeof o.n === "number" && o.index + o.n > i && (o.ref === "target" || o.ref === "anyTarget")) copy.n = o.n + n - 1;
   }
   if (typeof o.target === "number" && Object.keys(o).length === 1 && o.target > i) copy.target = o.target + n - 1;
+  // A delayed trigger about targets (floatingTrigger `about`, `each`): Kang Dynasty's "whenever any of those creatures"
+  // (round 382) is about each of the slot's targets.
+  if (o.type === "floatingTrigger" && typeof o.about === "number") {
+    if (o.about > i) copy.about = o.about + n - 1;
+    else if (o.about === i && typeof o.each === "number") copy.each = n;
+    else if (o.about < i && typeof o.each === "number" && o.about + o.each > i) copy.each = o.each + n - 1;
+  }
   // Display of Power's copySpell { target, many }: the slot's targets, all of them.
   if (typeof o.target === "number" && o.many === true && Object.keys(o).every((k) => k === "target" || k === "many" || k === "n")) {
     if (o.target > i) copy.target = o.target + n - 1;

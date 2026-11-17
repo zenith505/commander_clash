@@ -92,9 +92,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!ctx.legal[e.damage.target] || !t || (t.kind !== "player" && t.kind !== "object")) return;
         damage = { n: e.damage.n, to: t.kind === "player" ? { player: t.id } : { object: t.id, zc: t.zc ?? obj(s, t.id).zoneChanges ?? 0 } };
       }
-      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}) });
+      // Aladdin's Lamp (round 385): its X as it was activated.
+      const lamp = e.lamp ? amountNow(s, { count: { kind: "x" } }, ctx) : undefined;
+      (p.nextDrawInstead ??= []).push({ turn: s.turn, source: src, ...(ctx.sourceId !== undefined ? { sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0 } : {}), ...(e.gain !== undefined ? { gain: e.gain } : {}), ...(e.token ? { token: e.token } : {}), ...(damage ? { damage } : {}), ...(e.discard ? { discard: true as const } : {}), ...(e.wind ? { wind: true as const } : {}), ...(e.pile ? { pile: true as const } : {}), ...(lamp !== undefined ? { lamp } : {}) });
       const whom = damage && ("player" in damage.to ? player(s, damage.to.player).name : characteristics(s, obj(s, damage.to.object)).name);
-      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : `they gain ${e.gain} life`} instead (${src}).`);
+      log(s, `The next time ${p.name} would draw a card this turn, ${damage ? `${src} deals ${damage.n} damage to ${whom}` : e.token ? `they create a ${e.token.power}/${e.token.toughness} ${e.token.name} token` : e.discard ? "each opponent discards a card" : e.wind ? "each player returns a permanent they control to its owner's hand" : e.pile ? "they put the top card of the exiled pile into its owner's hand" : lamp !== undefined ? `they look at the top ${lamp === 1 ? "card" : `${lamp} cards`} of their library, put all but one on the bottom in a random order, then draw a card` : `they gain ${e.gain} life`} instead (${src}).`);
       return;
     }
     case "revealUntilLandToGraveyard":
@@ -1559,7 +1561,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(agent?.controller !== undefined ? { controlling: p.id } : {}),
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
           // Rootweaver Druid: the one found for another player's control says whose it becomes (round 354).
-          ...(e.others && agent?.exileFor === undefined ? { firstTo: `${describeDest(e.dest)}${underName(e.dest) !== undefined ? ` under ${underName(e.dest)}'s control` : ""}`, othersTo: `${describeDest(e.others)}${underName(e.dest) !== undefined && !e.others.under ? " under your control" : ""}`, ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
+          ...(e.others && agent?.exileFor === undefined ? { firstTo: `${describeDest(e.dest)}${underName(e.dest) !== undefined ? ` under ${underName(e.dest)}'s control` : ""}`, othersTo: `${describeDest(e.others)}${underName(e.dest) !== undefined && !e.others.under && e.others.zone === "battlefield" ? " under your control" : ""}`, ...(e.firstN ? { firstN: e.firstN } : {}), ...(e.second ? { secondN: e.second.n, secondTo: `${describeDest(e.second.dest)} under your control` } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.oneName ? { oneName: true as const } : {}),
           ...(e.exactly ? { exactly: true as const } : {}),
@@ -1623,7 +1625,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.cardTo && printedMatches(e.cardTo.card, defOf(s, obj(s, id))) ? e.cardTo.dest : e.condDest && condNow ? e.condDest.dest : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? (e.second && foundBy(pid).indexOf(id) < (e.firstN ?? 1) + e.second.n ? e.second.dest : e.others) : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.cardTo && printedMatches(e.cardTo.card, defOf(s, obj(s, id))) ? e.cardTo.dest : e.condDest && condNow ? e.condDest.dest : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).
@@ -2101,9 +2103,22 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      return pid === undefined ? undefined : dig(s, e, ctx, src, pid);
+      return pid === undefined ? undefined : dig(s, e.noncreatureCastTypes ? noncreatureCastTypesDig(s, e, ctx) : e, ctx, src, pid);
     }
   }
+}
+
+/**
+ * Hurkyl, Master Wizard (round 398): "For each card type among noncreature spells you've cast this turn, you may put a
+ * card of that type from among the revealed cards into your hand": one card for each card type (CR 205.2a) among the
+ * noncreature spells this ability's controller cast this turn, each as it was cast (a copy wasn't cast, CR 707.10), as
+ * it resolves; a card with several card types is taken for any one of them (as Atraxa's rulings), so `oneOfEach`.
+ */
+function noncreatureCastTypesDig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx): Extract<Effect, { type: "dig" }> {
+  const cast = (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller).map((x) => x.types ?? s.cards[x.card]?.types ?? []);
+  const types = new Set(cast.filter((ts) => !ts.includes("Creature")).flat());
+  const oneOfEach = (e.oneOfEach ?? []).filter((f) => f.types?.some((t) => types.has(t)));
+  return { ...e, count: oneOfEach.length, oneOfEach, filter: { kind: "card", anyOf: oneOfEach, text: e.filter?.text ?? "card" } };
 }
 
 /** "Look at the top N cards of your library": `pid` looks at them, takes some, and the rest go where they go. */
@@ -2195,7 +2210,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined && (count >= 99 || max > 1) ? `${count >= 99 ? "any number of" : `up to ${count}`} ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.playCast ? " (you may cast it this turn)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : e.into === "cyberman" ? "onto the battlefield face down (2/2 Cyberman artifact creature)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
+          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.play === "exiled" ? ` (you may cast it for as long as it remains exiled${e.playUndaunted ? ", with undaunted" : ""})` : e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.playCast ? " (you may cast it this turn)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : e.into === "cyberman" ? "onto the battlefield face down (2/2 Cyberman artifact creature)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
           const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           // Guided Passage: another player picks, for `p` (an opponent you chose, so the cards that help you least).
           const chooser = e.chooser ? players(s, e.chooser, ctx).find((x) => !player(s, x).lost) : undefined;
@@ -2284,7 +2299,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown === "cyberman") log(s, `${p.name} puts ${found.length === 1 ? "a card" : `${found.length} cards`} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library onto the battlefield face down: ${found.length === 1 ? "a" : "each a"} 2/2 Cyberman artifact creature.`);
       else if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
-      else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.playFree ? " and may cast it this turn without paying its mana cost" : e.playCast ? " and may cast it this turn" : e.play ? " and may play it this turn" : ""}.`);
+      else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.play === "exiled" ? ` and may cast it for as long as it remains exiled${e.playUndaunted ? " (it has undaunted)" : ""}` : e.playFree ? " and may cast it this turn without paying its mana cost" : e.playCast ? " and may cast it this turn" : e.play ? " and may play it this turn" : ""}.`);
       else if (found.length && e.into === "graveyard") log(s, `${p.name} puts ${names(found)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
       else if (found.length && !e.landsOnto) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       // Zimone's Experiment: the land cards taken go onto the battlefield tapped, the others into the hand.
@@ -2317,7 +2332,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
             moveObject(s, id, "exile");
             const o = obj(s, id);
             if (o.zone === "exile") (r.dugExiled ??= []).push({ id, zc: o.zoneChanges ?? 0 });
-            if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.playFree ? { castOnly: true as const, free: true as const } : e.playCast ? { castOnly: true as const } : {}) };
+            // Durnan of the Yawning Portal: "For as long as that card remains exiled, you may cast it. That spell has undaunted."
+            // (that object, CR 400.7; cast only, never played as a land, CR 601.3).
+            if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.play, turn: s.turn, ...(e.playFree ? { castOnly: true as const, free: true as const } : e.playCast ? { castOnly: true as const } : {}), ...(e.playUndaunted ? { undaunted: true as const } : {}) };
             // "If you do, it becomes plotted" (CR 702.170c): its owner may cast it without paying its mana cost on a later
             // turn (702.170d).
             if (e.plot && o.zone === "exile") {
@@ -2464,7 +2481,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
 }
 
 /** The Library of Leng `pid` controls, if any: its name. */
-function lengName(s: GameState, pid: PlayerId): string | undefined {
+export function lengName(s: GameState, pid: PlayerId): string | undefined {
   const o = s.battlefield.map((id) => obj(s, id)).find((o) => controllerOf(s, o) === pid && abilitiesOf(s, o).discardToTop);
   return o && defOf(s, o).name;
 }
@@ -2551,7 +2568,7 @@ export function cantSearch(s: GameState, pid: PlayerId): boolean {
 }
 
 /** The fewest top cards an opponent's Aven Mindcensor lets this player search, if any does. */
-function searchTop(s: GameState, pid: PlayerId): number | undefined {
+export function searchTop(s: GameState, pid: PlayerId): number | undefined {
   const ns = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost).map((o) => abilitiesOf(s, o).opponentsSearchTop).filter((n): n is number => n !== undefined);
   return ns.length ? Math.min(...ns) : undefined;
 }
@@ -2577,7 +2594,7 @@ const DEST_RANK: Record<string, number> = { battlefield: 4, hand: 3, libraryTop:
  * stay where they are). "An opponent" is one you choose as it resolves (rulings on Steam Augury). With no more cards
  * than that to choose from there's no choice: they're all chosen (rulings on Gifts Ungiven and Realms Uncharted).
  */
-export function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: PlayerRef | undefined, owner: PlayerId, cards: ObjectId[], eligible: ObjectId[], n: number, to: SearchDest, rest: SearchDest | undefined, /** Coin of Fate: where the chosen cards go, said instead of `to` ("on the bottom of Ken's library"). */ toText?: string): ObjectId[] | "paused" {
+export function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: PlayerRef | undefined, owner: PlayerId, cards: ObjectId[], eligible: ObjectId[], n: number, to: SearchDest, rest: SearchDest | undefined, /** Coin of Fate: where the chosen cards go, said instead of `to` ("on the bottom of Ken's library"). */ toText?: string, /** Emergent Ultimatum: what happens to the rest, said instead of `rest` ("may be cast by Ken without paying their mana costs"). */ restText?: string): ObjectId[] | "paused" {
   const r = s.resolving!;
   const sc = (r.scratch ??= {});
   if (sc.picking && sc.found) {
@@ -2607,7 +2624,7 @@ export function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, choose
     cards: eligible,
     min: n,
     max: n,
-    dig: { looked: cards, to: `to put ${toText ?? theirs(to)}`, rest: rest ? `go ${theirs(rest)}` : theirs(rest) },
+    dig: { looked: cards, to: `to put ${toText ?? theirs(to)}`, rest: restText ?? (rest ? `go ${theirs(rest)}` : theirs(rest)) },
     forPlayer: owner,
     ...(DEST_RANK[to.zone]! > (rest ? DEST_RANK[rest.zone]! : 2.5) ? { helps: true as const } : {}),
   };

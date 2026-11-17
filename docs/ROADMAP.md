@@ -1,6 +1,6 @@
 # Roadmap
 
-31,530 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,533 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -1893,7 +1893,7 @@ line blocks.
    counters on it, exile it. When you do, take an extra turn" needs a reflexive trigger after a mandatory exile, and its
    order against vanishing's own trigger on the last counter matters); Magma Pummeler ("When one or more counters are
    removed from ~ this way": a reflexive trigger from inside the damage shield); Pardic Dragon (done in round B152) ("that player may put a
-   time counter on ~": another player's "may" about a card in exile), Nihilith and Curse of the Cabal (done in round B216) (other "if ~ is
+   time counter on ~": another player's "may" about a card in exile), Nihilith (done in round B244) and Curse of the Cabal (done in round B216) (other "if ~ is
    suspended" triggers: a card put into a graveyard, each player's upkeep); Greater Gargadon (an activated ability of a
    card in exile: none can be activated there yet, for the engine, bots or the UI).
    Round 265 made permanents tapped at the same time one event (game.ts batchTaps: the attackers declared together, CR
@@ -7156,7 +7156,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of turn if you control a creature with X. The same is true for ..." (Majestic Myriarch, Thunderous Orator: each
   hexproof variant as that variant, rulings). +12 (28,673 of 31,936 with round 226).
 - Out after round B66 (looked at, not done): Swans of Bryn Argoll (its draws in the middle of damage could be replaced
-  by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Domri, Chaos Bringer (riot on mana spent from a loyalty
+  by dredge), Szadek, Lord of Secrets (the affected player orders it against prevention), Domri, Chaos Bringer (done in round B244) (riot on mana spent from a loyalty
   ability), Dreamshaper Shaman (done in round B219) (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way", done in round B132), Murktide Regent (done in round B182) (which cards
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche (done in round B203), Light Up the Night (done in round B213), Arachnus
@@ -9875,6 +9875,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the mulligan prompt's "Exile hand" button; bots use it rather than a mulligan that would count). Browser tests for
   Monastery Raid's freerunning X, Ecological Appreciation's search and opponent, and Serum Powder's button. +3, 31,530 of
   31,936. The compiled text of every other card is unchanged.
+- Round B244 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Ms. Marvel, Kamala Khan
+  (her trigger for a spell of yours that targets a creature you control draws, then she gains "~'s base power is equal to
+  the number of cards in your hand" until end of turn: granted, so not a characteristic-defining ability, CR 604.3a; it
+  sets her base power in layer 7b with the grant's timestamp, CR 613.4b, 613.7a, so +N/+N effects still add on top and a
+  later base-power effect overrides it, and the number keeps counting as her controller's hand changes, CR 611.3a; a
+  counted setPower static now marks the characteristics cache as counting). Domri, Chaos Bringer (+1 isn't a mana ability,
+  being a loyalty ability, so it uses the stack and the color is chosen as it resolves, CR 605.1a, rulings; its mana is a
+  ManaLot with `riot`, spent first on a creature spell and kept back from others; a creature spell it's spent on gains
+  riot and the permanent it becomes has it for good, CR 400.7a, so it enters with a +1/+1 counter or gains haste, CR
+  702.136a, one instance per such mana, rulings). Nihilith (while suspended, an ability of the card in exile, CR 113.6,
+  702.62b, with an intervening if, CR 603.4: once for each card put into an opponent's graveyard from anywhere, not a
+  token or a copy of a spell, rulings, its owner may remove a time counter; the last one removed this way lets its owner
+  cast it, as suspend's own does, rulings; batch triggers of cards in exile are now watched). Browser tests for Domri's +1,
+  its color and the riot choice, and Nihilith's question for each discarded card. +3, 31,533 of 31,936. The compiled text
+  of every other card is unchanged.
+- Out after round B244 (looked at, not done): the lists after round B243 stay out. Known gap: bots don't plan around
+  Domri's mana (they may add it with no creature spell to cast that turn).
 - Out after round B243 (looked at, not done): the lists after round B242 stay out, and Finale of Promise (still out: an
   instant and a sorcery cast as it resolves in the order its controller chooses, rulings, then each copied twice when X is
   10 or more; casting targets one at a time in a fixed order is all there is). Known gaps: bots cast Monastery Raid for
@@ -10359,7 +10376,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lord (damage replaced by sacrificing permanents: the same CR 616.1 order question as Phytohydra), Northampton Farm (its
   exile isn't linked yet, and "each other card" after the one returned), Ancient Hellkite (done in round B112) ("defending player" in an
   activated ability's target: needs binding as it's activated, like triggers do), Infectious Rage (done in round B131) (a random creature it
-  could enchant), Ms. Marvel, Kamala Khan (a gained "base power is equal to" ability that keeps counting, not locked in),
+  could enchant), Ms. Marvel, Kamala Khan (done in round B244) (a gained "base power is equal to" ability that keeps counting, not locked in),
   Araumi of the Dead Tide (encore granted until end of turn).
 - Out after round B102 (looked at, not done): Lichenthrope and Phytohydra (damage replaced by counters: its controller
   orders it with prevention shields and with damage-increasing replacements, CR 616.1, and the best order differs between

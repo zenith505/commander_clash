@@ -4874,6 +4874,8 @@ export type Effect =
       revealedColors?: true;
       /** Remember that this ability's source added mana this turn (StaticCondition addedManaThisTurn). */
       markSource?: true;
+      /** Domri, Chaos Bringer: "If that mana is spent on a creature spell, it gains riot" (ManaLot.riot, CR 702.136a, 400.7a). */
+      riot?: true;
       /** Squandered Resources: "Add one mana of any type the sacrificed land could produce": a type its cost's sacrificed land could make as it last existed (LastKnown.couldProduce, CR 106.7), chosen as it resolves; none if none (rulings). */
       sacrificedType?: true;
     }

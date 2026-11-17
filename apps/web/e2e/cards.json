@@ -19608,6 +19608,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1fb02bad-0d1f-437f-a269-f51cc19b280f",
+  "name": "Havengul Lich",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wizard"
+  ],
+  "oracleText": "{1}: You may cast target creature card in a graveyard this turn. When you cast it this turn, this creature gains all activated abilities of that card until end of turn.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dka",
+  "releasedAt": "2012-02-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845b40b1-dc09-44fa-9910-22544c1424ba",
   "name": "Hazel of the Rootbloom",
   "manaCost": "{2}{B}{G}",
@@ -33562,6 +33595,36 @@
   "set": "bro",
   "releasedAt": "2022-11-18",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c88e3aff-c539-4e8b-8ee1-a43b3d0962b4",
+  "name": "Quicksilver Elemental",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "{U}: This creature gains all activated abilities of target creature until end of turn. (If any of the abilities use that creature's name, use this creature's name instead.)\nYou may spend blue mana as though it were mana of any color to pay the activation costs of this creature's abilities.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slz",
+  "releasedAt": "2026-09-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

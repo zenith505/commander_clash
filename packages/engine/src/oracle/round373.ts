@@ -14,6 +14,7 @@ import { round390Sentence } from "./round390";
 import { round391Sentence } from "./round391";
 import { round392Sentence } from "./round392";
 import { round393Sentence } from "./round393";
+import { round400Sentence } from "./round400";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -22,6 +23,9 @@ const plain = (x: string | undefined) => (x ?? "").replace(/\.$/, "");
 export function round373Sentence(s: string, sentences: string[], si: number, ctx: Ctx, _effects: Effect[]): Found {
   // Round 393's sentences (oracle/round393.ts), then round 392's (oracle/round392.ts), then round 391's (oracle/round391.ts), then round 390's (oracle/round390.ts), then round 389's (oracle/round389.ts), then round 388's (oracle/round388.ts),
   // then round 387's (oracle/round387.ts), first.
+  // Round 400's (oracle/round400.ts) before all of them.
+  const r400 = round400Sentence(s, sentences, si, ctx, _effects);
+  if (r400) return r400;
   const r393 = round393Sentence(s, sentences, si, ctx, _effects);
   if (r393) return r393;
   const r392 = round392Sentence(s, sentences, si, ctx, _effects);

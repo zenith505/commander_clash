@@ -2412,6 +2412,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Loki Laufeyson: "with mana value less than or equal to ~'s power", that power as the spell is cast (CR 603.2), as it
       // last existed on the battlefield once it has left (CR 113.7a, 608.2h).
       if (d.mvMaxPowerOf && (item ? spellManaValue(s, item) : defMv(ev.card)) > sourcePowerNow(s, d.mvMaxPowerOf)) continue;
+      // Havengul Lich (round 400): only that card, cast from the graveyard it was in as that object (CR 400.7, 601.2a; a
+      // spell keeps the zone count it had there, castSpell).
+      if (d.card && !(spell && spell.id === d.card.id && (spell.zoneChanges ?? 0) === d.card.zc && spell.castFrom === "graveyard")) continue;
       if (d.loyalty === "only" || d.exhaust || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
@@ -2439,7 +2442,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Has storm" (Crackling Spellslinger): likewise the spell's own storm ability (CR 702.40a).
         if (spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: STORM_BODY, cause: ev.stackId });
       }
-      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}) });
+      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}), ...(d.sourceZc !== undefined ? { sourceZc: d.sourceZc } : {}) });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired) && (!t.ifSpent || spentMeets(ev.spent, t.ifSpent)) && (!t.castFromHand || spell.castFrom === "hand") && (!t.castNotFromExile || spell.castFrom !== "exile"), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)

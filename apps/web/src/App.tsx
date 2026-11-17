@@ -219,6 +219,7 @@ import {
   spellManaValue,
   blockWithoutCompany,
   showGrantSource,
+  gainedFrom,
   sameName,
   costChoiceShares,
   mayPayUse,
@@ -3397,7 +3398,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             </span>
           ))}
           {m.grantedAbilities.length > 0 && (
-            <span className="kw" title={m.grantedAbilities.map((t) => `Has "${showGrantSource(t).replace(/~/g, c.name)}"`).join("\n")}>
+            <span className="kw" title={m.grantedAbilities.map((t) => (gainedFrom(t) !== undefined ? `Has all activated abilities of ${gainedFrom(t)} (as it had them then)` : `Has "${showGrantSource(t).replace(/~/g, c.name)}"`)).join("\n")}>
               +{m.grantedAbilities.length} {m.grantedAbilities.length === 1 ? "ability" : "abilities"}
             </span>
           )}

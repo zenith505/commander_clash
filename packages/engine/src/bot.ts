@@ -7068,6 +7068,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // for a card there we could pay for afterwards.
       const yardCast = ab.body.effects.find((e) => e.type === "graveyardCastThisTurn");
       if (yardCast?.type === "graveyardCastThisTurn") {
+        // Havengul Lich (round 400): a target card in any graveyard; bots don't pick one to cast yet.
+        if (yardCast.what) continue;
         const unused = (s.graveGrants ?? []).some((g) => g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key));
         const mana = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost)) - (ab.tap ? 1 : 0);
         const worth = player(s, pid).graveyard.some((c) => { const d = defOf(s, obj(s, c)); return !!d.manaCost && printedMatches(yardCast.filter, d) && mv(s, c) >= 2 && mv(s, c) <= mana; });

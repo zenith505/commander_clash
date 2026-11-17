@@ -4245,6 +4245,21 @@ export type Effect =
    */
   | { type: "chooseLinkedCard"; filter: TargetSpec }
   /**
+   * Quicksilver Elemental, Grell Philosopher, Havengul Lich (round 400): "`what` gains all activated abilities of `from`
+   * until end of turn": the activated abilities, mana abilities among them (CR 605.1a), `from` has as this resolves, locked
+   * in then (CR 611.2c), as abilities of each of `what` (the permanents there now, CR 611.2c), "~" in them being that
+   * permanent (rulings). A layer 6 effect (CR 613.1f) whose text carries them (grants.ts gainedAbilityText). `blueAsAny`:
+   * "You may spend blue mana as though it were mana of any color to activate those abilities" (CR 609.4b), those only.
+   */
+  | { type: "gainActivatedOf"; what: ObjRef; from: ObjRef; blueAsAny?: true }
+  /**
+   * Havengul Lich (round 400): "When you cast it this turn, ~ gains all activated abilities of that card until end of
+   * turn.": a delayed trigger (CR 603.7) on that card (`what`, in a graveyard, as the object it is now, CR 400.7) being
+   * cast this turn by this ability's controller, from wherever and however (GameState.nextCast `card`). The abilities are
+   * the card's as it was in the graveyard (rulings), taken now; the trigger resolves before the spell (rulings).
+   */
+  | { type: "whenCastGainsActivated"; what: ObjRef }
+  /**
    * Mystic Reflection: "The next time one or more creatures or planeswalkers enter this turn, they enter as copies of the
    * chosen creature": a replacement effect for the next such event (CR 614.1c, 707.5), see GameState.nextEntersAsCopy.
    */
@@ -5452,7 +5467,7 @@ export type Effect =
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
-  | { type: "graveyardCastThisTurn"; filter: TargetSpec; /** The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types." */ rider?: GraveCastRider; /** Locke: only the cards the mill before put into graveyards, any player's (GameState.graveGrants `cards`). */ milled?: true; /** Whispersteel Dagger: "from that player's graveyard": the trigger's player's, not yours. */ fromYardOf?: PlayerRef; /** Whispersteel Dagger: "and you may spend mana as though it were mana of any color to cast that spell". */ anyType?: true }
+  | { type: "graveyardCastThisTurn"; filter: TargetSpec; /** The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types." */ rider?: GraveCastRider; /** Locke: only the cards the mill before put into graveyards, any player's (GameState.graveGrants `cards`). */ milled?: true; /** Havengul Lich (round 400): only this card (a target card in any graveyard), as the object it is now (GameState.graveGrants `cards`). */ what?: ObjRef; /** Whispersteel Dagger: "from that player's graveyard": the trigger's player's, not yours. */ fromYardOf?: PlayerRef; /** Whispersteel Dagger: "and you may spend mana as though it were mana of any color to cast that spell". */ anyType?: true }
   /**
    * For the rest of the turn, its controller may cast spells (`cast`: those cards) and/or play lands (`lands`) from their
    * graveyard, as many as they like, paying their costs and following their timing rules (rulings on Forgotten Cellar;
@@ -7472,6 +7487,8 @@ export interface ActivatedAbility {
   rollCost?: number;
   /** Another permanent's ability that this one has through "~ has all activated abilities of ..." (CompiledCard.borrows). */
   borrowed?: true;
+  /** Grell Philosopher (round 400): an ability gained with "You may spend blue mana as though it were mana of any color to activate those abilities" (CR 609.4b). */
+  blueAsAny?: true;
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
   spendOnlyChosenColor?: true;
   /** "{X}: ... Spend only black mana on X." (Crypt Rats): with {X} its whole mana cost, only mana of these types pays it. */
@@ -7731,6 +7748,8 @@ export type ManaProduce =
  */
 export interface ManaAbility {
   text: string;
+  /** Grell Philosopher (round 400): a mana ability gained with "you may spend blue mana as though it were mana of any color to activate those abilities" (CR 609.4b). */
+  blueAsAny?: true;
   /** Mana Cache (round B236): "Any player may activate this ability" (CR 602.2): its activator controls it (CR 113.8) and gets the mana. */
   anyPlayer?: true;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
@@ -9432,6 +9451,12 @@ export interface CompiledCard {
    * ~'s abilities." (CR 609.4b): every activated ability it has, mana abilities and borrowed ones among them (CR 602.1).
    */
   spendAnyColorOwnAbilities?: true;
+  /**
+   * Quicksilver Elemental (round 400): "You may spend blue mana as though it were mana of any color to pay the activation
+   * costs of ~'s abilities." (CR 609.4b): blue mana pays any colored symbol of every activated ability it has, mana and
+   * gained ones among them (CR 602.1); it can't pay {C} (colorless isn't a color, CR 105.1).
+   */
+  spendBlueAnyColorOwnAbilities?: true;
   /**
    * River Song (round 382): "You draw cards from the bottom of your library rather than the top.": every card its
    * controller draws while it's on the battlefield, not only in the draw step (rulings); it's a draw like any other.

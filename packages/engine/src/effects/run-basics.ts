@@ -493,7 +493,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "graveyardCastThisTurn": {
       // Locke: the cards milled, as they are now (CR 400.7).
-      const cards = e.milled ? [...(s.resolving?.milled ?? [])] : undefined;
+      // Havengul Lich (round 400): the target card, still in its graveyard as that object (CR 400.7).
+      const cards = e.what ? objects(s, e.what, ctx).filter((o) => o.zone === "graveyard").map((o) => ({ id: o.id, zc: o.zoneChanges ?? 0 })) : e.milled ? [...(s.resolving?.milled ?? [])] : undefined;
       if (cards && !cards.length) return;
       const yardOf = e.fromYardOf ? players(s, e.fromYardOf, ctx)[0] : undefined;
       if (e.fromYardOf && yardOf === undefined) return;

@@ -176,7 +176,7 @@ line blocks.
    discard a card", "the discarded card's mana value", "shuffle your library" and "target creature other than this
    creature".
    Out after round 174: Radagast the Brown (done in round 295) and Conjurer's Mantle (done in round 295) ("a card that shares a creature type with" a
-   creature, among the cards looked at), Quicksilver Elemental (gaining a creature's activated abilities), Secret of
+   creature, among the cards looked at), Quicksilver Elemental (done in round 400) (gaining a creature's activated abilities), Secret of
    Bloodbending (controlling a player), Chiss-Goria, Forge Tyrant (granting affinity for artifacts), Molecule Man
    (done in round 274), Confiscation Coup (done in round 273; paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
    Osseous Sticktwister (a punisher read back with "didn't"), Craig
@@ -221,7 +221,7 @@ line blocks.
    cost" (Zaxara, Nev, Owlin Spiralmancer, Lattice Library, Geometer's Arthropod), "enchanted creature or enchantment
    creature" (Feast of Dreams, Nyx Herald, Kestia, Temple Thief).
    Out after round 176: Extract Brain (an opponent chooses X cards from their hand for you to look at), Divergent Transformations and Chaos Mutation (both done in round 311) (each player's replacement
-   in APNAP order), Black Panther, Wakandan King (done in round 275), Grell Philosopher (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
+   in APNAP order), Black Panther, Wakandan King (done in round 275), Grell Philosopher (done in round 400) (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
    replacement), Etrata, Deadly Fugitive (a granted turn-face-up ability and cloak), The Creation of Avacyn (turning
    the exiled card face up), Pawpatch Recruit ("target creature other than that
    creature" needs the trigger's subject at target choice), Jhoira's Timebug and Greater Gargadon (suspended cards),
@@ -468,7 +468,7 @@ line blocks.
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
    Appropriation, Ixhel (done in round 273), Cybership, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon (done in round 304), Hourglass of the Lost, Kaya the
-   Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
+   Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich (done in round 400), Out of Time, Breath of
    Fury, Firkraag, Tam, Ivy, Disorienting Choice (done in round 330), Endless Sands, Tyvar the Bellicose (done in round 330), Sidisi, Pir's Whim, Eruth,
    Command the Dreadhorde.
    Round 191 went on from the top: base power and toughness "and are Juggernauts in addition to their other creature
@@ -2484,7 +2484,7 @@ line blocks.
    rounds 348 to 352 and B188 to B191 (31,209 with B192 to B196). The compiled text of every other card is unchanged.
    Bots always copy when asked.
    Out after round 353 (looked at, not done): Spectral Searchlight (done in round 373) (still out: another player chooses the color of the
-   mana it adds, in the middle of a mana ability); Quicksilver Elemental ("gains all activated abilities of target
+   mana it adds, in the middle of a mana ability); Quicksilver Elemental (done in round 400) ("gains all activated abilities of target
    creature until end of turn" and "You may spend blue mana as though it were mana of any color to pay the activation
    costs of ~'s abilities": abilities gained from a permanent for a while, and a mana rule for one source's abilities);
    Sudden Substitution (control of a spell exchanged with a creature's, then new targets chosen by the spell's new
@@ -3235,8 +3235,8 @@ line blocks.
    players' Cutpurse effects the would-be controller chooses the order, rulings, a choice in the middle of every token
    creation); Kraven the Hunter ("a creature an opponent controls with the greatest power among creatures that player
    controls dies": the comparison as it died, with the others leaving at the same time); Helm of Kaldra ("Attach those
-   Equipment to it": which ones when you control several with a name isn't settled by its rulings); Quicksilver Elemental
-   and Grell Philosopher (still out: gaining another permanent's activated abilities for a while); Wayta, Trainer Prodigy,
+   Equipment to it": which ones when you control several with a name isn't settled by its rulings); Quicksilver Elemental (done in round 400)
+   and Grell Philosopher (done in round 400) (still out: gaining another permanent's activated abilities for a while); Wayta, Trainer Prodigy,
    Archelos, Lagoon Mystic and the rest above rank 9,000 (still out, for the reasons in their earlier lists).
    Polish: Manascape Refractor lists one mana ability for each different land ability (Thriving Grove's shows "or one mana
    of the chosen color" though it adds only {G} there).
@@ -3636,6 +3636,28 @@ line blocks.
    only once each turn: no per-ability use count for borrowed abilities yet); Kylox's Voltstrider and Ogre Battlecaster
    (still out, for the reasons in their earlier lists); Valki, God of Lies and the rest of `npm run popular` above rank
    15,000 (still out, for the reasons in their earlier lists).
+   Round 400 went on with "gains all activated abilities of ... until end of turn" (Effect gainActivatedOf,
+   effects/run-round400.ts), out since round 173: the lender's activated abilities as the ability resolves (CR 611.2c),
+   mana abilities among them (CR 605.1a), not equip or loyalty ones nor ones that work from another zone (as the
+   "has all activated abilities of" borrowing), not bound to the lender's own choices (cards.ts abilitiesOf `unbound`);
+   kept after the lender leaves; given in layer 6 (CR 613.1f) as an `addAbility` text carrying them compiled
+   (grants.ts gainedAbilityText, "~" in them the permanent that gains them, rulings). Quicksilver Elemental's "{U}: This
+   creature gains all activated abilities of target creature until end of turn." and "You may spend blue mana as though it
+   were mana of any color to pay the activation costs of this creature's abilities." (CompiledCard
+   spendBlueAnyColorOwnAbilities, spend.ts blueAsAny: blue pays any colored symbol, not {C}, CR 609.4b); Grell
+   Philosopher's enters and upkeep trigger, each Horror you control gaining an opponent's artifact's abilities, "You may
+   spend blue mana as though it were mana of any color to activate those abilities." (ActivatedAbility and ManaAbility
+   blueAsAny, those only); Havengul Lich's "{1}: You may cast target creature card in a graveyard this turn. When you cast
+   it this turn, this creature gains all activated abilities of that card until end of turn." (graveyardCastThisTurn
+   `what`: a graveGrants permission for that card in any graveyard, its costs paid and timing followed, rulings; Effect
+   whenCastGainsActivated: a delayed trigger on that card being cast from that graveyard, GameState.nextCast `card`, its
+   printed abilities, resolving before the spell, rulings). Bots don't activate the Lich's ability yet. Browser tests
+   click through Quicksilver's gain and the ping it gains, and the Lich's target, the cast from Ana's graveyard and its
+   gained ping. +3, 31,597 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 400 (looked at, not done): Mairsil, the Pretender (each borrowed ability only once each turn); Kylox's
+   Voltstrider and Ogre Battlecaster (still out, for the reasons in their earlier lists); Guff Rewrites History, Sunken
+   Palace, Ulalek, Surge to Victory and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in
+   their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5282,7 +5304,7 @@ line blocks.
    Steward of the Harvest, Agent's Toolkit (done in round 296), Heroes in a Half Shell, Ran and
    Shaw, Unstable Glyphbridge (done in round 328), From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
-   Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
+   Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental (done in round 400), Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man (done in round 274), Confiscation Coup (done in round 273), Zoyowa Lava-Tongue, Role Reversal (done in round 273), Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister; and from before round 172: Grindstone, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite (done in round 274), Mazemind Tome, Asmodeus the Archfiend (done in round 297), Temporal

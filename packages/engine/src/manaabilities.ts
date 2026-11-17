@@ -648,7 +648,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
   const payCost = manaAbilityCostOf(s, pid, o, ab);
-  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o })) return "not enough mana";
+  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o, ...(ab.blueAsAny ? { blueAny: true as const } : {}) })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);

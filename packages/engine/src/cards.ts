@@ -406,16 +406,20 @@ export function printedManaAbilities(c: CompiledCard): CompiledCard {
  * The abilities an object has right now: its card's, unless an effect removed them, then the ones effects
  * gave it (CR 613.1f).
  */
-export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
+/**
+ * `unbound`: without its choices filled in ("the chosen name", "the chosen color"): an ability another object gains from it
+ * (round 400) refers to that object's choices, not this one's (CR 607.2a; one never made matches nothing).
+ */
+export function abilitiesOf(s: GameState, o: GameObject, unbound = false): CompiledCard {
   const c = characteristics(s, o);
   let own = withGranted(c.hasPrintedAbilities ? withoutFlanking(withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics), c.flankingLost) : c.printedManaOnly ? printedManaAbilities(compileCard(defOf(s, o))) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
-  if (o.chosen?.name !== undefined) own = withChosenName(own, o.chosen.name);
+  if (o.chosen?.name !== undefined && !unbound) own = withChosenName(own, o.chosen.name);
   // "Return target card of the chosen type" (Dawn-Blessed Pennant): the creature type chosen as it entered. "Destroy target
   // permanent of the chosen color" (Pentarch Paladin): the color.
-  if (o.chosen?.type !== undefined || o.chosen?.color !== undefined) own = withChosenType(own, o.chosen);
+  if ((o.chosen?.type !== undefined || o.chosen?.color !== undefined) && !unbound) own = withChosenType(own, o.chosen);
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];

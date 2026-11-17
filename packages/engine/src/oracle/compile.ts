@@ -124,6 +124,7 @@ import { round396Line } from "./round396";
 import { round397Line } from "./round397";
 import { round398Line } from "./round398";
 import { round399Line } from "./round399";
+import { round400Line } from "./round400";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -6293,6 +6294,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round398Line(line, raw, out, isSpell)) continue;
     // Round 399's whole lines (oracle/round399.ts).
     if (round399Line(line, raw, out, isSpell)) continue;
+    // Round 400's whole lines (oracle/round400.ts).
+    if (round400Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

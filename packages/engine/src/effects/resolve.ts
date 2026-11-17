@@ -620,7 +620,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }
   // The objects a batch trigger was about, still where they went (CR 400.7): permanents that entered, cards put into a graveyard.
-  if (ref.ref === "eventGroup") return (ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] && (s.objects[g.id]!.zoneChanges ?? 0) === g.zc ? [s.objects[g.id]!] : []));
+  // Pure Intentions (round B240): "those cards from your graveyard": only those still there (CR 400.7), not a madness card
+  // in exile or one Library of Leng put on top of the library.
+  if (ref.ref === "eventGroup") return (ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] && (s.objects[g.id]!.zoneChanges ?? 0) === g.zc && (!ref.inYourGraveyard || (s.objects[g.id]!.zone === "graveyard" && s.objects[g.id]!.owner === ctx.controller)) ? [s.objects[g.id]!] : []));
   if (ref.ref === "pairedWithTarget") {
     const t = objects(s, { ref: "target", index: ref.index }, ctx)[0];
     const other = t && pairedWith(s, t);

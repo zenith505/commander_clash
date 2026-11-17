@@ -2723,6 +2723,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const moved = card && s.zoneBatch?.find((m) => m.id === ev.id && m.zc === (card.zoneChanges ?? 0));
     if (moved) moved.discardedBy = ev.player;
     else if (card) (s.zoneBatch ??= []).push({ id: ev.id, zc: card.zoneChanges ?? 0, from: "hand", to: card.zone, owner: card.owner, card: card.cardId, discardedBy: ev.player });
+    // Pure Intentions (round B240): the controller of the spell or ability that made them discard (none for a cost).
+    const batched = card && s.zoneBatch?.find((m) => m.id === ev.id && m.zc === (card.zoneChanges ?? 0));
+    if (batched && ev.cause !== undefined) batched.discardCause = ev.cause;
     // "Whenever you discard a card", "whenever a player cycles a card": once for each card (CR 603.2c). "That player" is
     // the one who discarded.
     for (const id of s.battlefield) {
@@ -3533,6 +3536,8 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   // at the same time, or is the card, doesn't stop them (rulings).
   if (b.what === "toGraveyard" && m.from === "battlefield" && m.to === "graveyard" && m.chars?.types.includes("Creature") && dyingLocked(s, false)) return false;
   if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && !(b.other && m.id === w.id) && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : b.from === "handOrLibrary" ? m.from === "hand" || m.from === "library" : m.from === b.from));
+  // Pure Intentions: "a spell or ability an opponent controls causes you to discard cards" (rulings: whoever chose them).
+  if (b.byOpponent && (m.discardCause === undefined || m.discardCause === you)) return false;
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }
 

@@ -2428,7 +2428,8 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
     const given = c.madness ? undefined : grantedMadness(s, o);
     const madness = c.madness ?? given;
     if (!madness) {
-      moveObject(s, id, "graveyard");
+      // Abandoned Sarcophagus (round B240): a card discarded to pay a cycling cost was cycled (CR 702.29a).
+      moveObject(s, id, "graveyard", cycled ? { cycled: true } : {});
       if (o.zone === "graveyard") o.discardedTurn = s.turn; // mayhem (CR 702.187b)
       continue;
     }

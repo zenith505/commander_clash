@@ -1567,7 +1567,7 @@ export type ObjRef =
   /** "All Auras attached to that creature" (Treefolk Mystic): the permanents matching `filter` attached to the subject as this resolves. */
   | { ref: "attachedToSubject"; filter: TargetSpec; /** Corrosive Ooze: once the subject has left the battlefield, the ones attached to it just before it left, still on the battlefield as those objects (rulings, CR 400.7). */ lastKnown?: true }
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
-  | { ref: "eventGroup" }
+  | { ref: "eventGroup"; /** Pure Intentions (round B240): "return those cards from your graveyard": only those of them still in the graveyard of the ability's controller. */ inYourGraveyard?: true }
   /**
    * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
    * hand"). `moved`: an Aura's "when enchanted creature dies, return this card ..." (Angelic Destiny), the Aura card in a
@@ -5413,7 +5413,7 @@ export type Effect =
    */
   /** "Until end of turn, you may look at the top card of your library any time and you may play ... from the top of your library" (Gwenom): GameState.topTurn. */
   | { type: "topTurn"; top: FromTop }
-  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: "by foraging in addition to paying their other costs" (CR 601.2f-h): the costs of a spell cast this way. */ costs?: AdditionalCost[]; /** Osteomancer Adept: "If you cast a spell this way, that creature enters with a finality counter on it" (CR 614.1c). */ entersWith?: { counter: CounterKind; n: number }; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
+  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: "by foraging in addition to paying their other costs" (CR 601.2f-h): the costs of a spell cast this way. */ costs?: AdditionalCost[]; /** Osteomancer Adept: "If you cast a spell this way, that creature enters with a finality counter on it" (CR 614.1c). */ entersWith?: { counter: CounterKind; n: number }; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true; /** Bösium Strip (round B240): "from the top of your graveyard": only the card on top of its owner's graveyard as it's cast (CR 404.1, 404.2). */ topOnly?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** Will Kenrith: "Until your next turn, instant, sorcery, and planeswalker spells that player casts cost {2} less to cast": the spells this player casts (the target player), until this ability's controller's next turn (with `untilYourNextTurn`). */ who?: PlayerRef; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount; /** Cheering Fanatic: "spells with the chosen name": the card name chosen as it resolves, locked into `mod.filter.named`. */ chosenName?: true }
   /**
@@ -7295,6 +7295,8 @@ export interface BatchTrigger {
   eachPlayer?: true;
   /** With `milled`: once for the whole event, whoever milled them (The Wise Mothman, rulings), not once for each player. */
   together?: true;
+  /** `discards` (Pure Intentions, round B240): "a spell or ability an opponent controls causes you to discard cards": only the cards an opponent's spell or ability made `whose` discard (ZoneMove.discardCause), not a cost. */
+  byOpponent?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
   sacrificed?: true;
 }
@@ -8264,7 +8266,7 @@ export interface CompiledCard {
    * (not tokens or copies of spells, rulings) going to the graveyard of the player it enchants, its owner's (CR 404.2).
    */
   graveyardToLibraryBottom?: true;
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[]; /** Anafenza, the Foremost: "a nontoken creature ... would die or a creature card not on the battlefield": of one of these card types as it is in the zone it's leaving (rulings), a permanent's from the layers. */ typesNow?: string[] };
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true; permanents?: true; /** Sanctifier en-Vec: "a black or red permanent, spell, or card not on the battlefield": any one of these colors, as it is in the zone it's leaving (rulings), a permanent's from the layers. */ colorsNow?: Color[]; /** Anafenza, the Foremost: "a nontoken creature ... would die or a creature card not on the battlefield": of one of these card types as it is in the zone it's leaving (rulings), a permanent's from the layers. */ typesNow?: string[]; /** Abandoned Sarcophagus (round B240): "a card that has a cycling ability ... and it wasn't cycled": one with cycling or typecycling (CR 702.29a, 702.29e) as it is in the zone it's leaving, a permanent's from the layers (rulings: one that lost it goes to the graveyard), not discarded to pay a cycling cost. */ cyclingNotCycled?: true };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */

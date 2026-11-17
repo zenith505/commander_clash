@@ -546,6 +546,8 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
       // Myr Welder: the cards its exile ability exiled, linked to it as the object it is now (CR 607.2a, 400.7); their
       // printed abilities (rulings: only activated ones, "~" in them being this permanent).
       for (const l of s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []) {
+        // Koh, the Face Stealer: only the last chosen card (CR 607.2d), still that card in exile (CR 400.7).
+        if (b.chosen && (o.chosen?.card?.id !== l.id || o.chosen.card.zc !== l.zc)) continue;
         const card = s.objects[l.id];
         if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
       }
@@ -604,9 +606,42 @@ function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledC
   if (!hit) {
     const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
     hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l) => l.activated.filter(usable).map((a) => ({ ...a, borrowed: true as const })))] };
+    // Idris, Koh (round 399): "all activated and triggered abilities": the lenders' triggered abilities too.
+    if (own.borrows!.triggered) hit.triggers = [...own.triggers, ...lenders.flatMap((l) => l.triggers.filter(lendableTrigger))];
     byKey.set(key, hit);
   }
   return hit;
+}
+
+/**
+ * A lender's triggered ability that a permanent borrowing "all triggered abilities" (CompiledCard.borrows triggered) gets:
+ * those that work on the battlefield, not ones that work only from a graveyard, exile, the command zone (eminence) or the
+ * stack ("When you cast ~", CR 603.6, 113.6).
+ */
+function lendableTrigger(t: TriggeredAbility): boolean {
+  return !t.zone && !t.eminence && t.event !== "selfCast";
+}
+
+/**
+ * Idris, Soul of the TARDIS and Koh, the Face Stealer (round 399): the exiled cards (object ids) whose triggered abilities
+ * this permanent has now, kept as it leaves the battlefield so its leaves-the-battlefield abilities among them look back
+ * (CR 603.10a; GameState.leftTogether borrowed).
+ */
+export function borrowedTriggerSources(s: GameState, o: GameObject): ObjectId[] | undefined {
+  if (o.zone !== "battlefield" || !characteristics(s, o).hasPrintedAbilities) return undefined;
+  const b = compileCard(defOf(s, o)).borrows;
+  if (!b?.triggered || !b.linked) return undefined;
+  const ids = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).flatMap((l) => {
+    const card = s.objects[l.id];
+    if (b.chosen && (o.chosen?.card?.id !== l.id || o.chosen.card.zc !== l.zc)) return [];
+    return card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card)) ? [card.id] : [];
+  });
+  return ids.length ? ids : undefined;
+}
+
+/** The triggered abilities a permanent had from these exiled cards as it left (borrowedTriggerSources). */
+export function borrowedTriggersOf(s: GameState, ids: ObjectId[] | undefined): TriggeredAbility[] {
+  return (ids ?? []).flatMap((id) => (s.objects[id] ? compileCard(defOf(s, s.objects[id]!)).triggers.filter(lendableTrigger) : []));
 }
 
 /** The cards in exile haunting this permanent (CR 702.55b), for showing it. */

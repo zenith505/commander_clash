@@ -11727,6 +11727,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a30907c0-fbde-4fd3-a8c7-f304305fcea7",
+  "name": "Doomed Traveler",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "When this creature dies, create a 1/1 white Spirit creature token with flying.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "01bc8bfa-2e46-4324-a848-cc68bc9330d0",
   "name": "Doomsday Confluence",
   "manaCost": "{X}{X}{B}",
@@ -20585,6 +20616,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5b5ef43b-13fd-4461-8d2d-18be65e9a790",
+  "name": "Ichor Wellspring",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters or is put into a graveyard from the battlefield, draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "brr",
+  "releasedAt": "2022-11-18",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a200daec-983c-4ea6-ae98-1c963b50fbb1",
   "name": "Identity Thief",
   "manaCost": "{2}{U}{U}",
@@ -20610,6 +20663,44 @@
   "commanderLegal": "legal",
   "set": "emn",
   "releasedAt": "2016-07-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "abb5210f-597c-450d-9239-6253a9136680",
+  "name": "Idris, Soul of the TARDIS",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Incarnation",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Incarnation"
+  ],
+  "oracleText": "Vanishing 3\nImprint — When Idris enters, exile another artifact you control until Idris leaves the battlefield.\nIdris has all activated and triggered abilities of the exiled card and gets +X/+X, where X is the exiled card's mana value.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Vanishing",
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -23868,6 +23959,39 @@
   "set": "chk",
   "releasedAt": "2004-10-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2bbb33e3-7d03-457c-92bb-b0c943615fa1",
+  "name": "Koh, the Face Stealer",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Shapeshifter Spirit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter",
+   "Spirit"
+  ],
+  "oracleText": "When Koh enters, exile up to one other target creature.\nWhenever another nontoken creature dies, you may exile it.\nPay 1 life: Choose a creature card exiled with Koh.\nKoh has all activated and triggered abilities of the last chosen card.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

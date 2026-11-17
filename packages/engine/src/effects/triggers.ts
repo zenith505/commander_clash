@@ -2,7 +2,7 @@ import { exiledWithNamed } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
-import { abilitiesOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
+import { abilitiesOf, borrowedTriggersOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
 import { whileTappedHolds, checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
@@ -161,7 +161,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId; /** The controllers before of all the permanents whose control changed at the same time. */ before?: Record<ObjectId, PlayerId> }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; /** Idris, Koh (round 399): the exiled cards whose triggered abilities it had (CR 603.10a). */ borrowed?: ObjectId[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Attacking creatures an effect made blocked, by no creature (Effect becomeBlocked, CR 509.1h). */
@@ -959,7 +959,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
-    const lastAbilities = withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers;
+    const lastAbilities = [...withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers, ...borrowedTriggersOf(s, ev.borrowed)];
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
     if (diesLocked) locked = () => true;
     add(
@@ -1050,7 +1050,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const src = s.objects[left.id];
         if (!src) continue;
         if (src.zone === "battlefield") continue; // it already came back as a new object
-        consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, left.attachedTo, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
       // A delayed trigger about a creature (Touch of Moonglove): the creatures that one dealt damage this turn.
       fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers, (floating as { about?: { id: ObjectId } } | null)?.about?.id));
@@ -1077,7 +1077,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield") continue;
-        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
     }
     // Jaws, Relentless Predator: "Whenever a noncreature artifact is sacrificed or destroyed": anyone's, for whatever
@@ -1091,7 +1091,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield") continue;
-        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
@@ -1110,7 +1110,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield") continue;
-        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
       // Curious Cadaver: "When you sacrifice a Clue, return ~ from your graveyard to your hand": an ability of the card in
       // its owner's graveyard (CR 113.6m), not of a card that left the battlefield in the same event.
@@ -2953,7 +2953,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const m of ev.moves) {
       const w = s.objects[m.id];
       if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object
-      batchWatch(w, m.controller!, withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, true);
+      batchWatch(w, m.controller!, [...withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, ...borrowedTriggersOf(s, m.borrowed)], true);
     }
     // Golgari Brownscale: "When ~ is put into your hand from your graveyard": the card's ability, in the hand, under its
     // owner's control (CR 113.8), the same object that arrived.

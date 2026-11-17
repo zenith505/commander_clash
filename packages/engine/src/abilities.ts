@@ -4238,6 +4238,13 @@ export type Effect =
    */
   | { type: "becomeCopyOfLinked"; what: ObjRef }
   /**
+   * Koh, the Face Stealer (round 399): "Choose a creature card exiled with ~": one of the cards its exile abilities exiled
+   * (linked, CR 607.2a, 607.4) that's a creature card in exile now, chosen as this resolves (not a target; chooseOption
+   * "kohCard" when there are several), remembered on the source as the object it is (Chosen.card, CR 607.2d, 400.7) for
+   * "the last chosen card". With none, nothing is chosen and the last choice stands.
+   */
+  | { type: "chooseLinkedCard"; filter: TargetSpec }
+  /**
    * Mystic Reflection: "The next time one or more creatures or planeswalkers enter this turn, they enter as copies of the
    * chosen creature": a replacement effect for the next such event (CR 614.1c, 707.5), see GameState.nextEntersAsCopy.
    */
@@ -8306,7 +8313,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true; /** "All cards in exile with brain counters on them" (Rex, Cyber-Hound): every player's exiled cards with a counter of this kind, however they got it. */ exiledWithCounter?: CounterKind };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true; /** "All cards in exile with brain counters on them" (Rex, Cyber-Hound): every player's exiled cards with a counter of this kind, however they got it. */ exiledWithCounter?: CounterKind; /** "All activated and triggered abilities" (Idris, Soul of the TARDIS; Koh, the Face Stealer; round 399): the lenders' triggered abilities too, those that work on the battlefield. */ triggered?: true; /** With `linked`, Koh: "of the last chosen card": only the card its "choose a creature card exiled with ~" chose last (Chosen.card, CR 607.2d), while it's still that card in exile. */ chosen?: true };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while

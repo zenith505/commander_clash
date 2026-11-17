@@ -2062,6 +2062,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const life = (o: string) => player(s, Number(o.split(">")[1])).life;
       return [{ type: "chooseOption", player: pid, choice: moves.sort((a, b) => life(b) - life(a))[0] ?? "none" }];
     }
+    // Koh, the Face Stealer (round 399): the exiled creature card with the most abilities to lend.
+    if (pend.kind === "chooseOption" && pend.what === "kohCard") {
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => lendWorth(s, b) - lendWorth(s, a))[0]! }];
+    }
     // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
     if (pend.kind === "chooseOption" && pend.what === "aegisCopy") {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
@@ -2438,7 +2442,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Garth One-Eye (round 377): its copy before combat, rather than attacking with it.
       // Brutal Hordechief (round 378): the opponents' blocks before we attack.
       // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Koh, the Face Stealer (round 399): its card chosen before combat, so a borrowed attack ability works this turn.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -5972,6 +5977,31 @@ function reflexiveWorth(s: GameState, pid: PlayerId, body: AbilityBody, sourceId
 }
 
 /** A permanent's printed worth, to compare what a copy effect would make it: size for creatures, else mana value. */
+/**
+ * Koh, the Face Stealer (round 399): what an exiled card is worth lending its activated and triggered abilities (each
+ * one counts, its mana value breaks ties).
+ */
+function lendWorth(s: GameState, id: ObjectId): number {
+  const o = s.objects[id];
+  if (!o) return -1;
+  const d = defOf(s, o);
+  const c = compileCard(d);
+  return 10 * (c.triggers.filter((t) => !t.zone && !t.eminence && t.event !== "selfCast").length + c.activated.filter((a) => !a.zone).length) + defMv(d);
+}
+
+/**
+ * Koh's "Pay 1 life: Choose a creature card exiled with ~": only when there's a card worth more than the one chosen last
+ * (once each, so no paying life over and over), and with life to spare.
+ */
+function kohChoiceWorth(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility): boolean {
+  const e = ab.body.effects[0];
+  if (ab.body.effects.length !== 1 || e?.type !== "chooseLinkedCard" || player(s, pid).life <= (ab.lifeCost ?? 0) + 5) return false;
+  if (s.stack.some((x) => x.sourceId === o.id && x.kind === "ability")) return false;
+  const linked = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && !s.objects[l.id]!.isToken && printedMatches(e.filter, defOf(s, s.objects[l.id]!)));
+  const cur = o.chosen?.card && linked.some((l) => l.id === o.chosen!.card!.id && l.zc === o.chosen!.card!.zc) ? lendWorth(s, o.chosen.card.id) : -1;
+  return linked.some((l) => lendWorth(s, l.id) > cur && lendWorth(s, l.id) >= 10);
+}
+
 const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + baseToughness(d) : defMv(d));
 
 /**
@@ -6828,6 +6858,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (only && !only(ab, o)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
       if (ab.mana) continue;
+      // Koh, the Face Stealer (round 399): only for a better card to borrow from.
+      if (ab.body.effects.some((e) => e.type === "chooseLinkedCard") && !kohChoiceWorth(s, pid, o, ab)) continue;
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
       if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
       // Harvest Mage (round B224): a card for lands that make a color of our choice this turn, which no payment plans
@@ -6886,7 +6918,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // only with at most one card in our own hand (little to lose); its sorcery timing is our main phase anyway.
       const vessel = ab.body.effects.some((e) => e.type === "noHandPlaysUntilYourNextTurn");
       if (vessel && player(s, pid).hand.length > 1) continue;
-      if ((ab.exileSelf && !titan && !craft && !vessel) || (freeCost && !necro && !flipNow && !leonin) || ab.station) continue;
+      // Koh, the Face Stealer (round 399): 1 life for a better card to borrow from (weighed above, kohChoiceWorth).
+      const koh = ab.body.effects.some((e) => e.type === "chooseLinkedCard");
+      if ((ab.exileSelf && !titan && !craft && !vessel) || (freeCost && !necro && !flipNow && !leonin && !koh) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       if (lifeSwapHurts(s, pid, ab.body.effects)) continue;

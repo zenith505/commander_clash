@@ -10,7 +10,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -1086,6 +1086,8 @@ export function moveObject(
   const diedModified = fromZone === "battlefield" && to === "graveyard" && wasCreature && diedAsModified(s, o, lastController);
   // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
+  // Idris, Koh (round 399): the triggered abilities it had from exiled cards look back too (CR 603.10a).
+  const borrowed = fromZone === "battlefield" && hadAbilities ? borrowedTriggerSources(s, o) : undefined;
   // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
   const snapshot: GameObject | undefined = fromZone === "battlefield" ? { ...o, counters: lastCounters } : undefined;
   const snapshotKey = cardIdOf(o);
@@ -1093,7 +1095,7 @@ export function moveObject(
   // left, ones leaving at the same time included (they were still in combat then, CR 603.10a).
   const aloneIn = fromZone === "battlefield" ? combatAlone(s, o) : undefined;
   if (fromZone === "battlefield") {
-    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
+    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
@@ -1357,7 +1359,7 @@ export function moveObject(
       ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
       ...(opts.milled && fromZone === "library" ? { milled: true as const } : {}),
       card: fromZone === "battlefield" ? snapshotKey : o.cardId,
-      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
+      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(borrowed ? { borrowed } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
     });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
@@ -1465,7 +1467,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.destroyed ? { destroyed: true as const } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.destroyed ? { destroyed: true as const } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, ...(borrowed ? { borrowed } : {}), counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -11871,6 +11873,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // Lynde, Cheerful Tormentor (round 394): which Curse attached to you goes to which opponent, or none.
     if (r.scratch?.curseMove === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the options offered");
     r.scratch.curseMove = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "kohCard") {
+    // Koh, the Face Stealer (round 399): which creature card exiled with it is chosen.
+    if (r.scratch?.kohCard === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    r.scratch.kohCard = choice;
     continueResolution(s);
     return;
   }

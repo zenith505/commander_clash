@@ -123,6 +123,7 @@ import { round395Line } from "./round395";
 import { round396Line } from "./round396";
 import { round397Line } from "./round397";
 import { round398Line } from "./round398";
+import { round399Line } from "./round399";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1022,6 +1023,8 @@ export function compile(d: CardDef): CompiledCard {
       out.borrows = { filter: { kind: "object", types: ["Artifact", "Creature"], notTypes: [], notColors: [], text: "artifact or creature card" }, top: true };
       continue;
     }
+    // Territory Forge (round 399): "the exiled card" (oracle/round399.ts).
+    if (line === "~ has all activated abilities of the exiled card." && round399Line(line, raw, out, isSpell)) continue;
     // Myr Welder: "~ has all activated abilities of all cards exiled with it"; Dark Impostor, Patchwork Crawler: "all
     // creature cards exiled with it", linked to its one exile ability below (CR 607.2a).
     const borrowLinked = borrow && !borrow[2] && !borrow[3] ? /^all (?:(creature|artifact) )?cards exiled with (?:it|~)$/.exec(borrow[1]!) : null;
@@ -6288,6 +6291,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round397Line(line, raw, out, isSpell)) continue;
     // Round 398's whole lines (oracle/round398.ts).
     if (round398Line(line, raw, out, isSpell)) continue;
+    // Round 399's whole lines (oracle/round399.ts).
+    if (round399Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7850,13 +7855,16 @@ function linkExile(out: CompiledCard) {
     if ((exiles.length !== 1 && !oneAbility) || exiles.some((e) => e.type !== "exile" || e.until)) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
     else for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
   }
-  // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a).
+  // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a). Territory Forge, Idris
+  // (round 399): "the exiled card", Idris's exiled until it leaves the battlefield (a pick, not a target). Koh, the Face
+  // Stealer: "a creature card exiled with ~" is one that any of its exile abilities exiled (CR 607.4).
   if (out.borrows?.linked) {
     const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
-    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> | Extract<Effect, { type: "pick" }> => e.type === "exile" || (e.type === "pick" && e.action === "exile"));
     const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length !== 1 || exiles[0]!.until) out.unsupported.push("(has abilities of exiled cards it can't link to one exile ability)");
-    else exiles[0]!.linked = true;
+    const lasting = (e: (typeof exiles)[number]) => (e.type === "exile" ? !e.until || (e.until === "sourceLeaves" && !!out.borrows!.triggered) : !e.exiledCounter && (!!e.untilSourceLeaves || !!out.borrows!.triggered));
+    if (others || out.spell || !exiles.length || (exiles.length !== 1 && !out.borrows.chosen) || !exiles.every(lasting)) out.unsupported.push("(has abilities of exiled cards it can't link to one exile ability)");
+    else for (const e of exiles) e.linked = true;
   }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,581 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,905 of
+31,594 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,907 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3617,6 +3617,25 @@ line blocks.
    Killer, Celestial Dawn, Titania's Song, Bitter Feud, Breathstealer's Crypt, Swans of Bryn Argoll, Blood of the Martyr,
    Shared Fate, Elemental Resonance, Rhystic Cave, Sharkey, Eye for an Eye, Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
+   Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
+   round 285: Koh, the Face Stealer's "Pay 1 life: Choose a creature card exiled with Koh." and "Koh has all activated and
+   triggered abilities of the last chosen card." (Effect chooseLinkedCard, effects/run-round399.ts: one of the creature
+   cards either of its exile abilities exiled, CR 607.4, chosen as it resolves, chooseOption "kohCard" when there are
+   several, kept as Chosen.card, CR 607.2d; only while that's still the same card in exile and Koh the same object, CR
+   400.7); Idris, Soul of the TARDIS's "exile another artifact you control until Idris leaves the battlefield" (chosen, not
+   targeted, as Yannik's) and "Idris has all activated and triggered abilities of the exiled card and gets +X/+X, where X is
+   the exiled card's mana value." (borrows `triggered`: the lenders' triggered abilities that work on the battlefield;
+   linkedExiledMv); Territory Forge's "This artifact has all activated abilities of the exiled card." (Myr Welder's linked
+   borrowing, mana abilities and a basic land's intrinsic one included, CR 305.6; "~" in them is the Forge, rulings).
+   Borrowed triggered abilities look back as the permanent leaves (CR 603.10a: cards.ts borrowedTriggerSources, kept on
+   the leaving event, GameState.leftTogether and the zone batch), so Koh dying with Doomed Traveler chosen makes a Spirit.
+   Bots choose the exiled card with the most abilities, and pay Koh's life only for a better card than the one chosen. The
+   chosen card shows on Koh. Browser tests click through Koh's pick and the ability it borrows, and Idris's exile pick. +3,
+   31,594 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 399 (looked at, not done): Mairsil, the Pretender (activated abilities of cards with cage counters, each
+   only once each turn: no per-ability use count for borrowed abilities yet); Kylox's Voltstrider and Ogre Battlecaster
+   (still out, for the reasons in their earlier lists); Valki, God of Lies and the rest of `npm run popular` above rank
+   15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

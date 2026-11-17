@@ -121,6 +121,7 @@ import { round392Line } from "./round392";
 import { round394Line } from "./round394";
 import { round395Line } from "./round395";
 import { round396Line } from "./round396";
+import { round397Line } from "./round397";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -6279,6 +6280,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round395Line(line, raw, out, isSpell)) continue;
     // Round 396's whole lines (oracle/round396.ts).
     if (round396Line(line, raw, out, isSpell)) continue;
+    // Round 397's whole lines (oracle/round397.ts).
+    if (round397Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -8153,6 +8156,14 @@ function linkExile(out: CompiledCard) {
   // "When this creature dies, you may put the exiled card into its owner's hand" (Hoarding Dragon): a leaves ability too.
   // Toluz, Clever Conductor: "When ~ dies, put the cards exiled with it into their owner's hand", the cards its discard
   // trigger exiled (round B193).
+  // The Spot, Living Portal (round 397): "When ~ enters, exile up to one target nonland permanent and up to one target
+  // nonland permanent card from a graveyard" with "When ~ dies, put him on the bottom of his owner's library. If you do,
+  // return the exiled cards to their owners' hands": both exiles of its one enters ability are linked (CR 607.2a).
+  const spotEnters = out.triggers.find((t) => t.event === "selfEnters" && exiles.length === 2 && exiles.every((e) => t.body.effects.includes(e)));
+  if (spotEnters && !out.spell && !out.activated.length && returns.length === 1 && returns[0]!.event === "selfDies" && exiles.every((e) => e.type === "exile" && e.what.ref === "target") && allEffects(returns[0]!.body.effects).every((e) => e.type !== "returnLinked" || e.dest === "hand")) {
+    for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
+    return;
+  }
   const discardExile = exiles[0]?.type === "exile" && exiles[0].what.ref === "eventGroup";
   if (exiles.length !== 1 || returns.length !== 1 || (returns[0]!.event !== "selfLeaves" && !(returns[0]!.event === "selfDies" && (exiles[0]!.type === "search" || discardExile)))) {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");

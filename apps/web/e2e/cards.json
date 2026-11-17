@@ -154,6 +154,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ec8e310f-e871-498f-8d80-c3617c5e1433",
+  "name": "Absorbing Man",
+  "manaCost": "{1}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Villain"
+  ],
+  "oracleText": "Vigilance\nAt the beginning of your first main phase, until your next turn, Absorbing Man becomes a copy of up to one target artifact, non-Aura enchantment, or land, except his name is Absorbing Man, he's a legendary 4/4 Human Villain creature in addition to his other types, and he has vigilance.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "eccc9a54-2b56-4a02-9926-258d5b2e25fb",
   "name": "Abundance",
   "manaCost": "{2}{G}{G}",
@@ -21918,6 +21955,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "39b359c1-48b8-43a7-b972-54764eadd2c7",
+  "name": "Jeskai Infiltrator",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Monk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Monk"
+  ],
+  "oracleText": "This creature can't be blocked as long as you control no other creatures.\nWhen this creature deals combat damage to a player, exile it and the top card of your library in a face-down pile, shuffle that pile, then manifest those cards. (To manifest a card, put it onto the battlefield face down as a 2/2 creature. Turn it face up any time for its mana cost if it's a creature card.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Manifest"
+  ],
+  "commanderLegal": "legal",
+  "set": "frf",
+  "releasedAt": "2015-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bcc797b9-d2e5-4fde-8d80-c890c871f344",
   "name": "Jester's Mask",
   "manaCost": "{5}",
@@ -25593,6 +25663,32 @@
   "commanderLegal": "legal",
   "set": "wth",
   "releasedAt": "1997-06-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dba35ac5-7ad3-488a-a006-6b9a1d54eea5",
+  "name": "Loxodon Warhammer",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +3/+0 and has trample and lifelink.\nEquip {3}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-11-28",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -29810,6 +29906,32 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bd9b9772-f5f9-4c6b-913e-7193bea5d0a7",
+  "name": "Oblivion Ring",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile another target nonland permanent.\nWhen this enchantment leaves the battlefield, return the exiled card to the battlefield under its owner's control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -41915,6 +42037,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1111e042-0bce-4819-ab42-9912aed4d930",
+  "name": "Tetsuo, Imperial Champion",
+  "manaCost": "{U}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Samurai",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Samurai"
+  ],
+  "oracleText": "Whenever Tetsuo attacks, if it's equipped, choose one —\n• Tetsuo deals damage equal to the greatest mana value among Equipment attached to it to any target.\n• You may cast an instant or sorcery spell from your hand with mana value less than or equal to the greatest mana value among Equipment attached to Tetsuo without paying its mana cost.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmc",
+  "releasedAt": "2022-09-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7565c101-a479-4812-9d18-63918084bfca",
   "name": "Tetzimoc, Primal Death",
   "manaCost": "{4}{B}{B}",
@@ -42888,6 +43047,42 @@
   "commanderLegal": "legal",
   "set": "msh",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a5dfa7ad-9637-4da8-9ed2-0ac863617d9a",
+  "name": "The Spot, Living Portal",
+  "manaCost": "{3}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Scientist Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scientist",
+   "Villain"
+  ],
+  "oracleText": "When The Spot enters, exile up to one target nonland permanent and up to one target nonland permanent card from a graveyard.\nWhen The Spot dies, put him on the bottom of his owner's library. If you do, return the exiled cards to their owners' hands.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

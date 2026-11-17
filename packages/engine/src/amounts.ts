@@ -1233,11 +1233,15 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (!me) return 0;
       // Animal Friend: not the one that gave this ability, while it's still that object (CR 400.7).
       const ex = c.except;
-      return s.battlefield.filter((id) => {
+      const attached = s.battlefield.filter((id) => {
         const o = s.objects[id]!;
         if (ex && o.id === ex.id && (o.zoneChanges ?? 0) === ex.zc) return false;
         return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
-      }).length;
+      });
+      // Tetsuo, Imperial Champion: the greatest mana value among them, from their mana costs (copy and face-down values
+      // included, X as 0 on the battlefield, CR 202.3, 107.3), 0 with none.
+      if (c.greatestMv) return Math.max(0, ...attached.map((id) => defMv(defOf(s, s.objects[id]!))));
+      return attached.length;
     }
     case "attachedToAffected": {
       const me = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
@@ -1765,6 +1769,8 @@ function describeCount(c: Count): string {
     case "manaSymbols":
       return `#${c.color} mana symbols`;
     case "attachedToSelf":
+      if (c.greatestMv) return `the greatest mana value among ${c.subtypes.join(" and ")} attached`;
+      return `#${c.subtypes.join("/")} attached`;
     case "attachedToAffected":
     case "attachedToHost":
       return `#${c.subtypes.join("/")} attached`;

@@ -4159,6 +4159,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const todo = objects(s, e.what, ctx).filter((o) => o.zone !== "library");
       if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));
       const moved: Record<number, { id: ObjectId; zc: number }[]> = {};
+      if (e.setsDid) s.resolving!.did = false;
       for (const o of todo) {
         let position = e.position;
         if (position === "ownersChoice" || position === "ownersChoiceSecond" || position === "yourChoice") {
@@ -4197,6 +4198,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
         moveObject(s, o.id, "library", { top: position === "top" });
         if (o.zone === "library" && !o.isToken) (moved[o.owner] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        // The Spot, Living Portal: "If you do": the card is in that library now (a commander may have gone elsewhere).
+        if (e.setsDid && o.zone === "library" && !o.isToken) s.resolving!.did = true;
       }
       // Two or more cards put on top (or the bottom) of a library at once: their owner arranges them (CR 401.4), as the
       // instruction ends.

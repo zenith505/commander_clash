@@ -2172,7 +2172,7 @@ line blocks.
    targets); Vault 11: Voter's Dilemma (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
    one of the revealed cards and may cast it free); Hew the Entwood (done in round B204) (sacrifice any number of lands as it resolves);
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
-   Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (the greatest mana value
+   Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (done in round 397) (the greatest mana value
    among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
    Round 284 took the next names from the top that no earlier round looked at: "Each artifact creature card in your
    graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons: each card's own mana cost, none for a
@@ -3575,6 +3575,28 @@ line blocks.
    Out after round 396 (looked at, not done): Secret Invasion (still out: the enchanted creature a copy of the creature
    the Aura exiled, until the Aura leaves); Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility
    Storm, Arvinox and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 397 went on down `npm run popular` and the "Out after round N" lists, most played first, below rank 15,479:
+   Jeskai Infiltrator's "When this creature deals combat damage to a player, exile it and the top card of your library in a
+   face-down pile, shuffle that pile, then manifest those cards." (Effect faceDownPile `what` self and `top` 1; with it
+   gone or a new object as it resolves, only the top card is manifested, rulings); The Spot, Living Portal's "When The
+   Spot enters, exile up to one target nonland permanent and up to one target nonland permanent card from a graveyard."
+   and "When The Spot dies, put him on the bottom of his owner's library. If you do, return the exiled cards to their
+   owners' hands." (both exiles of its one enters ability linked to the dies ability, CR 607.2a, compile.ts linkExile; only
+   this object's, CR 400.7; putInLibrary `setsDid`: a token, gone from the graveyard, or a commander put into the command
+   zone returns nothing, rulings, CR 704.5d, 903.9a); Tetsuo, Imperial Champion's "Whenever Tetsuo attacks, if it's
+   equipped, choose one — ..." (count attachedToSelf `greatestMv`: the greatest mana value among Equipment attached to it
+   as the trigger resolves, 0 with none; the cast mode is castFromHand with a mana value bound; the intervening if checked
+   again on resolution, CR 603.4, rulings); Absorbing Man's "At the beginning of your first main phase, until your next
+   turn, Absorbing Man becomes a copy of up to one target artifact, non-Aura enchantment, or land, except his name is
+   Absorbing Man, he's a legendary 4/4 Human Villain creature in addition to his other types, and he has vigilance."
+   (becomeCopy with those exceptions as copiable values, CR 707.9b, duration "yourNextTurn"). Browser tests click through
+   The Spot's two targets, both of Tetsuo's modes and Absorbing Man's target, and watch Jeskai Infiltrator manifest. +4,
+   31,588 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 397 (looked at, not done): Sentinel of Lost Lore (still out: targets in exile, "a card you own in exile
+   that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown, Synthesis Pod,
+   Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack, Medomai's Prophecy,
+   Monastery Raid, Winter's Chill, Divine Intervention, Kotose and the rest from rank 15,000 to 20,000 (still out, for the
+   reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4908,7 +4930,7 @@ line blocks.
    target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (any number of
    targets controlled by different players, counters when they return under your control); Metamorphic Alteration (an
    Aura's copy effect of a chosen creature); Nick Fury, Agent of S.H.I.E.L.D. (a double-faced card put onto the
-   battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel (done in round B200); The Spot, Living Portal.
+   battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel (done in round B200); The Spot, Living Portal (done in round 397).
    Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
    counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
    Sidequest: Play Blitzball (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
@@ -7515,7 +7537,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   life it took, returned as it leaves), Blood Sun ("except mana abilities", and lands entering under it), Archangel of
   Strife (done in round B148) (a new choice for each player as it enters), Haktos the Unscarred (done in round B148) (protection from each mana value but one), plus
   Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax (done in round B198), Hibernation's
-  End, Jeskai Infiltrator and Flash Foliage (done in round B137).
+  End, Jeskai Infiltrator (done in round 397) and Flash Foliage (done in round B137).
 - Round B59 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "Until end of
   turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (Mistcaller), "Double all damage that
   creature sources you control would deal" (Absorbing Man and Titania), "Instant and sorcery spells you control have
@@ -10438,7 +10460,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Collector's and Notion Thief's, can't pause for) stay out.
 - Out after round B218 (looked at, not done): Enduring Renewal (its "Otherwise, draw a card" is a draw other replacements
   may still replace but not Enduring Renewal itself, CR 614.5, which the draw replacements don't track yet; and "Play with
-  your hand revealed"), The Spot, Living Portal (its dies trigger returns the cards its enters trigger exiled, linked to the
+  your hand revealed"), The Spot, Living Portal (done in round 397) (its dies trigger returns the cards its enters trigger exiled, linked to the
   permanent it was, CR 607.2a, 400.7) stay out.
 - Out after round B217 (looked at, not done): Lich and Nefarious Lich (life gained becomes cards drawn, and those draws
   can happen in the middle of lifelink damage, where a draw replacement can't pause yet, see Swans of Bryn Argoll; Nefarious
@@ -11092,7 +11114,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Blade of Shared Souls and Zygon Infiltrator done in round 396, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
   Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
-  Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man,
+  Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
   Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection; planeswalkers (Saheeli,
   Oko, Kaya).
 - Madness: "if its madness cost was paid" (Grave Scrabbler), X or non-mana madness costs, granting madness (Falkenrath

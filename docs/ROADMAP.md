@@ -1,6 +1,6 @@
 # Roadmap
 
-31,524 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,527 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -2353,7 +2353,7 @@ line blocks.
    Caller of the Hunt, Enigmatic Incarnation (how it was cast); Don't Blink (entering from exile replaced by a shuffle);
    Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
-   target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
+   target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River,
    Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome and Aladdin's Lamp (a draw replaced); All
@@ -4371,7 +4371,7 @@ line blocks.
    Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
    the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
    Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move (done in round B241) ("When you gain
-   control of ~ from another player": no control-change event yet); Blaster, Combat DJ (granted modular, and moving X
+   control of ~ from another player": no control-change event yet); Blaster, Combat DJ (done in round B242) (granted modular, and moving X
    counters onto another artifact); Jetfire, Ingenious Scientist (done in round 372) (removing counters from among artifacts as a cost, mana
    for a target player); Sabertooth Cobra ("unless they pay {2} before that step"); Ranar the Ever-Watchful (the first
    foretell each turn for {0}, and exile from hand or by your effects as one trigger); Soundwave, Sonic Spy (a copy of a
@@ -7160,7 +7160,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ability), Dreamshaper Shaman (done in round B219) (a nonland permanent card put onto the battlefield: Auras and battles), Qasali Ambusher
   (flash only for the alternative cost), Debt of Loyalty ("if it regenerates this way", done in round B132), Murktide Regent (done in round B182) (which cards
   delve exiled), War Tax, Mine Layer, Tatsumasa, the Dragon's Fang, Ride the Avalanche (done in round B203), Light Up the Night (done in round B213), Arachnus
-  Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (searches across zones, cost-time choices or
+  Spinner (done in round B71), Auratouched Mage, Bludgeon Brawl and Last Light of Durin's Day (done in round B242) (searches across zones, cost-time choices or
   granted abilities with their own costs).
 - Round B67 (from EDHREC rank about 19,700 up and the B10 and B11 lists): "{1}: The next time you would draw a card this
   turn, create a 2/2 green Bear creature token (you gain 5 life) instead" (Words of Wilding, Words of Worship: one draw
@@ -9846,6 +9846,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   layer 2, rulings). Browser tests for Frantic Scapegoat's choice and declining it, Lucius's target and return, and Risky
   Move's choice of creature and opponent at your upkeep. +4, 31,524 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B242 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Magnetic Web (once a
+  creature with a magnet counter is declared as an attacker, the attacking player's other creatures with magnet counters
+  attack if able, CR 508.1d, whoever controls the Web: CompiledCard.allAttackIfOneWithCounter, game.ts webCounterKinds; its
+  attack trigger gives every creature with a magnet counter as it resolves a requirement to block that attacker this turn,
+  CR 509.1c, only the defending player's being able to, CR 509.1a; a second requirement "this turn" beside another one now
+  keeps both, GameObject.provokedAlso `turn`, so a creature with two magnetized attackers blocks either; bots bring the other
+  magnetized creatures along). Blaster, Combat DJ (modular 1 granted to its controller's other nontoken artifact creatures
+  and Vehicles, CR 702.43a: its +1/+1 counter an additional one as the permanent enters, only with the ability from an effect
+  already applying, CR 614.12, so not for one entering with Blaster, rulings; its dies trigger looking back, CR 603.10a, so
+  one dying with Blaster still triggers, rulings; grants.ts and cards.ts withGranted; the back face's X counters moved, all of
+  them if it has fewer, rulings, the target artifact gaining haste, then converting with none left). Last Light of Durin's
+  Day (six or more quest counters as the trigger resolves: it's sacrificed, and only then, CR 608.2c, its controller searches
+  their hand and, if they choose, their library for a Dragon permanent card, rulings, shuffling only after searching the
+  library, CR 701.23: search `orHand`, the choice labelled "Hand and library" or "Hand only"). Browser tests for Last Light's
+  two search choices. +3, 31,527 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B242 (looked at, not done): the lists after round B241 stay out, and Idris, Soul of the TARDIS (still out:
+  "all activated and triggered abilities of the exiled card" needs every kind of triggered ability the card could have, and
+  several, such as triggered mana abilities and upkeep costs, live outside a card's trigger list). Known gap: "nontoken" in
+  Blaster's "other nontoken artifact creatures and Vehicles" is read for both, as for every such group.
 - Out after round B241 (looked at, not done): the lists after round B240 stay out. Known gaps: for a mutated Lucius, its dies trigger
   exiles every card of the merged permanent (CR 730.3c), but the delayed trigger returns only the card the ability came from
   (no ruling says whether "this card" finds the others); bots don't weigh which creature Lucius's trigger should watch (any opponent's creature) or which

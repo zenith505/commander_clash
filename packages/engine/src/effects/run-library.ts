@@ -1496,8 +1496,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // Without a "may": no search (nothing found), but the library is still shuffled if the effect says to (rulings).
       // Kassandra: barred from the library, the graveyard and hand are still searched (no shuffle).
-      if (e.andHand && queue.length && barred(queue[0]!) && sc.searchZones === undefined) sc.searchZones = "graveyard";
-      while (!e.orGraveyard && !e.andHand && queue.length && barred(queue[0]!)) {
+      if ((e.andHand || e.orHand) && queue.length && barred(queue[0]!) && sc.searchZones === undefined) sc.searchZones = "graveyard";
+      while (!e.orGraveyard && !e.andHand && !e.orHand && queue.length && barred(queue[0]!)) {
         log(s, `${player(s, queue[0]!).name} can't search ${libOf(queue[0]!) === player(s, queue[0]!) ? "their" : "that"} library.`);
         searchedBy.push({ pid: queue.shift()!, found: [] });
       }
@@ -1511,10 +1511,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Auratouched Mage: "an Aura card that could enchant it" once it has left, as it last existed (round B208, rulings).
         const gone = (id: ObjectId) => !e.couldEnchantSelfGone || (!!ctx.sourceId && ctx.sourceZc !== undefined && couldEnchantAsLastExisted(s, obj(s, id), ctx.sourceId, ctx.sourceZc, p.id));
         const fits = (id: ObjectId) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.couldEnchantDest || (!!enchantee && auraHostOptions(s, obj(s, id), p.id).some((h) => "attachTo" in h && h.attachTo === enchantee.id))) && gone(id);
-        if (e.orGraveyard && sc.searchZones === undefined) {
-          // Dark Supplicant: the hand is searched with the graveyard ("graveyard, hand, and/or library").
-          if (!barred(p.id) && (e.andHand ? [...p.graveyard, ...p.hand] : p.graveyard).some(fits)) {
-            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: e.andHand ? ["Graveyard, hand, and library", "Graveyard and hand only"] : ["Library and graveyard", "Graveyard only"], prompt: e.andHand ? "search your library too (then shuffle), or only your graveyard and hand?" : "search your library too (then shuffle), or only your graveyard?" };
+        if ((e.orGraveyard || e.orHand) && sc.searchZones === undefined) {
+          // Dark Supplicant: the hand is searched with the graveyard ("graveyard, hand, and/or library"). Last Light of
+          // Durin's Day: "your hand and/or library", the hand alone ("graveyard" here meaning not the library).
+          if (!barred(p.id) && (e.orHand ? p.hand : e.andHand ? [...p.graveyard, ...p.hand] : p.graveyard).some(fits)) {
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: e.orHand ? ["Hand and library", "Hand only"] : e.andHand ? ["Graveyard, hand, and library", "Graveyard and hand only"] : ["Library and graveyard", "Graveyard only"], prompt: e.orHand ? "search your library too (then shuffle), or only your hand?" : e.andHand ? "search your library too (then shuffle), or only your graveyard and hand?" : "search your library too (then shuffle), or only your graveyard?" };
             return "paused";
           }
           // Ashiok, Dream Render: only the graveyard.
@@ -1529,7 +1530,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // still shuffled after, rulings); the same top cards for the whole search.
         const top = searchTop(s, p.id);
         const lib = libOf(p.id).library;
-        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard || e.andGraveyard ? p.graveyard : []), ...(e.andHand ? p.hand : [])].filter(fits);
+        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard || e.andGraveyard ? p.graveyard : []), ...(e.andHand || e.orHand ? p.hand : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         if (e.totalMv !== undefined) cards = cards.filter((id) => defMv(defOf(s, obj(s, id))) <= e.totalMv!);
@@ -1642,7 +1643,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
-        const where = e.andHand ? (yardOnly ? `${whose} graveyard and hand` : `${whose} graveyard, hand, and library`) : yardOnly ? `${whose} graveyard` : e.orGraveyard || e.andGraveyard ? `${whose} library and graveyard` : `${whose} library`;
+        const where = e.orHand ? (yardOnly ? `${whose} hand` : `${whose} hand and library`) : e.andHand ? (yardOnly ? `${whose} graveyard and hand` : `${whose} graveyard, hand, and library`) : yardOnly ? `${whose} graveyard` : e.orGraveyard || e.andGraveyard ? `${whose} library and graveyard` : `${whose} library`;
         log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}${exiledFor(pid) !== undefined ? ` and exiles ${found.length === 1 ? "it" : "them"} for ${player(s, exiledFor(pid)!).name} to play` : ""}` : " and finds nothing"}${(searchers.length > 1 && e.dest.zone !== "libraryTop") || yardOnly || e.noShuffle ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
         // "And exile the rest" (Doomsday): every other card in the library and graveyard, before the chosen cards move.

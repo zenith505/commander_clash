@@ -84,6 +84,7 @@ import { roundB238Line } from "./laneb238";
 import { roundB239Line } from "./laneb239";
 import { roundB240Line } from "./laneb240";
 import { roundB241Line } from "./laneb241";
+import { roundB242Line } from "./laneb242";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2244,6 +2245,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB240Line(line, raw, out, isSpell)) continue;
     // Frantic Scapegoat, Lucius the Eternal, Risky Move (round B241).
     if (roundB241Line(line, raw, out, isSpell)) continue;
+    // Magnetic Web, Last Light of Durin's Day (round B242).
+    if (roundB242Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

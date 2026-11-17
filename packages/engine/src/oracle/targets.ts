@@ -1939,7 +1939,7 @@ export function parseTargetPhrase(
   // Temporal Distortion: "each permanent with an hourglass counter on it". Mine Layer: "a land with a mine counter on it";
   // Sporogenesis: "a creature with a fungus counter on it"; Bomb Squad: "each creature with a fuse counter on it".
   // Geyadrone Dihada: "each permanent with a corruption counter on it". Aurification: "each creature with a gold counter on it".
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom|hourglass|impostor|infection|time|mine|fungus|fuse|corruption|gold) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom|hourglass|mine|fungus|fuse|corruption) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey|rejection|doom|hourglass|impostor|infection|time|mine|fungus|fuse|corruption|gold|magnet) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level|doom|hourglass|mine|fungus|fuse|corruption|magnet) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

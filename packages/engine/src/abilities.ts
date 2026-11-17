@@ -3349,6 +3349,8 @@ export type Effect =
       attachSelf?: true;
       /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
       attachToTarget?: number;
+      /** Lynde, Cheerful Tormentor (round 394): an Aura "attached to you", this ability's controller, if it could enchant them (CR 303.4f-g). */
+      attachToYou?: true;
       /**
        * "Attached to enchanted creature" (Mantle of the Ancients): the creature the source Aura is attached to as this
        * resolves, or was last attached to if it has left (rulings); each card only if it could be attached to it.
@@ -5572,6 +5574,23 @@ export type Effect =
    */
   | { type: "powerToPlayers"; a: ObjRef; to: PlayerRef }
   /**
+   * Crafty Cutpurse (round 394): "each token that would be created under an opponent's control this turn is created under
+   * your control instead": from now until the turn ends (TurnLog.tokenSteals, counters.ts tokenMaker, CR 616.1b).
+   */
+  | { type: "stealTokensThisTurn" }
+  /**
+   * Rinoa, Angel Wing (round 394): "you may return one of them to the battlefield tapped under its owner's control with a
+   * flying counter on it. Do this only once each turn." (effects/run-round394.ts): one of the trigger's event group still in
+   * a graveyard as the card it became, or none; returning one is doing it (CR 603.2h).
+   */
+  | { type: "returnOneOfThem"; counters: Record<string, number> }
+  /**
+   * Lynde, Cheerful Tormentor (round 394): "you may attach a Curse attached to you to one of your opponents" (effects/
+   * run-round394.ts): a Curse attached to you, whoever controls it, to an opponent it could enchant (CR 701.3b, 702.16c);
+   * `did` is whether one moved, for "If you do".
+   */
+  | { type: "moveCurseToOpponent" }
+  /**
    * Sphinx Ambassador (round 377): "search that player's library for a card, then that player chooses a card name. If you
    * searched for a creature card that doesn't have that name, you may put it onto the battlefield under your control. Then
    * that player shuffles." The card found is kept hidden from that player (rulings) until it's put in (effects/run-round377.ts).
@@ -7407,6 +7426,8 @@ export interface BatchTrigger {
   together?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
   sacrificed?: true;
+  /** `leaves`: "one of them" (Rinoa, Angel Wing, round 394): the trigger's event group is those that left, each as the object it became (CR 400.7). */
+  them?: true;
 }
 
 export interface ActivatedAbility {

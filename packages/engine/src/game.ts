@@ -961,10 +961,10 @@ export function moveObject(
       if (n > 0) log(s, `${nameOf(s, by)} gets ${n} +1/+1 counter${n === 1 ? "" : "s"}.`);
     }
     if (x.token) {
-      const { same, extra } = tokenBatch(s, you, x.token, 1);
-      for (let i = 0; i < same; i++) createToken(s, you, x.token);
-      createExtraTokens(s, you, extra);
-      if (same) log(s, `${player(s, you).name} creates ${same === 1 ? "a" : same} ${x.token.name} token${same > 1 ? "s" : ""}.`);
+      const { pid: by, same, extra } = tokenBatch(s, you, x.token, 1);
+      for (let i = 0; i < same; i++) createToken(s, by, x.token);
+      createExtraTokens(s, by, extra);
+      if (same) log(s, `${player(s, by).name} creates ${same === 1 ? "a" : same} ${x.token.name} token${same > 1 ? "s" : ""}.`);
     }
     // Nemata: "When you do, ...": a reflexive trigger of that permanent's (CR 603.12), also if it's leaving at the same time.
     const from = s.objects[by];
@@ -3835,18 +3835,18 @@ function applyDrawShield(s: GameState, pid: PlayerId, key: string, left: number,
   if (w.damage) wordsDamage(s, pid, w as typeof w & { damage: NonNullable<typeof w.damage> });
   if (w.token) {
     const token = w.token;
-    const { same, extra } = tokenBatch(s, pid, token, 1);
+    const { pid: by, same, extra } = tokenBatch(s, pid, token, 1);
     enterTogether(s, () => {
       const made: GameObject[] = [];
-      for (let i = 0; i < same; i++) made.push(createToken(s, pid, token));
+      for (let i = 0; i < same; i++) made.push(createToken(s, by, token));
       // Created by that Words' ability, not by whatever spell or ability is resolving now.
       for (const t of made) {
         if (w.sourceId !== undefined) t.createdWith = { id: w.sourceId, zc: w.sourceZc ?? 0 };
         else delete t.createdWith;
       }
-      createExtraTokens(s, pid, extra);
+      createExtraTokens(s, by, extra);
     });
-    log(s, `${p.name} creates ${same === 1 ? "a" : same} ${token.power}/${token.toughness} ${token.name} token${same === 1 ? "" : "s"} instead of drawing a card (${w.source}).`);
+    log(s, `${player(s, by).name} creates ${same === 1 ? "a" : same} ${token.power}/${token.toughness} ${token.name} token${same === 1 ? "" : "s"} instead of drawing a card (${w.source}).`);
   }
 }
 
@@ -11833,6 +11833,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.secretType;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the creature types offered");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "curseMove") {
+    // Lynde, Cheerful Tormentor (round 394): which Curse attached to you goes to which opponent, or none.
+    if (r.scratch?.curseMove === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the options offered");
+    r.scratch.curseMove = choice;
     continueResolution(s);
     return;
   }

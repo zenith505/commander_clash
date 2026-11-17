@@ -283,9 +283,9 @@ export function dealDamage(
         const name = targetName;
         enterTogether(s, () => {
           const batch = tokenBatch(s, me, tokens, n);
-          for (let i = 0; i < batch.same; i++) createToken(s, me, tokens);
-          if (batch.same) log(s, `${player(s, me).name} creates ${batch.same} ${tokens.name} token${batch.same === 1 ? "" : "s"} (${name}).`);
-          createExtraTokens(s, me, batch.extra);
+          for (let i = 0; i < batch.same; i++) createToken(s, batch.pid, tokens);
+          if (batch.same) log(s, `${player(s, batch.pid).name} creates ${batch.same} ${tokens.name} token${batch.same === 1 ? "" : "s"} (${name}).`);
+          createExtraTokens(s, batch.pid, batch.extra);
         });
       }
       o.phantomEvent = event;
@@ -1692,9 +1692,9 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       for (const { r, n } of madeLater.values()) {
         if (n <= 0 || player(s, r.controller).lost) continue;
         const batch = tokenBatch(s, r.controller, r.tokens!, n);
-        for (let i = 0; i < batch.same; i++) createToken(s, r.controller, r.tokens!);
-        if (batch.same) log(s, `${player(s, r.controller).name} creates ${batch.same} ${r.tokens!.name} token${batch.same === 1 ? "" : "s"} (${cardName(s, r)}).`);
-        createExtraTokens(s, r.controller, batch.extra);
+        for (let i = 0; i < batch.same; i++) createToken(s, batch.pid, r.tokens!);
+        if (batch.same) log(s, `${player(s, batch.pid).name} creates ${batch.same} ${r.tokens!.name} token${batch.same === 1 ? "" : "s"} (${cardName(s, r)}).`);
+        createExtraTokens(s, batch.pid, batch.extra);
       }
     });
   for (const [pid, amount] of preventedTo) fireEvent(s, { type: "damagePreventedToPlayer", player: pid, amount });

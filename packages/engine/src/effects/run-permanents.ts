@@ -898,9 +898,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!armies().length) {
         const army: TokenSpec = { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] };
         enterTogether(s, () => {
-          const { same, extra } = tokenBatch(s, pid, army, 1);
-          for (let i = same; i > 0; i--) createToken(s, pid, army);
-          createExtraTokens(s, pid, extra);
+          const { pid: by, same, extra } = tokenBatch(s, pid, army, 1);
+          for (let i = same; i > 0; i--) createToken(s, by, army);
+          createExtraTokens(s, by, extra);
         });
       }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
@@ -957,11 +957,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (e.type === "recruit") {
         if (!nonland) return;
         const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };
-        const { same: k, extra } = tokenBatch(s, pid, soldier, 1);
+        const { pid: by, same: k, extra } = tokenBatch(s, pid, soldier, 1);
         enterTogether(s, () => {
-          for (let i = 0; i < k; i++) createToken(s, pid, soldier);
-          if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
-          createExtraTokens(s, pid, extra);
+          for (let i = 0; i < k; i++) createToken(s, by, soldier);
+          if (k) log(s, `${player(s, by).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
+          createExtraTokens(s, by, extra);
         });
         return;
       }
@@ -1268,10 +1268,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const spirit: TokenSpec = { name: "Spirit", power: n, toughness: n, colors: ["W"], types: ["Creature"], subtypes: ["Spirit"], keywords: [] };
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
-        const { same, extra } = tokenBatch(s, who, spirit, 1);
-        for (let i = same; i > 0; i--) createToken(s, who, spirit);
-        if (same) log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
-        createExtraTokens(s, who, extra);
+        const { pid: by, same, extra } = tokenBatch(s, who, spirit, 1);
+        for (let i = same; i > 0; i--) createToken(s, by, spirit);
+        if (same) log(s, `${src} endures ${n}: ${player(s, by).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
+        createExtraTokens(s, by, extra);
       });
       return;
     }

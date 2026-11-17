@@ -623,6 +623,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Thieves' Auction: the exiled card worth the most to us on our side of the battlefield.
     if (pend.kind === "searchLibrary" && s.resolving?.body.effects[s.resolving.next]?.type === "thievesAuction" && pend.cards.length)
       return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!] }];
+    // Rinoa, Angel Wing (round 394): the best of our own cards (another owner's comes back under theirs), else none.
+    if (pend.kind === "searchLibrary" && s.resolving?.body.effects[s.resolving.next]?.type === "returnOneOfThem") {
+      const mine = pend.cards.filter((id) => obj(s, id).owner === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "searchLibrary", player: pid, found: mine.slice(0, 1) }];
+    }
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
@@ -2043,6 +2048,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Backdraft (round B229): the most damage to an opponent; with only ourselves to choose, the least.
     // Cyclopean Tomb (round B231): our own land with mire counters (it gets its land types back), else one with none (nothing
     // changes), else an opponent's (only theirs are left).
+    // Lynde, Cheerful Tormentor (round 394): always move one (two cards), onto the opponent with the most life.
+    if (pend.kind === "chooseOption" && pend.what === "curseMove") {
+      const moves = pend.options.filter((o) => o !== "none");
+      const life = (o: string) => player(s, Number(o.split(">")[1])).life;
+      return [{ type: "chooseOption", player: pid, choice: moves.sort((a, b) => life(b) - life(a))[0] ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "mireLand") {
       const score = (id: string) => {
         const o = s.objects[id];

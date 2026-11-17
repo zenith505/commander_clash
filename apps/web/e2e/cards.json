@@ -3744,6 +3744,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7735eeba-693b-47e2-bd51-414379cf1016",
+  "name": "Beast Within",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target permanent. Its controller creates a 3/3 green Beast creature token.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2f24637d-8d8e-49de-b229-4cdb97595ed7",
   "name": "Beatrix, Loyal General",
   "manaCost": "{4}{W}{W}",
@@ -8925,6 +8951,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2ef53e18-0baf-4eee-b671-4c19b464cbfb",
+  "name": "Crafty Cutpurse",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Pirate",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Pirate"
+  ],
+  "oracleText": "Flash\nWhen this creature enters, each token that would be created under an opponent's control this turn is created under your control instead.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "rix",
+  "releasedAt": "2018-01-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6a462a69-3e42-41de-a3aa-a488d9f38d69",
   "name": "Craw Wurm",
   "manaCost": "{4}{G}{G}",
@@ -9464,6 +9523,44 @@
   "set": "dka",
   "releasedAt": "2012-02-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ba0d3df2-3acf-46d7-8d64-8d67d1579adc",
+  "name": "Curse of Opulence",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura Curse",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nWhenever enchanted player is attacked, create a Gold token. Each opponent attacking that player does the same. (A Gold token is an artifact with \"Sacrifice this token: Add one mana of any color.\")",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -14967,6 +15064,32 @@
   "commanderLegal": "legal",
   "set": "fdn",
   "releasedAt": "2024-11-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7e108b31-2ea3-4129-b324-a2d31c78bbe6",
+  "name": "Fiery Cannonade",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Fiery Cannonade deals 2 damage to each non-Pirate creature.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -25433,6 +25556,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dc386f6c-bd4a-462a-8d42-0e7a552a4f17",
+  "name": "Lynde, Cheerful Tormentor",
+  "manaCost": "{1}{U}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Deathtouch\nWhenever a Curse is put into your graveyard from the battlefield, return it to the battlefield attached to you at the beginning of the next end step.\nAt the beginning of your upkeep, you may attach a Curse attached to you to one of your opponents. If you do, draw two cards.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "mic",
+  "releasedAt": "2021-09-24",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f2ce9e55-07c0-4f36-a59e-127693fc0f62",
   "name": "Magnifying Glass",
   "manaCost": "{3}",
@@ -34540,6 +34702,40 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "47b29cf9-8ef3-4b6a-a9a3-3ab822c5dea4",
+  "name": "Rinoa, Angel Wing",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Rebel Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rebel",
+   "Warlock"
+  ],
+  "oracleText": "At the beginning of combat on your turn, creatures you control with flying get +1/+1 and gain vigilance until end of turn.\nWhenever one or more attacking creatures you control die, you may return one of them to the battlefield tapped under its owner's control with a flying counter on it. Do this only once each turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-12-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

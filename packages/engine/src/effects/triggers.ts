@@ -561,6 +561,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if ((once?.type === "castNow" || once?.type === "castFromAmong") && once.once && onceUsed(o, t.zone, "do:castNow")) return;
+      if (once?.type === "returnOneOfThem" && onceUsed(o, t.zone, `do:${once.type}`)) return; // Rinoa, Angel Wing (CR 603.2h)
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
         if (t.onceEver) (o.triggeredEver ??= []).push(everKey);
@@ -2934,7 +2935,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
         // Tamiyo, the Moon Sage's emblem: "a card is put into your graveyard from anywhere, you may return it": that card is
         // the group, alone.
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard" || (b.what === "leaves" && b.them)) && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };

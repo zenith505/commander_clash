@@ -23,10 +23,11 @@ export function tokenCopyBatch(s: GameState, pid: PlayerId, base: CardDef): numb
   return tokenBatch(s, pid, s.cards[tokenCopyKey(s, base).key]!, 1, true).same;
 }
 
-export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true; /** Mirror Match: "that's blocking that creature": each one a creature enters blocking it (createToken's `blocking`). */ blocking?: GameObject } = {}) {
+export function tokenCopies(s: GameState, pid0: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true; /** Mirror Match: "that's blocking that creature": each one a creature enters blocking it (createToken's `blocking`). */ blocking?: GameObject } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
-  const { same: k, extra } = tokenBatch(s, pid, s.cards[key]!, n);
+  // Crafty Cutpurse: maybe another player creates them (tokenBatch's pid, CR 616.1b).
+  const { pid, same: k, extra } = tokenBatch(s, pid0, s.cards[key]!, n);
   const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
   let made = 0;
   enterTogether(s, () => {
@@ -47,13 +48,13 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(host ?? {}) });
       const at = opts.attackAt?.[i];
       // A noncreature one enters, but not attacking (CR 506.3a).
-      if (defender !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature")) o.attacking = at?.player ?? defender;
+      if (defender !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature") && attackingPlayer(s, pid, at?.player ?? defender)) o.attacking = at?.player ?? defender;
       const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
       if (pw && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
       // Mirror Match: entering blocking that attacker, never declared as a blocker (rulings); a noncreature one isn't
       // blocking (rulings), and an attacker no longer attacking can't be blocked.
       const foe = opts.blocking;
-      if (foe && o.zone === "battlefield" && objIsType(s, o, "Creature") && foe.zone === "battlefield" && foe.attacking !== undefined) {
+      if (foe && o.zone === "battlefield" && objIsType(s, o, "Creature") && foe.zone === "battlefield" && foe.attacking !== undefined && defendingAgainst(s, pid, foe)) {
         o.blocking = [foe.id];
         (foe.blockedBy ??= []).push(o.id);
         foe.becameBlockedTurn = s.turn;
@@ -330,10 +331,10 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
         for (const pid of apnap(s, [...new Set(cards.map((c) => c.owner))]).filter((pid) => !player(s, pid).lost)) {
-          const { same: k, extra } = tokenBatch(s, pid, token, 1);
-          for (let i = 0; i < k; i++) createToken(s, pid, token);
-          if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} ${x}/${x} ${token.name} token${k > 1 ? "s" : ""} (${src}).`);
-          createExtraTokens(s, pid, extra);
+          const { pid: by, same: k, extra } = tokenBatch(s, pid, token, 1);
+          for (let i = 0; i < k; i++) createToken(s, by, token);
+          if (k) log(s, `${player(s, by).name} creates ${k === 1 ? "a" : k} ${x}/${x} ${token.name} token${k > 1 ? "s" : ""} (${src}).`);
+          createExtraTokens(s, by, extra);
         }
       });
       return;
@@ -438,9 +439,9 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
     const pid = ctx.controller;
     for (const opp of apnap(s, opponents(s, pid))) {
       const before = s.resolving?.created?.length ?? 0;
-      const { same: k, extra } = tokenBatch(s, pid, e.token, n);
-      for (let i = 0; i < k; i++) createToken(s, pid, e.token);
-      createExtraTokens(s, pid, extra);
+      const { pid: by, same: k, extra } = tokenBatch(s, pid, e.token, n);
+      for (let i = 0; i < k; i++) createToken(s, by, e.token);
+      createExtraTokens(s, by, extra);
       const ids = (s.resolving?.created ?? []).slice(before).filter((id) => s.objects[id]?.zone === "battlefield");
       if (k) log(s, `${src} creates ${k === 1 ? "a" : k} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""} that must attack ${player(s, opp).name} this turn.`);
       if (ids.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: pid, sourceName: src, duration: "endOfTurn", affected: ids, mods: [{ kind: "mustAttackPlayer", player: opp }] });
@@ -453,8 +454,8 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
     const pid = ctx.controller;
     const picks = s.resolving?.scratch?.attackEach ?? {};
     for (const opp of apnap(s, opponents(s, pid))) {
-      const { same: k, extra } = tokenBatch(s, pid, e.token, n);
-      const defender = inCombat(s) && s.activePlayer === pid ? opp : undefined;
+      const { pid: by, same: k, extra } = tokenBatch(s, pid, e.token, n);
+      const defender = inCombat(s) && s.activePlayer === by && by !== opp ? opp : undefined;
       // The planeswalker chosen for each of this opponent's tokens, if it's still there (Adeline).
       const walkerFor = (i: number) => {
         const pw = defender !== undefined ? /^\d+:(.+)$/.exec(picks[opp]?.[i] ?? "")?.[1] : undefined;
@@ -462,26 +463,27 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
       };
       const at: string[] = [];
       for (let i = 0; i < k; i++) {
-        const t = createToken(s, pid, e.token, { tapped: true, attacking: defender });
+        const t = createToken(s, by, e.token, { tapped: true, attacking: defender });
         const walker = walkerFor(i);
         if (walker && t?.zone === "battlefield" && t.attacking !== undefined) t.attackingPermanent = { id: walker.id, zc: walker.zoneChanges ?? 0 };
         if (defender !== undefined) at.push(walker ? `${defOf(s, walker).name} (${player(s, defender).name})` : player(s, defender).name);
       }
       const whom = [...new Set(at)].join(" and ");
       if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${whom})` : ""}.`);
-      createExtraTokens(s, pid, extra, { tapped: true, attacking: defender });
+      createExtraTokens(s, by, extra, { tapped: true, attacking: defender });
     }
     return;
   }
   // "Each player creates a number of ... tokens equal to the amount of mana they paid this way" (Liege of the Hollows):
   // each one's own number (PlayerRef eachOne).
   const each = JSON.stringify(e.n).includes('"eachOne"');
-  for (const pid of players(s, e.who, ctx)) {
-    const { same: k, extra } = tokenBatch(s, pid, e.token, each ? amountNow(s, e.n, { ...ctx, eachOne: pid }) : n);
+  for (const each0 of players(s, e.who, ctx)) {
+    // Crafty Cutpurse: maybe another player creates them (tokenBatch's pid, CR 616.1b); "each one" is still this player.
+    const { pid, same: k, extra } = tokenBatch(s, each0, e.token, each ? amountNow(s, e.n, { ...ctx, eachOne: each0 }) : n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
     const defender = e.attackingEvent ? eventDefender(s, ctx, pid) : e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
     // Oversimplify: each player's own number of counters (PlayerRef eachOne).
-    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, JSON.stringify(e.counters.n).includes('"eachOne"') ? { ...ctx, eachOne: pid } : ctx) } : undefined;
+    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, JSON.stringify(e.counters.n).includes('"eachOne"') ? { ...ctx, eachOne: each0 } : ctx) } : undefined;
     const blocking = e.blocking ? objects(s, e.blocking, ctx)[0] : undefined;
     const tapped = e.tapped || (e.attacking && !e.untapped);
     const opts = { tapped, attacking: defender, ...(counters ? { counters } : {}), ...(blocking ? { blocking } : {}) };
@@ -513,10 +515,11 @@ function createAttachedTokens(s: GameState, e: Extract<Effect, { type: "createTo
 }
 
 function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }>, hosts: ObjectId[], n: number, ctx: ResolveCtx, src: string) {
-  for (const pid of players(s, e.who, ctx))
+  for (const pid0 of players(s, e.who, ctx))
     for (const host of hosts) {
       if (s.objects[host]?.zone !== "battlefield") continue;
-      const { same: k, extra } = tokenBatch(s, pid, e.token, n);
+      // Crafty Cutpurse: maybe another player creates them (tokenBatch's pid, CR 616.1b).
+      const { pid, same: k, extra } = tokenBatch(s, pid0, e.token, n);
       // The other tokens a replacement adds (Peregrin Took's Food) aren't Auras: they're just created.
       createExtraTokens(s, pid, extra);
       let made = 0;
@@ -558,6 +561,26 @@ export function tokenDef(t: TokenSpec): CardDef {
   };
 }
 
+/**
+ * A token put onto the battlefield attacking under `pid`'s control attacks only if `pid` is an attacking player (the
+ * active player, in combat) and not the player it would attack (CR 506.3b): Crafty Cutpurse's rulings, "If a token would
+ * be created tapped and attacking, but the token's controller isn't an attacking player, that token is created tapped
+ * but not attacking."
+ */
+function attackingPlayer(s: GameState, pid: PlayerId, at: PlayerId): boolean {
+  return pid === s.activePlayer && at !== pid;
+}
+
+/**
+ * One put onto the battlefield blocking `attacker` blocks it only if that creature is attacking `pid`, a planeswalker
+ * `pid` controls or a battle `pid` protects (CR 506.3e; Crafty Cutpurse's rulings).
+ */
+function defendingAgainst(s: GameState, pid: PlayerId, attacker: GameObject): boolean {
+  const p = attacker.attackingPermanent ? s.objects[attacker.attackingPermanent.id] : undefined;
+  if (p?.zone === "battlefield") return controllerOf(s, p) === pid || p.protector === pid;
+  return attacker.attacking === pid;
+}
+
 export function createToken(s: GameState, pid: PlayerId, t0: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}): GameObject {
   // Gutter Grime's Ooze: "... slime counters on Gutter Grime": the name of the permanent whose ability creates it, as it is
   // now or as it last existed (CR 608.2h), so the token's ability reads it (grants.ts compileQuoted).
@@ -569,11 +592,11 @@ export function createToken(s: GameState, pid: PlayerId, t0: TokenSpec, opts: { 
   o.isToken = true;
   // It enters like any permanent, so ETB triggers see it, with any counters it's created with (CR 122.6, 614.1c).
   moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
-  if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
+  if (opts.attacking !== undefined && o.zone === "battlefield" && attackingPlayer(s, pid, opts.attacking)) o.attacking = opts.attacking;
   // Put onto the battlefield blocking (Brimaz): it blocks that attacker, never declared as a blocker (CR 509.1, rulings).
   const at = opts.blocking;
   // Only a creature can be blocking (Mirror Match rulings: a noncreature one enters but isn't).
-  if (at && o.zone === "battlefield" && objIsType(s, o, "Creature") && at.zone === "battlefield" && at.attacking !== undefined) {
+  if (at && o.zone === "battlefield" && objIsType(s, o, "Creature") && at.zone === "battlefield" && at.attacking !== undefined && defendingAgainst(s, pid, at)) {
     o.blocking = [at.id];
     (at.blockedBy ??= []).push(o.id);
     at.becameBlockedTurn = s.turn;
@@ -623,9 +646,9 @@ function copiesInstead(s: GameState, pid: PlayerId, of: ObjectId, n: number, opt
     const o = newObject(s, s.cards[key]!, pid, "exile");
     o.isToken = true;
     moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
-    if (opts.attacking !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature")) o.attacking = opts.attacking;
+    if (opts.attacking !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature") && attackingPlayer(s, pid, opts.attacking)) o.attacking = opts.attacking;
     const at = opts.blocking;
-    if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined && objIsType(s, o, "Creature")) {
+    if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined && objIsType(s, o, "Creature") && defendingAgainst(s, pid, at)) {
       o.blocking = [at.id];
       (at.blockedBy ??= []).push(o.id);
       at.becameBlockedTurn = s.turn;

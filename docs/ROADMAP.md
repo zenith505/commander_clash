@@ -1,6 +1,6 @@
 # Roadmap
 
-31,575 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,578 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,905 of
 9,979 (99%).
 
@@ -3230,7 +3230,7 @@ line blocks.
    land.
    Out after round 382 (looked at, not done): Aragorn, Company Leader ("Whenever you put one or more counters on ~, put one
    of each of those kinds of counters on up to one other target creature": counters of several kinds put at once are one
-   event, but the engine fires one countersPut event for each kind); Crafty Cutpurse (tokens that would be created under an
+   event, but the engine fires one countersPut event for each kind); Crafty Cutpurse (done in round 394) (tokens that would be created under an
    opponent's control this turn are created under yours: applied before every other token replacement, and with several
    players' Cutpurse effects the would-be controller chooses the order, rulings, a choice in the middle of every token
    creation); Kraven the Hunter ("a creature an opponent controls with the greatest power among creatures that player
@@ -3294,7 +3294,7 @@ line blocks.
    Out after round 384 (looked at, not done): Whims of the Fates (still out: each player separates all their permanents
    into three piles, a choice the browser has no prompt for yet); Stardew Valley ("another player of your choice may gain
    control of that permanent"); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Hero of
-   Bretagard, Rinoa, Angel Wing, Supper for Spiders, Immortal Coil, Nefarious Lich and the rest above rank 15,000 (still
+   Bretagard, Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil, Nefarious Lich and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Polish: the Trap's log reads "You reveals" and "You guesses" (the "You plays" grammar of the log).
    Round 385 went on down `npm run popular` and the "Out after round N" lists, most played first, to three more shields
@@ -3320,7 +3320,7 @@ line blocks.
    Out after round 385 (looked at, not done): Domri, Chaos Bringer ("If that mana is spent on a creature spell, it gains
    riot": mana from a loyalty ability, not a mana ability, CR 605.1a, and whether riot a spell gains applies as the
    permanent enters, CR 614.12, isn't settled by its rulings); Blood Scrivener and Breathstealer's Crypt (still out: a
-   draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing, Supper for Spiders, Immortal Coil,
+   draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil,
    Nefarious Lich and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 386 went on down `npm run popular` and the "Out after round N" lists, most played first, to the pieces rounds 241
    to 385 had left them waiting for: Parallel Thoughts' "When ~ enters, search your library for seven cards, exile them in a
@@ -3513,6 +3513,29 @@ line blocks.
    target); Whims of the Fates (three piles of permanents); C.A.M.P. (the colors of the mana its land produced);
    Abandoned Sarcophagus ("it wasn't cycled"); Helm of Kaldra (which Equipment when you control several with a name);
    Kraven the Hunter, Jasmine Boreal, Filigree Vector and the rest above rank 15,000 (still out, for the reasons in their
+   earlier lists).
+   Round 394 went on down `npm run popular` and the "Out after round N" lists, most played first, to tokens created under
+   another player's control, attacking creatures that died coming back, and Curses moving between players: Crafty
+   Cutpurse's "each token that would be created under an opponent's control this turn is created under your control
+   instead" (TurnLog.tokenSteals; counters.ts tokenMaker runs first in every token creation, before the doublers, so an
+   opponent's Anointed Procession doesn't apply and yours does, CR 616.1b, rulings; you create and own them, CR 111.2;
+   with several players' effects the would-be controller chooses which applies first, each once, asked like Jinnie
+   Fay's, CR 616.1f; a token created attacking or blocking under a player who isn't attacking or being attacked enters
+   without attacking or blocking, CR 506.3b, 506.3e; every tokenBatch caller now creates the tokens for the batch's
+   `pid`); Rinoa, Angel Wing's "Whenever one or more attacking creatures you control die, you may return one of them to the
+   battlefield tapped under its owner's control with a flying counter on it. Do this only once each turn." (BatchTrigger
+   `them`: the cards they became, Rinoa too, rulings; choosing none doesn't use it up, CR 603.2h; Effect
+   returnOneOfThem); Lynde, Cheerful Tormentor's "return it to the battlefield attached to you at the beginning of the next
+   end step" (putOntoBattlefield `attachToYou`, only if it could enchant you, CR 303.4f-g) and "you may attach a Curse
+   attached to you to one of your opponents. If you do, draw two cards." (any Curse attached to you, whoever controls it,
+   to an opponent it could enchant, not targeted, rulings; one question, chooseOption "curseMove"). Browser tests click
+   through Rinoa's pick, Lynde's choice, and Crafty Cutpurse alone and against another player's. +3, 31,578 of 31,936. The
+   compiled text of every other card is unchanged.
+   Out after round 394 (looked at, not done): Gather Specimens (nontoken creatures entering under your control instead:
+   the "as it enters" choices then made by the new controller on every way a creature enters, rulings); Invisible Woman,
+   Sue Storm (still no batched "one or more counters on one or more creatures" event); Hurkyl, Master Wizard (one revealed
+   card for each card type among the noncreature spells cast this turn, a card fitting several types counting once);
+   Titania's Song, Hero of Bretagard, Kraven the Hunter and the rest above rank 15,000 (still out, for the reasons in their
    earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
@@ -3979,7 +4002,7 @@ line blocks.
    Out after round 328 (looked at, not done): Omen Machine and Wild Evocation (done in round 349) (a card cast "if able" without paying its
    mana cost: a mandatory free cast needs every bot and UI path); Reservoir Kraken (done in round 339) (any opponent may tap a creature, a
    choice offered to several players in turn); Reap ("up to X targets" where X counts another target's permanents, as
-   before); Crafty Cutpurse (still out, for the reasons in its earlier list).
+   before); Crafty Cutpurse (done in round 394) (still out, for the reasons in its earlier list).
    Round 327 took cards back off the "Out after round N" lists, most played first: "Choose a creature at random. You
    gain control of that creature until end of turn. Untap it. It gains haste until end of turn. Then destroy all other
    creatures." (The Nipton Lottery: anyone's creature, not targeted, so hexproof and shroud don't matter, nothing in
@@ -5013,7 +5036,7 @@ line blocks.
    sacrificed, then an extra combat); Gollum, Scheming Guide (an opponent guesses land or nonland about your top card, then
    Gollum is removed from combat); Elrond of the White Council (secret council votes, then you gain control of the creatures
    chosen); Reverse the Sands (done in round 362) (redistribute life totals).
-   Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (a Curse returned "attached to you", then moved to an opponent);
+   Out after round 256 (looked at, not done): Scrap Welder (done in round 270); Lynde, Cheerful Tormentor (done in round 394) (a Curse returned "attached to you", then moved to an opponent);
    Supper for Spiders (cards that become Food artifacts losing their other card types and subtypes but keeping their
    abilities); Nahiri, the Unforgiving (done in round B203) ("attacks a player each combat if able" until your next turn); Cherished Hatchling
    (Dinosaur spells cast this turn gain an enters-and-fight ability); Heirloom Epic (done in round 314) and Crashing Wave (done in round 328) (tap creatures, or
@@ -7633,7 +7656,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of 31,936 with round 226).
 - Out after round B65 (looked at, not done): Kaya, Ghost Assassin (done in round B206) ("Exile ~ or up to one target creature"), Syrix,
   Carrier of the Flame ("if a creature card left your graveyard this turn", and casting it from the graveyard as a
-  trigger resolves), Rinoa, Angel Wing (returning one of the attacking creatures that died, from any owner's graveyard),
+  trigger resolves), Rinoa, Angel Wing (done in round 394) (returning one of the attacking creatures that died, from any owner's graveyard),
   Tide of War (done in round B202) ("Whenever one or more creatures block" and sacrifices by each controller), Countersculpt (done in round B179) ("behold a Jace
   or pay {1}"), Druid of the Emerald Grove (done in round B204) (a d20 that splits the searched cards), Sphinx's Approach ("exile ~ and four
   cards named ~"), Faces of the Past (done in round B154) (creatures that share a creature type with it), Diaochan, Artful Beauty (done in round B141) (a target
@@ -9794,7 +9817,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   spell). Jhoira, Weatherlight Corsair (the opponent reveals until a historic permanent card, which enters under your
   control, and you lose life equal to its mana value; with none, every revealed card goes to the bottom and no life is
   lost, CR 701.20a). +6, 31,299 of 31,936 with B201, B202 and rounds 358 to 361.
-- Out after round B203 (looked at, not done): Rinoa, Angel Wing ("you may return one of them", an attacking creature that
+- Out after round B203 (looked at, not done): Rinoa, Angel Wing (done in round 394) ("you may return one of them", an attacking creature that
   died from any owner's graveyard, "Do this only once each turn"), Sanctuary Blade ("As ~ becomes attached to a creature,
   choose a color": a choice in the middle of attaching, every way it can become attached) and Kodama of the Center Tree (done in round B213) stay
   out for the reasons in the earlier lists.
@@ -9814,7 +9837,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   choice, asked only for two different names, one found alone entering as with Cultivate, rulings, or both tapped; "20+"
   and "9 or less" count modified results). +6, 31,316 of 31,936 with rounds 362 and 363. `npm run typecheck` now gives tsc a 4 GB heap: the engine's
   check had reached Node's default limit of about 2 GB (2.36 GB on main) and ran out in a fresh clone.
-- Out after round B204 (looked at, not done): Rinoa, Angel Wing, Sanctuary Blade and Kodama of the Center Tree (done in round B213) stay out
+- Out after round B204 (looked at, not done): Rinoa, Angel Wing (done in round 394), Sanctuary Blade and Kodama of the Center Tree (done in round B213) stay out
   for the reasons in the earlier lists.
 - Round B205 (least played first, from the Lane B skip lists): Don & Leo, Problem Solvers (its end step's "up to one target
   artifact you control and up to one target creature you control", the same artifact creature allowed for both, CR 115.3,
@@ -10924,7 +10947,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Painter; Ashad) needed more than one instance of casualty (CR 702.153b; done in round 299).
 - Out after round B69 (looked at, not done): Day of the Moon (names chosen for the Saga each chapter, then goad by
   them), Anhelo, the Painter (done in round 299) and Ashad, the Lone Cyberman (done in round 299) (granted casualty, several instances), Unidentified Hovership (done in round 273)
-  (the owner of each card it exiled), Crafty Cutpurse (tokens an opponent would create, against token doubling and the
+  (the owner of each card it exiled), Crafty Cutpurse (done in round 394) (tokens an opponent would create, against token doubling and the
   attack rulings), Insatiable Frugivore (done in round 320) (a repeat loop), Galloping Lizrog (done in round 315) (counters spread over creatures).
 - Out after round B68 (looked at, not done): Oko, Lorwyn Liege (the back face's emblem of a chosen creature type; done in round 387),
   Abuelo's Awakening (the returned artifact that's also a Spirit creature), Light of Judgment (done in round B156) ("up to one Equipment"

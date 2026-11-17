@@ -7,7 +7,7 @@ import { countersRemoved, putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
+import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, playerProtectedFrom, printedMatches, spellManaValue } from "./targeting";
 import { phaseOut } from "../phasing";
 import { ResolveCtx, apnap, startingWith, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
@@ -3297,7 +3297,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       // One Last Job: an Aura only onto a creature you control (CR 303.4f), chosen as it resolves (rulings).
       if (e.attachToYours) kin = (h) => objIsType(s, h, "Creature") && controllerOf(s, h) === ctx.controller;
-      const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
+      const hosts = e.attachRandom ? randomAuraHosts(s, entering, under, src) : e.attachToSubject || e.attachToTarget !== undefined || e.attachToYou || e.attachToEnchanted || e.attachToCreated || e.attachToSource ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src, undefined, undefined, undefined, kin);
       if (hosts === "paused") return "paused";
       // One Last Job: an Equipment onto a creature you control it could be attached to, chosen as it resolves (not
       // targeted); with none it enters unattached (rulings, CR 301.5c).
@@ -3320,6 +3320,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
               continue;
             }
             log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(face ? { face } : {}), ...host });
+            continue;
+          }
+          if (e.attachToYou) {
+            // Lynde, Cheerful Tormentor (round 394): "return it to the battlefield attached to you": an Aura that could
+            // enchant you as it enters (CR 303.4f; not with protection from it, 702.16c), else it stays where it is (303.4g).
+            const me = ctx.controller;
+            const host = d.subtypes.includes("Aura") ? asFace(s, o, face, () => auraHostOptions(s, o, under(o))).find((h) => "attachToPlayer" in h && h.attachToPlayer === me) : undefined;
+            const ch = asFace(s, o, face, () => ({ name: d.name, colors: [...d.colors], types: [...d.types], subtypes: [...d.subtypes], controller: under(o) }));
+            if (!host || playerProtectedFrom(s, me, under(o), ch)) {
+              log(s, `${d.name} can't be attached to ${player(s, me).name}, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield attached to ${player(s, me).name}.`);
             moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, ...(face ? { face } : {}), ...host });
             continue;
           }

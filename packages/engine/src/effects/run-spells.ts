@@ -1,6 +1,6 @@
 import { isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType, objIsType, opponentForbidsDiscard } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { blightOptions, putCounters } from "../counters";
@@ -1642,7 +1642,8 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     const ways = [{ ...unless, orElse: undefined }, unless.orElse];
     if (sc.unlessWay === undefined) {
       const p = player(s, payer);
-      const can = (u: UnlessPays) => !p.lost && !(u.discard && p.hand.length < u.discard);
+      // Tamiyo, Collector of Tales (round B251): not a discard another player's spell or ability offers them (rulings).
+      const can = (u: UnlessPays) => !p.lost && !(u.discard && p.hand.length < u.discard) && !((u.discard || u.discardHand || u.discardRandom) && opponentForbidsDiscard(s, payer, ctx.controller));
       const options = ways.flatMap((u, i) => (can(u) ? [String(i)] : []));
       if (!options.length) {
         sc.paid = false;
@@ -1707,7 +1708,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);
     // A player can't discard more cards than they have (CR 701.9b), nor sacrifice permanents they don't control
     // (CR 118.3), so they can't pay that.
-    if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n) || (unless.blight && !blightOptions(s, payer, unless.blight).length) || (unless.collectEvidence && evidenceProblem(s, payer, unless.collectEvidence, undefined))) sc.paid = false;
+    if (p.lost || ((unless.discard || unless.discardHand || unless.discardRandom) && opponentForbidsDiscard(s, payer, ctx.controller)) || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n) || (unless.blight && !blightOptions(s, payer, unless.blight).length) || (unless.collectEvidence && evidenceProblem(s, payer, unless.collectEvidence, undefined))) sc.paid = false;
     else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.exileGraveyard && !unless.discardRandom && !unless.poison && !unless.blight && !unless.collectEvidence) {
       // Paying {0} is just saying so (CR 118.5); nobody would refuse.
       log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);

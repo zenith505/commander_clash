@@ -1,5 +1,5 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { abilitiesOf, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, opponentForbidsDiscard, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
@@ -13,7 +13,7 @@ import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffec
 import { exiledWithCounter } from "./run-choices";
 import { voteTally } from "./run-votes";
 import { createExtraTokens, createToken } from "./run-tokens";
-import { discardCards, discardToTop } from "./run-library";
+import { discardCards, discardToTop, logSpared } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
 import { cantPhaseIn, phaseIn, phaseOut } from "../phasing";
@@ -955,11 +955,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (n <= 0) return;
       if (sc.queue!.length) {
         const hand = player(s, pid).hand;
-        if (hand.length > n) {
+        // Tamiyo, Collector of Tales (round B251): connive by another player's spell or ability: drawn, but not discarded.
+        const spared = opponentForbidsDiscard(s, pid, ctx.controller);
+        if (spared && hand.length) logSpared(s, pid);
+        if (!spared && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src };
           return "paused";
         }
-        sc.chosen![pid] = [...hand];
+        sc.chosen![pid] = spared ? [] : [...hand];
         sc.queue!.shift();
       }
       const ids = sc.chosen![pid] ?? [];

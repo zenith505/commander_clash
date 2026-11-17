@@ -10,7 +10,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, discardShieldOf, opponentForbidsDiscard, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -4214,12 +4214,16 @@ function reedRichards(s: GameState, pid: PlayerId, used = false): ObjectId | und
  */
 function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], entry: number): "paused" | void {
   const p = player(s, pid);
-  const src = nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawChains)!);
+  const chains = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawChains)!;
+  const src = nameOf(s, chains);
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
-  if (!p.hand.length) {
+  // Tamiyo, Collector of Tales (round B251): another player's Chains can't make them discard, so they don't discard a card
+  // this way, and mill one.
+  const spared = opponentForbidsDiscard(s, pid, controllerOf(s, obj(s, chains)));
+  if (!p.hand.length || spared) {
     const ids = p.library.slice(0, millCount(s, pid, 1));
     for (const id of ids) moveObject(s, id, "graveyard", { milled: true });
-    log(s, `${p.name} has no card to discard instead of drawing, and mills ${ids.length === 1 ? nameOf(s, ids[0]!) : `${ids.length} cards`} (${src}).`);
+    log(s, `${p.name} ${spared ? `can't be made to discard by another player's ${src} (${nameOf(s, discardShieldOf(s, pid)!.id)})` : "has no card to discard instead of drawing"}, and mills ${ids.length === 1 ? nameOf(s, ids[0]!) : `${ids.length} cards`} (${src}).`);
     return;
   }
   if (p.hand.length === 1) {
@@ -11152,7 +11156,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const equipment = o.zone === "battlefield" ? s.battlefield.filter((b) => obj(s, b).attachedTo === o.id && characteristics(s, obj(s, b)).subtypes.includes("Equipment")).map((b) => ({ id: b, zc: obj(s, b).zoneChanges ?? 0 })) : [];
-  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(equipment.length ? { equipment } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(equipment.length ? { equipment } : {}), ...(ab.body.effects.some((e) => e.type === "search" && !!e.filter?.sharesColorWithSource) ? { colors: [...characteristics(s, o).colors] } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   if (ab.revealChosen && o.chosen?.player !== undefined) {
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);

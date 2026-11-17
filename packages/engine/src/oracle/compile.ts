@@ -92,6 +92,7 @@ import { roundB245Line, roundB245Spell } from "./laneb245";
 import { roundB246Line } from "./laneb246";
 import { roundB247Line } from "./laneb247";
 import { roundB249Line } from "./laneb249";
+import { roundB251Line, roundB251Loyalty } from "./laneb251";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -1240,6 +1241,8 @@ export function compile(d: CardDef): CompiledCard {
     if (d.types.includes("Planeswalker") && round387Line(line, raw, out, isSpell)) continue;
     // Domri, Chaos Bringer's +1 (round B244).
     if (d.types.includes("Planeswalker") && !isSpell && roundB244Loyalty(line, raw, out)) continue;
+    // Tamiyo, Collector of Tales' +1 and Kasmina, Enigma Sage's −8 (round B251).
+    if (d.types.includes("Planeswalker") && !isSpell && roundB251Loyalty(line, raw, out)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
     if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
@@ -2311,6 +2314,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB247Line(line, raw, out, isSpell)) continue;
     // Essence of the Wild, Infinite Reflection, The Prismatic Piper, Faceless One (round B249).
     if (roundB249Line(line, raw, out, isSpell)) continue;
+    // Sharkey, Tyrant of the Shire, Kasmina, Enigma Sage, Tamiyo, Collector of Tales (round B251).
+    if (roundB251Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

@@ -783,6 +783,8 @@ export interface TargetSpec {
   notColors?: Color[];
   /** "A card that shares a color with a legendary creature you control" (Ringsight): a color of one of them as the search is made; none if they're colorless (rulings). */
   colorOfYourLegend?: true;
+  /** Kasmina, Enigma Sage (round B251): "a card that shares a color with this planeswalker": one of the colors of the ability's source as the search is made, or as it last existed (CR 608.2h); a colorless source shares none, so nothing fits (rulings). Bound in the search (effects/run-library.ts). */
+  sharesColorWithSource?: true;
   /** "A creature card that shares a creature type with the sacrificed creature" (Pyre of Heroes): searched for as it resolves, the creature as it last existed. */
   sharesCreatureTypeWithSacrificed?: true;
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
@@ -9548,6 +9550,22 @@ export interface CompiledCard {
    * ~'s abilities." (CR 609.4b): every activated ability it has, mana abilities and borrowed ones among them (CR 602.1).
    */
   spendAnyColorOwnAbilities?: true;
+  /**
+   * Sharkey, Tyrant of the Shire (round B251): "Mana of any type can be spent to activate ~'s abilities." (CR 609.4b): its
+   * colored and {C} symbols paid with any mana, for every activated ability it has, borrowed ones among them (CR 602.1).
+   */
+  spendAnyTypeOwnAbilities?: true;
+  /**
+   * Kasmina, Enigma Sage (round B251): "Each other planeswalker you control has the loyalty abilities of ~.": its loyalty
+   * abilities (CR 606), as it has them now (CR 613.1f), are also abilities of each other planeswalker its controller
+   * controls; "this planeswalker" in them is the one they're activated from (rulings). See cards.ts withKasmina.
+   */
+  lendsLoyaltyToPlaneswalkers?: true;
+  /**
+   * Tamiyo, Collector of Tales (round B251): "Spells and abilities your opponents control can't cause you to discard
+   * cards": with `opponentsCantMakeYouSacrifice` (Sigarda, Host of Herons). See cards.ts opponentForbidsDiscard.
+   */
+  opponentsCantMakeYouDiscard?: true;
   /**
    * Quicksilver Elemental (round 400): "You may spend blue mana as though it were mana of any color to pay the activation
    * costs of ~'s abilities." (CR 609.4b): blue mana pays any colored symbol of every activated ability it has, mana and

@@ -6757,6 +6757,8 @@ function BigCardFace({ d }: { d: CardDef }) {
       <p>
         <RulesText text={d.oracleText} />
       </p>
+      {/* Vecna (The Book of Vile Darkness): the triggered abilities it has from the cards exiled to make it. */}
+      {d.borrowedTriggers?.length ? <p className="muted">Has all triggered abilities of {d.borrowedTriggers.map((b) => b.name).join(", ")}.</p> : null}
       {d.power !== undefined && (
         <div className="big-pt">
           {d.power}/{d.toughness}

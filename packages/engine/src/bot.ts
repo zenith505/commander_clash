@@ -792,6 +792,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.hand === pid && s.resolving && s.resolving.item.controller !== pid && pend.cards.length)
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => handWorth(s, a) - handWorth(s, b)).slice(0, Math.max(1, pend.min)) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
+    // Grime Gorger (round 398): one card of each card type from an opponent's graveyard, a +1/+1 counter for each: as many
+    // as fit, the ones they could use there first (a set built greedily is as big as any, as for Guided Passage).
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.oneOfEach && pend.cards.every((id) => obj(s, id).owner !== pid)) {
+      const found: ObjectId[] = [];
+      const ranked = [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, b)) - Number(usefulInGraveyard(s, a)) || mv(s, b) - mv(s, a));
+      for (const id of ranked) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
     // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.cards.some((id) => obj(s, id).owner !== pid)) {

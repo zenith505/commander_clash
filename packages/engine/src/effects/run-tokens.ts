@@ -428,7 +428,8 @@ function chosenColorTypeToken(s: GameState, token: TokenSpec, ctx: ResolveCtx): 
 
 /** "Create N ... tokens" for each player it names. */
 function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string, /** What each attacking one attacks, as chosen (attackChoices). */ attackAt?: ReturnType<typeof attackChoices>) {
-  const e0 = e00.chosenColorType ? { ...e00, token: chosenColorTypeToken(s, e00.token, ctx) } : e00;
+  const e01 = e00.token.triggersOfExiled ? { ...e00, token: triggersOfExiledToken(s, e00.token) } : e00;
+  const e0 = e01.chosenColorType ? { ...e01, token: chosenColorTypeToken(s, e01.token, ctx) } : e01;
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
   const t = e0.ptToughness !== undefined ? amountNow(s, e0.ptToughness, ctx) : undefined;
@@ -541,9 +542,28 @@ function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }
     }
 }
 
+/**
+ * The Book of Vile Darkness (round 398): "Create Vecna, ... with indestructible and all triggered abilities of the exiled
+ * cards": the cards its cost exiled, ~ first, then the others as they were paid for, each still that card in exile (CR
+ * 400.7). The rulings: the cards in exile, not the permanents they were (a copy's exiled card is that card); a token
+ * exiled isn't a card and is gone (CR 704.5d). Their triggered abilities are part of the token's copiable values (the
+ * rulings), so it's made with them (CardDef.borrowedTriggers): an enters ability among them triggers as it's created.
+ */
+function triggersOfExiledToken(s: GameState, t: TokenSpec): TokenSpec {
+  const item = s.resolving?.item;
+  const { triggersOfExiled: _, ...rest } = t;
+  if (item?.kind !== "ability") return rest;
+  const self = item.sourceId ? s.objects[item.sourceId] : undefined;
+  const cards = [
+    ...(self && self.zone === "exile" && !self.isToken && (self.zoneChanges ?? 0) === (item.sourceZc ?? 0) + 1 ? [self] : []),
+    ...(item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && !s.objects[c.id]!.isToken && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : [])),
+  ];
+  return cards.length ? { ...rest, triggersOf: cards.map((o) => defOf(s, o)) } : rest;
+}
+
 export function tokenDef(t: TokenSpec): CardDef {
   return {
-    oracleId: `token:${t.manaCost ? `cost${t.manaCost}:` : ""}${t.named ? "named:" : ""}${t.legendary ? "legendary:" : ""}${t.snow ? "snow:" : ""}${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
+    oracleId: `token:${t.manaCost ? `cost${t.manaCost}:` : ""}${t.named ? "named:" : ""}${t.legendary ? "legendary:" : ""}${t.snow ? "snow:" : ""}${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}${t.triggersOf?.length ? `|triggersOf:${t.triggersOf.map((d) => d.oracleId).join(",")}` : ""}`,
     name: t.named ? t.name : `${t.name} Token`,
     manaCost: t.manaCost ?? "",
     cmc: t.manaCost ? manaValue(parseManaCost(t.manaCost)) : 0,
@@ -557,6 +577,7 @@ export function tokenDef(t: TokenSpec): CardDef {
     colorIdentity: t.colors,
     keywords: t.keywords,
     ...(t.back ? { tokenBack: tokenDef(t.back) } : {}),
+    ...(t.triggersOf?.length ? { borrowedTriggers: t.triggersOf } : {}),
     ...(t.loyalty !== undefined ? { loyalty: String(t.loyalty) } : {}),
   };
 }

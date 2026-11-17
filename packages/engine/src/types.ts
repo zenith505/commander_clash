@@ -168,6 +168,12 @@ export interface CardDef {
   /** A double-faced token's back face (CR 111.10i, 712): what it becomes as it transforms (CR 701.27a). */
   tokenBack?: CardDef;
   /**
+   * The Book of Vile Darkness's Vecna (round 398): "all triggered abilities of the exiled cards", as they are on those
+   * cards (the rulings: the cards in exile, not the permanents they were). Part of the token's copiable values (the
+   * rulings), so compileCard adds each card's compiled triggered abilities to the token's own.
+   */
+  borrowedTriggers?: CardDef[];
+  /**
    * A mutating creature spell (CR 702.140a): it targets a non-Human creature with this owner, the spell's (see
    * mutatingDef). Set only on the definition a mutating spell uses on the stack.
    */

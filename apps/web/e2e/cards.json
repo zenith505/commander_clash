@@ -14324,6 +14324,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "371a7bbf-5890-46d8-ae57-f020c103b465",
+  "name": "Eye of Vecna",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When Eye of Vecna enters, you draw a card and you lose 2 life.\nAt the beginning of your upkeep, you may pay {2}. If you do, you draw a card and you lose 2 life.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3017ac79-37f1-4cc1-8efd-4add027618a2",
   "name": "Ezio Auditore da Firenze",
   "manaCost": "{1}{B}",
@@ -18608,6 +18632,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7271c442-2bd1-4d78-a049-b28bd5ee6876",
+  "name": "Grime Gorger",
+  "manaCost": "{2}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horror"
+  ],
+  "oracleText": "Menace\nWhenever this creature attacks, exile up to one card of each card type from defending player's graveyard. Put a +1/+1 counter on this creature for each card exiled this way.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fa798a3d-7797-4795-b251-a45f0429d169",
   "name": "Grinning Totem",
   "manaCost": "{4}",
@@ -20462,6 +20520,40 @@
   "commanderLegal": "legal",
   "set": "rex",
   "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "957df9f4-73e9-4540-b838-52f65d0c62ee",
+  "name": "Hurkyl, Master Wizard",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Wizard Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard",
+   "Advisor"
+  ],
+  "oracleText": "At the beginning of your end step, if you've cast a noncreature spell this turn, reveal the top five cards of your library. For each card type among noncreature spells you've cast this turn, you may put a card of that type from among the revealed cards into your hand. Put the rest on the bottom of your library in a random order.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -42271,6 +42363,36 @@
   "commanderLegal": "legal",
   "set": "ncc",
   "releasedAt": "2022-04-29",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fcc666bc-6fea-44e0-94bc-462c742db528",
+  "name": "The Book of Vile Darkness",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact — Book",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "At the beginning of your end step, if you lost 2 or more life this turn, create a 2/2 black Zombie creature token.\n{T}, Exile The Book of Vile Darkness and artifacts you control named Eye of Vecna and Hand of Vecna: Create Vecna, a legendary 8/8 black Zombie God creature token with indestructible and all triggered abilities of the exiled cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

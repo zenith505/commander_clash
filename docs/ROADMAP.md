@@ -3533,7 +3533,7 @@ line blocks.
    compiled text of every other card is unchanged.
    Out after round 394 (looked at, not done): Gather Specimens (nontoken creatures entering under your control instead:
    the "as it enters" choices then made by the new controller on every way a creature enters, rulings); Invisible Woman,
-   Sue Storm (still no batched "one or more counters on one or more creatures" event); Hurkyl, Master Wizard (one revealed
+   Sue Storm (still no batched "one or more counters on one or more creatures" event); Hurkyl, Master Wizard (done in round 398) (one revealed
    card for each card type among the noncreature spells cast this turn, a card fitting several types counting once);
    Titania's Song, Hero of Bretagard, Kraven the Hunter and the rest above rank 15,000 (still out, for the reasons in their
    earlier lists).
@@ -3597,6 +3597,26 @@ line blocks.
    Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack, Medomai's Prophecy,
    Monastery Raid, Winter's Chill, Divine Intervention, Kotose and the rest from rank 15,000 to 20,000 (still out, for the
    reasons in their earlier lists).
+   Round 398 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards of each card
+   type (CR 205.2a), a card with several card types taken for any one of them (Atraxa, Grand Unifier's rulings, as for
+   Revival Experiment): Hurkyl, Master Wizard's "For each card type among noncreature spells you've cast this turn, you may
+   put a card of that type from among the revealed cards into your hand." (Effect dig `noncreatureCastTypes`: Atraxa's
+   pick cut down as it resolves to the card types of the noncreature spells you cast this turn, each as it was cast; an
+   intervening if, CR 603.4); Grime Gorger's "Whenever this creature attacks, exile up to one card of each card type from
+   defending player's graveyard. Put a +1/+1 counter on this creature for each card exiled this way." (chooseFromGraveyard
+   `oneOfEach`, you choosing as it resolves, CR 608.2c; bots take as many as fit); The Book of Vile Darkness's "if you lost
+   2 or more life this turn" (the life lost this turn, added up) and "{T}, Exile ~ and artifacts you control named Eye of
+   Vecna and Hand of Vecna: Create Vecna, a legendary 8/8 black Zombie God creature token with indestructible and all
+   triggered abilities of the exiled cards." (one artifact of each name, a copy so named too; TokenSpec.triggersOfExiled:
+   the triggered abilities of the cards exiled, as they are in exile, kept in the token's definition,
+   CardDef.borrowedTriggers, so they're copiable values and an enters ability among them triggers as it's created, the
+   rulings). Browser tests click through Hurkyl's pick, the Book's cost and Grime Gorger's pick. +3, 31,591 of 31,936 on
+   this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
+   counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
+   Killer, Celestial Dawn, Titania's Song, Bitter Feud, Breathstealer's Crypt, Swans of Bryn Argoll, Blood of the Martyr,
+   Shared Fate, Elemental Resonance, Rhystic Cave, Sharkey, Eye for an Eye, Spy Kit and the rest from rank 15,000 to 25,000
+   (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5075,7 +5095,7 @@ line blocks.
    Out after round 260 (looked at, not done): Mirror-Mad Phantasm (done in round 261); Over
    the Top (each player reveals cards equal to their nonland permanents and all permanent cards revealed enter at once);
    Terminal Velocity (a permanent put from your hand gains a leaves-the-battlefield trigger and an end-step sacrifice);
-   Hurkyl, Master Wizard (one revealed card for each card type among noncreature spells you cast this turn); Hew the
+   Hurkyl, Master Wizard (done in round 398) (one revealed card for each card type among noncreature spells you cast this turn); Hew the
    Entwood (sacrifice any number of lands as it resolves, then reveal that many and pick artifact and land cards, nonland
    ones entering first); Coin of Fate (done in round 374) (an opponent chooses which of the two cards exiled as a cost goes to the bottom).
    Out after round 259 (looked at, not done): Requiem Monolith (a granted "whenever this creature is dealt damage" trigger
@@ -7513,7 +7533,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("attacks that player each combat"), Blue Dragon (done in round B154) (three targets until your next turn), Satyr Firedancer (a spell's damage
   to an opponent), Thrill-Kill Disciple (done in round B175) (squad with a discard), Magnigoth Treefolk and Diligent Zookeeper (both done in round B164) (counted
   landwalk and creature types), Exotic Pets and Storm of Forms (done in round B202) (each kind of counter), Sanctifier en-Vec (done in round B174) (a color filter on
-  permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion (done in round B179), The Book of Vile Darkness.
+  permanents, spells and cards going to graveyards), Greatbow Doyen, Ancestral Communion (done in round B179), The Book of Vile Darkness (done in round 398).
 - Round B58 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,000): "If that player
   can't, they discard a card, they lose 2 life, you draw a card, ..., then you sacrifice ~" (Doom Foretold: the whole list
   only when nothing was sacrificed), "If it entered under your control, put a +1/+1 counter on it. Otherwise, tap it"
@@ -9934,7 +9954,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Cube (a delayed "when target creature you control attacks and isn't blocked" for the rest of the turn, CR 603.7c,
   triggering after blockers are declared, so none when activated later, rulings; "assigns no combat damage this turn",
   CR 510.1a). +6, 31,343 of 31,936.
-- Out after round B207 (looked at, not done): Noxious Vapors and Grime Gorger (multicolored or multitype cards, no
+- Out after round B207 (looked at, not done): Noxious Vapors and Grime Gorger (done in round 398) (multicolored or multitype cards, no
   rulings on how they count) and Cleansing (done in round B215) (each land's destruction paid off by any player) stay out for the reasons in
   the earlier lists.
 - Round B208 (least played first, from the Lane B skip lists): Lumbering Battlement (any number of other nontoken

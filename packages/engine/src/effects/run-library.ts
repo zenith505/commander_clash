@@ -2097,9 +2097,22 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      return pid === undefined ? undefined : dig(s, e, ctx, src, pid);
+      return pid === undefined ? undefined : dig(s, e.noncreatureCastTypes ? noncreatureCastTypesDig(s, e, ctx) : e, ctx, src, pid);
     }
   }
+}
+
+/**
+ * Hurkyl, Master Wizard (round 398): "For each card type among noncreature spells you've cast this turn, you may put a
+ * card of that type from among the revealed cards into your hand": one card for each card type (CR 205.2a) among the
+ * noncreature spells this ability's controller cast this turn, each as it was cast (a copy wasn't cast, CR 707.10), as
+ * it resolves; a card with several card types is taken for any one of them (as Atraxa's rulings), so `oneOfEach`.
+ */
+function noncreatureCastTypesDig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx): Extract<Effect, { type: "dig" }> {
+  const cast = (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller).map((x) => x.types ?? s.cards[x.card]?.types ?? []);
+  const types = new Set(cast.filter((ts) => !ts.includes("Creature")).flat());
+  const oneOfEach = (e.oneOfEach ?? []).filter((f) => f.types?.some((t) => types.has(t)));
+  return { ...e, count: oneOfEach.length, oneOfEach, filter: { kind: "card", anyOf: oneOfEach, text: e.filter?.text ?? "card" } };
 }
 
 /** "Look at the top N cards of your library": `pid` looks at them, takes some, and the rest go where they go. */

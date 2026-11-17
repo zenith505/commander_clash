@@ -122,6 +122,7 @@ import { round394Line } from "./round394";
 import { round395Line } from "./round395";
 import { round396Line } from "./round396";
 import { round397Line } from "./round397";
+import { round398Line } from "./round398";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -187,6 +188,9 @@ export function compileCard(card: CardDef): CompiledCard {
   if (d.oracleId === RAD.oracleId) out.triggers = RAD_TRIGGERS;
   const rooms = dungeonTriggers(d.oracleId);
   if (rooms) out.triggers = rooms;
+  // Vecna (The Book of Vile Darkness, round 398): "all triggered abilities of the exiled cards", each card's own, after
+  // the token's (CardDef.borrowedTriggers); "~" in them is this object (CR 201.5).
+  if (d.borrowedTriggers?.length) out.triggers = [...out.triggers, ...d.borrowedTriggers.flatMap((b) => compileCard(b).triggers)];
   cache.set(d.oracleId, out);
   return out;
 }
@@ -6282,6 +6286,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round396Line(line, raw, out, isSpell)) continue;
     // Round 397's whole lines (oracle/round397.ts).
     if (round397Line(line, raw, out, isSpell)) continue;
+    // Round 398's whole lines (oracle/round398.ts).
+    if (round398Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,

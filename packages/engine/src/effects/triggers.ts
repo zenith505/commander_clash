@@ -397,6 +397,7 @@ function diesMatches(
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
   // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
   if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
+  if (d.greatestPowerOfController && !greatestOfController(s, dying)) return false;
   // Dance of Many: a token this object created, as the object it is now (CR 400.7).
   if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
   // Diabolic Servitude (round B236): the creature its enters ability put onto the battlefield, linked to the object the
@@ -416,6 +417,26 @@ function diesMatches(
   // "A creature of the chosen type" (Species Specialist): the type chosen for the watcher, as it last existed if it's
   // dying too (rulings; CR 603.10a).
   return objectMatches(s, bindChosen(bindEnchanted(d.filter, s.objects[srcId]), chosen), dying.o, you, false, undefined, dying.c);
+}
+
+/**
+ * Kraven the Hunter (round B250): "with the greatest power among creatures that player controls", looking back to just
+ * before it left (CR 603.10a): its power then is at least that of each creature its controller controlled then, those
+ * leaving at the same time too (GameState.leftTogether `before`), a tie included. Without that look back kept, its power
+ * as it last existed against the others' now and the last known power of those leaving with it.
+ */
+function greatestOfController(s: GameState, dying: { o: GameObject; c: Characteristics }): boolean {
+  const before = s.leftTogether?.find((l) => l.before)?.before;
+  const me = before?.find((b) => b.id === dying.o.id);
+  if (before && me) return before.every((b) => b.controller !== me.controller || b.power <= me.power);
+  const ctl = dying.c.controller;
+  const mine = dying.c.power;
+  const now = s.battlefield.map((id) => s.objects[id]!).filter((b) => b.id !== dying.o.id && controllerOf(s, b) === ctl && objIsType(s, b, "Creature")).map((b) => power(s, b));
+  const leaving = (s.leftTogether ?? []).filter((l) => l.id !== dying.o.id && l.controller === ctl).flatMap((l) => {
+    const k = s.lastKnown?.[l.id];
+    return k?.source?.types.includes("Creature") ? [k.power] : [];
+  });
+  return [...now, ...leaving].every((p) => p <= mine);
 }
 
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */

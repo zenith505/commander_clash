@@ -1,6 +1,6 @@
 # Roadmap
 
-31,551 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,553 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,893 of
 9,979 (99%).
 
@@ -9971,6 +9971,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   isn't a commander, and the color is part of its color identity (validateCommanderDeck's `colors`, commanderIdentity for
   Command Tower and the like, `identityOf`). A browser test for the copy prompt. +5, 31,551 of 31,936. The compiled text of
   every other card is unchanged.
+- Round B250 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Gather Specimens ("If a
+  creature would enter the battlefield under an opponent's control this turn, it enters under your control instead."):
+  GameState `gatherSpecimens`, a control-changing replacement of how a creature enters (CR 614.1c, 614.12), tokens too, a
+  token's owner still its creator (rulings), applied before copy effects and the creature's own replacements (CR 616.1b,
+  rulings), each instance once per event (CR 614.5). With several that could apply (two players' Gather Specimens, or one
+  and the creature's own Xantcha replacement), the player it would enter under chooses which applies first, then the new
+  one among those left (rulings): the "controlFirst" prompt; bots pick the player with the least life. A creature put onto
+  the battlefield attacking under the wrong player's control is never attacking (CR 506.3c, Hero of Bladehold's tokens),
+  and a blocker under the active player's is never blocking (506.3d). Kraven the Hunter ("Whenever a creature an opponent
+  controls with the greatest power among creatures that player controls dies, draw a card and put a +1/+1 counter on
+  Kraven"): TriggeredAbility.dies `greatestPowerOfController`, judged with the powers of that player's creatures just
+  before the event (CR 603.10a), so of creatures destroyed together each player's biggest triggers it, ties too
+  (leftTogether `before`). A browser test for the order prompt. +2, 31,553 of 31,936. The compiled text of every other card
+  is unchanged.
+- Out after round B250 (looked at, not done): the lists after round B249 stay out, and Filigree Vector (two "any number of
+  target" slots in one ability), Lich's Mirror (each creature's own choice of graveyard or library as the game restarts),
+  Lodestone Bauble (a player chosen on activation and a delayed draw), Pulmonic Sliver, Breathstealer's Crypt, Land
+  Equilibrium, Elemental Resonance and Ashiok, Wicked Manipulator (none of whose lines parse yet). Known gaps: bots cast
+  Gather Specimens only in response to an opponent's creature spell; a choice put off until after the order prompt (the
+  life a player noted as it entered and the like) still reads the controller it would have entered under first.
 - Out after round B249 (looked at, not done): the lists after round B248 stay out. Known gaps: two Mystic Reflections
   still apply in timestamp order rather than asking (only different kinds of copy effect are asked); the app's decks have
   no way to choose a color for a commander like The Prismatic Piper yet (no sample deck has one).

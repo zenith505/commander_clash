@@ -91,6 +91,7 @@ import { roundB245Line, roundB245Spell } from "./laneb245";
 import { roundB246Line } from "./laneb246";
 import { roundB247Line } from "./laneb247";
 import { roundB249Line } from "./laneb249";
+import { roundB250Line } from "./laneb250";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2267,6 +2268,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB247Line(line, raw, out, isSpell)) continue;
     // Essence of the Wild, Infinite Reflection, The Prismatic Piper, Faceless One (round B249).
     if (roundB249Line(line, raw, out, isSpell)) continue;
+    // Kraven the Hunter (round B250).
+    if (roundB250Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

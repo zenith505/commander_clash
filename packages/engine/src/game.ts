@@ -4211,7 +4211,7 @@ function advanceStep(s: GameState): void {
       }
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
-    for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
+    for (const id of s.battlefield) clearProvokedAlso(s, obj(s, id));
     s.unblockedChoice = undefined; // made for this combat's damage steps
     s.creatureDamageChoice = undefined;
     s.blockLimits = undefined;
@@ -4262,7 +4262,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.thatCombat = undefined;
   for (const o of attackersAndBlockers(s)) clearCombat(o);
   for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
-  for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
+  for (const id of s.battlefield) clearProvokedAlso(s, obj(s, id));
   s.unblockedChoice = undefined;
   s.creatureDamageChoice = undefined;
   s.blockLimits = undefined;
@@ -13922,6 +13922,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (bey && idle) throw new RulesError(`${defOf(s, idle).name} has to attack too: all creatures ${p.name} controls attack if able once ${nameOf(s, bey.attacker)} does`);
     const cyclops = potentialAttackers(s, p.id).find((o) => abilitiesOf(s, o).attacksIfOneAttacks && idleOk(o));
     if (cyclops) throw new RulesError(`${defOf(s, cyclops).name} has to attack too: it attacks if able once a creature ${p.name} controls does`);
+    // Magnetic Web (round B242): once a creature with a magnet counter attacks, all creatures with magnet counters attack
+    // if able (CR 508.1d), the attacking player's (CR 508.1a).
+    for (const kind of webCounterKinds(s)) {
+      if (!attacks.some((a) => (obj(s, a.attacker).counters[kind] ?? 0) > 0)) continue;
+      const idleWeb = potentialAttackers(s, p.id).find((o) => (o.counters[kind] ?? 0) > 0 && idleOk(o));
+      if (idleWeb) throw new RulesError(`${defOf(s, idleWeb).name} has to attack too: all creatures with ${kind} counters on them attack if able once one does`);
+    }
   }
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
@@ -13987,9 +13994,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // (Trove of Temptation, rulings).
   const tollNow = attacks.length ? attackAllIfOne(s, p.id) : undefined;
   const beyNow = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+  const webNow = webCounterKinds(s).filter((kind) => attacks.some((a) => (obj(s, a.attacker).counters[kind] ?? 0) > 0));
   const hadTo = attacks.filter((a) => {
     const o = obj(s, a.attacker);
-    return tollNow || beyNow || characteristics(s, o).attacksIfAble || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
+    return tollNow || beyNow || webNow.some((kind) => (o.counters[kind] ?? 0) > 0) || characteristics(s, o).attacksIfAble || mustAttackPlayers(s, o).length > 0 || walkersToAttack(s, o).length > 0 || (abilitiesOf(s, o).attacksIfOneAttacks && attacks.some((x) => x.attacker !== o.id));
   });
   if (hadTo.length) s.hadToAttack = { turn: s.turn, combat: s.combatsThisTurn ?? 0, keys: hadTo.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`) };
   else delete s.hadToAttack;
@@ -14516,6 +14524,16 @@ export function lureBinds(s: GameState, at: GameObject, b: GameObject): boolean 
   return !!by?.some((f) => objectMatches(s, f, b, controllerOf(s, at), false));
 }
 
+/** Magnetic Web (round B242): the kinds of counters whose creatures all attack if able once one of them does (CR 508.1d). */
+export function webCounterKinds(s: GameState): CounterKind[] {
+  const kinds = new Set<CounterKind>();
+  for (const id of s.battlefield) {
+    const k = abilitiesOf(s, obj(s, id)).allAttackIfOneWithCounter;
+    if (k) kinds.add(k);
+  }
+  return [...kinds];
+}
+
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
 export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
   return provokersOf(s, b)[0];
@@ -14528,7 +14546,13 @@ export function provokersOf(s: GameState, b: GameObject): GameObject[] {
     return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === p.zc && at.attacking === controllerOf(s, b) ? [at] : [];
   };
   const first = b.provokedBy && (b.provokedBy.turn === undefined || b.provokedBy.turn === s.turn) ? live(b.provokedBy) : [];
-  return [...first, ...(b.provokedAlso ?? []).flatMap(live).filter((at) => !first.includes(at))];
+  return [...first, ...(b.provokedAlso ?? []).filter((p) => p.turn === undefined || p.turn === s.turn).flatMap(live).filter((at) => !first.includes(at))];
+}
+
+/** At end of combat: the "this combat" requirements go; the "this turn" ones (Magnetic Web, round B242) stay for that turn. */
+function clearProvokedAlso(s: GameState, o: GameObject) {
+  const kept = o.provokedAlso?.filter((p) => p.turn === s.turn);
+  o.provokedAlso = kept?.length ? kept : undefined;
 }
 
 /**

@@ -45,6 +45,7 @@ import {
   attackLifeCost,
   attackYouLimit,
   attackAllIfOne,
+  webCounterKinds,
   attackRequirementImprovement,
   attackWithOneOptions,
   attackWithOneRequired,
@@ -8716,8 +8717,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Viashino Bey: with it attacking, all the others that can join it (CR 508.1d); Ekundu Cyclops joins any attack.
   if (attacks.length) {
     const bey = attacks.some((a) => abilitiesOf(s, obj(s, a.attacker)).allAttackIfSelfAttacks);
+    // Magnetic Web: with one attacking, the others with that kind of counter join (CR 508.1d).
+    const web = webCounterKinds(s).filter((kind) => attacks.some((a) => (obj(s, a.attacker).counters[kind] ?? 0) > 0));
     for (const o of potentialAttackers(s, pid)) {
-      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id) || !(bey || abilitiesOf(s, o).attacksIfOneAttacks)) continue;
+      if (attacks.some((a) => a.attacker === o.id) || walkerBound.some((a) => a.attacker === o.id) || !(bey || abilitiesOf(s, o).attacksIfOneAttacks || web.some((kind) => (o.counters[kind] ?? 0) > 0))) continue;
       const d = !attackProblem(s, o, target) ? target : opps.find((x) => !attackProblem(s, o, x));
       if (d !== undefined) attacks.push({ attacker: o.id, defender: d });
     }

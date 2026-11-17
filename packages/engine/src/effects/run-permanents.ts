@@ -670,7 +670,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) {
         // Already required to block another creature this combat (Fighter Class twice): one of them (rulings).
         const others = provokersOf(s, o).filter((x) => x.id !== source.id);
-        if (others.length && !e.thisTurn) (o.provokedAlso ??= []).push({ id: source.id, zc: source.zoneChanges ?? 0 });
+        // Magnetic Web (round B242): a "this turn" requirement beside another keeps both, for the rest of the turn.
+        if (others.length && e.thisTurn) (o.provokedAlso ??= []).push({ id: source.id, zc: source.zoneChanges ?? 0, turn: s.turn });
+        else if (others.length) (o.provokedAlso ??= []).push({ id: source.id, zc: source.zoneChanges ?? 0 });
         else o.provokedBy = { id: source.id, zc: source.zoneChanges ?? 0, ...(e.thisTurn ? { turn: s.turn } : {}) };
         log(s, `${characteristics(s, o).name} must block ${characteristics(s, source).name} this ${e.thisTurn ? "turn" : "combat"} if able.`);
       }

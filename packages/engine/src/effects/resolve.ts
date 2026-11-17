@@ -33,11 +33,28 @@ import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run
 import { runChooseSourceNowEffect } from "./run-round364";
 import { runMillUntilEffect } from "./run-round373";
 import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
+import { runFaceDownPileEffect } from "./run-round391";
+import { runPlayTopOrHandEffect, runPowerToPlayersEffect } from "./run-round392";
+import { runMoveCurseEffect, runReturnOneOfThemEffect, runStealTokensEffect } from "./run-round394";
+import { runExileUntilNonlandLinkedEffect, runRevealTopsShareTypeEffect } from "./run-round395";
+import { runBecomeCopyOfLinkedEffect } from "./run-round396";
+import { runChooseLinkedCardEffect } from "./run-round399";
+import { runGainActivatedOfEffect, runWhenCastGainsActivatedEffect } from "./run-round400";
+import { runExileFromHandOrYardEffect } from "./run-round401";
+import { runGlimpseOfTomorrowEffect } from "./run-round390";
+import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
+import { runNoteCreatureTypeEffect } from "./run-round380";
+import { runGoadChosenNamesEffect } from "./run-round382";
+import { runCopyNamedCardEffect, runSearchTheyNameEffect } from "./run-round377";
 import { runAttachSelfToPlayerEffect } from "./run-round365";
 import { runFlickerWithAurasEffect, runReturnAurasAttachedEffect } from "./run-round366";
 import { runTapLandsSharingManaEffect } from "./run-round367";
 import { runAuraCopiesOnAttackersEffect } from "./run-round368";
 import { runAttackingNowEffect, runDiscardOrSacrificeEffect, runExileTopDamageEachEffect, runGuessTopKindEffect, runReturnSacrificedCardsEffect, runSacrificeTargetsRevealEffect } from "./run-round319";
+import { runSecretNumberGuessEffect } from "./run-round384";
+import { runShuffleExiledPileEffect } from "./run-round385";
+import { runNoHandPlaysEffect } from "./run-round386";
+import { runOverTheTopEffect, runPhaseInSubjectEffect } from "./run-round389";
 import { runRepeatIfDidEffect } from "./run-round320";
 import { runChooseHostOrNamedEffect, runPutMilledPairEffect, runSearchEachExileEffect } from "./run-round321";
 import { runLaneB160Effect } from "./run-laneb160";
@@ -1880,6 +1897,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSearchEachExileEffect(s, e, ctx, src);
     case "guessTopKind":
       return runGuessTopKindEffect(s, e, ctx, src);
+    case "secretNumberGuess":
+      return runSecretNumberGuessEffect(s, e, ctx, src);
+    case "shuffleExiledPile":
+      return runShuffleExiledPileEffect(s, ctx, src);
+    case "noHandPlaysUntilYourNextTurn":
+      return runNoHandPlaysEffect(s, ctx, src);
     case "exileRandomTokenCopy":
       return runExileRandomTokenCopyEffect(s, e, ctx, src);
     case "kinCounters":
@@ -1898,6 +1921,52 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runReturnWithSacrificedEffect(s, e, ctx, src);
     case "swapFromGraveyards":
       return runSwapFromGraveyardsEffect(s, ctx, src);
+    case "opponentShufflesExiledIn":
+      return runOpponentShufflesExiledInEffect(s, ctx, src);
+    case "thievesAuction":
+      return runThievesAuctionEffect(s, ctx, src);
+    case "warpWorld":
+      return runWarpWorldEffect(s, ctx, src);
+    case "glimpseOfTomorrow":
+      return runGlimpseOfTomorrowEffect(s, ctx, src);
+    case "faceDownPile":
+      return runFaceDownPileEffect(s, e, ctx, src);
+    case "playTopOrHand":
+      return runPlayTopOrHandEffect(s, e, ctx, src);
+    case "powerToPlayers":
+      return runPowerToPlayersEffect(s, e, ctx, src);
+    case "stealTokensThisTurn":
+      return runStealTokensEffect(s, ctx, src);
+    case "returnOneOfThem":
+      return runReturnOneOfThemEffect(s, e, ctx, src);
+    case "moveCurseToOpponent":
+      return runMoveCurseEffect(s, ctx, src);
+    case "exileUntilNonlandLinked":
+      return runExileUntilNonlandLinkedEffect(s, e, ctx, src);
+    case "revealTopsShareType":
+      return runRevealTopsShareTypeEffect(s, ctx, src);
+    case "becomeCopyOfLinked":
+      return runBecomeCopyOfLinkedEffect(s, e, ctx, src);
+    case "chooseLinkedCard":
+      return runChooseLinkedCardEffect(s, e, ctx, src);
+    case "gainActivatedOf":
+      return runGainActivatedOfEffect(s, e, ctx, src);
+    case "exileFromHandOrYard":
+      return runExileFromHandOrYardEffect(s, e, ctx, src);
+    case "whenCastGainsActivated":
+      return runWhenCastGainsActivatedEffect(s, e, ctx, src);
+    case "phaseInSubject":
+      return runPhaseInSubjectEffect(s, ctx, src);
+    case "overTheTop":
+      return runOverTheTopEffect(s, ctx, src);
+    case "searchTheyName":
+      return runSearchTheyNameEffect(s, e, ctx, src);
+    case "copyNamedCard":
+      return runCopyNamedCardEffect(s, e, ctx, src);
+    case "noteCreatureType":
+      return runNoteCreatureTypeEffect(s, e, ctx, src);
+    case "goadChosenNames":
+      return runGoadChosenNamesEffect(s, e, ctx, src);
     case "attachSelfToPlayer":
       return runAttachSelfToPlayerEffect(s, e, ctx);
     case "flickerWithAuras":
@@ -2085,6 +2154,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "controlFromEach":
     case "chooseVotes":
     case "chooseBlocks":
+    case "chooseAttacks":
     case "secretNumbers":
     case "bidLife":
     case "payLifeRounds":

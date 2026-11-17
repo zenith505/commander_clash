@@ -8,7 +8,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, TYPE_ORDERS, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
-import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource, chosenPlayerOf } from "./resolve";
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
@@ -600,6 +600,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Gilgamesh: "When you put one or more Equipment onto the battlefield this way": only if any are there now.
       // Yuna's Whistle: "When you reveal a creature card this way": only if one was found.
       if (e.xRevealedMv && s.resolving!.revealedUntilMv === undefined) return;
+      // Ogre Battlecaster (round 401): "When you cast that spell": only if the castNow before cast one.
+      if (e.xCastMv && s.resolving!.castThisWayMv === undefined) return;
       // Cait Sith, Fortune Teller: "When you exile a card this way": only if the card is there; Hidetsugu, Devouring Chaos's
       // "a nonland card" only if it isn't a land card (CR 603.12).
       const exiled = e.xExiledMv && s.resolving!.exiledTop ? s.objects[s.resolving!.exiledTop.id] : undefined;
@@ -621,7 +623,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Craig Boone, Novac Guard: once for every two quest counters put on it this way, so twice with Doubling Season's
       // four and not at all if none could be put (rulings).
       const perCounters = e.perCounters;
-      const times = perCounters ? Math.floor((s.resolving!.countersPutThisWay ?? []).filter((c) => c.id === sourceId && c.kind === perCounters.counter).reduce((a, c) => a + (c.n ?? 1), 0) / perCounters.n) : kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
+      const times = e.perDrawn ? (s.resolving!.drawnCount ?? 0) : perCounters ? Math.floor((s.resolving!.countersPutThisWay ?? []).filter((c) => c.id === sourceId && c.kind === perCounters.counter).reduce((a, c) => a + (c.n ?? 1), 0) / perCounters.n) : kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
       // Forum Filibuster (round 371): "attached to that token": each one about its own token (CR 603.12a).
       const tokens = e.perTokenSubject && kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).map((id) => ({ id, zc: s.objects[id]!.zoneChanges ?? 0 })) : undefined;
       for (let i = 0; i < times; i++) s.triggerQueue.push({
@@ -645,7 +647,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "Up to that many target creatures" after "you may sacrifice one or more Treasures" (Swashbuckler Extraordinaire).
         // Jailbreak (round B220): "with equal or lesser mana value" than the permanent put onto the battlefield this way, as it
         // is there now (CR 202.3).
-        ...(e.xPutMv ? { x: put?.[0] && s.objects[put[0].id] ? characteristics(s, s.objects[put[0].id]!).manaValue : 0 } : e.xAmount ? { x: Math.max(0, amountNow(s, e.xAmount, ctx)) } : e.xDiscardedMv ? { x: ((id) => (id && s.objects[id] ? characteristics(s, s.objects[id]!).manaValue : 0))((s.resolving!.discardedAll ?? []).at(-1)) } : e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xDiscarded ? { x: s.resolving!.discardedAll?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
+        ...(e.xPutMv ? { x: put?.[0] && s.objects[put[0].id] ? characteristics(s, s.objects[put[0].id]!).manaValue : 0 } : e.xAmount ? { x: Math.max(0, amountNow(s, e.xAmount, ctx)) } : e.xDiscardedMv ? { x: ((id) => (id && s.objects[id] ? characteristics(s, s.objects[id]!).manaValue : 0))((s.resolving!.discardedAll ?? []).at(-1)) } : e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xDiscarded ? { x: s.resolving!.discardedAll?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : e.xCastMv ? { x: s.resolving!.castThisWayMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),
@@ -832,7 +834,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const keep = () => {
           const me = e.keepOnSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
           if (me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && r.chosen?.player !== undefined) {
-            me.chosen = { ...me.chosen, player: r.chosen.player };
+            // Stalking Leonin: kept secret (Chosen.secret) until "Reveal the player you chose" is paid.
+            me.chosen = { ...me.chosen, player: r.chosen.player, ...(e.secret ? { secret: true as const } : {}) };
             invalidateCharacteristics(s);
           }
         };
@@ -874,10 +877,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         if (opps.length === 1) {
           r.chosen = { ...r.chosen, player: opps[0]! };
-          log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
+          log(s, e.secret ? `${player(s, ctx.controller).name} secretly chooses an opponent for ${src}.` : `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
         if (opps.length <= 1) return keep();
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.moreLandsThanYou ? "choose an opponent who controls more lands than you" : e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), ...(e.secret ? { secret: true as const } : {}), prompt: e.secret ? "secretly choose an opponent" : e.moreLandsThanYou ? "choose an opponent who controls more lands than you" : e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife === "least" ? "choose a player with the lowest life total" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
       if (e.each) {
@@ -937,7 +940,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         r.chosen = { ...r.chosen, name: undefined };
         if (chooser === undefined || !options.length) return;
         const of = ctx.targets.find((t) => t?.kind === "player");
-        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: e.purpose === "guardLibrary" ? `choose a card name: if the card ${player(s, ctx.controller).name} found in your library is a creature card without that name, they may put it onto the battlefield under their control` : e.purpose === "goadTheirs" ? `choose a creature card name: you goad every creature with a name chosen for ${src}` : `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
         return "paused";
       }
       if (e.choice === "number") {
@@ -1168,6 +1171,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetControlledByChosen"
+            ? // Stalking Leonin (round 377): that target, still legal, controlled by the player chosen for the source now.
+              ((o, chosen) => !!o && o.zone === "battlefield" && chosen !== undefined && controllerOf(s, o) === chosen)(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined, chosenPlayerOf(s, ctx))
             : e.cond.kind === "targetSharesName"
             ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
               ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)

@@ -199,7 +199,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         // War Barge: "When ~ leaves the battlefield this turn, destroy that creature": ~ watched, about the target as it is
         // now (CR 603.7c, 400.7); none if that target is gone.
-        const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === "battlefield") : undefined;
+        // The Pandorica (round 389): about the target it just phased out (`aboutPhasedOut`).
+        const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === (e.aboutPhasedOut ? "phasedOut" : "battlefield")) : undefined;
         if (e.about !== undefined && !about) return;
         for (const o of objects(s, e.of, ctx)) {
           if (o.zone !== "battlefield") continue;
@@ -293,7 +294,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (e.each === "selfCard") {
         // An Aura's card that went to the graveyard as its creature died (Ghoulish Impetus): `of` says so.
-        for (const card of objects(s, e.of?.ref === "selfCard" ? e.of : { ref: "selfCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body);
+        // Endless Whispers: "choose target opponent. That player puts ~ ...": the delayed trigger remembers that player as its
+        // event player (CR 603.7c); none is made for a player who has left.
+        const who = e.event?.player ? players(s, e.event.player, ctx)[0] : undefined;
+        if (e.event?.player && who === undefined) return;
+        for (const card of objects(s, e.of?.ref === "selfCard" ? e.of : { ref: "selfCard" }, ctx)) {
+          addDelayed(s, e.when, ctx.controller, card, body);
+          if (who !== undefined) s.delayed![s.delayed!.length - 1]!.event = { player: who };
+        }
         return;
       }
       if (e.each === "subject") {
@@ -655,10 +663,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       // "Of the chosen type": the source's; with none chosen, it does nothing (rulings on Progenitor's Icon).
-      const filter = e.filter.chosen ? bindChosen(e.filter, o?.chosen) : e.filter;
+      let filter = e.filter.chosen ? bindChosen(e.filter, o?.chosen) : e.filter;
       if (filter.chosen) {
         log(s, `${src}: no type was chosen, so it does nothing.`);
         return;
+      }
+      // Long List of the Ents (round 381): "a creature spell of that type": the creature type its chapter just noted.
+      if (e.ofNoted) {
+        const noted = s.resolving?.lastNoted;
+        if (!noted) {
+          log(s, `${src}: no creature type was noted, so it does nothing.`);
+          return;
+        }
+        filter = { ...filter, subtypes: [...(filter.subtypes ?? []), noted], text: `${noted} creature spell` };
       }
       if (e.flash) log(s, `${src}: ${player(s, ctx.controller).name} may cast ${e.text.replace(/^the next (.+?) you cast this turn can be cast .*$/, (_, w: string) => (w === "spell of the chosen type" ? `their next ${filter.subtypes?.join(" ") ?? ""} spell` : `their next ${w}`))} this turn as though it had flash.`);
       if (e.alt) log(s, `${src}: ${player(s, ctx.controller).name} may cast their next ${filter.text.replace(/^target /, "")} this turn ${e.alt === "free" ? "without paying its mana cost" : "for life equal to its mana value"}.`);

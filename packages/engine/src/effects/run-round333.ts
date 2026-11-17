@@ -1,7 +1,7 @@
 // Round 333's effects.
 import type { Effect, TargetChoice } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
-import { enterTogether, log, obj, opponents, player, turnOrderFrom } from "../game";
+import { askAttachColor, enterTogether, log, obj, opponents, player, turnOrderFrom } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { copiableDef } from "../copies";
 import { tokenCopies } from "./run-tokens";
@@ -43,6 +43,7 @@ export function runRound333Effect(s: GameState, e: R333Effect, ctx: ResolveCtx, 
             eq.attachedTo = host.id;
             invalidateCharacteristics(s);
             log(s, `${defOf(s, eq).name} enters attached to ${defOf(s, host).name}.`);
+            askAttachColor(s, eq);
           }
         }
       });

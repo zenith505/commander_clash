@@ -7,6 +7,7 @@ import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, X_MODES_MAX, type CastHow } from "../modes";
 import type { CardDef, Color, ManaType, PlayerId } from "../types";
+import { CHOSEN_TYPE_EMBLEM } from "../emblems";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -120,6 +121,31 @@ import { round371Line } from "./round371";
 import { round372Line } from "./round372";
 import { round373Line } from "./round373";
 import { round374Line } from "./round374";
+import { round375Line } from "./round375";
+import { round376Line } from "./round376";
+import { round377Line } from "./round377";
+import { round378Line } from "./round378";
+import { round380Line } from "./round380";
+import { round389Line } from "./round389";
+import { markExileBeforeVanishing, round390Line } from "./round390";
+import { round391Line } from "./round391";
+import { round392Line } from "./round392";
+import { round394Line } from "./round394";
+import { round395Line } from "./round395";
+import { round396Line } from "./round396";
+import { round397Line } from "./round397";
+import { round398Line } from "./round398";
+import { round399Line } from "./round399";
+import { round400Line } from "./round400";
+import { round401Line } from "./round401";
+import { round402Line } from "./round402";
+import { round381Chapter, round381Line } from "./round381";
+import { round382Chapter, round382Line } from "./round382";
+import { round383Line } from "./round383";
+import { round384Line } from "./round384";
+import { round385Line } from "./round385";
+import { round386Line } from "./round386";
+import { round387Line } from "./round387";
 import { roundB189Line } from "./laneb189";
 
 const cache = new Map<string, CompiledCard>();
@@ -170,12 +196,17 @@ export function compileCard(card: CardDef): CompiledCard {
   const phasesIn = out.triggers.findIndex((t) => t.event === "selfPhasesIn");
   if (phasesIn >= 0 && out.triggers.some((t) => t.event === "yourUpkeep" && allEffects(t.body.effects).some((e) => e.type === "phaseOut" && e.what.ref === "self")))
     out.triggers[phasesIn] = { ...out.triggers[phasesIn]!, resolveFirst: true };
+  // Regenerations Restored: its exile on the last time counter before vanishing's sacrifice (oracle/round390.ts).
+  markExileBeforeVanishing(out);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
   if (d.oracleId === RAD.oracleId) out.triggers = RAD_TRIGGERS;
   const rooms = dungeonTriggers(d.oracleId);
   if (rooms) out.triggers = rooms;
+  // Vecna (The Book of Vile Darkness, round 398): "all triggered abilities of the exiled cards", each card's own, after
+  // the token's (CardDef.borrowedTriggers); "~" in them is this object (CR 201.5).
+  if (d.borrowedTriggers?.length) out.triggers = [...out.triggers, ...d.borrowedTriggers.flatMap((b) => compileCard(b).triggers)];
   cache.set(d.oracleId, out);
   return out;
 }
@@ -991,6 +1022,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Scheming Fence (round 402): its chosen permanent (oracle/round402.ts), before the generic borrowing below.
+    if ((line === "As ~ enters, you may choose a nonland permanent." || line.startsWith("~ has all activated abilities of the chosen permanent")) && round402Line(line, raw, out, isSpell)) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
     const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
     // Conspicuous Snoop: "As long as the top card of your library is a Goblin card, ~ has all activated abilities of that
@@ -1007,6 +1040,10 @@ export function compile(d: CardDef): CompiledCard {
       out.borrows = { filter: { kind: "object", types: ["Artifact", "Creature"], notTypes: [], notColors: [], text: "artifact or creature card" }, top: true };
       continue;
     }
+    // Territory Forge (round 399): "the exiled card" (oracle/round399.ts).
+    if (line === "~ has all activated abilities of the exiled card." && round399Line(line, raw, out, isSpell)) continue;
+    // Mairsil, the Pretender (round 401): "all cards you own in exile with cage counters on them" (oracle/round401.ts).
+    if (line.startsWith("~ has all activated abilities of all cards you own in exile with cage counters") && round401Line(line, raw, out, isSpell)) continue;
     // Myr Welder: "~ has all activated abilities of all cards exiled with it"; Dark Impostor, Patchwork Crawler: "all
     // creature cards exiled with it", linked to its one exile ability below (CR 607.2a).
     const borrowLinked = borrow && !borrow[2] && !borrow[3] ? /^all (?:(creature|artifact) )?cards exiled with (?:it|~)$/.exec(borrow[1]!) : null;
@@ -1024,7 +1061,8 @@ export function compile(d: CardDef): CompiledCard {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;
       const same = / that don't have the same name as ~$/.exec(borrow[1]!);
-      const group = yard ? null : parseGroup(same ? borrow[1]!.slice(0, same.index) : borrow[1]!);
+      // Manascape Refractor: "all lands on the battlefield" (round 382) is all lands, whoever controls them.
+      const group = yard ? null : parseGroup((same ? borrow[1]!.slice(0, same.index) : borrow[1]!).replace(/^(all [a-z]+) on the battlefield$/, "$1"));
       if (yard && what?.kind === "object" && !what.controller && Object.entries(what).every(([k, v]) => v === undefined || ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)))
         out.borrows = { filter: { ...what, text: `${yard[1]} cards` }, graveyard: true, ...(yard[2] === "your graveyard" ? { yours: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
       else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}), ...(borrow[3] ? { anyColor: true as const } : {}) };
@@ -1113,7 +1151,11 @@ export function compile(d: CardDef): CompiledCard {
         // its chapter I exiled (CR 607.2a; linkExile).
         // The Aesir Escape Valhalla's linked chapters (round 345).
         // The Three Seasons (round B206).
-        const rB206 = roundB206Chapter(chapter[2]!);
+        // Long List of the Ents (round 381).
+        // Day of the Moon (round 382).
+        const r382 = round382Chapter(chapter[2]!);
+        const r381 = r382 !== undefined ? r382 : round381Chapter(chapter[2]!);
+        const rB206 = r381 !== undefined ? r381 : roundB206Chapter(chapter[2]!);
         const r345 = rB206 !== undefined ? rB206 : round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
         const body = r345 === "fail" ? null : r345 ? r345 : /^Return the exiled card to the battlefield under its owner's control\.$/.test(chapter[2]!)
           ? { targets: [], effects: [{ type: "returnLinked" as const, dest: "battlefield" as const, here: true as const }], text: chapter[2]! }
@@ -1194,6 +1236,8 @@ export function compile(d: CardDef): CompiledCard {
     if (d.types.includes("Planeswalker") && roundB206Line(line, raw, out, isSpell)) continue;
     // Garruk, Curse Breaker's −4 (round B219).
     if (d.types.includes("Planeswalker") && roundB219Line(line, raw, out, isSpell)) continue;
+    // Oko, Lorwyn Liege's +2 and Oko, Shadowmoor Scion's −6 (round 387).
+    if (d.types.includes("Planeswalker") && round387Line(line, raw, out, isSpell)) continue;
     // Domri, Chaos Bringer's +1 (round B244).
     if (d.types.includes("Planeswalker") && !isSpell && roundB244Loyalty(line, raw, out)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
@@ -6262,6 +6306,52 @@ export function compile(d: CardDef): CompiledCard {
     if (round373Line(line, raw, out, isSpell)) continue;
     // Round 374's whole lines (oracle/round374.ts).
     if (round374Line(line, raw, out, isSpell)) continue;
+    // Round 375's whole lines (oracle/round375.ts).
+    if (round375Line(line, raw, out, isSpell)) continue;
+    // Round 376's whole lines (oracle/round376.ts).
+    if (round376Line(line, raw, out, isSpell)) continue;
+    // Round 377's whole lines (oracle/round377.ts).
+    if (round377Line(line, raw, out, isSpell, d)) continue;
+    // Round 378's whole lines (oracle/round378.ts).
+    if (round378Line(line, raw, out, isSpell)) continue;
+    // Round 380's whole lines (oracle/round380.ts).
+    if (round380Line(line, raw, out, isSpell, d)) continue;
+    if (round381Line(line, raw, out, isSpell)) continue;
+    // Round 382's whole lines (oracle/round382.ts).
+    if (round382Line(line, raw, out, isSpell)) continue;
+    // Round 383's whole lines (oracle/round383.ts).
+    if (round383Line(line, raw, out, isSpell)) continue;
+    // Round 384's whole lines (oracle/round384.ts).
+    if (round384Line(line, raw, out, isSpell)) continue;
+    // Round 385's whole lines (oracle/round385.ts).
+    if (round385Line(line, raw, out, isSpell)) continue;
+    // Round 386's whole lines (oracle/round386.ts).
+    if (round386Line(line, raw, out, isSpell)) continue;
+    // Round 387's whole lines (oracle/round387.ts).
+    if (round387Line(line, raw, out, isSpell)) continue;
+    // Round 389's whole lines (oracle/round389.ts).
+    if (round389Line(line, raw, out, isSpell)) continue;
+    // Round 390's whole lines (oracle/round390.ts).
+    if (round390Line(line, raw, out, isSpell)) continue;
+    // Round 391's whole lines (oracle/round391.ts).
+    if (round391Line(line, raw, out, isSpell)) continue;
+    // Round 392's whole lines (oracle/round392.ts).
+    if (round392Line(line, raw, out, isSpell)) continue;
+    // Round 394's whole lines (oracle/round394.ts).
+    if (round394Line(line, raw, out, isSpell)) continue;
+    // Round 395's whole lines (oracle/round395.ts).
+    if (round395Line(line, raw, out, isSpell)) continue;
+    // Round 396's whole lines (oracle/round396.ts).
+    if (round396Line(line, raw, out, isSpell)) continue;
+    // Round 397's whole lines (oracle/round397.ts).
+    if (round397Line(line, raw, out, isSpell)) continue;
+    // Round 398's whole lines (oracle/round398.ts).
+    if (round398Line(line, raw, out, isSpell)) continue;
+    // Round 399's whole lines (oracle/round399.ts).
+    if (round399Line(line, raw, out, isSpell)) continue;
+    // Round 400's whole lines (oracle/round400.ts).
+    if (round400Line(line, raw, out, isSpell)) continue;
+    if (round401Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7230,7 +7320,7 @@ export function compile(d: CardDef): CompiledCard {
       spellLines.push(line);
       continue;
     }
-    if (isSpell && spellLines.length && /^Whenever [^,]+ this turn, /.test(line)) {
+    if (isSpell && spellLines.length && /^Whenever [^,]+ this (?:turn|combat), /.test(line)) {
       spellLines.push(line);
       continue;
     }
@@ -7512,7 +7602,7 @@ export function compile(d: CardDef): CompiledCard {
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
-  checkCastingLinks(out);
+  checkCastingLinks(out, d);
   // Lavabrink Venturer: protection "of the chosen quality" needs odd or even chosen as it enters (CR 614.12).
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_NUMBER_EXCEPT_PROTECTION) && !out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push("(protection from mana values but a chosen number with no number chosen as it enters)");
   if (JSON.stringify([out.statics, out.triggers, out.activated, out.spell]).includes(CHOSEN_PARITY_PROTECTION) && !out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push("(protection of a chosen quality with no odd or even chosen as it enters)");
@@ -7674,6 +7764,24 @@ const castsTheExiled = new WeakSet<CompiledCard>();
  * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
  */
 function linkExile(out: CompiledCard) {
+  // Kylox's Voltstrider (round 401): "cards exiled with it" are those its one "Collect evidence N:" cost exiled (CR 607.2a),
+  // with no other exile instruction on the card.
+  const bodies0 = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (bodies0.some((b) => allEffects(b.effects).some((e) => e.type === "castFromAmong" && !!e.evidenceLinked))) {
+    const evidence = out.activated.flatMap((a) => (a.costs ?? []).filter((c): c is Extract<AdditionalCost, { kind: "collectEvidence" }> => c.kind === "collectEvidence"));
+    const others = bodies0.flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "search", "chooseFromGraveyard", "pick", "flicker", "exileUntilNonlandLinked"].includes(e.type));
+    if (out.spell || evidence.length !== 1 || others.length) out.unsupported.push("(casts from cards exiled with it, but no one cost exiles them)");
+    else evidence[0]!.linkSource = true;
+  }
+  // Assimilation Aegis (round 396): "a creature card exiled with ~" is one its enters ability exiled (CR 607.2a), its only
+  // exile instruction.
+  const copyBodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (copyBodies.some((b) => allEffects(b.effects).some((e) => e.type === "becomeCopyOfLinked"))) {
+    const enters = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && e.until === "sourceLeaves");
+    const others = copyBodies.flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick", "flicker", "exileUntilNonlandLinked"].includes(e.type) || (e.type === "discard" && !!e.exile));
+    if (out.spell || enters.length !== 1 || others.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one exile ability)");
+    else enters[0]!.linked = true;
+  }
   // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
   // linked to the one ability that exiles it as it enters (CR 607.2a).
   if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {
@@ -7815,13 +7923,16 @@ function linkExile(out: CompiledCard) {
     if ((exiles.length !== 1 && !oneAbility) || exiles.some((e) => e.type !== "exile" || e.until)) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
     else for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
   }
-  // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a).
+  // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a). Territory Forge, Idris
+  // (round 399): "the exiled card", Idris's exiled until it leaves the battlefield (a pick, not a target). Koh, the Face
+  // Stealer: "a creature card exiled with ~" is one that any of its exile abilities exiled (CR 607.4).
   if (out.borrows?.linked) {
     const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
-    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> | Extract<Effect, { type: "pick" }> => e.type === "exile" || (e.type === "pick" && e.action === "exile"));
     const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length !== 1 || exiles[0]!.until) out.unsupported.push("(has abilities of exiled cards it can't link to one exile ability)");
-    else exiles[0]!.linked = true;
+    const lasting = (e: (typeof exiles)[number]) => (e.type === "exile" ? !e.until || (e.until === "sourceLeaves" && !!out.borrows!.triggered) : !e.exiledCounter && (!!e.untilSourceLeaves || !!out.borrows!.triggered));
+    if (others || out.spell || !exiles.length || (exiles.length !== 1 && !out.borrows.chosen) || !exiles.every(lasting)) out.unsupported.push("(has abilities of exiled cards it can't link to one exile ability)");
+    else for (const e of exiles) e.linked = true;
   }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
@@ -7978,7 +8089,7 @@ function linkExile(out: CompiledCard) {
   // Kaho, Minamo Historian; Jeleva, Nephalia's Scourge; Shell of the Last Kappa: "cast a spell from among cards exiled
   // with ~" as it resolves: the cards its one exile instruction exiled (CR 607.2a): Kaho's search, Jeleva's "each player
   // exiles the top X cards", Shell's exiled spell.
-  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted) || e.type === "playLinkedThisTurn"))) {
+  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted && !e.evidenceLinked) || e.type === "playLinkedThisTurn"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
@@ -7986,7 +8097,9 @@ function linkExile(out: CompiledCard) {
     // Kayla's Music Box: "exile it face down", always linked to its source. River Song's Diary: its spells exiled as they
     // resolve, linked as they're exiled.
     // Summon: Esper Valigarmanda: "exile an instant or sorcery card from each graveyard", linked as it's parsed.
-    const faceDown = all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked));
+    // Krang & Shredder (round 395): its "each opponent exiles cards ... until they exile a nonland card", always linked, one
+    // effect shared by the two triggers of its one ability (CR 603.2, 607.2a), counted once.
+    const faceDown = [...new Set(all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked) || e.type === "exileUntilNonlandLinked"))];
     const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.linked) || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked));
     if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
     else if (faceDown.length) {
@@ -8125,6 +8238,14 @@ function linkExile(out: CompiledCard) {
   // "When this creature dies, you may put the exiled card into its owner's hand" (Hoarding Dragon): a leaves ability too.
   // Toluz, Clever Conductor: "When ~ dies, put the cards exiled with it into their owner's hand", the cards its discard
   // trigger exiled (round B193).
+  // The Spot, Living Portal (round 397): "When ~ enters, exile up to one target nonland permanent and up to one target
+  // nonland permanent card from a graveyard" with "When ~ dies, put him on the bottom of his owner's library. If you do,
+  // return the exiled cards to their owners' hands": both exiles of its one enters ability are linked (CR 607.2a).
+  const spotEnters = out.triggers.find((t) => t.event === "selfEnters" && exiles.length === 2 && exiles.every((e) => t.body.effects.includes(e)));
+  if (spotEnters && !out.spell && !out.activated.length && returns.length === 1 && returns[0]!.event === "selfDies" && exiles.every((e) => e.type === "exile" && e.what.ref === "target") && allEffects(returns[0]!.body.effects).every((e) => e.type !== "returnLinked" || e.dest === "hand")) {
+    for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
+    return;
+  }
   const discardExile = exiles[0]?.type === "exile" && exiles[0].what.ref === "eventGroup";
   if (exiles.length !== 1 || returns.length !== 1 || (returns[0]!.event !== "selfLeaves" && !(returns[0]!.event === "selfDies" && (exiles[0]!.type === "search" || discardExile)))) {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
@@ -8142,7 +8263,7 @@ function linkExile(out: CompiledCard) {
  * Text that refers to how the spell was cast needs the cost it refers to: "if it was kicked with its
  * {1}{U} kicker" becomes that kicker's index (CR 702.33f), "the sacrificed creature" needs a sacrifice cost.
  */
-function checkCastingLinks(out: CompiledCard) {
+function checkCastingLinks(out: CompiledCard, d: CardDef) {
   let bad = false;
   for (const k of out.entersKicked ?? []) {
     // "If ~ was kicked" with one (not multi-) kicker: that one.
@@ -8258,6 +8379,10 @@ function checkCastingLinks(out: CompiledCard) {
   // Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType) is its targets' type.
   if (out.castChooseType) choices.add("creatureType");
   if (out.entersNamesWithOpponent) choices.add("cardName");
+  // Sanctuary Blade (round 390): "the last chosen color" is the one chosen as it last became attached (askAttachColor).
+  if (out.attachChooseColor) choices.add("color");
+  // Oko, Shadowmoor Scion's emblem (round 387): its "chosen type" is the one chosen as the ability that made it resolved.
+  if (d.typeLine === "Emblem" && d.oracleId.endsWith(CHOSEN_TYPE_EMBLEM)) choices.add("creatureType");
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   // "The exiled card's power" (Corpse Lunge): the one card an "exile a creature card from your graveyard" cost exiled,
   // with nothing sacrificed to share the record.
@@ -8382,8 +8507,9 @@ function checkCastingLinks(out: CompiledCard) {
   }
   // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
   // permanent's enters trigger.
-  // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
-  const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
+  // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery; Verdant Mastery's "... if
+  // the {3}{G} cost was paid" at the end of a sentence, round 390).
+  const masteryMana = /\b[Ii]f the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
   for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl", "mayhem", "emerge", "freerunning"] as const) {

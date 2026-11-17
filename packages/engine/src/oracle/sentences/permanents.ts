@@ -153,6 +153,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
   // Odric, Master Tactician: the defending players' blocks are declared by you (rulings: they must still be legal).
   if (/^[Yy]ou choose which creatures block this combat and how those creatures block$/.test(s)) return [{ type: "chooseBlocks" }];
+  // Berserker's Frenzy (round 378): "You choose which creatures block this turn and how those creatures block": the same
+  // for every combat of the turn (CR 509.1), whoever's creatures they are, yours too (rulings: the blocks must be legal).
+  if (/^[Yy]ou choose which creatures block this turn and how those creatures block$/.test(s)) return [{ type: "chooseBlocks", thisTurn: true }];
+  // Master Warcraft (round 379): "You choose which creatures attack this turn": in every combat this turn you choose which of
+  // the active player's creatures attack, legally, and that player chooses what each attacks (rulings; game.ts attacksChooser).
+  if (/^[Yy]ou choose which creatures attack this turn$/.test(s)) return [{ type: "chooseAttacks" }];
+  // Brutal Hordechief (round 378): "Creatures your opponents control block this turn if able, and you choose how those
+  // creatures block": a rule for whatever creatures they control at any time this turn, those that enter later too, and
+  // you declare those creatures' blocks (rulings; CR 509.1c: still only as many requirements as can be obeyed, none that
+  // costs to obey).
+  if (/^Creatures your opponents control block this turn if able, and you choose how those creatures block$/.test(s)) {
+    const affects = parseAffected("Creatures your opponents control");
+    return affects ? [{ type: "groupRules", affects, text: "creatures your opponents control", mods: [{ kind: "mustBlock" }], duration: "endOfTurn" }, { type: "chooseBlocks", thisTurn: true, opponents: true }] : null;
+  }
   // "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect that lasts
   // (CR 614.1c, 611.2b).
   const untilTapped = /^Until your next turn, ([a-z][^,]*?) enter tapped$/.exec(s);
@@ -445,7 +459,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   // Observed Stasis: "remove enchanted creature from combat".
   if (/^[Rr]emove enchanted creature from combat$/.test(s) && !ctx.spell) return [{ type: "removeFromCombat", what: { ref: "attached" } }];
-  if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
+  if ((m = /^(?:([Uu]ntap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
     const what = parseObject(m[2] ?? m[3]!, ctx);
     if (!what || isGroup(what)) return null;
@@ -2230,6 +2244,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const among = ["Artifact", "Creature", "Land"];
     const a = addTarget(ctx, { kind: "object", types: among, controller: "you", text: "target artifact, creature, or land you control" });
     const b = addTarget(ctx, { kind: "object", types: [], controller: "opponent", sharesCardTypeWith: [a], sharesCardTypeAmong: among, text: "target permanent an opponent controls that shares one of those types with it" });
+    return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
+  }
+  // Daring Thief (round 393): "exchange control of target nonland permanent you control and target permanent an opponent
+  // controls that shares a card type with it": any card type in common (artifact, battle, creature, enchantment, kindred,
+  // planeswalker; the second may be a land that shares one of those, rulings), as they're chosen and again as it resolves;
+  // either illegal then, and nothing changes control (rulings, CR 608.2b, 701.12b).
+  if (/^[Ee]xchange control of target nonland permanent you control and target permanent an opponent controls that shares a card type with it$/.test(s)) {
+    const a = addTarget(ctx, { kind: "object", types: [], notTypes: ["Land"], notColors: [], controller: "you", text: "target nonland permanent you control" });
+    const b = addTarget(ctx, { kind: "object", types: [], notTypes: [], notColors: [], controller: "opponent", sharesCardTypeWith: [a], text: "target permanent an opponent controls that shares a card type with it" });
     return [{ type: "exchangeControl", a: { ref: "target", index: a }, b: { ref: "target", index: b } }];
   }
   // Role Reversal: "Exchange control of two target permanents that share a permanent type": a permanent type in common

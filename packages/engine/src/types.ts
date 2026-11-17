@@ -23,6 +23,48 @@ export interface RedirectShield {
  * "damageRule" effect made, with its choices made and targets fixed as it resolved. `to` and `by` are checked when
  * damage would be dealt (CR 611.2c, 609.7b).
  */
+/** What drawing was part of, to carry on with once a draw replacement's question is answered: the draw step, or Sokrates's draws after combat damage (round 381). */
+export type DrawAfter = "drawStep" | "damageDraws";
+
+/**
+ * Words of Waste (round 383): a draw replaced by "each opponent discards a card instead" (CR 614.1a). Every opponent with a
+ * choice to make chooses in APNAP order (CR 101.4), one card each (CR 701.9b); a Library of Leng's controller then says
+ * whether theirs goes on top; all of them are discarded at the same time, then the draws still to make go on (CR 614.11a).
+ */
+export interface WasteDraw {
+  drawer: PlayerId;
+  source: string;
+  /** Every opponent still in the game, in APNAP order. */
+  order: PlayerId[];
+  /** The opponents still to choose, in APNAP order. */
+  queue: PlayerId[];
+  chosen: Record<PlayerId, ObjectId[]>;
+  /** The Library of Leng controllers still to answer, and what they put on top. */
+  leng?: PlayerId[];
+  toTop?: Record<PlayerId, ObjectId[]>;
+  left: number;
+  made: number[];
+  after?: DrawAfter;
+}
+
+/**
+ * Words of Wind (round 385): a draw replaced by "each player returns a permanent they control to its owner's hand
+ * instead" (CR 614.1a). Every player with a choice to make chooses in APNAP order (CR 101.4); then all of them are
+ * returned at the same time, then the draws still to make go on (CR 614.11a).
+ */
+export interface WindDraw {
+  drawer: PlayerId;
+  source: string;
+  /** Every player still in the game, in APNAP order. */
+  order: PlayerId[];
+  /** The players still to choose, in APNAP order. */
+  queue: PlayerId[];
+  chosen: Record<PlayerId, ObjectId[]>;
+  left: number;
+  made: number[];
+  after?: DrawAfter;
+}
+
 export interface DamageRule {
   id: string;
   turn: number;
@@ -74,6 +116,8 @@ export interface DamageRule {
    * after the damage event (CR 615.5), even if the damage can't be prevented (CR 615.12).
    */
   shuffleIn?: true;
+  /** Sokrates's granted ability (round 381): its controller and the player the damage would be dealt to each draw half that much, rounded down, prevented or not (CR 615.5, 615.12). */
+  drawHalf?: true;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
@@ -81,7 +125,7 @@ export interface DamageRule {
   /** Channel Harm: dealTo only if its controller chooses to, each time it prevents damage (rulings). */
   dealToMay?: true;
   /** New Way Forward: the reflexive trigger's body, and the object that made the rule (the spell, as it was then). */
-  reflect?: { body: AbilityBody; source?: { id: ObjectId; zc: number } };
+  reflect?: { body: AbilityBody; source?: { id: ObjectId; zc: number }; /** Judgment of Alexander: one trigger for each creature source, about it (DamageRuleSpec.reflectEachCreature). */ eachCreature?: true };
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -123,6 +167,12 @@ export interface CardDef {
   producedMana?: ManaType[];
   /** A double-faced token's back face (CR 111.10i, 712): what it becomes as it transforms (CR 701.27a). */
   tokenBack?: CardDef;
+  /**
+   * The Book of Vile Darkness's Vecna (round 398): "all triggered abilities of the exiled cards", as they are on those
+   * cards (the rulings: the cards in exile, not the permanents they were). Part of the token's copiable values (the
+   * rulings), so compileCard adds each card's compiled triggered abilities to the token's own.
+   */
+  borrowedTriggers?: CardDef[];
   /**
    * A mutating creature spell (CR 702.140a): it targets a non-Human creature with this owner, the spell's (see
    * mutatingDef). Set only on the definition a mutating spell uses on the stack.
@@ -368,6 +418,8 @@ export interface GameObject {
   redirectNext?: RedirectShield[];
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
+  /** Mairsil, the Pretender (round 401): the once-each-turn keys of the borrowed abilities activated this turn (ActivatedAbility.onceKey). */
+  borrowedUsed?: string[];
   /** Exhaust abilities activated since it became this object (CR 702.177a, 400.7): their indexes. */
   activatedEver?: number[];
   /**
@@ -512,7 +564,7 @@ export interface GameObject {
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
     free?: true;
-    /** With until "yourNextEndStep": whose end step ends it, if not `player`'s (Rocco, Street Chef: "Until your next end step, each player may play the card they exiled this way"). */
+    /** With until "yourNextEndStep": whose end step ends it, if not `player`'s (Rocco, Street Chef: "Until your next end step, each player may play the card they exiled this way"); with "yourNextTurn", whose turn (Memory Vessel, round 386). */
     untilOf?: PlayerId;
     /** With until "thisTurn": only while `source` is still on the battlefield as that object too (Uba Mask's "cards they exiled with ~ this turn"). */
     whileSource?: true;
@@ -583,6 +635,8 @@ export interface GameObject {
     castTrigger?: { body: AbilityBody; sourceId: ObjectId; sourceZc: number; sourceCardId: string; /** Fires of Mount Doom: "When you play a card this way": a land played with the permission too. */ play?: true };
     /** Monk Class: "as long as you've cast another spell this turn": only while `player` has cast a spell this turn (GameState.castThisTurn). */
     castAnotherThisTurn?: true;
+    /** Durnan of the Yawning Portal (round 380): "That spell has undaunted": {1} less for each opponent its caster has (CR 702.125a-b). */
+    undaunted?: true;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -697,7 +751,7 @@ export interface GameObject {
    * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
-  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number }; /** The Phasing of Zhalfir: it can't phase in while `controller` controls `id` (as that object, CR 400.7); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhile?: { id: ObjectId; zc: number; controller: PlayerId } };
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number }; /** The Phasing of Zhalfir: it can't phase in while `controller` controls `id` (as that object, CR 400.7); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhile?: { id: ObjectId; zc: number; controller: PlayerId }; /** The Pandorica (round 389): it can't phase in while `id` is still that object on the battlefield, tapped, without having untapped since (`untaps`); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhileTapped?: { id: ObjectId; zc: number; untaps: number } };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
@@ -810,6 +864,8 @@ export interface GameObject {
   exileIfLeaves?: ZoneName;
   /** A spell: "if that spell would be put into your graveyard, exile it instead" (Torrential Gearhulk, CR 614.1a). */
   exileIfToGraveyard?: true;
+  /** A spell: "if that spell would be put into a graveyard, put it on the bottom of its owner's library instead" (Kylox's Voltstrider, round 401; CR 614.1a). */
+  bottomIfToGraveyard?: true;
   /**
    * A spell: "exile that card instead of putting it into your graveyard as it resolves" (Effect exileAsResolves), each
    * one applied as it finishes resolving (CR 608.2n), the first one created first. `by`: whose ability made it; `zc`:
@@ -854,8 +910,16 @@ export interface GameObject {
 export interface CopyEffect {
   key: string;
   timestamp: number;
-  until?: "endOfTurn" | { turnOf: PlayerId };
+  until?: "endOfTurn" | { turnOf: PlayerId } | CopyWhile;
 }
+
+/**
+ * Round 396's "for as long as" copy durations (CR 611.2b), over for good once they stop (game.ts endWhileTapped):
+ * `whileTapped`, while that permanent (as the object `zc`) stays on the battlefield tapped without untapping since
+ * (Zygon Infiltrator); `whileAttached`, while the Aura or Equipment `id` stays attached to `host`, each the same object
+ * on the battlefield (Blade of Shared Souls, Assimilation Aegis). A phased-out permanent can't be seen (CR 702.26f).
+ */
+export type CopyWhile = { whileTapped: { id: ObjectId; zc: number; untaps: number } } | { whileAttached: { id: ObjectId; zc: number; host: ObjectId; hostZc: number } };
 
 /**
  * What a mana's source was as it made the mana (CR 106.3): snow mana pays {S} (107.4h); "mana from a Treasure", "mana
@@ -1054,7 +1118,7 @@ export interface Player {
    * Bear creature token (you gain 5 life) instead." One entry for each activation, in turn `turn`; each replaces one draw
    * (CR 614.1a, 614.11); with different ones waiting, the player chooses (PendingDecision "drawInstead").
    */
-  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } } }[];
+  nextDrawInstead?: { turn: number; source: string; sourceId?: ObjectId; sourceZc?: number; gain?: number; token?: TokenSpec; /** Words of War: the damage and the target chosen as the ability was activated (an object as the one it was then, CR 400.7). */ damage?: { n: number; to: { player: PlayerId } | { object: ObjectId; zc: number } }; /** Words of Waste (round 383): each opponent of the drawing player discards a card instead. */ discard?: true; /** Words of Wind (round 385): each player returns a permanent they control to its owner's hand instead. */ wind?: true; /** Mangara's Tome (round 385): the top card of the pile its enters ability exiled (linked to `sourceId` as it was, CR 607.2a) into its owner's hand instead. */ pile?: true; /** Aladdin's Lamp (round 385): look at the top this many cards, all but one onto the bottom in a random order, then draw a card. */ lamp?: number }[];
   /**
    * Stunning Reversal: "The next time you would lose the game this turn, instead draw seven cards and your life total
    * becomes 1." One entry for each resolved, in turn `turn`; each replaces one loss (CR 614.1a, 614.11).
@@ -1684,6 +1748,11 @@ export interface ContinuousEffect {
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   /**
+   * "For as long as they're the monarch" (Garland, Royal Kidnapper, CR 611.2b): it ends once this player isn't the monarch
+   * (CR 725.3), and doesn't start again if they become the monarch later.
+   */
+  whileMonarch?: PlayerId;
+  /**
    * "For as long as that creature is enchanted" (Rootwater Matriarch, CR 611.2b): over for a permanent once no Aura is
    * attached to it (checked with the state-based actions), even if one is attached to it again later (rulings).
    */
@@ -1703,14 +1772,21 @@ export interface ContinuousEffect {
 
 /** What the engine is waiting on from a specific player, beyond normal priority. */
 export type PendingDecision =
-  | { kind: "declareAttackers"; player: PlayerId }
+  /**
+   * Master Warcraft (round 379): with `fixed`, `chooser` chose which of this player's creatures attack (chooseAttackers),
+   * and this player declares exactly those, choosing what each attacks and paying the costs (rulings); `declined` are the
+   * groups this player refused to pay for, which `chooser` can't choose again this combat.
+   */
+  | { kind: "declareAttackers"; player: PlayerId; fixed?: ObjectId[]; chooser?: PlayerId; declined?: string[] }
+  /** Master Warcraft (round 379): this player chooses which of `attacker`'s creatures attack this combat (GameState.attacksChosenThisTurn). */
+  | { kind: "chooseAttackers"; player: PlayerId; attacker: PlayerId; declined?: string[] }
   /** `defender`: Odric's controller (`player`) declares the blockers of that defending player (GameState.blocksChosenBy). */
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[]; defender?: PlayerId }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ /** Chains of Mephistopheles (round B237): a discard instead of a draw, then the draws to make (see game.ts draw), the first of `made` the one the discard leads to. */ thenDraw?: { left: number; made: number[]; after?: "drawStep" }; among?: ObjectId[]; /** Worldpurge: the cards clicked are the ones kept (up to `count`, with `upTo`); the rest are shuffled into the library. */ keep?: true }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ /** Chains of Mephistopheles (round B237): a discard instead of a draw, then the draws to make (see game.ts draw), the first of `made` the one the discard leads to. */ thenDraw?: { left: number; made: number[]; after?: DrawAfter }; among?: ObjectId[]; /** Worldpurge: the cards clicked are the ones kept (up to `count`, with `upTo`); the rest are shuffled into the library. */ keep?: true; /** Words of Waste (round 383): the discard replacing a draw, not a resolving spell's. */ waste?: WasteDraw }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[] }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[]; /** With `discarding`: Words of Waste's discard (round 383), not a resolving spell's. */ waste?: WasteDraw }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -1721,7 +1797,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId; /** "Ward—Collect evidence 4": the payment for a payUnless they said yes to; none picked means they don't pay after all. */ forUnless?: true }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** Liar's Pendulum: revealing the hand, for the bots: whether the opponent guessed right (then revealing gains nothing). */ liarReveal?: { guessedRight: boolean }; /** Retriever Phoenix: return this card from the graveyard to the battlefield instead of learning (CompiledCard.returnInsteadOfLearn)? */ insteadOfLearn?: ObjectId; /** Fiery Gambit: "flip again?" after this many flips won in a row, more doing nothing more past `enough`. */ flipAgain?: { wins: number; enough: number }; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** The payment is this permanent's cumulative upkeep (CR 702.24a): mana "only to pay cumulative upkeep costs" pays it (mayPayUse). */ upkeepOf?: ObjectId; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] }; /** Game of Chaos: "flip again?" for the winner of the last flip, the next flip's life stakes, and what the game has given this player so far (for bots). */ chaosAgain?: { stake: number; net: number; against: PlayerId }; /** Fasting: skip the draw step that would begin, with the permanent `from` (the ones in `declined` were declined already)? */ skipDraw?: { from: ObjectId; declined: ObjectId[] }; /** Zur's Weirding (round B237): `player` may pay 2 life (`pay`) to put the revealed `card` (none from an empty library) into its owner's graveyard instead of `drawer` drawing it; `remaining` are the other players asked after this one, in turn order (CR 101.4); with no one paying, `entry` (game.ts madeEntry) is the draw `drawer` makes, before `made`. */ weirding?: { drawer: PlayerId; remaining: PlayerId[]; left: number; made: number[]; after?: "drawStep"; entry: number } }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** Liar's Pendulum: revealing the hand, for the bots: whether the opponent guessed right (then revealing gains nothing). */ liarReveal?: { guessedRight: boolean }; /** Retriever Phoenix: return this card from the graveyard to the battlefield instead of learning (CompiledCard.returnInsteadOfLearn)? */ insteadOfLearn?: ObjectId; /** Fiery Gambit: "flip again?" after this many flips won in a row, more doing nothing more past `enough`. */ flipAgain?: { wins: number; enough: number }; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** The payment is this permanent's cumulative upkeep (CR 702.24a): mana "only to pay cumulative upkeep costs" pays it (mayPayUse). */ upkeepOf?: ObjectId; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] }; /** Game of Chaos: "flip again?" for the winner of the last flip, the next flip's life stakes, and what the game has given this player so far (for bots). */ chaosAgain?: { stake: number; net: number; against: PlayerId }; /** Fasting: skip the draw step that would begin, with the permanent `from` (the ones in `declined` were declined already)? */ skipDraw?: { from: ObjectId; declined: ObjectId[] }; /** Zur's Weirding (round B237): `player` may pay 2 life (`pay`) to put the revealed `card` (none from an empty library) into its owner's graveyard instead of `drawer` drawing it; `remaining` are the other players asked after this one, in turn order (CR 101.4); with no one paying, `entry` (game.ts madeEntry) is the draw `drawer` makes, before `made`. */ weirding?: { drawer: PlayerId; remaining: PlayerId[]; left: number; made: number[]; after?: DrawAfter; entry: number } }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -1738,7 +1814,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** "Casts it without paying its mana cost if able" (Omen Machine, Wild Evocation): it may be declined only while it can't be cast (freeCastable): a mandatory additional cost in mana its player's mana pool can't pay lets them decline, since they may choose not to activate mana abilities (rulings). */ must?: true; /** Miracle: the cost of the instance that triggered (a granted one, Lorehold), when not the card's own. */ miracleCost?: string; /** Madness a permanent gave the card (Falkenrath Gorger): that cost, when not the card's own. */ madnessCost?: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** "If you don't, put that card into your hand" (Discover the Impossible): cast free now, or it goes to the hand. */ "orHand" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[]; /** "A legendary spell" (Kaya the Inexorable's emblem): the spell as it's cast has these supertypes (an Adventure half isn't legendary, CR 715.3). */ supertypes?: string[]; /** "A Hero or noncreature spell" (Scarlet Witch, Chaotic Avenger): the spell as it's cast fits this (an Adventure's instant or sorcery half is noncreature, CR 715.3). */ spellFilter?: TargetSpec; /** Twinning Glass: "if it has the same name as a spell that was cast this turn": the spell as it's cast has one of these names (a split card's half, an Adventure or a back face, CR 709.3b, 715.3, 712.8a; a fused split spell has both names, 709.4d). */ names?: string[]; /** "By discarding a card rather than paying its mana cost" (The Infamous Cruelclaw): cast for this alternative cost instead (CastPay; "mana" goes with `how` "paid"). */ pay?: CastPay }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** "Casts it without paying its mana cost if able" (Omen Machine, Wild Evocation): it may be declined only while it can't be cast (freeCastable): a mandatory additional cost in mana its player's mana pool can't pay lets them decline, since they may choose not to activate mana abilities (rulings). */ must?: true; /** Miracle: the cost of the instance that triggered (a granted one, Lorehold), when not the card's own. */ miracleCost?: string; /** Madness a permanent gave the card (Falkenrath Gorger): that cost, when not the card's own. */ madnessCost?: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** "If you don't, put that card into your hand" (Discover the Impossible): cast free now, or it goes to the hand. */ "orHand" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[]; /** "A legendary spell" (Kaya the Inexorable's emblem): the spell as it's cast has these supertypes (an Adventure half isn't legendary, CR 715.3). */ supertypes?: string[]; /** "A Hero or noncreature spell" (Scarlet Witch, Chaotic Avenger): the spell as it's cast fits this (an Adventure's instant or sorcery half is noncreature, CR 715.3). */ spellFilter?: TargetSpec; /** Twinning Glass: "if it has the same name as a spell that was cast this turn": the spell as it's cast has one of these names (a split card's half, an Adventure or a back face, CR 709.3b, 715.3, 712.8a; a fused split spell has both names, 709.4d). */ names?: string[]; /** "By discarding a card rather than paying its mana cost" (The Infamous Cruelclaw): cast for this alternative cost instead (CastPay; "mana" goes with `how` "paid"). */ pay?: CastPay; /** Ogre Battlecaster (round 401): "by paying {R}{R} in addition to its other costs": mana added to the total cost as an additional cost (CR 118.8, 601.2f). */ addedMana?: string }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1754,7 +1830,7 @@ export type PendingDecision =
       source: string;
       cards: ObjectId[];
       left: number;
-      after?: "drawStep";
+      after?: DrawAfter;
       /**
        * Other replacements of the same draw the player may apply first instead (CR 616.1): Alhammarret's Archive's
        * "draw two cards instead" (`archive`, the draws it makes) or dredging one of `dredge`. Either uses up "the
@@ -1771,6 +1847,11 @@ export type PendingDecision =
       bottom?: true;
       made?: number[];
       archives?: number;
+      /**
+       * Aladdin's Lamp (round 385): `cards` are the top cards looked at; the one chosen stays on top and the rest go on the
+       * bottom in a random order, then the draws `left` and `made` go on (the Lamp's "then draw a card" already among them).
+       */
+      lamp?: true;
       /** Blood Scrivener (round B235): how many Scriveners already replaced a draw this one was made of (CR 614.5). */
       scriv?: number;
     }
@@ -1778,7 +1859,7 @@ export type PendingDecision =
    * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
    * `cards`, the creature cards in their graveyard, returns to the battlefield. `left` and `made` are the draws after it.
    */
-  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep"; /** Forbidden Crypt (CompiledCard.drawReturnsFromGraveyard): any card of `cards`, the player's graveyard, to their hand instead, whatever their library holds. */ toHand?: true }
+  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: DrawAfter; /** Forbidden Crypt (CompiledCard.drawReturnsFromGraveyard): any card of `cards`, the player's graveyard, to their hand instead, whatever their library holds. */ toHand?: true }
   /**
    * Different replacements could apply to this draw (shields of Urabrask, Heretic Praetor and the Words, with each other
    * or with Underrealm Lich, Tomorrow, dredge, Notion Thief, Alhammarret's Archive, Scion of Halaster or Abundance; two
@@ -1793,7 +1874,7 @@ export type PendingDecision =
       labels: string[];
       left: number;
       made?: number[];
-      after?: "drawStep";
+      after?: DrawAfter;
       /** This draw is one a replacement made: how many Alhammarret's Archives can still replace it (CR 614.5). */
       archives?: number;
       /** Blood Scrivener (round B235): how many Scriveners already replaced a draw this one was made of (CR 614.5). */
@@ -1815,7 +1896,7 @@ export type PendingDecision =
       scriv?: number;
       /** Abundance could replace this draw too (CR 616.1): the permanent's name; choosing land or nonland applies it. */
       abundance?: string;
-      after?: "drawStep";
+      after?: DrawAfter;
     }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
@@ -1828,20 +1909,20 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** Winter, Cynical Opportunist: the cards chosen, if any, have at least this many card types among them (CR 205.2a). */ cardTypes?: number; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** With `firstTo`: the first this many go there (one if left out). */ firstN?: number; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string; /** Each card taken costs this much life (Search for Blex). */ lifeEach?: number; /** Each card taken is paid for with this much life (Wand of Denial). */ payLife?: number }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; /** With `fromHand`: aura swap (CR 702.65a), the card exchanged with the source Aura. */ swap?: true; reveal?: true; /** With `reveal`: behold (CR 701.4a), so `cards` also holds permanents you control of that quality. */ behold?: true; bottom?: true; /** From the hand: the cards are shuffled into the library (Credit Voucher). */ shuffle?: true; /** From the hand: the cards are manifested (Kozilek, the Broken Reality). */ manifest?: true; /** With `hand`: `dig.looked` also holds that player's graveyard, after the hand (Never Happened). */ handYard?: true; /** With `manifest`: cloaked instead (Vannifar, Evolved Enigma). */ cloak?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop" | "libraryBottom" | /** The Three Seasons: the cards chosen are shuffled into their owners' libraries. */ "shuffleIn" | "castThisTurn" | /** The cards chosen stay; the rest of the graveyard is exiled (Watchers of the Dead). */ "keep"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** Wildfire Devils: the card exiled is copied, and the copy may be cast, by this player (for bots and the prompt). */ copiedBy?: PlayerId; /** "Creature and/or Vehicle cards with different powers" (Rip, Spawn Hunter): no two found with the same power. */ distinctPowers?: true; /** "Creature cards with different names" from the library and graveyard together (Ecological Appreciation): no two found with the same name (`cards` has one of each name in each zone). */ distinctNames?: true; /** "Exactly two cards" (Burning-Rune Demon): `max` of them or none. */ exactly?: true; /** Ulamog's Despoiler (round B229): chosen as this permanent enters (CompiledCard.entersProcess), not as something resolves. */ entering?: ObjectId; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "With total power X or less" (Moorland Rescuer, round B202): the cards found together, each card's power where it is. */ totalPower?: number; /** Jötun Grunt's cumulative upkeep: cards from every graveyard, an even number from each (two from a single graveyard for each age counter). */ pairsPerYard?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "Basic land cards which have the same name as the chosen land" (Canoptek Wraith): every card found has the same name. */ oneName?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** With `reveal`: the cards are revealed for this player to choose one of them for `player` to discard (Disciple of Phenax). */ revealFor?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ /** Extract Brain: cards chosen from your hand for this player to look at, who may cast one of them. */ handFor?: PlayerId; forPlayer?: PlayerId; helps?: true; /** From `player`'s graveyard onto the battlefield under this player's control (Visions of Dread). */ under?: PlayerId; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** With `piles`: the cards are in the graveyard (Death or Glory), for the prompt. */ yardPiles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true; /** The cards found are exiled from the searcher's own library (Foresight): the ones they want least. */ away?: true; /** Archmage Ascension: a search instead of a draw; the card found goes into the hand, then the draws still to make (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** Winter, Cynical Opportunist: the cards chosen, if any, have at least this many card types among them (CR 205.2a). */ cardTypes?: number; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** With `fromGraveyard` "battlefield" (Rinoa, Angel Wing, round 394): the card returns under its owner's control, tapped, as `what` says. */ owners?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** With `firstTo`: the first this many go there (one if left out). */ firstN?: number; /** With `firstTo`: the next this many after those go to `secondTo` (Verdant Mastery, round 390), only the rest to `othersTo`. */ secondN?: number; secondTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string; /** Each card taken costs this much life (Search for Blex). */ lifeEach?: number; /** Each card taken is paid for with this much life (Wand of Denial). */ payLife?: number }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; /** With `fromHand`: aura swap (CR 702.65a), the card exchanged with the source Aura. */ swap?: true; reveal?: true; /** With `reveal`: behold (CR 701.4a), so `cards` also holds permanents you control of that quality. */ behold?: true; bottom?: true; /** From the hand: the cards are shuffled into the library (Credit Voucher). */ shuffle?: true; /** From the hand: the cards are manifested (Kozilek, the Broken Reality). */ manifest?: true; /** With `hand`: `dig.looked` also holds that player's graveyard, after the hand (Never Happened). */ handYard?: true; /** With `manifest`: cloaked instead (Vannifar, Evolved Enigma). */ cloak?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop" | "libraryBottom" | /** The Three Seasons: the cards chosen are shuffled into their owners' libraries. */ "shuffleIn" | "castThisTurn" | /** The cards chosen stay; the rest of the graveyard is exiled (Watchers of the Dead). */ "keep"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** Wildfire Devils: the card exiled is copied, and the copy may be cast, by this player (for bots and the prompt). */ copiedBy?: PlayerId; /** "Creature and/or Vehicle cards with different powers" (Rip, Spawn Hunter): no two found with the same power. */ distinctPowers?: true; /** "Creature cards with different names" from the library and graveyard together (Ecological Appreciation): no two found with the same name (`cards` has one of each name in each zone). */ distinctNames?: true; /** "Exactly two cards" (Burning-Rune Demon): `max` of them or none. */ exactly?: true; /** Ulamog's Despoiler (round B229): chosen as this permanent enters (CompiledCard.entersProcess), not as something resolves. */ entering?: ObjectId; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "With total power X or less" (Moorland Rescuer, round B202): the cards found together, each card's power where it is. */ totalPower?: number; /** Jötun Grunt's cumulative upkeep: cards from every graveyard, an even number from each (two from a single graveyard for each age counter). */ pairsPerYard?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "Basic land cards which have the same name as the chosen land" (Canoptek Wraith): every card found has the same name. */ oneName?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** With `reveal`: the cards are revealed for this player to choose one of them for `player` to discard (Disciple of Phenax). */ revealFor?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ /** Extract Brain: cards chosen from your hand for this player to look at, who may cast one of them. */ handFor?: PlayerId; forPlayer?: PlayerId; helps?: true; /** From `player`'s graveyard onto the battlefield under this player's control (Visions of Dread). */ under?: PlayerId; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** With `piles`: the cards are in the graveyard (Death or Glory), for the prompt. */ yardPiles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true; /** The cards found are exiled from the searcher's own library (Foresight): the ones they want least. */ away?: true; /** Archmage Ascension: a search instead of a draw; the card found goes into the hand, then the draws still to make (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: DrawAfter } }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | /** Preferred Selection (round B216): which card looked at moves (an object id). */ "lookedCard" | /** Backdraft (round B229): a player who cast a sorcery spell this turn and the damage one of those spells dealt, "player:amount". */ "spellDamageBack" | /** Cyclopean Tomb (round B231): the land whose mire counters are removed (an object id). */ "mireLand" | /** A Killer Among Us (round B233): the creature type chosen secretly. */ "secretType" | /** Liberated Livestock (round B208): the Aura card (an object id, or "none") put onto the battlefield attached to the next token. */ "auraForToken" | /** Zevlor, Elturel Exile: the player or permanent a copy targets, for one opponent ("p<player>", an object id, or "none"). */ "copyTargetFor" | "drawUpTo" | "payX" | /** Sword-Point Diplomacy: which revealed card "for each of those cards" does next (an object id). */ "nextRevealed" | /** Chaotic Transformation: which of the player's exiled permanents to reveal for next (its id). */ "nextExiled" | /** "You may pay any amount of life" (Necrodominance): the amount, a number in `numberRange`. */ "payLife" | /** "You may pay any amount of {E}" (Galvanic Discharge): the amount, a number in `numberRange`. */ "payEnergy" | /** "You may collect evidence X" (Incinerator of the Guilty): X, a number in `numberRange`, or "none". */ "evidenceX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Dubious Challenge: the exiled card the opponent puts onto the battlefield under their control, or "none". */ "takeExiled" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | /** Nicol Bolas, Dragon-God: a card in the chooser's hand or a permanent they control, to exile. */ "exileHandOrPermanent" | "pile" | "demonstrate" | /** Effect "villainous" (CR 701.55): "0" or "1", one of the two options. */ "villainous" | /** Soulfire Eruption (effect exileTopDamageEach): which of a player's group of targets is next, a target's index. */ "nextTarget" | "damageShield" | "topOrBottom" | "damageSource" | /** Effect "damage" to "that player or a planeswalker that player controls": "p<player id>" or a planeswalker's id. */ "damageWhom" | "enchant" | "rollResult" | "attackWhom" | /** Effect "reselectAttack" (Misleading Signpost): what the creature (`about`) attacks now. */ "reselectAttack" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** Which replacement of a game loss applies (CR 616.1): an option of loseReplacements. */ "loseReplacement" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer" | /** Zada's copies: the permanent the next copy put on the stack targets. */ "copyOrder" | /** Effect "unlockDoor": `${roomId}:${door}`, a locked door to unlock (CR 709.5f). */ "unlockDoor" | /** Effect attachToChosen with `pickOne` (Gilgamesh): which of the permanents to attach, or "none". */ "attachWhich" | /** Effect "splitTargets" (Retribution): "0" or "1", the target picked. */ "splitTargets" | /** Time travel (CR 701.56a): "add", "remove" or "none", for the permanent or suspended card `about`. */ "timeTravel" | /** Aquamorph Entity turned face up by an effect (CompiledCard.faceUpForms): the form `about` is turned face up as, an index into its entersForms. */ "faceUpForm" | /** Effect counterKindsAddOrRemove (Quarry Hauler): "add" or "remove", for the kind of counter `counterKind` on `about`. */ "addOrRemoveCounter" | /** Effect counterKindsBribe (Bribe Taker): "plus", "kind" or "none", for the kind of counter `counterKind`. */ "bribeCounter" | /** Master of Predicaments: the card in hand chosen (secretly), then the guess, "over" or "notOver". */ "predicamentCard" | "predicamentGuess" | /** Liar's Pendulum (effect guessNamedInHand): "in" or "out", whether a card with the chosen name is in that player's hand. */ "liarGuess" | /** Memories Returning: the revealed card picked for this step. */ "alternatePick" | /** Struggle for Sanity: the card of the revealed hand to exile next (its id). */ "struggleExile" | /** Giant Albatross: "pay" the life for the creature `about`, or "none" to let it be destroyed. */ "payLifeOrDestroy" | /** Juxtapose: which of the tied permanents with the greatest mana value (its id). */ "greatestTie" | /** Storage Matrix: "Artifact", "Creature" or "Land", what untaps this untap step. */ "untapType" | /** Wall of Shards' cumulative upkeep: the opponent who gains the life for the next age counter. */ "giveLife" | /** Effect "piles" `pickOne` (Truth or Tale): the card of the chosen pile to put into the hand. */ "pileCard" | /** Effect "bidLife": a bid to top the high bid (a number in `numberRange`), or "pass". */ "bid" | /** "Target ... of an opponent's choice" (Mausoleum Turnkey): the opponent who chooses the target, as the trigger is put on the stack. */ "targetChooser" | /** "An opponent chooses one —" (Misfortune): the opponent who chooses the spell's mode, as it's cast (CR 700.2e). */ "modeChooser" | /** Effect "changeText" (Sleight of Mind): the word to replace in the text of `about` ("textFrom"), then the word it becomes ("textTo"); a color word in lower case, a land or creature type capitalized. */ "textFrom" | "textTo" | /** Effect "skipChosenThisTurn" (Fatespinner): "draw", "main" or "combat", skipped each time this turn. */ "skipChoice" | /** Effect "payLifeRounds" (Plague of Vermin): life to pay now, a number in `numberRange`; 0 declines. */ "payLifeRound" | /** Ward with a choice of costs (Titania, Rugged Rumbler: "Discard a card or pay {2}"): "0" or "1", the cost to pay, or "none". */ "unlessWay" | /** Effect "may" with `payOneOf` (Isu the Abominable): the index of the mana cost to pay, or "none". */ "payWhich" | /** Effect counterKindsOnEither (Exotic Pets): the token (its id) that gets the counter of kind `counterKind`. */ "eitherToken" | /** Effect damageDefendingOthers (Kusari-Gama): which defending player "defending player" is (CR 508.5a), a player id. */ "defendingPlayer" | /** An optional token replacement (CountMod mayInstead): "none" or the index of what's created instead. */ "tokenInstead" | /** Effect "redistributeLife" (Reverse the Sands): for each player still in the game, in APNAP order, whose life total they get (indexes into that order, comma-separated). */ "redistribute" | /** Spectral Searchlight: the color of the mana this player adds from another player's mana ability (GameState.manaColorFor), a color name. */ "manaColorFor" | /** Charmed Pendant (round B239): the mana for the milled card's hybrid symbols, its letters ("GW"). */ "pendantMana" | /** Lagrella, the Magpie (round B246): which object a delayed trigger is about, of those its event happened to at once (an object id, PendingTrigger.subjectChoices). */ "triggerSubject"; options: string[]; /** "tokenInstead": the option a bot picks. */ botChoice?: string; /** "targetChooser" for a spell or activated ability being cast or activated (not a trigger); "modeChooser" for a spell's mode chosen by an opponent. */ deferred?: DeferredAct; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** "addOrRemoveCounter": the kind of counter asked about. */ counterKind?: string; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true; /** Do or Die: the chosen pile is destroyed rather than sacrificed. */ destroyPile?: true; /** "pile": "faceDown", the first pile is face down and only its size is shown (Atris); "pickOne", one card of the chosen pile goes into the hand (Truth or Tale). */ pileMode?: "faceDown" | "pickOne" | /** Hostile Negotiations: the pile chosen is turned face up, both piles' cards shown to their owner. */ "turnFaceUp" | /** Boneyard Parley: the chosen pile goes onto the battlefield under `of`'s control. */ "battlefield" | /** Death or Glory: the chosen pile of `of`'s graveyard cards is exiled, the other returns to the battlefield. */ "exile" | /** Fight or Flight, Stand or Fall (round B234): the chosen pile's creatures are the only ones that can attack (block) this turn. */ "canAttack" | "canBlock" }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | /** Preferred Selection (round B216): which card looked at moves (an object id). */ "lookedCard" | /** Backdraft (round B229): a player who cast a sorcery spell this turn and the damage one of those spells dealt, "player:amount". */ "spellDamageBack" | /** Cyclopean Tomb (round B231): the land whose mire counters are removed (an object id). */ "mireLand" | /** Lynde, Cheerful Tormentor (round 394): a Curse attached to you and the opponent it moves to ("id>player"), or "none". */ "curseMove" | /** Assimilation Aegis (round 396): the creature card exiled with ~ that the creature becomes a copy of (an object id). */ "aegisCopy" | /** Koh, the Face Stealer (round 399): the creature card exiled with ~ chosen (an object id). */ "kohCard" | /** A Killer Among Us (round B233): the creature type chosen secretly. */ "secretType" | /** Liberated Livestock (round B208): the Aura card (an object id, or "none") put onto the battlefield attached to the next token. */ "auraForToken" | /** Zevlor, Elturel Exile: the player or permanent a copy targets, for one opponent ("p<player>", an object id, or "none"). */ "copyTargetFor" | "drawUpTo" | "payX" | /** Sword-Point Diplomacy: which revealed card "for each of those cards" does next (an object id). */ "nextRevealed" | /** Chaotic Transformation: which of the player's exiled permanents to reveal for next (its id). */ "nextExiled" | /** "You may pay any amount of life" (Necrodominance): the amount, a number in `numberRange`. */ "payLife" | /** "You may pay any amount of {E}" (Galvanic Discharge): the amount, a number in `numberRange`. */ "payEnergy" | /** "You may collect evidence X" (Incinerator of the Guilty): X, a number in `numberRange`, or "none". */ "evidenceX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Dubious Challenge: the exiled card the opponent puts onto the battlefield under their control, or "none". */ "takeExiled" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | /** Nicol Bolas, Dragon-God: a card in the chooser's hand or a permanent they control, to exile. */ "exileHandOrPermanent" | "pile" | "demonstrate" | /** Effect "villainous" (CR 701.55): "0" or "1", one of the two options. */ "villainous" | /** Soulfire Eruption (effect exileTopDamageEach): which of a player's group of targets is next, a target's index. */ "nextTarget" | "damageShield" | "topOrBottom" | "damageSource" | /** Effect "damage" to "that player or a planeswalker that player controls": "p<player id>" or a planeswalker's id. */ "damageWhom" | "enchant" | "rollResult" | "attackWhom" | /** Effect "reselectAttack" (Misleading Signpost): what the creature (`about`) attacks now. */ "reselectAttack" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** Which replacement of a game loss applies (CR 616.1): an option of loseReplacements. */ "loseReplacement" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer" | /** Zada's copies: the permanent the next copy put on the stack targets. */ "copyOrder" | /** Effect "unlockDoor": `${roomId}:${door}`, a locked door to unlock (CR 709.5f). */ "unlockDoor" | /** Effect attachToChosen with `pickOne` (Gilgamesh): which of the permanents to attach, or "none". */ "attachWhich" | /** Effect "splitTargets" (Retribution): "0" or "1", the target picked. */ "splitTargets" | /** Time travel (CR 701.56a): "add", "remove" or "none", for the permanent or suspended card `about`. */ "timeTravel" | /** Aquamorph Entity turned face up by an effect (CompiledCard.faceUpForms): the form `about` is turned face up as, an index into its entersForms. */ "faceUpForm" | /** Effect counterKindsAddOrRemove (Quarry Hauler): "add" or "remove", for the kind of counter `counterKind` on `about`. */ "addOrRemoveCounter" | /** Effect counterKindsBribe (Bribe Taker): "plus", "kind" or "none", for the kind of counter `counterKind`. */ "bribeCounter" | /** Master of Predicaments: the card in hand chosen (secretly), then the guess, "over" or "notOver". */ "predicamentCard" | "predicamentGuess" | /** Liar's Pendulum (effect guessNamedInHand): "in" or "out", whether a card with the chosen name is in that player's hand. */ "liarGuess" | /** Memories Returning: the revealed card picked for this step. */ "alternatePick" | /** Struggle for Sanity: the card of the revealed hand to exile next (its id). */ "struggleExile" | /** Giant Albatross: "pay" the life for the creature `about`, or "none" to let it be destroyed. */ "payLifeOrDestroy" | /** Juxtapose: which of the tied permanents with the greatest mana value (its id). */ "greatestTie" | /** Storage Matrix: "Artifact", "Creature" or "Land", what untaps this untap step. */ "untapType" | /** Wall of Shards' cumulative upkeep: the opponent who gains the life for the next age counter. */ "giveLife" | /** Effect "piles" `pickOne` (Truth or Tale): the card of the chosen pile to put into the hand. */ "pileCard" | /** Effect "bidLife": a bid to top the high bid (a number in `numberRange`), or "pass". */ "bid" | /** "Target ... of an opponent's choice" (Mausoleum Turnkey): the opponent who chooses the target, as the trigger is put on the stack. */ "targetChooser" | /** "An opponent chooses one —" (Misfortune): the opponent who chooses the spell's mode, as it's cast (CR 700.2e). */ "modeChooser" | /** Effect "changeText" (Sleight of Mind): the word to replace in the text of `about` ("textFrom"), then the word it becomes ("textTo"); a color word in lower case, a land or creature type capitalized. */ "textFrom" | "textTo" | /** Effect "skipChosenThisTurn" (Fatespinner): "draw", "main" or "combat", skipped each time this turn. */ "skipChoice" | /** Effect "payLifeRounds" (Plague of Vermin): life to pay now, a number in `numberRange`; 0 declines. */ "payLifeRound" | /** Ward with a choice of costs (Titania, Rugged Rumbler: "Discard a card or pay {2}"): "0" or "1", the cost to pay, or "none". */ "unlessWay" | /** Effect "may" with `payOneOf` (Isu the Abominable): the index of the mana cost to pay, or "none". */ "payWhich" | /** Effect counterKindsOnEither (Exotic Pets): the token (its id) that gets the counter of kind `counterKind`. */ "eitherToken" | /** Effect damageDefendingOthers (Kusari-Gama): which defending player "defending player" is (CR 508.5a), a player id. */ "defendingPlayer" | /** An optional token replacement (CountMod mayInstead): "none" or the index of what's created instead. */ "tokenInstead" | /** Effect "redistributeLife" (Reverse the Sands): for each player still in the game, in APNAP order, whose life total they get (indexes into that order, comma-separated). */ "redistribute" | /** Spectral Searchlight: the color of the mana this player adds from another player's mana ability (GameState.manaColorFor), a color name. */ "manaColorFor" | /** Garth One-Eye (Effect copyNamedCard, round 377): the card name chosen, one of those not chosen yet for that source. */ "namedCopy" | /** Charmed Pendant (round B239): the mana for the milled card's hybrid symbols, its letters ("GW"). */ "pendantMana" | /** Volo's Journal (Effect noteCreatureType, round 380): the creature type noted, one of the cast spell's not noted yet. */ "noteType" | /** The Toymaker's Trap (round 384): the number chosen in secret ("toyNumber"), then the opponent's guess ("toyGuess"). */ "toyNumber" | "toyGuess" | /** Lagrella, the Magpie (round B246): which object a delayed trigger is about, of those its event happened to at once (an object id, PendingTrigger.subjectChoices). */ "triggerSubject"; options: string[]; /** "Secretly choose an opponent" (Stalking Leonin, round 377): the log doesn't say who. */ secret?: true; /** "tokenInstead": the option a bot picks. */ botChoice?: string; /** "targetChooser" for a spell or activated ability being cast or activated (not a trigger); "modeChooser" for a spell's mode chosen by an opponent. */ deferred?: DeferredAct; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** "addOrRemoveCounter": the kind of counter asked about. */ counterKind?: string; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true; /** Do or Die: the chosen pile is destroyed rather than sacrificed. */ destroyPile?: true; /** "pile": "faceDown", the first pile is face down and only its size is shown (Atris); "pickOne", one card of the chosen pile goes into the hand (Truth or Tale). */ pileMode?: "faceDown" | "pickOne" | /** Hostile Negotiations: the pile chosen is turned face up, both piles' cards shown to their owner. */ "turnFaceUp" | /** Boneyard Parley: the chosen pile goes onto the battlefield under `of`'s control. */ "battlefield" | /** Death or Glory: the chosen pile of `of`'s graveyard cards is exiled, the other returns to the battlefield. */ "exile" | /** Fight or Flight, Stand or Fall (round B234): the chosen pile's creatures are the only ones that can attack (block) this turn. */ "canAttack" | "canBlock" }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "keep": the rest are tapped (Regna's Sanction). */ tap?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** Phyrexian Dreadnought: the permanents picked have at least this total power (see the "pick" effect). */ minTotalPower?: number; /** Thelon's Curse: this mana for each permanent picked, paid from the pool as they're chosen (pick `payEach`). */ payEach?: string; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "keep": the rest are tapped (Regna's Sanction). */ tap?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** Phyrexian Dreadnought: the permanents picked have at least this total power (see the "pick" effect). */ minTotalPower?: number; /** Thelon's Curse: this mana for each permanent picked, paid from the pool as they're chosen (pick `payEach`). */ payEach?: string; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true; /** Words of Wind (round 385): the permanent this player returns as a draw is replaced, not a resolving spell's pick. */ wind?: WindDraw }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true; /** Remove up to `total` of them, no more from each than `has` (Sensational Spider-Man). */ remove?: true; has?: Record<ObjectId, number>; /** With `remove`: exactly `total` of them (Overseer of Vault 76). */ exact?: true; /** Up to `total` of them, none included (Stumpsquall Hydra gone before its ability resolves). */ upTo?: true }
@@ -1881,7 +1962,7 @@ export type PendingDecision =
    * A merged permanent was put into its owner's library (CR 730.3a): its cards are `cards` there, top first, together on
    * top of the library or at the bottom, and the owner arranges them without revealing the order.
    */
-  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Whose library, if not `player`'s (Misinformation). */ owner?: PlayerId; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } };
+  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Whose library, if not `player`'s (Misinformation). */ owner?: PlayerId; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: DrawAfter } };
 
 export interface GameEvent {
   seq: number;
@@ -1972,12 +2053,24 @@ export interface TurnLog {
   artifactsToYard?: number;
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
   creaturesLeft?: Partial<Record<PlayerId, number>>;
+  /**
+   * Impact Resonance (round 395): the damage each source dealt to each permanent or player this turn, keyed
+   * "source>recipient" (each as the object it was, CR 400.7), and the greatest of them.
+   */
+  pairDamage?: Record<string, number>;
+  greatestDamage?: number;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
   plusOnes?: { by: PlayerId; controller: PlayerId; creature: boolean; id: ObjectId; zc: number; n: number }[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** The players who would have created one or more tokens this turn, replaced or not ("the first time you would create one or more tokens each turn", Moonlit Meditation). */
   tokenEvents?: PlayerId[];
+  /**
+   * Crafty Cutpurse (round 394): "each token that would be created under an opponent's control this turn is created under
+   * your control instead": each such effect this turn, in the order they began, whose and from what (counters.ts
+   * tokenMaker, CR 616.1b).
+   */
+  tokenSteals?: { player: PlayerId; source: string }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
   /** Oblivious Bookworm: the players who turned a permanent face up this turn, by the special action or an effect they controlled (CR 116.2b, 708.8). */
   turnedFaceUp?: PlayerId[];
@@ -2148,6 +2241,8 @@ export interface ZoneMove {
   chars?: Characteristics;
   hadAbilities?: boolean;
   granted?: string[];
+  /** Idris, Koh (round 399): the exiled cards whose triggered abilities it had as it left (CR 603.10a). */
+  borrowed?: ObjectId[];
   /** Left the battlefield because its controller sacrificed it (CR 701.21a). */
   sacrificed?: true;
 }
@@ -2168,7 +2263,7 @@ export interface GameState {
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
    */
   /** `card`: its copiable values as it last existed (CR 603.10a), a key into `cards`. */
-  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string }[];
+  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string; /** Idris, Koh (round 399): the exiled cards whose triggered abilities it had as it left (cards.ts borrowedTriggerSources, CR 603.10a). */ borrowed?: ObjectId[] }[];
   /**
    * Cards put into a graveyard in the current event (one instruction of a resolving spell or ability, one pass of
    * state-based actions, one action's costs), as they are there: their owner arranges them (CR 404.3). See graveyard.ts.
@@ -2200,7 +2295,7 @@ export interface GameState {
   yardCastGrants?: { id: ObjectId; zc: number; kind: "jumpStart" | "harmonize" }[];
   flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number }; /** "You may cast this card from your graveyard" instead (Case of the Uneaten Feast). */ cast?: true; /** Flashback with this cost instead of the card's mana cost (Archmage's Newt's "flashback {0}"). */ mana?: string }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; /** Jaya's Phoenix, Repeated Reverberation (Effect nextCast `loyalty`). */ loyalty?: "also" | "only"; /** Magus Lucea Kane (Effect nextCast `xAbility`): an ability with {X} in its activation cost uses it up too. */ xAbility?: true; /** Zevlor, Elturel Exile: only a spell whose one target is an opponent or a permanent an opponent controls (Effect nextCast). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Every matching spell this turn, not used up (Yidris, Maelstrom Wielder). */ allTurn?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** Savage Summoning: the creature enters with this counter too. */ counter?: string; /** World War Hulk, Marshland Bloodcaster: an alternative cost for that spell (AltCostKind "nextFree", "nextLife"). */ alt?: "free" | "life"; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number; /** Loki Laufeyson (round B202): only a spell with mana value at most this permanent's power as it's cast, or its power as it last existed on the battlefield. */ mvMaxPowerOf?: { id: ObjectId; zc: number }; /** Pit Automaton (Effect nextCast `exhaust`): only the next exhaust ability that isn't a mana ability. */ exhaust?: true }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; /** Havengul Lich (round 400): only this card being cast from the graveyard it was in then, as that object (CR 400.7), with the trigger's source as the object it was (`sourceZc`). */ card?: { id: ObjectId; zc: number }; sourceZc?: number; /** Jaya's Phoenix, Repeated Reverberation (Effect nextCast `loyalty`). */ loyalty?: "also" | "only"; /** Magus Lucea Kane (Effect nextCast `xAbility`): an ability with {X} in its activation cost uses it up too. */ xAbility?: true; /** Zevlor, Elturel Exile: only a spell whose one target is an opponent or a permanent an opponent controls (Effect nextCast). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Every matching spell this turn, not used up (Yidris, Maelstrom Wielder). */ allTurn?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** Savage Summoning: the creature enters with this counter too. */ counter?: string; /** World War Hulk, Marshland Bloodcaster: an alternative cost for that spell (AltCostKind "nextFree", "nextLife"). */ alt?: "free" | "life"; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number; /** Loki Laufeyson (round B202): only a spell with mana value at most this permanent's power as it's cast, or its power as it last existed on the battlefield. */ mvMaxPowerOf?: { id: ObjectId; zc: number }; /** Pit Automaton (Effect nextCast `exhaust`): only the next exhaust ability that isn't a mana ability. */ exhaust?: true }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made
@@ -2238,7 +2333,7 @@ export interface GameState {
    * Taunt: during `player`'s next turn after turn `since`, the creatures they control attack `attack` if able (CR 508.1d).
    * `turn` is that turn, set as it begins (game.ts mustAttackPlayers).
    */
-  attackPlayerNextTurn?: { player: PlayerId; attack: PlayerId; since: number; turn?: number }[];
+  attackPlayerNextTurn?: { player: PlayerId; attack: PlayerId; since: number; turn?: number; /** Rowan Kenrith (round 391): "attacks if able", attacking anything it can, not `attack` (game.ts attacksIfAbleNow). */ anyone?: true }[];
   /** "Creatures can't be blocked this turn": matching creatures can't be blocked, also ones that arrive later. */
   cantBeBlockedThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast (and ability activated) this turn as it was put on the stack, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
@@ -2320,6 +2415,8 @@ export interface GameState {
    * the creature's own requirements, not its controller's).
    */
   hadToAttack?: { turn: number; combat: number; keys: string[] };
+  /** Aradesh, the Founder (round 384): the attackers that enlisted a creature in this combat, by `id@zoneChanges` (CR 702.154a, 400.7). */
+  enlistedThisCombat?: { turn: number; combat: number; keys: string[] };
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;
@@ -2416,8 +2513,22 @@ export interface GameState {
    * Odric, Master Tactician: "you choose which creatures block this combat and how those creatures block": `player`
    * declares each defending player's blockers in this turn's combat number `combat` (see blockersPending).
    */
-  blocksChosenBy?: { player: PlayerId; turn: number; combat: number };
+  blocksChosenBy?: { player: PlayerId; turn: number; combat: number; /** When it resolved (s.nextTimestamp), against the others in blockersPending. */ timestamp?: number };
+  /**
+   * Brutal Hordechief, Berserker's Frenzy (round 378): "you choose which creatures block this turn and how those creatures
+   * block": `player` declares the defending players' blockers in every combat of turn `turn` (`opponents`: only its
+   * opponents', Hordechief's "you choose how those creatures block"). With several of these, Odric's and Invasion Plans',
+   * the latest one that covers a defending player decides for that player (rulings), see blockersPending.
+   */
+  blocksChosenThisTurn?: { player: PlayerId; turn: number; timestamp: number; opponents?: true }[];
+  /**
+   * Master Warcraft (round 379): "You choose which creatures attack this turn": `player` chooses which creatures the active
+   * player attacks with in every combat of turn `turn`; with several, the latest one to resolve decides (attacksChooser).
+   */
+  attacksChosenThisTurn?: { player: PlayerId; turn: number; timestamp: number }[];
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
+  /** Memory Vessel (round 386): "until your next turn, ... they can't play cards from their hand": every player, until `controller`'s next turn begins. */
+  handPlayBansUntil?: { controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
@@ -2448,6 +2559,12 @@ export interface GameState {
   topTurn?: { player: PlayerId; turn: number; top: FromTop; source: string }[];
   /** Plagiarize: "Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a card" (CR 614.1a): `victim`'s draws are `by`'s, until the cleanup step (CR 514.2). `id` names it for CR 614.5. */
   drawSteals?: { id: string; victim: PlayerId; by: PlayerId; source: string }[];
+  /**
+   * Sokrates's granted ability (round 381, DamageRule.drawHalf): the draws its prevention calls for in this combat damage
+   * step, in order, made once the damage is dealt (dealCombatDamage); a draw replacement can stop them to ask (dredge), and
+   * the rest follow its answer (draw `after` "damageDraws").
+   */
+  damageDraws?: { player: PlayerId; n: number; card: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
@@ -2477,6 +2594,12 @@ export interface GameState {
   exileDyingOpponents?: { turn: number; player: PlayerId }[];
   /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */
   noSearchTurn?: number;
+  /** Garth One-Eye (Effect copyNamedCard, round 377): the card names chosen for each source, by `${source id}@${its zone changes}` (that object, CR 400.7, rulings). */
+  namesChosenFor?: Record<string, string[]>;
+  /** The Toymaker's Trap (Effect secretNumberGuess, round 384): the numbers chosen for each source, by `${source id}@${its zone changes}` (that object, CR 400.7, rulings). */
+  numbersChosenFor?: Record<string, number[]>;
+  /** Volo's Journal (round 380): the creature types noted for each object, by `id@zoneChanges` (a new object has none, CR 400.7). */
+  notedFor?: Record<string, string[]>;
   /** How much damage each player was dealt this turn (Spinerock Knoll). */
   damageThisTurn?: Record<number, number>;
   /** What the Traps' "this turn" conditions look back at (StaticCondition opponentSearched and the rest); cleared each turn. */
@@ -2675,6 +2798,8 @@ export interface Chosen {
   landOrNonland?: "land" | "nonland";
   /** "As ~ enters, choose another creature you control" (Dauntless Bodyguard, CR 614.12): that permanent, as the object it was then (CR 400.7). */
   object?: { id: ObjectId; zc: number };
+  /** Koh, the Face Stealer (round 399): "Choose a creature card exiled with ~": that card, as the object it is in exile (CR 400.7). */
+  card?: { id: ObjectId; zc: number };
 }
 
 export interface TurnRule {
@@ -2697,7 +2822,7 @@ export interface TurnRule {
   /** "noLoyalty": Revel in Silence's "your opponents can't ... activate planeswalkers' loyalty abilities this turn" (CR 606.3). */
   /** "noActivations": Abeyance's "that player can't activate abilities that aren't mana abilities" this turn, in any zone (rulings). */
   /** "castFromHandFree": Chandra, Flame's Catalyst's "Until end of turn, you may cast spells from your hand without paying their mana costs" (Omniscience's alternative cost for this turn, CR 118.9). */
-  /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings). */
+  /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings); with no `object` (Urza Assembles the Titans), of every planeswalker `player` controls this turn. */
   rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree" | "loyaltyTwice" | /** Piracy (round B238): this player may tap lands they don't control for mana (CR 106.12), that mana spendable only to cast spells. */ "tapOthersLands";
   /** The permanent the rule is about ("loyaltyTwice"), as the object it was then (CR 400.7). */
   object?: { id: ObjectId; zc: number };
@@ -2807,6 +2932,8 @@ export interface Resolving {
   flippedTails?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
+  /** Explosion of Riches (round 383): every card drawn while this resolves, by any of its instructions ("whenever a card is drawn this way", rulings). */
+  drawnCount?: number;
   /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */
   drawnBefore?: ObjectId[];
   /**
@@ -2892,6 +3019,8 @@ export interface Resolving {
   parley?: { land: number; nonland: number; /** Their total mana value (Naya Soulbeast). */ mv?: number; /** The cards revealed (Dakra Mystic). */ ids?: ObjectId[] };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
   revealedUntilMv?: number;
+  /** Ogre Battlecaster (round 401): the mana value of the spell its castNow cast, as it was cast (CR 202.3), for a reflexive "when you cast that spell". */
+  castThisWayMv?: number;
   /** How many cards the last revealUntil revealed, the one found included ("the number of cards revealed this way", Madcap Experiment). */
   revealedUntilCount?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
@@ -3028,6 +3157,8 @@ export interface Resolving {
   flipped?: { won: boolean; wins: number; /** How many coins were flipped in that set, when it was several (Yusri). */ flips?: number };
   /** Effect "chooseOwnCommander" (Stinging Study): the chosen commander's mana value. */
   commanderMv?: number;
+  /** Long List of the Ents (round 381): the creature type this resolution noted, for "of that type" (Effect nextCast `ofNoted`). */
+  lastNoted?: string;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
@@ -3035,6 +3166,10 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect revealUntil `anyNumber` (Aurora Awakener, round 392): the cards to put onto the battlefield have been asked for (their answer is in `found`). */
+    revealPicked?: true;
+    /** Effect "playTopOrHand" (Ziatora's Envoy, round 392): which question has been asked about the top card, and that card. */
+    topPlay?: { id: ObjectId; asked: "land" | "untapped" | "cast"; /** A modal double-faced card's land face, played as that. */ face?: number };
     /** Effect "exileRandomTokenCopy" (Sin, Spira's Punishment): the card exiled this time, and whether it was a land card, until its token copy is made. */
     randomCopy?: { id: ObjectId; zc: number; land: boolean };
     /** Effect "othersChooseDestroyRest" (Fortunate Few): the players still to choose, in order, and the permanents chosen so far. */
@@ -3063,6 +3198,12 @@ export interface Resolving {
     glyph?: { left: { player: PlayerId; n: number }[]; chosen: ObjectId[] };
     /** Cyclopean Tomb (Effect tombRemove, round B231): asked which land; the land chosen (an object id). */
     mireLand?: { pick?: string };
+    /** Lynde, Cheerful Tormentor (round 394): the Curse move chosen ("id>player" or "none"), "" while asked. */
+    curseMove?: string;
+    /** Assimilation Aegis (Effect becomeCopyOfLinked, round 396): the exiled creature card chosen to copy (an object id), "" while asked. */
+    aegisCopy?: string;
+    /** Koh, the Face Stealer (Effect chooseLinkedCard, round 399): the exiled creature card chosen (an object id), "" while asked. */
+    kohCard?: string;
     /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */
     iceCave?: { queue: PlayerId[] };
     /** Tidal Flats (Effect attackersPayOrBlockersGain, round B214): the attackers whose controllers are still to choose, and those not paid for. */
@@ -3276,6 +3417,8 @@ export interface Resolving {
     facePiles?: [ObjectId[], ObjectId[]];
     /** Gollum, Scheming Guide (effect guessTopKind): whether the guess was right, once revealed, and the next of its effects to run. */
     guessRight?: boolean;
+    /** The Toymaker's Trap (Effect secretNumberGuess, round 384): the number chosen in secret, the opponent who guesses, and the guess. */
+    toy?: { pick?: number; kept?: true; guesser?: PlayerId; guess?: number; done?: true };
     guessStep?: number;
     /** Eumidian Wastewaker (effect discardOrSacrifice): the players still to choose, the scratch keys to keep between them, the graveyards' cards before, and the choice made. */
     /** Soulfire Eruption (effect exileTopDamageEach): the targets done so far, and the one chosen to be next. */
@@ -3473,6 +3616,21 @@ export interface Resolving {
     splitDone?: true;
     /** Dawnbreak Reclaimer (Effect swapFromGraveyards): the pick being asked for, the cards chosen ("none" when there was none to choose) and the opponent choosing in your graveyard. */
     swap?: { asking?: "theirs" | "yours"; theirs?: { id: ObjectId; zc: number } | "none"; chooser?: PlayerId; yours?: { id: ObjectId; zc: number } | "none" };
+    /** Thieves' Auction (Effect thievesAuction): the cards exiled this way, whose pick it is (an index into the players from you in turn order), how many players in a row had nothing to choose, the card chosen and being put in, and whether a pick is being asked for; `auctionBefore` the exile zones' objects before the exile. */
+    auction?: { cards: { id: ObjectId; zc: number }[]; at: number; idle: number; chosen?: ObjectId; asking?: true };
+    auctionBefore?: Record<ObjectId, number>;
+    /** Sphinx Ambassador (Effect searchTheyName, round 377): the card found (none if nothing could be), whether the name was asked and whether the put was offered. */
+    ambassador?: { found?: { id: ObjectId; zc: number } | "none"; named?: true; asked?: true };
+    /** Garth One-Eye (Effect copyNamedCard, round 377): the name picked, and the copy made and offered. */
+    garth?: { pick?: string; copy?: ObjectId };
+    /** Volo's Journal (round 380): the creature type chosen to note. */
+    noteType?: string;
+    /** Warp World (Effect warpWorld): each player's revealed cards, and the step: 1 artifacts, creatures and lands; 2 enchantments; 3 the rest to the bottom (`bottomAt`, by APNAP). */
+    warp?: { revealed: Record<number, ObjectId[]>; stage: number; bottomAt?: number };
+    /** Glimpse of Tomorrow (Effect glimpseOfTomorrow, round 390): your revealed cards, and the step: 1 non-Aura permanent cards; 2 Auras; 3 the rest to the bottom. */
+    glimpse?: { revealed: ObjectId[]; stage: number };
+    /** Over the Top (Effect overTheTop, round 389): each player's revealed cards, and whether the permanent cards among them have entered. */
+    overTop?: { revealed: Record<number, ObjectId[]>; entered?: true };
     /** Rona, Tolarian Obliterator (Effect "exileRandomThenPlay"): the card exiled, and whether it's been offered. */
     exiledAtRandom?: { id: ObjectId; zc: number; asked?: true };
     /** castTargetFree with several targets: the ones offered already. */
@@ -3539,7 +3697,10 @@ export type Action =
   /** The new target for a spell whose target is being changed (see PendingDecision "changeTarget"). */
   | { type: "changeTarget"; player: PlayerId; target: TargetChoice }
   /** `planeswalker`: it attacks that planeswalker, controlled by `defender`, instead of the player (CR 508.1b). */
-  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[] }
+  /** `decline` (Master Warcraft, round 379): with attackers another player chose that only attack for a cost, refuse to pay; that player chooses again. */
+  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]; decline?: true }
+  /** Master Warcraft (round 379): the creatures of the active player's that attack, chosen by another player (PendingDecision chooseAttackers). */
+  | { type: "chooseAttackers"; player: PlayerId; attackers: ObjectId[] }
   | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }
   | { type: "discard"; player: PlayerId; objectIds: ObjectId[] }
   /** Answer to arrangeTop: `top` goes back on top in this order (first = top); `away` goes to the bottom (scry) or graveyard (surveil). */

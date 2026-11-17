@@ -1560,6 +1560,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Chandra, Flame's Catalyst: "Until end of turn, you may cast spells from your hand without paying their mana costs":
   // Omniscience's alternative cost (CR 118.9) for the rest of this turn, with the normal timing (rulings); X is 0.
   if (/^(?:Until end of turn, you may cast spells from your hand without paying their mana costs|You may cast spells from your hand without paying their mana costs until end of turn)$/.test(s)) return [{ type: "turnRules", rules: ["castFromHandFree"] }];
+  // Urza Assembles the Titans: "You may activate the loyalty abilities of planeswalkers you control twice this turn rather
+  // than only once." A rule for the player this turn (CR 606.3), not a change to the planeswalkers, so ones that come
+  // under their control later this turn too (CR 611.2c); never more than twice with Oath of Teferi too (rulings).
+  if (/^You may activate the loyalty abilities of planeswalkers you control twice this turn rather than only once$/.test(s)) return [{ type: "turnRules", rules: ["loyaltyTwice"] }];
   // The Chain Veil (CR 606.3, rulings): planeswalkers that come under your control later this turn too.
   if (/^For each planeswalker you control, you may activate one of its loyalty abilities once this turn as though none of its loyalty abilities have been activated this turn$/.test(s)) return [{ type: "turnRules", rules: ["extraLoyalty"] }];
   if ((m = /^Until your next turn, you may cast (sorcery|creature|artifact|enchantment) spells as though they had flash$/.exec(s))) {

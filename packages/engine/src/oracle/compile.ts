@@ -87,6 +87,7 @@ import { roundB241Line } from "./laneb241";
 import { roundB242Line } from "./laneb242";
 import { roundB243Line } from "./laneb243";
 import { roundB244Line, roundB244Loyalty } from "./laneb244";
+import { roundB245Line, roundB245Spell } from "./laneb245";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2255,6 +2256,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB243Line(line, out, isSpell)) continue;
     // Ms. Marvel, Kamala Khan's granted ability (round B244).
     if (roundB244Line(line, out, isSpell)) continue;
+    // Caller of the Hunt (round B245).
+    if (roundB245Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -7335,7 +7338,7 @@ export function compile(d: CardDef): CompiledCard {
     const typeChoice = !floatingFirst && tail === undefined && spellLines.length === 1 && spellLines[0]!.split(ofYourChoice).length === 2 && /\btarget creatures?(?: cards?)?$/.test(spellLines[0]!.split(ofYourChoice)[0]!) && !spellLines[0]!.includes("•");
     // Round B191 (Multiple Choice): a whole spell read at once.
     // Round B194 (Farsight Ritual): the same.
-    const b191 = !floatingFirst && tail === undefined ? ((t) => { const r = roundB191Spell(t); return r !== undefined ? r : roundB194Spell(t); })(spellLines.join(" ")) : undefined;
+    const b191 = !floatingFirst && tail === undefined ? ((t) => { const r = roundB191Spell(t); if (r !== undefined) return r; const r194 = roundB194Spell(t); return r194 !== undefined ? r194 : roundB245Spell(t); })(spellLines.join(" ")) : undefined;
     const body0 = b191 !== undefined ? b191 : floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(typeChoice ? spellLines[0]!.replace(ofYourChoice, "") : spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}), ...(costTappedX ? { costTappedX } : {}) }) : null;
     // "Up to three target creature cards" is three target specs alike: each one of that type.
     const typed = typeChoice && body0 && !body0.modal && body0.targets.length > 0 && body0.targets.every((t) => (t.kind === "object" || t.kind === "card") && !t.chosen && t.types?.length === 1 && t.types[0] === "Creature" && !t.subtypes?.length && t.text === body0.targets[0]!.text);

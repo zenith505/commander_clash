@@ -6015,6 +6015,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2ad60059-7a29-40a8-b595-3932f1222d33",
+  "name": "Caller of the Hunt",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Human",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human"
+  ],
+  "oracleText": "As an additional cost to cast this spell, choose a creature type.\nCaller of the Hunt's power and toughness are each equal to the number of creatures of the chosen type on the battlefield.",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "de14f6a9-1c62-42e9-b174-3e8b1080e0dc",
   "name": "Callous Oppressor",
   "manaCost": "{1}{U}{U}",
@@ -9892,6 +9922,34 @@
   "set": "ema",
   "releasedAt": "2016-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "04e2afbe-0c08-42bc-93e6-662066a958bf",
+  "name": "Deadly Cover-Up",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may collect evidence 6.\nDestroy all creatures. If evidence was collected, exile a card from an opponent's graveyard. Then search its owner's graveyard, hand, and library for any number of cards with that name and exile them. That player shuffles, then draws a card for each card exiled from their hand this way.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Collect evidence"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32614,6 +32672,34 @@
   "set": "tmp",
   "releasedAt": "1997-10-14",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "aa97eb3d-8b8d-418b-8615-839812d60fe0",
+  "name": "Reap Intellect",
+  "manaCost": "{X}{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You choose up to X nonland cards from it and exile them. For each card exiled this way, search that player's graveyard, hand, and library for any number of cards with the same name as that card and exile them. Then that player shuffles.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dgm",
+  "releasedAt": "2013-05-03",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

@@ -934,6 +934,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = s.resolving?.chosen?.player;
       return apnap(s, livingPlayers(s).filter((x) => x === ctx.controller || x === p));
     }
+    case "yardChosenOwner": {
+      // Deadly Cover-Up (round B245): the owner of the card exiled from an opponent's graveyard (CR 108.3).
+      const c = s.resolving?.chosenFromYard;
+      const o = c ? s.objects[c.id] : undefined;
+      return o && !player(s, o.owner).lost ? [o.owner] : [];
+    }
     case "sacrificedThisWay": {
       const by = new Set((s.resolving?.sacrificedThisWay ?? []).filter((x) => !ref.subtype || !!x.subtypes?.includes(ref.subtype)).map((x) => x.controller));
       return apnap(s, livingPlayers(s).filter((x) => by.has(x)));

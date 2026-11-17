@@ -48,7 +48,7 @@ test("Expert-Level Safe: target Ana, choose 3 with + (no higher), and the number
 
 test("Urgent Necropsy: target Ana's Sol Ring and Grizzly Bears, then collect evidence 3 for them", async ({ page }) => {
   const s = scene({ hand: ["Urgent Necropsy"], board: LANDS, yard: ["Hill Giant", "Shock", "Divination"] }, [{ board: ["Sol Ring", "Grizzly Bears"] }]);
-  const [necropsy, ring, bears, giant, shock, divination] = ["Urgent Necropsy", "Sol Ring", "Grizzly Bears", "Hill Giant", "Shock", "Divination"].map((n) => one(s, n));
+  const [necropsy, ring, bears, giant, shock, divination] = [one(s, "Urgent Necropsy"), one(s, "Sol Ring"), one(s, "Grizzly Bears"), one(s, "Hill Giant"), one(s, "Shock"), one(s, "Divination")];
   await open(page, s);
   await card(page, "Urgent Necropsy", s).click();
   const cast = menu(page).getByRole("button", { name: /^Cast it/ });
@@ -78,7 +78,7 @@ test("Urgent Necropsy: target Ana's Sol Ring and Grizzly Bears, then collect evi
 
 test("Inniaz: three fliers attack; you pick for yourself from Cy, for Cy from Ben, Ben gets Ana's only one, and Ana one of yours", async ({ page }) => {
   const s0 = scene({ board: [...LANDS, "Inniaz, the Gale Force", "Wind Drake", "Ornithopter"] }, [{ board: ["Sol Ring"] }, { board: ["Grizzly Bears", "Hill Giant"] }, { board: ["Mind Stone", "Gray Ogre"] }]);
-  const [inniaz, drake, thopter, ring, bears, giant, stone, ogre] = ["Inniaz, the Gale Force", "Wind Drake", "Ornithopter", "Sol Ring", "Grizzly Bears", "Hill Giant", "Mind Stone", "Gray Ogre"].map((n) => one(s0, n));
+  const [inniaz, drake, thopter, ring, bears, giant, stone, ogre] = [one(s0, "Inniaz, the Gale Force"), one(s0, "Wind Drake"), one(s0, "Ornithopter"), one(s0, "Sol Ring"), one(s0, "Grizzly Bears"), one(s0, "Hill Giant"), one(s0, "Mind Stone"), one(s0, "Gray Ogre")];
   await open(page, playUntil(s0, (st) => st.pending?.kind === "declareAttackers"));
   await attack(page, [[inniaz, 1], [drake, 1], [thopter, 1]]);
   const bar = controls(page);

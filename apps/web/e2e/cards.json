@@ -119,6 +119,28 @@
   ]
  },
  {
+  "oracleId": "a051dee0-60c8-4f58-84cb-55460c097115",
+  "name": "Abandoned Sarcophagus",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast spells that have a cycling ability from your graveyard.\nIf a card that has a cycling ability would be put into your graveyard from anywhere and it wasn't cycled, exile it instead.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hou",
+  "releasedAt": "2017-07-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cab092f9-b7ff-43b9-935f-310869a4daf8",
   "name": "Abdel Adrian, Gorion's Ward",
   "manaCost": "{4}{W}",
@@ -5852,6 +5874,28 @@
   "commanderLegal": "legal",
   "set": "dbl",
   "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2fa6f1b1-00af-433f-b8e1-36db99cd9bba",
+  "name": "Bösium Strip",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Until end of turn, you may cast instant and sorcery spells from the top of your graveyard. If a spell cast this way would be put into a graveyard, exile it instead.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "wth",
+  "releasedAt": "1997-06-09",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -19043,6 +19087,34 @@
   "commanderLegal": "legal",
   "set": "lci",
   "releasedAt": "2023-11-17",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "60e358ec-eb11-4a16-a0ae-b7c064a8ea6c",
+  "name": "Hieroglyphic Illumination",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw two cards.\nCycling {U} ({U}, Discard this card: Draw a card.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "akh",
+  "releasedAt": "2017-04-28",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

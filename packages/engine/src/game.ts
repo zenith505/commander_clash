@@ -795,6 +795,8 @@ export function moveObject(
     emerged?: true;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
+    /** Discarded to pay a cycling cost (CR 702.29a): Abandoned Sarcophagus's "and it wasn't cycled" (round B240). */
+    cycled?: true;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[]; name?: string; ability?: string };
     /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
@@ -973,7 +975,7 @@ export function moveObject(
   // Rest in Peace, Leyline of the Void, Dauthi Voidwalker: "If a card would be put into an opponent's graveyard from
   // anywhere, exile it instead" (CR 614.1a), from a permanent on the battlefield, or one leaving it at the same time
   // (rulings on Rest in Peace: destroyed by a spell, it's exiled, and the spell goes to the graveyard).
-  const yardExile = to === "graveyard" ? graveyardExileFor(s, o, fromZone) : undefined;
+  const yardExile = to === "graveyard" ? graveyardExileFor(s, o, fromZone, !!opts.cycled) : undefined;
   if (yardExile) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard (${yardExile.source}).`);
@@ -2361,7 +2363,7 @@ export function simultaneousLifeLoss<T>(s: GameState, fn: () => T): T {
  * graveyardExile) that applies to `o` going to its owner's graveyard, if one does: the name of its source, and the
  * counter it's exiled with.
  */
-function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { source: string; counter?: CounterKind; linkTo?: ObjectId } | undefined {
+function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName, cycled = false): { source: string; counter?: CounterKind; linkTo?: ObjectId } | undefined {
   // Who controlled it: as a permanent or spell, its controller; anywhere else, its owner (CR 108.4a).
   const item = fromZone === "stack" ? s.stack.find((x) => x.objectId === o.id) : undefined;
   const controlled = fromZone === "battlefield" ? controllerOf(s, o) : fromZone === "stack" ? (item?.controller ?? o.controller) : o.owner;
@@ -2371,8 +2373,12 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   // Anafenza, the Foremost: its card types the same way (rulings: an animated land dies as a creature; a bestowed Aura
   // isn't one, CR 702.103b).
   const typesNow = fromZone === "battlefield" ? characteristics(s, o).types : defOf(s, o).types;
+  // Abandoned Sarcophagus (round B240): "a card that has a cycling ability" as it is in the zone it's leaving (a permanent's
+  // from the layers: one that lost it goes to the graveyard, rulings; the card data lists "Cycling" with typecycling, CR
+  // 702.29e), "and it wasn't cycled": not discarded to pay a cycling cost.
+  const hasCyclingNow = () => (fromZone === "battlefield" ? objHasKeyword(s, o, "Cycling") : (defOf(s, o).keywords ?? []).includes("Cycling"));
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c))) && (!x.typesNow || typesNow.some((t) => x.typesNow!.includes(t)));
+    !!x && (!x.cyclingNotCycled || (!cycled && hasCyclingNow())) && (!o.isToken || !!x.tokens) && (!x.permanents || fromZone === "battlefield") && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller) && (!x.colorsNow || colorsNow.some((c) => x.colorsNow!.includes(c))) && (!x.typesNow || typesNow.some((t) => x.typesNow!.includes(t)));
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;
@@ -8512,7 +8518,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
   // Its caster would choose it over a permission that exiles the spell afterwards (Vohar's).
-  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.costs && !g.entersWith && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.topOnly && !g.costs && !g.entersWith && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
     const i = out.findIndex((w) => w.kind === "permission");
     if (i >= 0) out.splice(i, 1);
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
@@ -8520,12 +8526,19 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // Osteomancer Adept: "Until end of turn, you may cast creature spells from your graveyard by foraging in addition to
   // paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it.": when no
   // other permission lets it be cast from there (its caster would pick one without the cost).
-  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && (!!g.costs || !!g.entersWith) && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && !g.topOnly && (!!g.costs || !!g.entersWith) && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
   if (costly && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: costly.costs ?? [], exile: false, ...(costly.entersWith ? { entersWith: costly.entersWith } : {}) });
   // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
   // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
   const any = d.manaCost ? s.graveyardTurn?.find((g) => g.anyGraveyard && g.player === caster && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
   if (any && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, anyOwner: true, ...(any.exileCast ? { exileIfToGraveyard: true as const } : {}) });
+  // Bösium Strip (round B240): "Until end of turn, you may cast instant and sorcery spells from the top of your graveyard. If
+  // a spell cast this way would be put into a graveyard, exile it instead.": only the card on top of its owner's graveyard
+  // (CR 404.1-2; the top is the last one in Player.graveyard) as it's cast, paying its mana cost with the usual timing; once
+  // it's on the stack (CR 601.2a) the card under it is the top one. Its caster would choose a permission that doesn't exile
+  // the spell afterwards over this one.
+  const top = d.manaCost && player(s, o.owner).graveyard.at(-1) === o.id ? s.graveyardTurn?.find((g) => g.topOnly && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  if (top && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, exileIfToGraveyard: true });
   // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
   // the once-each-turn permissions (rulings: each activation is a permission of its own).
   const used = s.turnLog?.gravePermits ?? [];

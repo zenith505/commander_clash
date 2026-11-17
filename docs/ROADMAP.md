@@ -1,6 +1,6 @@
 # Roadmap
 
-31,517 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,520 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -4582,7 +4582,7 @@ line blocks.
    graveyard or an artifact on the battlefield); Vault 101: Birthday Party (done in round 367) (put an Aura or Equipment from hand or
    graveyard, then may attach the Equipment); Expedited Inheritance ("its controller may exile that many cards ... They may
    play those cards": an impulse for another player, counting the damage); Obscuring Aether (done in round B198) (turning a permanent without
-   morph face down); Abandoned Sarcophagus (casting cards with cycling from the graveyard, and "it wasn't cycled").
+   morph face down); Abandoned Sarcophagus (done in round B240) (casting cards with cycling from the graveyard, and "it wasn't cycled").
    Out after round 243 (looked at, not done): Discerning Financier and Stiltzkin, Moogle Merchant (done in round
    272); Silverquill, the Disputant (done in round 299) (granted casualty 1: with a spell's printed casualty that's
    two instances, each paid separately, CR 702.153b, and one payment per spell is all there is); Blood for Bones (a
@@ -5969,7 +5969,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Tahngarth's Rage, Even the Odds, Time of Heroes, Make a Wish, Rats' Feast, Vitalizing Cascade, An-Havva Inn and
   others. +76 (26,545 with round 185).
 - Skipped there, with reasons: Dragon Whelp, Farrelite Priest, Initiates of the Ebon Hand and Nalathni Dragon (how
-  many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector (done in round B174) ("a face-down permanent enters"); Friendly
+  many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line (done in round B240); Cryptid Inspector (done in round B174) ("a face-down permanent enters"); Friendly
   Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
   twice: no ruling); Gideon's Triumph (done in round B109) and Inferno Hellion (done in round B106) ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Perilous Predicament (two sacrifices of different
@@ -9815,6 +9815,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   main face only; a hybrid symbol's color is chosen after the mill, rulings, with a picker; Mana Reflection's doubling applies,
   CR 106.12b; never used by automatic payment). Browser tests for Charmed Pendant's menu and its hybrid picker, and Silhouette
   against your own Lightning Bolt. +3, 31,517 of 31,936. The compiled text of every other card is unchanged.
+- Round B240 (least played first, from the Lane B skip lists): Pure Intentions (its first paragraph is the instant's effect, a
+  delayed triggered ability for the rest of the turn, CR 603.7b, once for each event in which a spell or ability one of its
+  controller's opponents controls makes them discard cards, CR 603.2c, whoever chose the cards, rulings; not a cost or their
+  own spell; those of them still in their graveyard return to their hand, CR 400.7, so a card Rest in Peace or madness exiled
+  stays: BatchTrigger.byOpponent, ZoneMove.discardCause, ObjRef eventGroup `inYourGraveyard`). Bösium Strip (until end of turn
+  its controller may cast the instant or sorcery card on top of their graveyard, CR 404.1-2, the last one in Player.graveyard,
+  with its mana cost and the usual timing; once that one is on the stack the card under it is on top; a spell cast this way
+  is exiled instead of going to a graveyard: Effect graveyardTurn `topOnly`). Abandoned Sarcophagus (its controller may cast
+  spells with cycling or typecycling from their graveyard, CR 702.29e, paying their mana costs; a card of theirs that has a
+  cycling ability as it is in the zone it's leaving, a permanent's from the layers, rulings, is exiled instead of going to
+  their graveyard unless it was discarded to pay a cycling cost: CompiledCard.graveyardExile `cyclingNotCycled`, moveObject
+  `cycled`). Browser tests for casting Lightning Bolt from the top of your graveyard after Bösium Strip's ability, and
+  Hieroglyphic Illumination from your graveyard with Abandoned Sarcophagus. +3, 31,520 of 31,936. The compiled text of every
+  other card is unchanged.
+- Out after round B240 (looked at, not done): the lists after round B239 stay out, and Chorus of the Conclave (still out: no
+  ruling says whether a creature spell paid for with its extra mana still enters with the counters once Chorus has left the
+  battlefield, the "if you do" being part of its static ability). Known gap: bots don't plan around Bösium Strip's permission.
 - Out after round B239 (looked at, not done): the lists after round B238 stay out, and Ghostly Flame (still out: its rulings
   make black and red sources colorless only "when something looks at the damage", not for triggers on a red spell's damage,
   which every damage-color check would have to tell apart). Known gaps: Charmed Pendant isn't activated while a replacement
@@ -9896,8 +9913,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Charger's foretellActionCost) and the lists after round B225 stay out.
 - Out after round B225 (looked at, not done): Cultivator Drone (its mana pays "a cost that contains {C}", a trigger's
   payment too, rulings: a cost paid as something resolves isn't known to the mana yet), Threefold Signal (a second
-  replicate cost beside a spell's own, rulings: one kicker-like cost per spell is modeled), Bösium Strip (casting from the top
-  of a graveyard), Pure Intentions (a turn's delayed trigger on "one or more cards" an opponent's spell or ability makes you
+  replicate cost beside a spell's own, rulings: one kicker-like cost per spell is modeled), Bösium Strip (done in round B240) (casting from the top
+  of a graveyard), Pure Intentions (done in round B240) (a turn's delayed trigger on "one or more cards" an opponent's spell or ability makes you
   discard, once per event) and the lists after round B224 stay out.
 - Out after round B224 (looked at, not done): Peace Talks (activated abilities, not triggered ones, can't target: target
   legality doesn't yet know whether an ability was activated or triggered), False Dawn (mana from spells and abilities, not
@@ -10087,7 +10104,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   abilities take no cost increase here), Tourach's Chant (done in round B207) and Thelon's Chant (done in round B207) (the player who puts the land onto the
   battlefield, even if someone else controls it, rulings: not tracked apart from its controller).
 - Out after round B160 (looked at, not done): Whippoorwill ("can't be prevented or dealt instead to another permanent or
-  player": no rule bans redirection of damage to one creature yet), Bösium Strip (casting from the top of a graveyard: a
+  player": no rule bans redirection of damage to one creature yet), Bösium Strip (done in round B240) (casting from the top of a graveyard: a
   permission by position in the graveyard), Tetravus (done in round B171) (the tokens created with ~ remembered for its second upkeep trigger),
   Alpine Moon (done in round B214) (losing land types and abilities by a chosen name, opponents' lands only), Null Chamber (an opponent naming a
   card too), Grimoire Thief (done in round B189) (face-down exiles you may look at, then spells countered by their names).
@@ -10523,7 +10540,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Host of the Hereafter).
 - Graveyard order (CR 404.3) is modeled: cards put into a graveyard at the same time are arranged by their owner when
   a card in the game reads the order. Still out: Volrath's Shapeshifter (its text changes with the top card, layer 1/3),
-  Bösium Strip (cast the top instant or sorcery of your graveyard, exile it after), Circling Vultures, Genesis and Kheru Lich
+  Bösium Strip (done in round B240) (cast the top instant or sorcery of your graveyard, exile it after), Circling Vultures, Genesis and Kheru Lich
   Lord (blocked by other lines).
 - Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect

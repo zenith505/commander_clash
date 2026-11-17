@@ -2086,6 +2086,8 @@ export interface ZoneMove {
   /** A land entering because it was played (CR 305.1), not put onto the battlefield. */
   played?: true;
   discardedBy?: PlayerId;
+  /** A discarded card: the controller of the spell or ability that made its owner discard it (none for a cost, CR 701.9a), Pure Intentions. */
+  discardCause?: PlayerId;
   /** Milled (CR 701.17a): put into the graveyard from the library by a mill instruction. */
   milled?: true;
   /** A token this player created (CR 111.2), for "whenever you create one or more creature tokens". */
@@ -2385,7 +2387,7 @@ export interface GameState {
    * exileReturnThisTurn): for `player`'s permanents during `turn`, each with its own delayed trigger (rulings).
    */
   exileReturnTurn?: { player: PlayerId; turn: number; source: string; sourceCardId: string }[];
-  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: the costs and counter of a spell cast this way (Effect graveyardTurn). */ costs?: AdditionalCost[]; entersWith?: { counter: CounterKind; n: number }; exileCast?: true; source: string }[];
+  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: the costs and counter of a spell cast this way (Effect graveyardTurn). */ costs?: AdditionalCost[]; entersWith?: { counter: CounterKind; n: number }; exileCast?: true; /** Bösium Strip (round B240): only the top card of `player`'s graveyard. */ topOnly?: true; source: string }[];
   /**
    * "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
    * your library" (Gwenom, Remorseless; Effect topTurn): `player` may, during `turn`, as a permanent's FromTop lets them.

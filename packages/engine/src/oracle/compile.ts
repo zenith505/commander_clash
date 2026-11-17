@@ -119,6 +119,7 @@ import { markExileBeforeVanishing, round390Line } from "./round390";
 import { round391Line } from "./round391";
 import { round392Line } from "./round392";
 import { round394Line } from "./round394";
+import { round395Line } from "./round395";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -6273,6 +6274,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round392Line(line, raw, out, isSpell)) continue;
     // Round 394's whole lines (oracle/round394.ts).
     if (round394Line(line, raw, out, isSpell)) continue;
+    // Round 395's whole lines (oracle/round395.ts).
+    if (round395Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7997,7 +8000,9 @@ function linkExile(out: CompiledCard) {
     // Kayla's Music Box: "exile it face down", always linked to its source. River Song's Diary: its spells exiled as they
     // resolve, linked as they're exiled.
     // Summon: Esper Valigarmanda: "exile an instant or sorcery card from each graveyard", linked as it's parsed.
-    const faceDown = all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked));
+    // Krang & Shredder (round 395): its "each opponent exiles cards ... until they exile a nonland card", always linked, one
+    // effect shared by the two triggers of its one ability (CR 603.2, 607.2a), counted once.
+    const faceDown = [...new Set(all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked) || e.type === "exileUntilNonlandLinked"))];
     const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.linked) || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked));
     if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
     else if (faceDown.length) {

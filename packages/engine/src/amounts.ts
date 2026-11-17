@@ -699,6 +699,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "creaturesLeftThisTurn":
       return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
+    case "greatestDamageThisTurn":
+      return s.turnLog?.greatestDamage ?? 0;
     case "typeToYourGraveyardThisTurn":
       return (c.controlled ? s.turnLog?.controlledTypesToYard : s.turnLog?.permanentTypesToYard)?.[ctx.controller]?.includes(c.type) ? 1 : 0;
     case "artifactsToGraveyardThisTurn":
@@ -1693,6 +1695,8 @@ function describeCount(c: Count): string {
       return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.combatDamagedBySelfOr ? ` dealt combat damage by ~ or a ${c.combatDamagedBySelfOr} this turn` : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.choseThisWay ? " who chose to" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.discardedFewerNonland ? ` who didn't discard ${c.discardedFewerNonland} nonland cards` : ""}${c.discardedThisTurn ? " who discarded this turn" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.poisonAtLeast !== undefined ? ` with ${c.poisonAtLeast}+ poison counters` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
+    case "greatestDamageThisTurn":
+      return "the greatest damage dealt by a source to a permanent or player this turn";
     case "typeToYourGraveyardThisTurn":
       return c.controlled ? `a ${c.type.toLowerCase()} you controlled put into a graveyard from the battlefield this turn` : `an ${c.type.toLowerCase()} put into your graveyard from the battlefield this turn`;
     case "artifactsToGraveyardThisTurn":

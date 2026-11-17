@@ -16349,6 +16349,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4563ae4b-6226-4cc9-abde-582d0ab83433",
+  "name": "Gandalf, Westward Voyager",
+  "manaCost": "{3}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Avatar Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar",
+   "Wizard"
+  ],
+  "oracleText": "Whenever you cast a spell with mana value 5 or greater, each opponent reveals the top card of their library. If any of those cards shares a card type with that spell, copy that spell, you may choose new targets for the copy, and each opponent draws a card. Otherwise, you draw a card. (A copy of a permanent spell becomes a token.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-06-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ab914053-4384-415f-b1e8-09fecb5a30b8",
   "name": "Garland, Royal Kidnapper",
   "manaCost": "{2}{U}{B}",
@@ -20562,6 +20597,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "94846856-fe68-4ada-8c34-a54de568e803",
+  "name": "Impact Resonance",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Impact Resonance deals X damage divided as you choose among any number of target creatures, where X is the greatest amount of damage dealt by a source to a permanent or player this turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac2b3adb-45bb-4f56-9d52-e08771164b35",
   "name": "Imperial Edict",
   "manaCost": "{1}{B}",
@@ -23642,6 +23703,44 @@
   "set": "sld",
   "releasedAt": "2022-06-13",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2385c8fb-9c38-4ff3-8f61-4e25a8c7d46b",
+  "name": "Krang & Shredder",
+  "manaCost": "{4}{U/B}{U/B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Utrom Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Utrom",
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "Whenever Krang & Shredder enter or attack, each opponent exiles cards from the top of their library until they exile a nonland card.\nDisappear — At the beginning of your end step, if a permanent left the battlefield under your control this turn, you may cast a card exiled with Krang & Shredder without paying its mana cost.",
+  "power": "6",
+  "toughness": "7",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Disappear"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmt",
+  "releasedAt": "2026-03-06",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

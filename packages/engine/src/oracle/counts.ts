@@ -724,6 +724,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^player who discarded a card this turn$/i.test(p)) return count({ kind: "players", discardedThisTurn: true });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
+  // Impact Resonance (round 395): "the greatest amount of damage dealt by a source to a permanent or player this turn": the
+  // most one source dealt to one permanent or player over the whole turn (rulings), each as the object it was (CR 400.7).
+  if (!each && /^the greatest amount of damage dealt by a source to a permanent or player this turn$/.test(p)) return count({ kind: "greatestDamageThisTurn" });
   // Caller of the Claw: "for each nontoken creature put into your graveyard from the battlefield this turn".
   if (/^artifacts that were put into graveyards from the battlefield this turn$/i.test(p)) return count({ kind: "artifactsToGraveyardThisTurn" });
   if ((m = /^(nontoken )?creatures? put into your graveyard from the battlefield this turn$/i.exec(p))) return count({ kind: "creaturesToYourGraveyard", ...(m[1] ? { nontoken: true as const } : {}) });

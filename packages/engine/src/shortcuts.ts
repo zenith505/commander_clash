@@ -397,6 +397,8 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     creaturesCountered: [...new Set((t.creaturesCountered ?? []).map((e) => JSON.stringify(e)))].sort(),
     entered,
     // "For the first time each turn" (Hercules): once or more.
+    // Impact Resonance (round 395): the greatest damage one source dealt to one thing this turn, as far as 20.
+    greatestDamage: t.greatestDamage === undefined ? undefined : Math.min(t.greatestDamage, 20),
     timesDealtDamage: Object.fromEntries(Object.entries(t.timesDealtDamage ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
     damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
     toGraveyard: capped(t.toGraveyard ?? {}),

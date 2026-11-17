@@ -161,6 +161,13 @@ function fireSourceDealt(s: GameState, src: DamageSource, amount: number, stackS
 /** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
 function noteDealt(s: GameState, src: DamageSource, combat: boolean | undefined, to: { player: PlayerId } | { object: GameObject }, n: number) {
   sourceDealtOnce(s, src, n);
+  // Impact Resonance (round 395): what each source dealt to each permanent or player this turn, added up (rulings: over the
+  // whole turn), the source as sourceDealtOnce keys it and the permanent as the object it is (CR 400.7).
+  const pairKey = `${src.ref ? `${src.ref.object}@${src.ref.zc}` : src.id ? `id:${src.id}` : `name:${src.name}:${src.controller}`}>${"player" in to ? `p${to.player}` : `${to.object.id}@${to.object.zoneChanges ?? 0}`}`;
+  const tl = (s.turnLog ??= {});
+  const pairs = (tl.pairDamage ??= {});
+  pairs[pairKey] = (pairs[pairKey] ?? 0) + n;
+  tl.greatestDamage = Math.max(tl.greatestDamage ?? 0, pairs[pairKey]!);
   const o = src.id ? s.objects[src.id] : undefined;
   if (!o || o.zone !== "battlefield" || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
   // Diseased Vermin and The Fallen: the players and planeswalkers it has dealt damage to as this object (phasing keeps

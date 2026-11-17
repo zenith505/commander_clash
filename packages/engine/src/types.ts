@@ -1980,6 +1980,12 @@ export interface TurnLog {
   artifactsToYard?: number;
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
   creaturesLeft?: Partial<Record<PlayerId, number>>;
+  /**
+   * Impact Resonance (round 395): the damage each source dealt to each permanent or player this turn, keyed
+   * "source>recipient" (each as the object it was, CR 400.7), and the greatest of them.
+   */
+  pairDamage?: Record<string, number>;
+  greatestDamage?: number;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
   plusOnes?: { by: PlayerId; controller: PlayerId; creature: boolean; id: ObjectId; zc: number; n: number }[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */

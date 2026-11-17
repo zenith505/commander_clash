@@ -606,6 +606,8 @@ export type Count =
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
   /** "For each creature that left the battlefield under your control this turn" (Kutzil's Flanker): a token too. */
   | { kind: "creaturesLeftThisTurn" }
+  /** Impact Resonance (round 395): "the greatest amount of damage dealt by a source to a permanent or player this turn" (TurnLog.greatestDamage). */
+  | { kind: "greatestDamageThisTurn" }
   /** "For each (nontoken) creature put into your graveyard from the battlefield this turn" (Caller of the Claw): its owner's graveyard, whoever controlled it. */
   | { kind: "creaturesToYourGraveyard"; nontoken?: true }
   /** "The number of artifacts that were put into graveyards from the battlefield this turn" (Structural Assault): anyone's, tokens too. */
@@ -5590,6 +5592,17 @@ export type Effect =
    * `did` is whether one moved, for "If you do".
    */
   | { type: "moveCurseToOpponent" }
+  /**
+   * Krang & Shredder (round 395): "each opponent exiles cards from the top of their library until they exile a nonland card"
+   * (effects/run-round395.ts): every card exiled this way, lands too, linked to the source as it's exiled (CR 607.2a), for
+   * its "cast a card exiled with ~".
+   */
+  | { type: "exileUntilNonlandLinked"; who: PlayerRef }
+  /**
+   * Gandalf, Westward Voyager (round 395): "each opponent reveals the top card of their library. If any of those cards
+   * shares a card type with that spell" (effects/run-round395.ts): `did` is whether one does, for the "if" after it.
+   */
+  | { type: "revealTopsShareType" }
   /**
    * Sphinx Ambassador (round 377): "search that player's library for a card, then that player chooses a card name. If you
    * searched for a creature card that doesn't have that name, you may put it onto the battlefield under your control. Then

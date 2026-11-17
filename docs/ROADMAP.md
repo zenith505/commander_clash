@@ -1,6 +1,6 @@
 # Roadmap
 
-31,578 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,581 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,905 of
 9,979 (99%).
 
@@ -3537,6 +3537,26 @@ line blocks.
    card for each card type among the noncreature spells cast this turn, a card fitting several types counting once);
    Titania's Song, Hero of Bretagard, Kraven the Hunter and the rest above rank 15,000 (still out, for the reasons in their
    earlier lists).
+   Round 395 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards exiled until a
+   nonland card and cast later, a spell copied on a revealed card type, and the most damage one source dealt this turn:
+   Krang & Shredder's "Whenever ~ enter or attack, each opponent exiles cards from the top of their library until they
+   exile a nonland card." (Effect exileUntilNonlandLinked, effects/run-round395.ts: every card exiled, lands too, linked
+   to it as it's exiled, one ability with two trigger events, CR 603.2, 607.2a) and "Disappear — At the beginning of your
+   end step, if a permanent left the battlefield under your control this turn, you may cast a card exiled with ~ without
+   paying its mana cost." (an intervening if, CR 603.4; one spell as it resolves, timing ignored, X as 0, rulings, CR
+   608.2g; land cards not offered); Gandalf, Westward Voyager's "each opponent reveals the top card of their library. If
+   any of those cards shares a card type with that spell, copy that spell, you may choose new targets for the copy, and
+   each opponent draws a card. Otherwise, you draw a card." (Effect revealTopsShareType: the spell's card types as it is
+   on the stack or last was there, CR 113.7a; one copy however many share a type, rulings; the revealed cards stay on top);
+   Impact Resonance's "X is the greatest amount of damage dealt by a source to a permanent or player this turn" (Count
+   greatestDamageThisTurn, TurnLog.pairDamage and greatestDamage, kept in damage.ts noteDealt: what one source dealt one
+   permanent or player over the whole turn, added up, each as the object it was, CR 400.7, rulings; worked out as it's cast
+   for the division, CR 601.2d). Browser tests click through Krang & Shredder's end step cast, Gandalf's copy aimed at
+   another opponent and Impact Resonance's division. +3, 31,581 of 31,936. The compiled text of every other card is
+   unchanged.
+   Out after round 395 (looked at, not done): Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree
+   Vector, Possibility Storm, Arvinox and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in
+   their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

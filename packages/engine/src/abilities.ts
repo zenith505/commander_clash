@@ -4118,7 +4118,17 @@ export type Effect =
    * chose.": no targets (rulings); the choices in seat order from you, then all the control changes at once (rulings,
    * layer 2, CR 613.1b).
    */
-  | { type: "successionControl" }
+  | {
+      type: "successionControl";
+      /**
+       * Inniaz, the Gale Force (round B247): "each player gains control of a nonland permanent of your choice controlled by
+       * the player to their right": no direction to choose (to the right, the one before in turn order, CR 101.4), this
+       * ability's controller picks for every player (`youChoose`) among `filter` permanents (rather than creatures).
+       */
+      side?: "right";
+      youChoose?: true;
+      filter?: TargetSpec;
+    }
   /**
    * Aminatou, the Fateshifter: "Choose left or right. Each player gains control of all nonland permanents other than ~
    * controlled by the next player in the chosen direction.": the direction chosen as it resolves, then each player
@@ -6038,7 +6048,7 @@ export type Effect =
    * choose the lowest discards their hand and draws seven. `ogre`: each player with the highest number loses that much
    * life, and two +1/+1 counters on the source if its controller is one of them.
    */
-  | { type: "secretNumbers"; /** "goblin" (Goblin Game): "hides at least one item", a number 1 or greater; each loses that much life, then the fewest lose half their life, rounded up. */ then: "wheel" | "ogre" | "goblin" }
+  | { type: "secretNumbers"; /** "goblin" (Goblin Game): "hides at least one item", a number 1 or greater; each loses that much life, then the fewest lose half their life, rounded up. */ then: "wheel" | "ogre" | "goblin" | /** Expert-Level Safe (round B247): "You and target opponent each secretly choose 1, 2, or 3. Then those choices are revealed.": only those two players, from 1 to 3; whether the numbers match is kept for the "if" after it (Condition numbersMatched). */ "match"; /** With "match": the other player who chooses, besides this ability's controller. */ with?: PlayerRef }
   /**
    * `choose`: "Starting with you, each player may choose an artifact or enchantment you don't control" (Druid of
    * Purification): not a vote (no extra votes, nobody chooses for another), each player in turn order picks one of
@@ -6123,6 +6133,8 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string; /** "If it was kicked twice" (Archangel of Wrath): at least this many kicker costs paid. */ times?: number }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /** Expert-Level Safe (round B247): "If they match": the numbers just chosen secretly (Effect secretNumbers "match") were all the same. */
+  | { kind: "numbersMatched" }
   /** Guard Dogs: "if it shares a color with that permanent": both objects as they are now, on the battlefield, with a color in common (CR 105.2). */
   | { kind: "sharesColor"; a: ObjRef; b: ObjRef }
   /** Musician: "If it doesn't have "...", it gains that ability": the permanent has an ability an effect gave it with this text now (layer 6, CR 613.1f), from any source. */
@@ -10199,6 +10211,12 @@ export interface CompiledCard {
   evidence?: number;
   /** "This spell costs {2} less to cast if evidence was collected." */
   evidenceReduction?: number;
+  /**
+   * Urgent Necropsy (round B247): "As an additional cost to cast this spell, collect evidence X, where X is the total mana
+   * value of the permanents this spell targets": not optional, paid with CostChoices.evidence (none for X = 0), X counted
+   * from its targets once they're chosen and locked in before costs are paid (CR 601.2c, 601.2f, rulings).
+   */
+  evidenceTargetsMv?: true;
   /** Open the Way: "X can't be greater than the number of players in the game." */
   xMaxPlayers?: true;
   /** Soul Immolation: "X can't be greater than the greatest toughness among creatures you control", as X is announced (CR 601.2b). */

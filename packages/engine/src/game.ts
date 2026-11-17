@@ -7062,7 +7062,7 @@ export function castProblem(
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined, targets);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices, o) ?? bargainProblem(s, pid, id, d, choices) ?? offeringProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices, o) ?? bargainProblem(s, pid, id, d, choices) ?? offeringProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices, targets) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -8052,6 +8052,8 @@ export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, o
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
   choices = convertChoices(o, choices);
+  // Urgent Necropsy (round B247): X of its "collect evidence X", locked in from its targets before any cost is paid (rulings).
+  const evidenceX = targetedPermanentsMv(s, targets);
   if (choices.face !== undefined && o.face !== choices.face) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
@@ -8412,8 +8414,14 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     moveObject(s, choices.offering, "graveyard", { sacrificed: true, cost: true });
     closeZoneBatch(s);
   }
+  // Urgent Necropsy (round B247): "collect evidence X", X from its targets as they were locked in (rulings), the cards
+  // picked for it (the fewest that do it when nobody picked them, as for an ability's cost).
+  if (compileCard(d).evidenceTargetsMv) {
+    const n = evidenceX;
+    collectEvidence(s, p, choices.evidence ?? autoEvidence(s, p.id, n, o.id), n);
+    closeZoneBatch(s);
+  } else if (choices.evidence) {
   // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c).
-  if (choices.evidence) {
     collectEvidence(s, p, choices.evidence, compileCard(d).evidence ?? 0);
     o.evidence = true;
     closeZoneBatch(s);
@@ -9155,8 +9163,24 @@ export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: num
   fireEvent(s, { type: "evidenceCollected", player: p.id });
 }
 
+/**
+ * Urgent Necropsy (round B247): the X of "collect evidence X, where X is the total mana value of the permanents this spell
+ * targets": each permanent among the targets once, as it is now (CR 202.3), whichever of the spell's targets it is.
+ */
+export function targetedPermanentsMv(s: GameState, targets: readonly TargetChoice[] | undefined): number {
+  const ids = new Set((targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [t.id] : [])));
+  return [...ids].reduce((n, id) => n + characteristics(s, obj(s, id)).manaValue, 0);
+}
+
 /** "You may collect evidence N" as an additional cost to cast it (CR 701.59a). */
-function evidenceCastProblem(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, choices?: CostChoices): string | null {
+function evidenceCastProblem(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, choices?: CostChoices, targets?: TargetChoice[]): string | null {
+  // Urgent Necropsy (round B247): always paid, X from the targets (with none chosen yet, X is 0 if it targets nothing). It
+  // can't be cast with targets whose total mana value the graveyard can't meet (rulings, CR 701.59b).
+  if (compileCard(d).evidenceTargetsMv) {
+    const n = targetedPermanentsMv(s, targets);
+    const taken = [...(choices?.exileCards ?? []), ...(choices?.delve ?? []), ...(choices?.collect ?? [])];
+    return evidenceProblem(s, pid, n, choices?.evidence, o.id, taken);
+  }
   if (!choices?.evidence) return null;
   const n = compileCard(d).evidence;
   if (n === undefined) return `${d.name} doesn't let you collect evidence`;

@@ -2115,7 +2115,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "successionControl": {
       const r = s.resolving!;
-      const side = r.chosen?.direction;
+      // Inniaz, the Gale Force (round B247): always to the right, the one before in turn order (CR 101.4).
+      const side = e.side ?? r.chosen?.direction;
       if (!side) {
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "direction", options: ["left", "right"], labels: ["Left", "Right"], prompt: "choose left or right: starting with you, each player chooses a creature controlled by the next player that way and gains control of it." };
         return "paused";
@@ -2133,14 +2134,19 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
         const them = next(pid);
-        const opts = them === pid ? [] : s.battlefield.filter((id) => !s.phasedOut?.includes(id) && objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === them);
+        // Inniaz: a nonland permanent (`filter`), any one of them, not targeted (rulings: none with no nonland permanent).
+        const opts = them === pid ? [] : s.battlefield.filter((id) => !s.phasedOut?.includes(id) && (e.filter ? objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : objIsType(s, obj(s, id), "Creature")) && controllerOf(s, obj(s, id)) === them);
         // With only one, that one; with none, nothing (rulings).
         if (opts.length <= 1) {
           sc.chosen![pid] = opts;
           sc.queue.shift();
           continue;
         }
-        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "choose", what: "creature", options: opts, count: 1, of: them, prompt: `choose a creature ${player(s, them).name} controls: you gain control of it.` };
+        const what = e.filter?.text ?? "creature";
+        // Inniaz: this ability's controller chooses for each player in turn, themselves too ("of your choice").
+        const picker = e.youChoose ? ctx.controller : pid;
+        const gets = picker === pid ? "you gain" : `${player(s, pid).name} gains`;
+        s.pending = { kind: "pickPermanents", player: picker, source: src, action: "choose", what, options: opts, count: 1, of: them, ...(picker !== pid ? { pickFor: pid } : {}), prompt: `choose ${/^[aeiou]/.test(what) ? "an" : "a"} ${what} ${them === picker ? "you control" : `${player(s, them).name} controls`}: ${gets} control of it.` };
         return "paused";
       }
       const got: [PlayerId, ObjectId][] = Object.entries(sc.chosen ?? {}).flatMap(([pid, ids]) => (ids as ObjectId[]).map((id) => [Number(pid) as PlayerId, id] as [PlayerId, ObjectId]));
@@ -2151,7 +2157,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [id], mods: [{ kind: "control" }] });
         log(s, `${player(s, to).name} gains control of ${defOf(s, obj(s, id)).name}.`);
       }
-      if (!got.length) log(s, `${src}: nobody chose a creature.`);
+      if (!got.length) log(s, `${src}: nobody chose ${e.filter ? "a permanent" : "a creature"}.`);
       invalidateCharacteristics(s);
       return;
     }

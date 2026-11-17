@@ -2173,7 +2173,7 @@ line blocks.
    one of the revealed cards and may cast it free); Hew the Entwood (done in round B204) (sacrifice any number of lands as it resolves);
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (done in round 397) (the greatest mana value
-   among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (secret numbers).
+   among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (done in round B247) (secret numbers).
    Round 284 took the next names from the top that no earlier round looked at: "Each artifact creature card in your
    graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons: each card's own mana cost, none for a
    card without one, CR 118.6); "turn target creature with a morph ability face down" and "any number of target creatures
@@ -3705,7 +3705,7 @@ line blocks.
    `whileAffectedTapped`: the target, not the source, must stay tapped without untapping, CR 611.2b; already tapped
    targets too; even abilities whose cost untaps it, rulings). Bots choose for Fence the permanent with the most activated
    abilities, an opponent's first, or nothing; they no longer keep a permanent tapped for an effect on that permanent
-   itself. Browser tests click through Fence's choice (a permanent, and nothing) and the Net's activation. +3, 31,634 of
+   itself. Browser tests click through Fence's choice (a permanent, and nothing) and the Net's activation. +3, 31,637 of
    31,936 on this stacked branch. The compiled text of every other card is unchanged.
    Out after round 402 (looked at, not done): Filigree Vector (two "any number of target" slots), Helm of Kaldra (which
    Equipment "those Equipment" are with more than one of a name), Archelos, Lagoon Mystic, Pulmonic Sliver, Capricopian,
@@ -4429,7 +4429,7 @@ line blocks.
    first target's controller), Mastermind's Acquisition and the wishes (cards from outside the game), Encroaching
    Mycosynth, Biotransference, Crucible of the Spirit Dragon, Jinnie Fay, Mirrormind Crown, Moonlit Meditation, Guff
    Rewrites History, Possibility Storm, Sokrates, Sunken Palace, Ulalek, Surge to Victory, Norman Osborn, Filigree Vector
-   and the rest above rank 6,800 (still out, for the reasons in their earlier lists); Kusari-Gama, Urgent Necropsy,
+   and the rest above rank 6,800 (still out, for the reasons in their earlier lists); Kusari-Gama, Urgent Necropsy (done in round B247),
    Spectral Searchlight and Glowcap Lantern (done in round B186) (still out). Bots turn Hostile Negotiations' less valuable pile face up and
    guess at a face-down pile by its size. When Fisher's Talent and Divine Visitation would both replace a Fish token, the
    order isn't asked (either order ends in the same Angel).
@@ -4460,7 +4460,7 @@ line blocks.
    spells), Crucible of the Spirit Dragon (storage counters with spend-only mana), Jinnie Fay, Mirrormind Crown and
    Moonlit Meditation (token replacement choices), Guff Rewrites History, Possibility Storm, Sokrates, Sunken Palace,
    Ulalek, Surge to Victory, Norman Osborn, Filigree Vector and the rest above rank 6,800 (still out, for the reasons in
-   their earlier lists); Kusari-Gama, Urgent Necropsy, Spectral Searchlight and Glowcap Lantern (done in round B186) (still out). Bots haven't been
+   their earlier lists); Kusari-Gama, Urgent Necropsy (done in round B247), Spectral Searchlight and Glowcap Lantern (done in round B186) (still out). Bots haven't been
    taught when The Legend of Yangchen's chapter II is worth it (they give it the usual answer to a "you may").
    Round 316 took cards back off the "Out after round N" lists, most played first: a named Equipment token whose granted
    ability names it, "create a colorless Equipment artifact token named Rock with "Equipped creature has '{1}, {T},
@@ -4485,7 +4485,7 @@ line blocks.
    the rest into your hand" (Boreas Charger: only those opponents are offered, none when there are none, rulings; a
    browser test). +8, 30,668 of 31,936 with B154.
    Out after round 316 (looked at, not done): Spectral Searchlight (a mana ability that adds mana to another player's
-   pool), Glowcap Lantern (done in round B186) (a granted "look at the top card of your library any time"), Kusari-Gama and Urgent Necropsy
+   pool), Glowcap Lantern (done in round B186) (a granted "look at the top card of your library any time"), Kusari-Gama and Urgent Necropsy (done in round B247)
    (still out, for the reasons in their earlier lists). Bots haven't been taught to activate Radiant Lotus.
    Round 315 took cards back off the "Out after round N" lists, most played first: additional costs of any size as a
    spell is cast, X the number paid (CR 601.2b, 601.2f, 601.2h, 107.3a): "As an additional cost to cast this spell, you
@@ -4511,7 +4511,7 @@ line blocks.
    Out after round 315 (looked at, not done): Arcee, Sharpshooter (its other line), Jetfire, Ingenious Scientist (convert
    and mana from removed counters), Tetravus (done in round B171) (tokens created with ~ and exiled with it), Gorex, the Tombshell (done in round 368) (a card at
    random from the linked exile, CR 607.2q), Mossbridge Troll (tap creatures with total power 10 or more), Light Up the
-   Night, Kusari-Gama and Urgent Necropsy (still out, for the reasons in their earlier lists). Bots don't yet activate
+   Night, Kusari-Gama and Urgent Necropsy (done in round B247) (still out, for the reasons in their earlier lists). Bots don't yet activate
    Baba Lysaga or Ooze Flux, or move counters onto Aetherborn Marauder.
    Round 314 took cards back off the "Out after round N" lists, most played first: "As an additional cost to cast this
    spell, waterbend {X}. ... Exile X target creatures you control. Return those cards ... at the beginning of the next end
@@ -4532,7 +4532,7 @@ line blocks.
    Out after round 314 (looked at, not done): Crashing Wave (done in round 328) and Foggy Swamp Visions (their "waterbend {X}" now reads, but
    "distribute three stun counters among any number of tapped creatures your opponents control" and "for each creature
    card exiled this way, create a token that's a copy of it" don't yet); Professor Hojo (done in round 330), Disorienting Choice (done in round 330), Hot Pursuit (done in round 349),
-   Karn, Living Legacy (done in round 330), Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (still out,
+   Karn, Living Legacy (done in round 330), Into the Pit, Hatchery Sliver, Abstruse Appropriation, Kusari-Gama and Urgent Necropsy (done in round B247) (still out,
    for the reasons in their earlier lists).
    Round 313 took cards back off the "Out after round N" lists, most played first: paying to ignore a permanent's effect
    until end of turn, a special action (CR 116.2d) offered from that permanent's menu, with nothing on the stack:
@@ -4550,7 +4550,7 @@ line blocks.
    When you do, ~ deals X damage to each creature and planeswalker that player controls" (Incinerator of the Guilty: X
    chosen as it resolves up to the graveyard's total mana value, then the cards, CR 701.59a; evidence 0 collects no
    cards, rulings; a browser test for each prompt). +7 Commander-legal, 30,626 of 31,936 with round 312, B151 and B152.
-   Out after round 313 (looked at, not done): Kusari-Gama (as after round 312); Urgent Necropsy ("collect evidence X,
+   Out after round 313 (looked at, not done): Kusari-Gama (as after round 312); Urgent Necropsy (done in round B247) ("collect evidence X,
    where X is the total mana value of the permanents this spell targets": an additional cost counted from the targets
    chosen in the same casting step); Eumidian Wastewaker, Hierophant Bio-Titan (done in round 315), Firkraag and Moxite Refinery (still
    out, for the reasons in their earlier lists).
@@ -5021,7 +5021,7 @@ line blocks.
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
    Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
-   Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
+   Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force (done in round B247).
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
@@ -10616,6 +10616,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   there, rulings, CR 715.4; with none, only the graveyard mode can be chosen, rulings, CR 700.2). Browser tests for Lagrella's
   targets and the choice of the card, Sentinel's modes and exile targets, and Cloudspire's Pilots. +3, 31,539 of 31,936. The
   compiled text of every other card is unchanged.
+- Round B247 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Expert-Level Safe
+  ("You and target opponent each secretly choose 1, 2, or 3": Effect secretNumbers "match", only those two players
+  choosing, nobody told a number before both are revealed at once, rulings; "If they match" is Condition numbersMatched,
+  kept on the resolution; then the sacrifice and "all cards exiled with it" into their owners' hands, the cards its enters
+  trigger and this ability exiled face down, CR 607.2a, still found when the Safe has left; otherwise one more card exiled
+  face down that nobody may look at, rulings, CR 406.3). Urgent Necropsy ("collect evidence X, where X is the total mana
+  value of the permanents this spell targets": always paid, CR 601.2b, 701.59a; X locked in from the targets before costs
+  are paid, CR 601.2c, 601.2f and rulings, each permanent counted once however many of its targets it is; with no targets, X is
+  0 and nothing is exiled; CompiledCard evidenceTargetsMv, game.ts targetedPermanentsMv; the UI asks for the evidence right
+  after the targets; bots leave out their most expensive target until the evidence can be paid). Inniaz, the Gale Force
+  ("Whenever three or more creatures you control with flying attack": once for the declaration, rulings; "each player gains
+  control of a nonland permanent of your choice controlled by the player to their right": the player before them in turn
+  order, CR 101.4, Effect successionControl `side` "right", `youChoose` and `filter`; you choose for every player as it
+  resolves, one with a single choice taken without asking, none if that player has no nonland permanent, rulings; then every
+  control change at once, for good, CR 613.1b; a creature given away leaves combat, CR 506.4). Browser tests for the Safe's
+  number, Necropsy's targets and evidence, and Inniaz's picks. +3, 31,542 of 31,936. The compiled text of every other card is
+  unchanged.
+- Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich and Swans of
+  Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done
+  after it merges), Divine Intervention (still out: who removed its last counter isn't recorded), Allure of the Unknown
+  (still out: another player casting one of the cards in the middle of the resolution), Medomai's Prophecy (still out: its
+  rulings don't settle the "named card" check) and Immortal Coil (still out: a graveyard card chosen for each point of
+  damage prevented, and its state trigger "when there are no cards in your graveyard"). Known gaps: bots choose the Safe's
+  number at random, and pick Inniaz's gifts by worth alone.
 - Out after round B246 (looked at, not done): the lists after round B245 stay out, and Hero of Bretagard (still out: "a spell
   or ability you control exiles one or more permanents" needs who caused each exile, which a zone move doesn't record, and
   whether an exile cost or a replacement counts) and Kraven the Hunter (still out, as before). Known gap: bots don't target
@@ -11356,7 +11380,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lord (blocked by other lines).
 - Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
-  evidence X" as a cost (Urgent Necropsy; Incinerator of the Guilty's done in round 313), "if evidence was collected, instead" (Analyze the Pollen,
+  evidence X" as a cost (Urgent Necropsy (done in round B247); Incinerator of the Guilty's done in round 313), "if evidence was collected, instead" (Analyze the Pollen,
   Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer (done in round B127), Lamplight Phoenix,
   Memory Vampire (done in round B233), Tenth District Hero (done in round B200), Deadly Cover-Up (done in round B245)).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's

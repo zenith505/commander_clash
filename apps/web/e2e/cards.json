@@ -6219,6 +6219,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "da164485-c985-42fa-819e-42f0d33237c5",
+  "name": "Captured by the Consulate",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature you don't control\nEnchanted creature can't attack.\nWhenever an opponent casts a spell, if it has a single target, change the target to enchanted creature if able.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8c411f4e-a091-447c-9450-d895b10b4985",
   "name": "Carnage Tyrant",
   "manaCost": "{4}{G}{G}",
@@ -19783,6 +19813,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2f33aced-c737-4b3c-ba25-aff7b340c2d7",
+  "name": "Infernal Denizen",
+  "manaCost": "{7}{B}",
+  "cmc": 8,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "At the beginning of your upkeep, sacrifice two Swamps. If you can't, tap this creature, and an opponent may gain control of a creature you control of their choice for as long as this creature remains on the battlefield.\n{T}: Gain control of target creature for as long as this creature remains on the battlefield.",
+  "power": "5",
+  "toughness": "7",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "348201c4-79de-4278-9896-d8b1567cc5cc",
   "name": "Infernal Offering",
   "manaCost": "{4}{B}",
@@ -30304,6 +30364,32 @@
   "commanderLegal": "legal",
   "set": "ltr",
   "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "131acf69-fa5c-4ce7-9e39-2677af4f8907",
+  "name": "Piracy",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, you may tap lands you don't control for mana. Spend this mana only to cast spells.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

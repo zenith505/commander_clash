@@ -943,6 +943,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Fortunate Few: we can't spare our own, so we spare the least of the others' permanents.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving?.body.effects[s.resolving.next]?.type === "othersChooseDestroyRest")
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
+    // Infernal Denizen (round B238): the best of the creatures we may gain control of (pick, then a control effect for us).
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.options.length && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "continuous" && e.what.ref === "created" && e.giveTo?.ref === "chosenPlayer" && e.whileOnBattlefield && e.mods.some((m) => m.kind === "control")))
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     // Order of Succession: the best of the creatures we gain control of.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl"))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];

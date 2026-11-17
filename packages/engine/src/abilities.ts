@@ -4589,6 +4589,17 @@ export type Effect =
    */
   | { type: "servitudeLink"; target: number }
   | { type: "servitudeExile" }
+  /**
+   * Captured by the Consulate (round B238): "change the target to enchanted creature if able": the spell whose cast
+   * triggered this (ctx.cause), if it still has a single target (CR 603.4), gets the creature this Aura is attached to, or
+   * was as it last existed (CR 608.2h), as its target, only if that's a legal target for it (CR 115.7, rulings).
+   */
+  | { type: "consulateRedirect" }
+  /**
+   * Piracy (round B238): "Until end of turn, you may tap lands you don't control for mana. Spend this mana only to cast
+   * spells.": TurnRule "tapOthersLands" for its controller (CR 106.12: a mana ability of the land with {T} in its cost).
+   */
+  | { type: "piracy" }
   /** Oracle en-Vec's delayed trigger: destroy each of the creatures chosen with GameState.chosenAttackers[key] that didn't attack this turn. */
   | { type: "chosenAttackDestroy"; key: string }
   /** A Killer Among Us (round B233): "Then secretly choose Human, Merfolk, or Goblin.": one of `options`, kept on the source (GameObject.secretType). */

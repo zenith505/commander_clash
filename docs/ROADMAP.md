@@ -1,6 +1,6 @@
 # Roadmap
 
-31,511 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,514 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,980 of 4,988 (99%), top 10,000: 9,892 of
 9,979 (99%).
 
@@ -2352,9 +2352,9 @@ line blocks.
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
    Caller of the Hunt, Enigmatic Incarnation (how it was cast); Don't Blink (entering from exile replaced by a shuffle);
    Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
-   (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (changing a single
+   (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web, Raging River,
-   Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (tapping lands you
+   Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome and Aladdin's Lamp (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (done in round B223) (permanents can't phase in);
@@ -4305,7 +4305,7 @@ line blocks.
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
-   (creatures a Wall blocked this turn); Infernal Denizen; Drought and Brutal Suppression (sacrifices added to costs);
+   (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
    battlefield); The Prismatic Piper (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
@@ -9789,6 +9789,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   one base-100 digit for each kind (Scriveners, Renewals, Chains, Weirdings). Browser tests for Reed's four draws beside the
   Archive, Chains' discard for your Divination and paying 2 life for Zur's Weirding when Ana draws. +3, 31,511 of 31,936. The
   compiled text of every other card is unchanged.
+- Round B238 (least played first, from the Lane B skip lists): Captured by the Consulate (a cast trigger for its controller's
+  opponents' spells with an intervening if, CR 603.4: exactly one target as the spell was cast, the same object twice being two,
+  rulings; the target changes to the creature it enchants, or enchanted as it last existed, CR 608.2h, only if that creature
+  is a legal target for the spell as if its controller chose it now, CR 115.7, otherwise it stays the same, rulings; Effect
+  consulateRedirect, run-spells changeTarget `toId`). Piracy (for the rest of the turn its controller may activate a land's mana
+  ability with {T} in its cost, CR 106.12, while another player controls the land: TurnRule "tapOthersLands",
+  manaabilities.ts piracyTap; that mana goes to them and can be spent only to cast spells, CR 106.6, PIRACY_SPEND, known as it's
+  activated, before a cost like Crystal Vein's sacrifice moves the land; automatic payment uses those lands for spells, not for
+  abilities). Infernal Denizen (two Swamps sacrificed at its controller's upkeep if they can, and with fewer the ones they have,
+  CR 609.3, rulings; then "if you can't": ~ tapped, its controller chooses the opponent, rulings, who may take any creature of
+  theirs, ~ included, for as long as ~ stays on the battlefield whoever controls it, layer 2; bots take the best). Browser tests
+  for your Lightning Bolt turned onto your own creature by Ana's Captured by the Consulate, Ana's Forests paying for your
+  creature after Piracy, and Infernal Denizen's choice of opponent and the opponent's choice of creature. +3, 31,514 of 31,936.
+  The compiled text of every other card is unchanged.
+- Out after round B238 (looked at, not done): the lists after round B237 stay out. Known gaps: Piracy doesn't offer another
+  player's land whose mana ability already restricts its mana, a land a triggered mana ability would add to (Mana Flare, Wild
+  Growth: whose mana it is and whether it's restricted aren't modeled), or a land's mana abilities that are activated abilities
+  in the engine (a filter land's); its lands are tapped by automatic payment only, not by clicking them; bots don't count them
+  as mana they have when planning.
 - Out after round B237 (looked at, not done): the lists after round B236 stay out, and Breathstealer's Crypt ("instead they draw
   a card and reveal it": once another replacement, such as an Archive's two draws or dredge, applies to that draw, which card
   "it" is isn't settled). Known gaps: Chains of Mephistopheles' discard doesn't ask Library of Leng; bots pay Zur's Weirding's 2
@@ -9931,7 +9950,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counter) stay out.
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its
   mana cost": the activation's mana cost is set by the card the cost exiles, and activationCost doesn't see the cost's
-  choices yet), Blood of the Martyr, Piracy, Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
+  choices yet), Blood of the Martyr, Piracy (done in round B238), Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
 - Out after round B206 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability: only one
   per ability is modeled), Reap (a target count set by another target as it's cast), Pulmonic Sliver (an optional
   granted "put it on top of its owner's library instead", with several Slivers ordered at once), Day of the Moon (the

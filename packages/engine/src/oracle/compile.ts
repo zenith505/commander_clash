@@ -80,6 +80,7 @@ import { roundB234Line } from "./laneb234";
 import { roundB235Line } from "./laneb235";
 import { roundB236Line } from "./laneb236";
 import { roundB237Line } from "./laneb237";
+import { roundB238Line } from "./laneb238";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2232,6 +2233,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB236Line(line, raw, out, isSpell)) continue;
     // Reed Richards, Smartest Man, Chains of Mephistopheles, Zur's Weirding (round B237).
     if (roundB237Line(line, raw, out, isSpell)) continue;
+    // Captured by the Consulate, Infernal Denizen (round B238).
+    if (roundB238Line(line, raw, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

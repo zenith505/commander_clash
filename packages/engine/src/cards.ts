@@ -406,16 +406,20 @@ export function printedManaAbilities(c: CompiledCard): CompiledCard {
  * The abilities an object has right now: its card's, unless an effect removed them, then the ones effects
  * gave it (CR 613.1f).
  */
-export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
+/**
+ * `unbound`: without its choices filled in ("the chosen name", "the chosen color"): an ability another object gains from it
+ * (round 400) refers to that object's choices, not this one's (CR 607.2a; one never made matches nothing).
+ */
+export function abilitiesOf(s: GameState, o: GameObject, unbound = false): CompiledCard {
   const c = characteristics(s, o);
   let own = withGranted(c.hasPrintedAbilities ? withoutFlanking(withoutLost(compileCard(defOf(s, o)), c.lostActivated, c.lostStatics), c.flankingLost) : c.printedManaOnly ? printedManaAbilities(compileCard(defOf(s, o))) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
-  if (o.chosen?.name !== undefined) own = withChosenName(own, o.chosen.name);
+  if (o.chosen?.name !== undefined && !unbound) own = withChosenName(own, o.chosen.name);
   // "Return target card of the chosen type" (Dawn-Blessed Pennant): the creature type chosen as it entered. "Destroy target
   // permanent of the chosen color" (Pentarch Paladin): the color.
-  if (o.chosen?.type !== undefined || o.chosen?.color !== undefined) own = withChosenType(own, o.chosen);
+  if ((o.chosen?.type !== undefined || o.chosen?.color !== undefined) && !unbound) own = withChosenType(own, o.chosen);
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
@@ -536,8 +540,8 @@ const borrowed = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
  * What a permanent with "~ has all activated abilities of ..." (CompiledCard.borrows) borrows from now: the permanents
  * (`objects`) or graveyard cards (`cards`) matching it. A lender's own borrowing isn't followed (no loops).
  */
-export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCard["borrows"]>): { objects: GameObject[]; cards: CardDef[] } {
-  const out = { objects: [] as GameObject[], cards: [] as CardDef[] };
+export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCard["borrows"]>): { objects: GameObject[]; cards: CardDef[]; /** Mairsil (round 401): with `exiledWithCounter`, the card objects behind `cards`, in the same order. */ cardIds: ObjectId[] } {
+  const out = { objects: [] as GameObject[], cards: [] as CardDef[], cardIds: [] as ObjectId[] };
   if (o.zone !== "battlefield" || borrowing) return out;
   const c = characteristics(s, o);
   borrowing = true;
@@ -546,6 +550,8 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
       // Myr Welder: the cards its exile ability exiled, linked to it as the object it is now (CR 607.2a, 400.7); their
       // printed abilities (rulings: only activated ones, "~" in them being this permanent).
       for (const l of s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []) {
+        // Koh, the Face Stealer: only the last chosen card (CR 607.2d), still that card in exile (CR 400.7).
+        if (b.chosen && (o.chosen?.card?.id !== l.id || o.chosen.card.zc !== l.zc)) continue;
         const card = s.objects[l.id];
         if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
       }
@@ -555,7 +561,12 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
       for (const pid of s.turnOrder)
         for (const id of s.players[pid]!.exile) {
           const card = s.objects[id]!;
-          if ((card.counters[b.exiledWithCounter] ?? 0) > 0 && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
+          // Mairsil, the Pretender (round 401): "all cards you own", its controller's (rulings).
+          if (b.owned && card.owner !== c.controller) continue;
+          if ((card.counters[b.exiledWithCounter] ?? 0) > 0 && printedMatches(b.filter, defOf(s, card))) {
+            out.cards.push(defOf(s, card));
+            out.cardIds.push(card.id);
+          }
         }
     } else if (b.top) {
       const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
@@ -597,16 +608,57 @@ function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledC
     borrowing = false;
   }
   if (!lenders.length) return own;
-  const key = lenders.map(idOf).join(",");
+  // Mairsil, the Pretender (round 401): each card's abilities are instances of their own, once each turn each (rulings).
+  const once = own.borrows!.oncePerTurn ? found.cards.map((_, i) => onceKeyBase(s, found.cardIds[i]!)) : undefined;
+  const key = lenders.map(idOf).join(",") + (once ? `|${once.join(",")}` : "");
   let byKey = borrowed.get(own);
   if (!byKey) borrowed.set(own, (byKey = new Map()));
   let hit = byKey.get(key);
   if (!hit) {
     const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
-    hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l) => l.activated.filter(usable).map((a) => ({ ...a, borrowed: true as const })))] };
+    const base = found.objects.length;
+    hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l, li) => l.activated.map((a, ai) => [a, ai] as const).filter(([a]) => usable(a)).map(([a, ai]) => ({ ...a, borrowed: true as const, ...(once && li >= base ? { onceKey: `${once[li - base]}#${ai}` } : {}) })))] };
+    // Idris, Koh (round 399): "all activated and triggered abilities": the lenders' triggered abilities too.
+    if (own.borrows!.triggered) hit.triggers = [...own.triggers, ...lenders.flatMap((l) => l.triggers.filter(lendableTrigger))];
     byKey.set(key, hit);
   }
   return hit;
+}
+
+/** Mairsil, the Pretender (round 401): a lender card's part of its borrowed abilities' once-each-turn keys (ActivatedAbility.onceKey): that object as it is now (CR 400.7). */
+export function onceKeyBase(s: GameState, id: ObjectId): string {
+  return `${id}@${s.objects[id]?.zoneChanges ?? 0}`;
+}
+
+/**
+ * A lender's triggered ability that a permanent borrowing "all triggered abilities" (CompiledCard.borrows triggered) gets:
+ * those that work on the battlefield, not ones that work only from a graveyard, exile, the command zone (eminence) or the
+ * stack ("When you cast ~", CR 603.6, 113.6).
+ */
+function lendableTrigger(t: TriggeredAbility): boolean {
+  return !t.zone && !t.eminence && t.event !== "selfCast";
+}
+
+/**
+ * Idris, Soul of the TARDIS and Koh, the Face Stealer (round 399): the exiled cards (object ids) whose triggered abilities
+ * this permanent has now, kept as it leaves the battlefield so its leaves-the-battlefield abilities among them look back
+ * (CR 603.10a; GameState.leftTogether borrowed).
+ */
+export function borrowedTriggerSources(s: GameState, o: GameObject): ObjectId[] | undefined {
+  if (o.zone !== "battlefield" || !characteristics(s, o).hasPrintedAbilities) return undefined;
+  const b = compileCard(defOf(s, o)).borrows;
+  if (!b?.triggered || !b.linked) return undefined;
+  const ids = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).flatMap((l) => {
+    const card = s.objects[l.id];
+    if (b.chosen && (o.chosen?.card?.id !== l.id || o.chosen.card.zc !== l.zc)) return [];
+    return card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card)) ? [card.id] : [];
+  });
+  return ids.length ? ids : undefined;
+}
+
+/** The triggered abilities a permanent had from these exiled cards as it left (borrowedTriggerSources). */
+export function borrowedTriggersOf(s: GameState, ids: ObjectId[] | undefined): TriggeredAbility[] {
+  return (ids ?? []).flatMap((id) => (s.objects[id] ? compileCard(defOf(s, s.objects[id]!)).triggers.filter(lendableTrigger) : []));
 }
 
 /** The cards in exile haunting this permanent (CR 702.55b), for showing it. */
@@ -735,6 +787,9 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     // Glowcap Lantern's granted "You may look at the top card of your library any time": the creature's controller's
     // (rulings: only while it's attached to a creature you control; see topVisible in game.ts).
     if (extra.some((x) => x.lookTop)) hit.lookTop = true;
+    // Sokrates's granted prevention (round 381): each instance its own (see staticRules in damage.ts).
+    const halves = (base.combatToPlayerDrawsHalf ?? 0) + extra.reduce((n, x) => n + (x.combatToPlayerDrawsHalf ?? 0), 0);
+    if (halves) hit.combatToPlayerDrawsHalf = halves;
     // Bone Shaman's granted "Creatures dealt damage by this creature this turn can't be regenerated this turn" (round B230).
     if (extra.some((x) => x.damagedCantRegenerate)) hit.damagedCantRegenerate = true;
     // Jubilant Skybonder's granted "Spells your opponents cast that target this creature cost {2} more to cast": each

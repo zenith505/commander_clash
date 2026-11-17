@@ -2,9 +2,9 @@
 // them, and whether paying for a card with some colors helps them (its text hoping some was spent to cast it).
 
 import { allEffects, type AbilityBody, type ChosenTarget, type Effect, type ObjRef, type SpentReq } from "./abilities";
-import { power, toughness, defOf } from "./cards";
+import { power, toughness, defOf, isPermanentCard } from "./cards";
 import { bindChosen, estimate, harmfulCounter, harmfulTargets, legalTargets, lethalDamage, modsAreHarmful, objectMatches } from "./effects";
-import { livingPlayers, nearestOpponent, obj, opponents } from "./game";
+import { livingPlayers, nearestOpponent, obj, opponents, player } from "./game";
 import { characteristics, controllerOf } from "./layers";
 import { compileCard } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type PlayerId } from "./types";
@@ -32,6 +32,9 @@ export function ofPlayerTargets(body: AbilityBody): number[] {
     const o = v as Record<string, unknown>;
     const of = o.of as { ref?: string; index?: number } | undefined;
     if (o.ref === "each" && of?.ref === "target" && of.index !== undefined) out.add(of.index);
+    // Ghastly Conscription (round 391): "all creature cards from target player's graveyard".
+    const yard = o.yardOf as { ref?: string; index?: number } | undefined;
+    if (o.type === "faceDownPile" && yard?.ref === "target" && yard.index !== undefined) out.add(yard.index);
     Object.values(o).forEach(walk);
   };
   walk(body.effects);
@@ -86,6 +89,49 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     const nonland = (p: PlayerId | undefined) => s.battlefield.map((id) => obj(s, id)).filter((o) => p !== undefined && o.id !== sourceId && !s.phasedOut?.includes(o.id) && controllerOf(s, o) === p && !characteristics(s, o).types.includes("Land"));
     const sum = (os: GameObject[]) => os.reduce((n, o) => n + worth(s, pid, o), 0);
     return Math.max(...(["left", "right"] as const).map((side) => sum(nonland(nearestOpponent(s, pid, side))))) - sum(nonland(pid));
+  }
+  // Over the Top (round 389): each player gets about as many cards as nonland permanents they control, so only when we
+  // control more of them than the opponents do on average; each card revealed is worth about a card drawn.
+  if (body.effects.some((e) => e.type === "overTheTop")) {
+    const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && !characteristics(s, obj(s, id)).types.includes("Land")).length;
+    const opps = livingPlayers(s).filter((p) => p !== pid);
+    return opps.length ? (n(pid) - opps.reduce((m, p) => m + n(p), 0) / opps.length) * 2 : 0;
+  }
+  // Thieves' Auction, Warp World: everything is shared out again, so only when we're behind the opponents on average.
+  if (body.effects.some((e) => e.type === "thievesAuction" || e.type === "warpWorld")) {
+    const sum = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);
+    const opps = livingPlayers(s).filter((p) => p !== pid);
+    return opps.length ? opps.reduce((n, p) => n + sum(p), 0) / opps.length - sum(pid) : 0;
+  }
+  // Glimpse of Tomorrow (round 390): our permanents (tokens and all) for as many cards from the top of our library, only
+  // its permanent cards staying (worth what they'd be worth there, a token's nothing), so only when what we have is worth
+  // less than that many cards of our library are on average.
+  if (body.effects.some((e) => e.type === "glimpseOfTomorrow")) {
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && o.owner === pid);
+    const lib = player(s, pid).library.map((id) => obj(s, id));
+    const cardWorth = (o: GameObject) => {
+      const d = defOf(s, o);
+      if (!isPermanentCard(d)) return 0;
+      if (d.types.includes("Land")) return 3;
+      if (d.types.includes("Creature")) return Math.max(1, Number(d.power) + Number(d.toughness) || 0) + 1;
+      return 1 + mv(s, o.id);
+    };
+    const avg = lib.length ? lib.reduce((n, o) => n + cardWorth(o), 0) / lib.length : 0;
+    return Math.min(mine.length, lib.length + mine.filter((o) => !o.isToken).length) * avg - mine.reduce((n, o) => n + worth(s, pid, o), 0);
+  }
+  // Round 391's face-down piles: each card a face-down 2/2 of ours (about 3, more than a bare 2/2 for the chance to turn
+  // it face up), less what goes into the pile of ours: Ghastly Conscription, the creature cards of the player we'd target;
+  // Become Anonymous, the creature we target (bot.ts picks our least worth) and the top two cards of our library.
+  const pile = body.effects.find((e) => e.type === "faceDownPile");
+  if (pile?.type === "faceDownPile" && !pile.chooseDisguised) {
+    if (pile.yardOf?.ref === "target") {
+      const p = ofPick?.get(pile.yardOf.index);
+      return p === undefined ? 0 : player(s, p).graveyard.filter((id) => characteristics(s, obj(s, id)).types.includes("Creature")).length * 3;
+    }
+    const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid && !o.isToken && !o.faceDown && controllerOf(s, o) === pid && characteristics(s, o).types.includes("Creature"));
+    if (!mine.length) return -1;
+    const least = Math.min(...mine.map((o) => worth(s, pid, o)));
+    return (1 + Math.min(pile.top ?? 0, player(s, pid).library.length)) * 3 - least;
   }
   let v: number | null = null;
   const group = (r: ObjRef) => {

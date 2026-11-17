@@ -10,11 +10,17 @@
 
 import type { CardDef, GameObject, GameState, PlayerId } from "./types";
 
+/**
+ * Oko, Shadowmoor Scion (round 387): an emblem whose abilities read "the chosen type", the creature type chosen as the
+ * ability that made it resolved (kept on the emblem as GameObject.chosen).
+ */
+export const CHOSEN_TYPE_EMBLEM = "|chosenType";
+
 /** The emblem's definition: no characteristics but its abilities (CR 114.3). Named for where it came from, for the log. */
-export function emblemDef(abilities: string[], from: string): CardDef {
+export function emblemDef(abilities: string[], from: string, chosenType?: true): CardDef {
   const text = abilities.join("\n");
   return {
-    oracleId: `emblem:${from}:${text}`,
+    oracleId: `emblem:${from}:${text}${chosenType ? CHOSEN_TYPE_EMBLEM : ""}`,
     name: `${from} emblem`,
     manaCost: "",
     cmc: 0,
@@ -30,8 +36,8 @@ export function emblemDef(abilities: string[], from: string): CardDef {
 }
 
 /** Put an emblem with these abilities into `pid`'s command zone (CR 114.2). */
-export function createEmblem(s: GameState, pid: PlayerId, abilities: string[], from: string): GameObject {
-  const d = emblemDef(abilities, from);
+export function createEmblem(s: GameState, pid: PlayerId, abilities: string[], from: string, chosenType?: string): GameObject {
+  const d = emblemDef(abilities, from, chosenType !== undefined ? true : undefined);
   s.cards[d.oracleId] ??= d;
   const o: GameObject = {
     id: `o${s.nextId++}`,
@@ -48,6 +54,7 @@ export function createEmblem(s: GameState, pid: PlayerId, abilities: string[], f
     isCommander: false,
     isToken: false,
     emblem: true,
+    ...(chosenType !== undefined ? { chosen: { type: chosenType } } : {}),
   };
   s.objects[o.id] = o;
   (s.emblems ??= []).push(o.id);

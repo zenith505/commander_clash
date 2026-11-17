@@ -74,6 +74,7 @@ import {
   blockersNeeded,
   canEnterUntapped,
   othersMakeItEnterUntapped,
+  playsFromAnyGraveyard,
   entersRulesOf,
   conditionHolds,
   isSummoningSick,
@@ -84,6 +85,8 @@ import {
   canGainLife,
   player,
   potentialAttackers,
+  attackAssignment,
+  chosenAttackersProblem,
   foretoldCast,
   foretellCostOf,
   combatDamageOf,
@@ -154,18 +157,20 @@ import {
   ignorableBy,
   payableDelayed,
   plotCost,
+  attacksIfAbleNow,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
-import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
+import { asFace, castableFaces, defMv, layoutOf, registerFace, restingDef, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { prepareSpellOf } from "./prepare";
-import { castingBody, castTimeTargets, compileCard } from "./oracle";
+import { castingBody, castTimeTargets, compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CREATURE_TYPES, CHOSEN_PARITY_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, protectedFrom } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
+import { pileCards } from "./effects/run-round386";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -176,6 +181,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   // A bot controlling another player's turn (CR 723.5) makes them do nothing they don't have to: no spells, abilities,
   // land or attacks. The choices they must make (blocks, discards, what their own triggers target) are made for them
   // as they'd make them.
+  // Master Warcraft (round 379): attackers another player chose: what each attacks, never paying for them (see
+  // fixedAttacks); and choosing which of the active player's creatures attack.
+  if (pend?.player === pid && pend.kind === "declareAttackers" && pend.fixed) return [fixedAttacks(s, pid, pend.fixed)];
+  if (pend?.player === pid && pend.kind === "chooseAttackers") return [{ type: "chooseAttackers", player: pid, attackers: attackersForOpponent(s, pid, pend.attacker) }];
   if (deciderOf(s, pid) !== pid) {
     if (!pend) return [{ type: "passPriority", player: pid }];
     if (pend.player === pid && pend.kind === "declareAttackers") return [{ type: "declareAttackers", player: pid, attacks: [] }];
@@ -238,6 +247,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Omen Machine, Wild Evocation: one we must cast if able goes on the stack even when we'd rather not.
       return plan ?? (pend.must ? forcedFreeCast(s, pid, pend.objectId) : null) ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
+    if (pend.kind === "drawLook" && pend.lamp) {
+      // Aladdin's Lamp (round 385): keep on top, to draw, the card we'd most like to draw (as Underrealm Lich's).
+      const best = [...pend.cards].sort((a, b) => Number(wantOnTop(s, pid, b)) - Number(wantOnTop(s, pid, a)) || mv(s, b) - mv(s, a))[0]!;
+      return [{ type: "drawLook", player: pid, objectId: best }];
+    }
     if (pend.kind === "drawLook" && pend.keep) {
       // Underrealm Lich: keep the card we'd most like to draw (what scry would keep, the most expensive of those).
       if (pend.cards.length < 2) return [{ type: "drawLook", player: pid }];
@@ -271,11 +285,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const grounded = (only: string[]) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== pid && objIsType(s, obj(s, id), "Creature") && !only.some((k) => objHasKeyword(s, obj(s, id), k))).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const shelter = sanctuary && !player(s, pid).attackOnlyByUntil && grounded(abilitiesOf(s, s.objects[sanctuary.slice("mayskip:".length)]!).drawStepMaySkip!.attackOnlyBy) * 2 >= player(s, pid).life ? sanctuary : undefined;
       const skip = shelter ?? (player(s, pid).library.length <= 5 ? has("mayskip") : undefined);
-      const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter):/.test(k);
+      const declinable = (k: string) => k === "thief" || /^(?:dredge|mayskip|counter|pthoughts):/.test(k);
+      // Parallel Thoughts (round 386): the pile's card while it has one (the cards searched for), its empty pile only to
+      // skip a draw from an empty library.
+      const pileOpts = pend.options.filter((k) => k.startsWith("pthoughts:"));
+      const pile = pileOpts.find((k) => pileCards(s, k.slice("pthoughts:".length)).length > 0) ?? (!player(s, pid).library.length ? pileOpts[0] : undefined);
       // Forbidden Crypt with an empty graveyard loses the game: anything else first.
       const loses = (k: string) => k.startsWith("crypt:") && !player(s, pid).graveyard.length;
       // Reed Richards (round B237): its four cards before the Archive's two (once the Archive applies, Reed's first time is gone).
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("reed") ?? has("archive") ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("reed") ?? has("archive") ?? pile ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {
@@ -353,6 +371,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.pay?.mana && theirMay?.type === "lookTopMaySacrificePay") {
       const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
       return taps && player(s, pid).hand.length === 0 ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
+    }
+    // Stardew Valley (round 393): another player's permanent offered to us: taken, while it's still there.
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider?.ref === "chosenPlayer" && s.resolving!.item.controller !== pid && theirMay.effects.length === 1) {
+      const gift = theirMay.effects[0]!;
+      if (gift.type === "continuous" && gift.giveTo?.ref === "chosenPlayer" && gift.what.ref === "target" && gift.mods.some((m) => m.kind === "control")) {
+        const t = s.resolving!.item.targets?.[gift.what.index];
+        return [{ type: "chooseMay", player: pid, yes: t?.kind === "object" && s.objects[t.id]?.zone === "battlefield" }];
+      }
     }
     if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.decider && s.resolving!.item.controller !== pid)
       return [{ type: "chooseMay", player: pid, yes: theirMay.effects.every((x) => x.type === "counters" && x.counter === "time" && x.what.ref === "selfCard") }];
@@ -464,6 +490,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
     // Primal Surge: every permanent is worth having, and saying no ends it.
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "surge") return [{ type: "chooseMay", player: pid, yes: true }];
+    // Ziatora's Envoy (round 392): a land card on top is played; a modal double-faced card's land face isn't, so its spell
+    // may be cast or it goes into the hand.
+    if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "playTopOrHand" && s.resolving.scratch?.topPlay?.asked === "land") return [{ type: "chooseMay", player: pid, yes: isType(defOf(s, obj(s, pend.card)), "Land") }];
     // Dina's Guidance: the creature card found goes into the hand, not the graveyard (bots don't plan reanimation).
     const searching = s.resolving?.body.effects[s.resolving.next];
     if (pend.kind === "chooseMay" && searching?.type === "search" && searching.mayInstead?.dest.zone === "graveyard") return [{ type: "chooseMay", player: pid, yes: false }];
@@ -588,6 +617,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const hits = (id: ObjectId) => new Set((s.castThisTurn ?? []).filter((c) => c.player !== pid && sameName(c.name, defOf(s, obj(s, id)).name)).map((c) => c.player)).size;
       const best = [...pend.cards].sort((a, b) => hits(b) - hits(a))[0];
       return [{ type: "searchLibrary", player: pid, found: best && pend.max > 0 ? [best] : [] }];
+    }
+    // Sphinx Ambassador (round 377): the player whose library it is names the creature card there that costs the most,
+    // so the second name down, if there's one; the dearest if not; any card without a creature card.
+    if (pend.kind === "searchLibrary" && s.resolving?.body.effects[s.resolving.next]?.type === "searchTheyName" && pend.cards.length) {
+      const ranked = ambassadorRanked(s, pend.cards);
+      const pick = ranked.find((c) => c.name !== ranked[0]!.name) ?? ranked[0];
+      return [{ type: "searchLibrary", player: pid, found: [pick?.id ?? pend.cards[0]!] }];
+    }
+    // Thieves' Auction: the exiled card worth the most to us on our side of the battlefield.
+    if (pend.kind === "searchLibrary" && s.resolving?.body.effects[s.resolving.next]?.type === "thievesAuction" && pend.cards.length)
+      return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!] }];
+    // Rinoa, Angel Wing (round 394): the best of our own cards (another owner's comes back under theirs), else none.
+    if (pend.kind === "searchLibrary" && s.resolving?.body.effects[s.resolving.next]?.type === "returnOneOfThem") {
+      const mine = pend.cards.filter((id) => obj(s, id).owner === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "searchLibrary", player: pid, found: mine.slice(0, 1) }];
     }
     if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
@@ -720,6 +764,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const puts = (id: ObjectId) => (isPermanentCard(defOf(s, obj(s, id))) && printedMatches(named, defOf(s, obj(s, id))) ? 1 : 0);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => puts(b) - puts(a) || (puts(a) ? mv(s, b) - mv(s, a) : mv(s, a) - mv(s, b))).slice(0, 1) }];
     }
+    // Mairsil, the Pretender (round 401): cage the card with the most activated abilities, mana ones among them (its
+    // abilities are what Mairsil gets); none with none.
+    if (pend.kind === "searchLibrary" && pend.fromHand && s.resolving?.body.effects[s.resolving.next]?.type === "exileFromHandOrYard") {
+      const count = (id: ObjectId) => ((c) => c.activated.filter((a) => !a.zone && !a.equip && a.loyalty === undefined).length + c.mana.length)(compileCard(defOf(s, obj(s, id))));
+      const best = [...pend.cards].filter((id) => count(id) > 0).sort((a, b) => count(b) - count(a) || mv(s, b) - mv(s, a))[0];
+      return [{ type: "searchLibrary", player: pid, found: best ? [best] : [] }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
       const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
       const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);
@@ -753,6 +804,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.dig?.to === "to exile face down" && pend.hand === pid && s.resolving && s.resolving.item.controller !== pid && pend.cards.length)
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => handWorth(s, a) - handWorth(s, b)).slice(0, Math.max(1, pend.min)) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
+    // Grime Gorger (round 398): one card of each card type from an opponent's graveyard, a +1/+1 counter for each: as many
+    // as fit, the ones they could use there first (a set built greedily is as big as any, as for Guided Passage).
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.oneOfEach && pend.cards.every((id) => obj(s, id).owner !== pid)) {
+      const found: ObjectId[] = [];
+      const ranked = [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, b)) - Number(usefulInGraveyard(s, a)) || mv(s, b) - mv(s, a));
+      for (const id of ranked) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
     // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.cards.some((id) => obj(s, id).owner !== pid)) {
@@ -919,6 +978,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Oracle en-Vec (round B233): none of ours, so none of them can be made to attack into blockers or be destroyed for
     // not attacking (we can't attack with any creature that turn either).
+    // Expose the Culprit (round 391): cloak again only the disguise creatures that lose nothing by leaving (no counters,
+    // nothing attached), so they can be turned face up once more.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.what === "face-up creatures you control with disguise")
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => !Object.values(obj(s, id).counters ?? {}).some((n) => n > 0) && !s.battlefield.some((b) => obj(s, b).attachedTo === id)) }];
     const enVec = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && enVec?.type === "chosenAttackNextTurn") return [{ type: "pickPermanents", player: pid, ids: [] }];
     // A Killer Among Us (round B233): any of the three types (which token we'd pump isn't planned for).
@@ -995,7 +1058,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       // Coffin Queen: kept tapped while the creature it returned would be exiled as it untaps.
       const guarding = (id: string) => (s.delayed ?? []).some((d) => d.when === "lostControl" && d.orUntaps && d.subject.id === id && !!d.about && s.objects[d.about.id]?.zone === "battlefield");
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id) || guarding(id)) }];
+      // The Pandorica (round 389): kept tapped while an opponent's permanent it phased out can't phase in.
+      const locking = (id: string) => (s.phasedOut ?? []).some((x) => s.objects[x]!.phased?.lockWhileTapped?.id === id && s.objects[x]!.phased!.by !== pid);
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id) || guarding(id) || locking(id)) }];
     }
     // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
     if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
@@ -1100,6 +1165,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // would only gain it too).
     // Celestial Judgment: one of each power, the rest destroyed: our own best of each power, else the other player's least
     // valuable, so the better ones go.
+    // Berserker's Frenzy (round 378): "Choose any number of creatures. They block this turn if able.": our opponents'
+    // creatures that could block, not ours.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber && /they block this turn if able$/.test(pend.prompt ?? "")) {
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) !== pid && !obj(s, id).tapped) }];
+    }
     if (pend.kind === "pickPermanents" && pend.differentPowers && pend.action === "choose" && !pend.anyNumber) {
       const byPower = new Map<number, ObjectId[]>();
       for (const id of pend.options) byPower.set(power(s, obj(s, id)), [...(byPower.get(power(s, obj(s, id))) ?? []), id]);
@@ -2021,6 +2091,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Backdraft (round B229): the most damage to an opponent; with only ourselves to choose, the least.
     // Cyclopean Tomb (round B231): our own land with mire counters (it gets its land types back), else one with none (nothing
     // changes), else an opponent's (only theirs are left).
+    // Lynde, Cheerful Tormentor (round 394): always move one (two cards), onto the opponent with the most life.
+    if (pend.kind === "chooseOption" && pend.what === "curseMove") {
+      const moves = pend.options.filter((o) => o !== "none");
+      const life = (o: string) => player(s, Number(o.split(">")[1])).life;
+      return [{ type: "chooseOption", player: pid, choice: moves.sort((a, b) => life(b) - life(a))[0] ?? "none" }];
+    }
+    // Koh, the Face Stealer (round 399): the exiled creature card with the most abilities to lend.
+    if (pend.kind === "chooseOption" && pend.what === "kohCard") {
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => lendWorth(s, b) - lendWorth(s, a))[0]! }];
+    }
+    // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
+    if (pend.kind === "chooseOption" && pend.what === "aegisCopy") {
+      const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "mireLand") {
       const score = (id: string) => {
         const o = s.objects[id];
@@ -2164,6 +2249,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // could then cast from our hand or command zone.
     // Spectral Searchlight: mana another player gave us, in the color of most of the cards in our hand (it empties as the
     // step ends, so only what we could cast now counts, if anything).
+    // Garth One-Eye (round 377): the name whose copy we'd cast now, to most effect.
+    // The Toymaker's Trap (round 384): the secret number and the guess, each at random among the options (the bot can't
+    // see the number; a guess of a number already chosen can't be right, so only the others).
+    if (pend.kind === "chooseOption" && (pend.what === "toyNumber" || pend.what === "toyGuess")) {
+      const opts = pend.what === "toyGuess" ? toyGuessOptions(s, pend.options) : pend.options;
+      return [{ type: "chooseOption", player: pid, choice: opts[((s.rngState >>> 3) ^ (s.log.length * 7)) % opts.length]! }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "namedCopy") return [{ type: "chooseOption", player: pid, choice: namedCopyPick(s, pid, pend.options) ?? pend.options[0]! }];
+    // Volo's Journal (round 380): each noted type counts the same for its draw, so the first one.
+    // Long List of the Ents (round 381): any type, so the one most of our creature cards in hand (counted twice) and
+    // library have, for the next creature spell of it.
+    if (pend.kind === "chooseOption" && pend.what === "noteType") return [{ type: "chooseOption", player: pid, choice: noteTypePick(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "manaColorFor") {
       const counts = new Map<string, number>(pend.options.map((o) => [o, 0]));
       for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) counts.set(COLOR_NAMES[c], (counts.get(COLOR_NAMES[c]) ?? 0) + 1);
@@ -2219,6 +2316,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const shield = chooseFullShield(s, pid);
   if (shield) return shield;
+  const dialogue = chooseSokraticDialogue(s, pid);
+  if (dialogue) return dialogue;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
   const echo = chooseCopyWithTaps(s, pid);
@@ -2305,7 +2404,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -2336,7 +2435,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Locke, Treasure Hunter: the cards it milled, in anyone's graveyard.
     // Whispersteel Dagger: the damaged player's graveyard.
     const milled = (s.graveGrants ?? []).flatMap((g) => (g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key) ? (g.cards ? g.cards.map((c) => c.id) : g.fromYardOf !== undefined ? [...(s.players[g.fromYardOf]?.graveyard ?? [])] : []) : []));
-    const fromYard = [...new Set([...(anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
+    // Coram, the Undertaker (round 381): every graveyard's, its own permission deciding which.
+    const fromYard = [...new Set([...(anyYard || playsFromAnyGraveyard(s, pid) ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
@@ -2386,7 +2486,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (s.step === "main1") {
       // Osteomancer Adept: before combat, so the creature cast from our graveyard comes in this main phase (and Adept
       // isn't tapped by attacking first).
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "graveyardTurn" && !!e.costs)) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Garth One-Eye (round 377): its copy before combat, rather than attacking with it.
+      // Brutal Hordechief (round 378): the opponents' blocks before we attack.
+      // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
+      // Koh, the Face Stealer (round 399): its card chosen before combat, so a borrowed attack ability works this turn.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -2740,6 +2844,15 @@ function chooseLimitedUntap(s: GameState, pid: PlayerId, options: ObjectId[]): O
   const chosen: ObjectId[] = [];
   for (const id of [...options].sort((a, b) => value(b) - value(a))) if (!untapChoiceProblem(s, pid, [], [...chosen, id])) chosen.push(id);
   return chosen;
+}
+
+/** The numbers a Toymaker's Trap guess could be right with: those not chosen for it before this one (GameState.numbersChosenFor). */
+function toyGuessOptions(s: GameState, options: string[]): string[] {
+  const r = s.resolving;
+  const key = r ? `${r.item.sourceId}@${r.item.sourceZc ?? 0}` : "";
+  const earlier = (s.numbersChosenFor?.[key] ?? []).slice(0, -1).map(String);
+  const left = options.filter((o) => !earlier.includes(o));
+  return left.length ? left : options;
 }
 
 /**
@@ -3257,6 +3370,14 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (!rest && chosenBy.length < printed.targets.length) return null;
     return printed.targets.map((t, i): TargetChoice => (t.chosenBy === "opponent" ? { kind: "none" } : (rest?.[i] ?? { kind: "none" })));
   }
+  // Stardew Valley (round 393): "Choose target permanent you control. Draw a card, then another player of your choice may
+  // gain control of that permanent": only a noncreature token of ours (a Food, a Treasure), the least worth, for the card.
+  const offered = printed.targets.length === 1 ? printed.effects.find((e) => e.type === "may" && e.decider?.ref === "chosenPlayer" && e.effects.some((x) => x.type === "continuous" && x.giveTo?.ref === "chosenPlayer" && x.what.ref === "target" && x.what.index === 0)) : undefined;
+  if (offered) {
+    const mine = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid ? [obj(s, t.id)] : [])).sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+    const pick = mine.find((o) => o.isToken && !objIsType(s, o, "Creature")) ?? (forced ? mine[0] : undefined);
+    return pick ? [{ kind: "object", id: pick.id }] : null;
+  }
   // Yare, Blaze of Glory: "target creature defending player controls": only one of ours, while we're attacked, untapped
   // before blockers are declared (to block more) or blocking after; never an opponent's (the effects help the creature).
   if (printed.targets.length === 1 && printed.targets[0]!.defendingAny) {
@@ -3592,6 +3713,22 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       : reanimate
         ? forOwner ? all.filter((t) => t.kind === "object" && obj(s, t.id).owner === pid) : onOurs ? all.filter((t) => t.kind === "object" && (!defOf(s, obj(s, t.id)).subtypes.includes("Aura") || auraHelps(defOf(s, obj(s, t.id))))) : all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)) && !isBattleTarget(s, t));
+    // Become Anonymous (round 391): our least worth creature becomes one of three face-down 2/2s (value.ts weighs it).
+    if (allEffects(body.effects).some((e) => e.type === "faceDownPile" && e.what?.ref === "target" && e.what.index === i)) {
+      const ours = all.filter((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid && !obj(s, t.id).faceDown);
+      if (!ours.length) return null;
+      out.push([...ours].sort((a, b) => worth(s, pid, obj(s, (a as { id: string }).id)) - worth(s, pid, obj(s, (b as { id: string }).id)))[0]!);
+      continue;
+    }
+    // Rowan Kenrith's +2 (round 391): never us; the opponent with the most creatures, which all have to attack during
+    // their next turn and leave them open to the rest of us.
+    if (spec.kind === "player" && allEffects(body.effects).some((e) => e.type === "attackYouNextTurn" && e.anyone && e.who.ref === "target" && e.who.index === i)) {
+      const creatures = (p: PlayerId) => s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === p && objIsType(s, obj(s, b), "Creature")).length;
+      const opps = all.filter((t): t is Extract<TargetChoice, { kind: "player" }> => t.kind === "player" && t.id !== pid);
+      if (!opps.length) return null;
+      out.push([...opps].sort((a, b) => creatures(b.id) - creatures(a.id))[0]!);
+      continue;
+    }
     // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
     const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);
     if (provoke && sourceId && s.objects[sourceId]) {
@@ -3763,6 +3900,34 @@ function chooseFullShield(s: GameState, pid: PlayerId): Action[] | null {
   for (const id of shields) {
     const plan = planCast(s, pid, id, undefined, undefined, "auto");
     if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
+}
+
+/**
+ * Sokrates, Athenian Teacher (round 381): once blockers are declared, the opponent's unblocked attacker with the most power
+ * coming at us (at least 2) gets "prevent that damage ... each draw half": we take none of it and draw as many as they do.
+ */
+function chooseSokraticDialogue(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.step !== "declareBlockers" || s.activePlayer === pid || s.stack.length) return null;
+  const coming = s.battlefield
+    .map((x) => obj(s, x))
+    .filter((o) => o.attacking === pid && !o.attackingPermanent && !o.blockedBy?.length && power(s, o) >= 2 && !abilitiesOf(s, o).combatToPlayerDrawsHalf)
+    .sort((a, b) => power(s, b) - power(s, a));
+  if (!coming.length) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const e = abilities[i]!.body.effects;
+      const grant = e.length === 1 && e[0]!.type === "continuous" ? e[0]! : undefined;
+      if (grant?.type !== "continuous" || !grant.mods.some((m) => m.kind === "addAbility" && compileGranted(m.text).combatToPlayerDrawsHalf)) continue;
+      for (const att of coming) {
+        const plan = planActivate(s, pid, id, i, [{ kind: "object", id: att.id }]);
+        if (plan) return plan;
+      }
+    }
   }
   return null;
 }
@@ -4115,7 +4280,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge" || x.kind === "dreamHalls")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv" || a.kind === "nextLife") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
@@ -4696,6 +4861,20 @@ function castNumberFor(s: GameState, id: ObjectId, targets: TargetChoice[] | und
   const o = t?.kind === "object" ? s.objects[t.id] : undefined;
   const need = o?.zone === "battlefield" ? Math.max(0, toughness(s, o) - (o.damage ?? 0)) : r.max;
   return Math.min(r.max, Math.max(r.min, need));
+}
+
+/** Long List of the Ents (round 381): the type to note, the one most of our creature cards have, in hand above all. */
+function noteTypePick(s: GameState, pid: PlayerId, options: string[]): string {
+  if (options.length === 1) return options[0]!;
+  const counts = new Map<string, number>();
+  const me = player(s, pid);
+  for (const [ids, w] of [[me.hand, 2], [me.library, 1]] as const)
+    for (const id of ids) {
+      const d = defOf(s, obj(s, id));
+      if (!d.types.includes("Creature")) continue;
+      for (const ty of d.subtypes) if (options.includes(ty)) counts.set(ty, (counts.get(ty) ?? 0) + w);
+    }
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? options[0]!;
 }
 
 /**
@@ -5649,6 +5828,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (r && e?.type === "eachMay" && e.chain) {
     // "They may copy ~", asked after the land is sacrificed: what it was for.
     if (r.scratch?.offer) return true;
+    // Barroom Brawl (round 389): only with a creature of ours that kills one of our left opponent's in the fight and
+    // survives it, so each copy costs someone a creature and the brawl ends.
+    const brawl = r.body.effects.find((x) => x.type === "fight");
+    const [mine, theirs] = r.body.targets;
+    if (brawl && theirs?.kind === "object" && theirs.leftOpponentControls && mine) {
+      const ours = legalTargets(s, mine, pid).flatMap((t) => (t.kind === "object" ? [obj(s, t.id)] : []));
+      const foes = legalTargets(s, theirs, pid).flatMap((t) => (t.kind === "object" ? [obj(s, t.id)] : []));
+      return ours.some((m) => foes.some((f) => power(s, m) >= toughness(s, f) && power(s, f) < toughness(s, m)));
+    }
     const spec = r.body.targets[0];
     const cost = e.effects[0]?.type === "pick";
     const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
@@ -5897,6 +6085,31 @@ function reflexiveWorth(s: GameState, pid: PlayerId, body: AbilityBody, sourceId
 }
 
 /** A permanent's printed worth, to compare what a copy effect would make it: size for creatures, else mana value. */
+/**
+ * Koh, the Face Stealer (round 399): what an exiled card is worth lending its activated and triggered abilities (each
+ * one counts, its mana value breaks ties).
+ */
+function lendWorth(s: GameState, id: ObjectId): number {
+  const o = s.objects[id];
+  if (!o) return -1;
+  const d = defOf(s, o);
+  const c = compileCard(d);
+  return 10 * (c.triggers.filter((t) => !t.zone && !t.eminence && t.event !== "selfCast").length + c.activated.filter((a) => !a.zone).length) + defMv(d);
+}
+
+/**
+ * Koh's "Pay 1 life: Choose a creature card exiled with ~": only when there's a card worth more than the one chosen last
+ * (once each, so no paying life over and over), and with life to spare.
+ */
+function kohChoiceWorth(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility): boolean {
+  const e = ab.body.effects[0];
+  if (ab.body.effects.length !== 1 || e?.type !== "chooseLinkedCard" || player(s, pid).life <= (ab.lifeCost ?? 0) + 5) return false;
+  if (s.stack.some((x) => x.sourceId === o.id && x.kind === "ability")) return false;
+  const linked = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && !s.objects[l.id]!.isToken && printedMatches(e.filter, defOf(s, s.objects[l.id]!)));
+  const cur = o.chosen?.card && linked.some((l) => l.id === o.chosen!.card!.id && l.zc === o.chosen!.card!.zc) ? lendWorth(s, o.chosen.card.id) : -1;
+  return linked.some((l) => lendWorth(s, l.id) > cur && lendWorth(s, l.id) >= 10);
+}
+
 const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + baseToughness(d) : defMv(d));
 
 /**
@@ -5917,6 +6130,15 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
   if (revealed && e.what.ref === "each" && e.what.other) {
     const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== me.id && controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
     return mine.reduce((n, o) => n + defWorth(revealed) - defWorth(defOf(s, o)), 0);
+  }
+  // Blade of Shared Souls (round 396): the creature it became attached to becomes a copy of another creature of ours, worth
+  // it when that one is bigger and not a legendary one (the legend rule would cost us one of them, CR 704.5j).
+  if (e.what.ref === "subject" && e.of.ref === "target") {
+    const host = item.subject && s.objects[item.subject.id];
+    const tt = item.targets?.[e.of.index];
+    if (host?.zone !== "battlefield" || controllerOf(s, host) !== pid || tt?.kind !== "object") return 0;
+    const d = defOf(s, obj(s, tt.id));
+    return d.supertypes.includes("Legendary") ? -1 : defWorth(d) - defWorth(defOf(s, host));
   }
   if (e.what.ref !== "self") return 0;
   const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
@@ -6369,6 +6591,34 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? options[0]!;
 }
 
+/** Sphinx Ambassador (round 377): the creature cards among `ids`, the dearest first (by mana value, then name). */
+function ambassadorRanked(s: GameState, ids: readonly ObjectId[]): { id: ObjectId; name: string }[] {
+  return ids
+    .map((id) => ({ id, d: defOf(s, obj(s, id)) }))
+    .filter((c) => isType(c.d, "Creature"))
+    .sort((a, b) => defMv(b.d) - defMv(a.d) || a.d.name.localeCompare(b.d.name))
+    .map((c) => ({ id: c.id, name: c.d.name }));
+}
+
+/**
+ * Garth One-Eye (round 377): of the names left, the first in this order whose copy we could use now: Shivan Dragon with six
+ * mana, Terror or Disenchant with two and something of an opponent's to destroy, Regrowth with two and a card in our
+ * graveyard, Braingeyser with four (X 2 or more), else Black Lotus (free: three mana once, as a token).
+ */
+function namedCopyPick(s: GameState, pid: PlayerId, options: readonly string[]): string | undefined {
+  const mana = availableMana(s, pid);
+  const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost);
+  const want: Record<string, () => boolean> = {
+    "Shivan Dragon": () => mana >= 6,
+    Terror: () => mana >= 2 && theirs.some((o) => objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !characteristics(s, o).colors.includes("B")),
+    Disenchant: () => mana >= 2 && theirs.some((o) => objIsType(s, o, "Artifact") || objIsType(s, o, "Enchantment")),
+    Regrowth: () => mana >= 2 && player(s, pid).graveyard.length > 0,
+    Braingeyser: () => mana >= 4,
+    "Black Lotus": () => true,
+  };
+  return Object.keys(want).find((n) => options.includes(n) && want[n]!());
+}
+
 /**
  * Name a card (CR 201.4), from what it's for (NamePurpose) and only what this player could know: its own cards, and
  * the cards other players have shown (on the battlefield, in graveyards, face up in exile, commanders, spells).
@@ -6406,6 +6656,8 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
     return most(tally(seen)) ?? pend.options[0]!;
   }
   if (pend.purpose === "guessHand") return most(tally(me.hand)) ?? pend.options[0]!;
+  // Sphinx Ambassador (round 377): the creature card in our own library someone else would most like to take from it.
+  if (pend.purpose === "guardLibrary") return ambassadorRanked(s, me.library)[0]?.name ?? pend.options[0]!;
   // Mindblaze: a card in that library. Ours we know; another player's, a card of theirs not yet seen anywhere (one they
   // have shown is out of their library in a singleton deck) is all there is to go on.
   if (pend.purpose === "inLibrary") {
@@ -6420,6 +6672,13 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
     const board = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
     const ready = board.filter((id) => !obj(s, id).tapped && !isSummoningSick(s, obj(s, id)));
     return best(ready.length ? ready : board, (o) => power(s, o)) ?? best([...me.hand, ...me.library], value) ?? pend.options[0]!;
+  }
+  // Day of the Moon (round 382): goaded creatures must attack someone other than us, so an opponent's biggest creature
+  // whose name none of ours has; else any opponent's.
+  if (pend.purpose === "goadTheirs") {
+    const ours = new Set(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).map((id) => characteristics(s, obj(s, id)).name));
+    const theirs = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) !== pid && objIsType(s, obj(s, id), "Creature"));
+    return best(theirs.filter((id) => !ours.has(characteristics(s, obj(s, id)).name)), (o) => power(s, o)) ?? best(theirs, (o) => power(s, o)) ?? pend.options[0]!;
   }
   if (pend.purpose === "own") return best([...me.hand, ...me.library], (o) => value(o) + (o.zone === "hand" ? 10 : 0)) ?? pend.options[0]!;
   // Null Chamber's opponent: a name that hurts the player whose Chamber it is.
@@ -6583,6 +6842,12 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "bite":
         v += 7;
         break;
+      // Lukka, Coppercoat Outcast's −7 (round 392): each creature's power, to each opponent.
+      case "powerToPlayers": {
+        const foes = opponents(s, pid).filter((q) => !player(s, q).lost).length;
+        for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")) v += Math.max(0, power(s, obj(s, id))) * foes;
+        break;
+      }
       case "continuous":
         v += e.what.ref === "target" && harm[e.what.index] ? 5 : 2;
         break;
@@ -6689,7 +6954,7 @@ const BOT_LOOP_LIMIT = 8;
 /** Mechtitan Core's ability: this permanent and other permanents exiled to make a 10/10 or bigger token. */
 const makesTitan = (ab: ActivatedAbility) => !!ab.exileSelf && ab.body.effects.some((e) => e.type === "createToken" && (e.token.power ?? 0) >= 10) && !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile && c.other);
 
-function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility) => boolean): Action[] | null {
+function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility, o: GameObject) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid) continue;
@@ -6698,9 +6963,11 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     const order = abilities.map((_, i) => i).sort((a, b) => Number(!!abilities[b]!.energyX) - Number(!!abilities[a]!.energyX));
     for (const i of order) {
       const ab = abilities[i]!;
-      if (only && !only(ab)) continue;
+      if (only && !only(ab, o)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
       if (ab.mana) continue;
+      // Koh, the Face Stealer (round 399): only for a better card to borrow from.
+      if (ab.body.effects.some((e) => e.type === "chooseLinkedCard") && !kohChoiceWorth(s, pid, o, ab)) continue;
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
       if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
       // Harvest Mage (round B224): a card for lands that make a color of our choice this turn, which no payment plans
@@ -6753,7 +7020,15 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const titan = makesTitan(ab) && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
       // Craft: in our main phase with the stack empty, the back face being the point of it (materials: abilityCosts).
       const craft = ab.keyword === "Craft" && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
-      if ((ab.exileSelf && !titan && !craft) || (freeCost && !necro && !flipNow) || ab.station) continue;
+      // Stalking Leonin (round 377): its cost is revealing the chosen player, once ever (weighed below).
+      const leonin = !!ab.revealChosen && ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "targetControlledByChosen");
+      // Memory Vessel (round 386): seven fresh cards for every player, and nobody plays from their hand until our next turn:
+      // only with at most one card in our own hand (little to lose); its sorcery timing is our main phase anyway.
+      const vessel = ab.body.effects.some((e) => e.type === "noHandPlaysUntilYourNextTurn");
+      if (vessel && player(s, pid).hand.length > 1) continue;
+      // Koh, the Face Stealer (round 399): 1 life for a better card to borrow from (weighed above, kohChoiceWorth).
+      const koh = ab.body.effects.some((e) => e.type === "chooseLinkedCard");
+      if ((ab.exileSelf && !titan && !craft && !vessel) || (freeCost && !necro && !flipNow && !leonin && !koh) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       if (lifeSwapHurts(s, pid, ab.body.effects)) continue;
@@ -6796,6 +7071,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // graveyard with one more mana value.
       if (ab.costs?.some((c) => c.kind === "sacrifice" && c.mvX)) {
         const plan = sacrificeMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
+      // Fabrication Foundry (round 386): the artifact card back for artifacts worth less (totalMvXPlan).
+      if (ab.costs?.some((c) => c.kind === "sacrifice" && c.totalMvX)) {
+        const plan = totalMvXPlan(s, pid, o, i, ab);
         if (plan) return plan;
         continue;
       }
@@ -6895,6 +7176,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // for a card there we could pay for afterwards.
       const yardCast = ab.body.effects.find((e) => e.type === "graveyardCastThisTurn");
       if (yardCast?.type === "graveyardCastThisTurn") {
+        // Havengul Lich (round 400): a target card in any graveyard; bots don't pick one to cast yet.
+        if (yardCast.what) continue;
         const unused = (s.graveGrants ?? []).some((g) => g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key));
         const mana = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost)) - (ab.tap ? 1 : 0);
         const worth = player(s, pid).graveyard.some((c) => { const d = defOf(s, obj(s, c)); return !!d.manaCost && printedMatches(yardCast.filter, d) && mv(s, c) >= 2 && mv(s, c) <= mana; });
@@ -6925,6 +7208,27 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (refresh === null) continue;
       // "{1}: Look at the top card of your library" (Brutal Deceiver): nothing a bot can use.
       if (!ab.body.modal && ab.body.effects.every((e) => e.type === "orderTop" && e.n === 1)) continue;
+      // Garth One-Eye (round 377): in our main phase with the stack empty, while a name left is one we'd cast a copy of.
+      const garth = ab.body.effects.find((e) => e.type === "copyNamedCard");
+      if (garth?.type === "copyNamedCard") {
+        const chosen = s.namesChosenFor?.[`${id}@${o.zoneChanges ?? 0}`] ?? [];
+        if (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length || namedCopyPick(s, pid, garth.names.filter((n) => !chosen.includes(n))) === undefined) continue;
+      }
+      // Stalking Leonin (round 377): only on a creature attacking us that the chosen player controls, the one worth most.
+      let leoninTarget: TargetChoice[] | undefined;
+      if (leonin) {
+        const who = o.chosen?.player;
+        const att = s.battlefield.filter((b) => { const x = obj(s, b); return x.attacking === pid && !x.attackingPermanent && who !== undefined && controllerOf(s, x) === who && objIsType(s, x, "Creature"); }).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+        if (!att.length) continue;
+        leoninTarget = [{ kind: "object", id: att[0]! }];
+      }
+      // Brutal Hordechief (round 378): once a turn, on our turn before attackers are declared with the stack empty, while we
+      // have a creature that could attack and an opponent an untapped creature it makes block.
+      if (ab.body.effects.some((e) => e.type === "chooseBlocks")) {
+        const already = (s.blocksChosenThisTurn ?? []).some((b) => b.turn === s.turn && b.player === pid);
+        const before = (s.step === "main1" && !s.combatsThisTurn) || (s.step === "beginCombat" && (s.combatsThisTurn ?? 0) <= 1);
+        if (already || s.activePlayer !== pid || !before || s.stack.length || !potentialAttackers(s, pid).length || !opponents(s, pid).some((d) => s.battlefield.some((b) => { const c = obj(s, b); return !c.tapped && controllerOf(s, c) === d && objIsType(s, c, "Creature"); }))) continue;
+      }
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
@@ -6932,7 +7236,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const body = withModes(ab.body, modes);
       // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
       const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
-      if (!craft && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      if (!craft && !vessel && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
@@ -6952,8 +7256,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       for (const x of xs) {
         // Krumar Initiate: "Pay X life" too; keep at least 10 life.
         if (ab.lifeCostX && (x ?? 0) > player(s, pid).life - 10) continue;
-        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
+        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : leoninTarget ?? (body.targets.length ? chooseTargets(s, pid, body, false, id, x) : []);
         if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
+        // Zygon Infiltrator (round 396): only to become a copy of a creature at least as big as it is.
+        const tappedCopy = body.effects.find((e) => e.type === "becomeCopy" && e.duration === "whileTargetTapped");
+        if (tappedCopy?.type === "becomeCopy" && tappedCopy.of.ref === "target") {
+          const t = targets[tappedCopy.of.index];
+          if (t?.kind !== "object" || defWorth(defOf(s, obj(s, t.id))) < defWorth(defOf(s, o))) continue;
+        }
         // O-Naginata: not to a creature it can't be attached to (it would stay where it is, rulings).
         const only = ab.equip ? abilitiesOf(s, o).attachOnly : undefined;
         if (only && targets.some((t) => t.kind === "object" && !objectMatches(s, only, obj(s, t.id), pid, false))) continue;
@@ -7452,12 +7762,47 @@ function choosePayEnchantedCost(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/**
+ * Master Warcraft (round 379): the creatures we choose for another player to attack with: as few as the rules allow (none
+ * if that's legal), so that nobody is attacked by more than they must be. Then the ones that have to attack (requirements,
+ * CR 508.1d), then all of them, then one more at a time.
+ */
+function attackersForOpponent(s: GameState, pid: PlayerId, ap: PlayerId): ObjectId[] {
+  const ok = (ids: ObjectId[]) => !chosenAttackersProblem(s, pid, ids);
+  if (ok([])) return [];
+  const all = potentialAttackers(s, ap);
+  const must = all.filter((o) => { const c = characteristics(s, o); return attacksIfAbleNow(s, o) || c.goadedBy.length > 0 || c.mustAttack.length > 0; }).map((o) => o.id);
+  if (must.length && ok(must)) return must;
+  for (const o of all) if (ok([o.id])) return [o.id];
+  const ids = all.map((o) => o.id);
+  if (ok(ids)) return ids;
+  // Growing from the required ones, one creature at a time (the first group that's legal).
+  const grown = [...must];
+  for (const o of all) {
+    if (grown.includes(o.id)) continue;
+    grown.push(o.id);
+    if (ok(grown)) return grown;
+  }
+  return ids;
+}
+
+/** Master Warcraft (round 379): attackers another player chose for us: a declaration that costs nothing, or we don't pay (CR 508.1h-i; rulings). */
+function fixedAttacks(s: GameState, pid: PlayerId, ids: ObjectId[]): Action {
+  const prefer = [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life);
+  const free = attackAssignment(s, pid, ids, true, prefer);
+  if (free) return { type: "declareAttackers", player: pid, attacks: free };
+  return { type: "declareAttackers", player: pid, attacks: [], decline: true };
+}
+
 function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   if (s.stack.length || s.step === "beginCombat") return null;
   for (const id of player(s, pid).hand) {
     const c = compileCard(defOf(s, obj(s, id)));
     if (!c.castOnly || !timedCondition(c.castOnly) || !staticConditionNow(s, c.castOnly, id, pid)) continue;
     if (c.spell && doesNothingNow(s, id, c.spell)) continue;
+    // Berserker's Frenzy (round 378): in our first main phase, while we have a creature that could attack and an opponent an
+    // untapped creature to make block.
+    if (c.spell && allEffects(c.spell.effects).some((e) => e.type === "chooseBlocks") && (s.activePlayer !== pid || s.step !== "main1" || !potentialAttackers(s, pid).length || !opponents(s, pid).some((d) => s.battlefield.some((b) => { const x = obj(s, b); return !x.tapped && controllerOf(s, x) === d && objIsType(s, x, "Creature"); })))) continue;
     if (shieldBody(c.spell)) {
       const coming = s.battlefield.map((x) => obj(s, x)).filter((o) => o.attacking === pid && !o.attackingPermanent).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
       if (coming < Math.min(4, player(s, pid).life)) continue;
@@ -7475,11 +7820,21 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
     }
   }
   // Tidal Flats (round B214), Heroism (round B232): after blockers are declared (see chooseActivation).
-  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent");
+  // Stalking Leonin (round 377): while a creature of the chosen player's is attacking us (see chooseActivation).
+  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent" || (e.type === "if" && e.cond.kind === "targetControlledByChosen"));
   // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
   if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
-    const words = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead"));
+    // Not Words of Wind (round 385), which costs every player a permanent, ours too; Mangara's Tome only while its pile
+    // has a card.
+    const words = chooseActivation(s, pid, (ab, o) => ab.body.effects.some((e) => e.type === "nextDrawInstead" && !e.wind && (!e.pile || (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).some((l) => s.objects[l.id]?.zone === "exile" && (obj(s, l.id).zoneChanges ?? 0) === l.zc))));
     if (words) return words;
+    // Aladdin's Lamp (round 385): X = 2, the better of the top two cards drawn (abilities with X are otherwise left alone).
+    for (const id of s.battlefield) {
+      if (controllerOf(s, obj(s, id)) !== pid) continue;
+      const i = abilitiesOf(s, obj(s, id)).activated.findIndex((ab) => ab.body.effects.some((e) => e.type === "nextDrawInstead" && e.lamp));
+      const plan = i >= 0 && player(s, pid).library.length >= 2 ? planActivate(s, pid, id, i, undefined, undefined, undefined, 2) : null;
+      if (plan) return plan;
+    }
   }
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
 }
@@ -7780,6 +8135,46 @@ function sacrificeMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number,
       if (size(card) <= power(s, c) + toughness(s, c)) continue;
       if (abilityProblem(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] })) continue;
       const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice: [c.id] });
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X: Return target
+ * artifact card with mana value X or less from your graveyard to the battlefield." The most expensive artifact card in our
+ * graveyard (not a land, mana value 2 or more), for the smallest X at least its mana value that some of our other artifacts add up to: tokens
+ * and the least valuable first, never our commander, each of them cheaper than the card coming back, three at most.
+ */
+function totalMvXPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null {
+  if (ab.body.modal || ab.body.targets.length !== 1 || parseManaCost(ab.manaCost).hasX) return null;
+  const cards = player(s, pid).graveyard.filter((c) => isType(defOf(s, obj(s, c)), "Artifact") && !isType(defOf(s, obj(s, c)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
+  const mine = s.battlefield.map((x) => obj(s, x)).filter((c) => c.id !== o.id && controllerOf(s, c) === pid && !c.isCommander && objIsType(s, c, "Artifact")).sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, 8);
+  const mvOf = (c: GameObject) => characteristics(s, c).manaValue;
+  for (const card of cards) {
+    const want = mv(s, card);
+    if (want < 2) break;
+    const pool = mine.filter((c) => mvOf(c) < Math.max(1, want));
+    // Every pick of one to three of them, the smallest total first, then the least valuable.
+    const picks: GameObject[][] = [];
+    for (let a = 0; a < pool.length; a++) {
+      picks.push([pool[a]!]);
+      for (let b = a + 1; b < pool.length; b++) {
+        picks.push([pool[a]!, pool[b]!]);
+        for (let c = b + 1; c < pool.length; c++) picks.push([pool[a]!, pool[b]!, pool[c]!]);
+      }
+    }
+    const total = (p: GameObject[]) => p.reduce((n, c) => n + mvOf(c), 0);
+    const cost = (p: GameObject[]) => p.reduce((n, c) => n + worth(s, pid, c), 0);
+    const fits = picks.filter((p) => total(p) >= want).sort((a, b) => total(a) - total(b) || cost(a) - cost(b));
+    for (const p of fits) {
+      const x = total(p);
+      const t: TargetChoice[] = [{ kind: "object", id: card }];
+      const sacrifice = p.map((c) => c.id);
+      const problem = abilityProblem(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice });
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const plan = planActivate(s, pid, o.id, i, t, undefined, undefined, x, { sacrifice });
       if (plan) return plan;
     }
   }
@@ -8546,6 +8941,31 @@ function chooseForecast(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * The Beamtown Bullies (round 380): at an opponent's beginning of combat, give that player the creature card in our
+ * graveyard with the greatest power (at least 2): goaded, it must attack another player if it can (CR 701.15b), and it's
+ * exiled at the next end step.
+ */
+function chooseGiftToActive(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer === pid || s.step !== "beginCombat" || s.stack.length) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || o.tapped) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const [who, what] = ab.body.targets;
+      if (ab.body.targets.length !== 2 || who?.kind !== "player" || !who.activePlayer || !what) continue;
+      const cards = legalTargets(s, what, pid, undefined, botSource(s, id), id).flatMap((x) => (x.kind === "object" ? [obj(s, x.id)] : []));
+      const best = cards.map((c) => ({ c, p: Number(defOf(s, c).power) || 0 })).sort((a, b) => b.p - a.p)[0];
+      if (!best || best.p < 2) continue;
+      const plan = planActivate(s, pid, id, i, [{ kind: "player", id: s.activePlayer }, { kind: "object", id: best.c.id }]);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
  * An emblem's activated ability (CR 114.4), after our spells in our second main phase: Karn, Living Legacy's "Tap an
  * untapped artifact you control: This emblem deals 1 damage to any target." with an artifact that has no other use left
  * this turn (no ability but mana), at the target chooseTargets picks; Ob Nixilis of the Black Oath's "{1}{B}, Sacrifice a
@@ -8763,10 +9183,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
   const allIn = ready.length > theirBlockers.length;
   // Creatures that attack each combat if able have to (CR 508.1d), whatever their power, at whoever they can.
-  const must = potentialAttackers(s, pid).filter((o) => characteristics(s, o).attacksIfAble && !ready.includes(o));
+  const must = potentialAttackers(s, pid).filter((o) => attacksIfAbleNow(s, o) && !ready.includes(o));
   let attacks = [
     ...ready
-      .filter((o) => allIn || characteristics(s, o).attacksIfAble || survivesBlocks(o))
+      .filter((o) => allIn || attacksIfAbleNow(s, o) || survivesBlocks(o))
       .map((o) => ({ attacker: o.id, defender: target })),
     ...must.map((o) => ({ attacker: o.id, defender: attackProblem(s, o, target) ? opps.find((d) => !attackProblem(s, o, d))! : target })),
   ];
@@ -8834,7 +9254,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");
   if (declared.length > cap) {
-    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    const must = (a: { attacker: string }) => (attacksIfAbleNow(s, obj(s, a.attacker)) ? 1 : 0);
     declared = [...declared].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(0, cap);
   }
   // Seeker of Slaanesh: with nobody attacking, one creature has to (CR 508.1d): the toughest one that can go alone, at
@@ -8852,7 +9272,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     const room = attackYouLimit(s, d);
     const at = declared.filter((a) => a.defender === d && a.planeswalker === undefined);
     if (at.length <= room) continue;
-    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    const must = (a: { attacker: string }) => (attacksIfAbleNow(s, obj(s, a.attacker)) ? 1 : 0);
     const extra = [...at].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(room);
     declared = declared.flatMap((a) => {
       if (!extra.includes(a)) return [a];
@@ -8941,8 +9361,28 @@ function withCompany<B extends { blocker: ObjectId; attacker: ObjectId }>(s: Gam
 function blocksForOpponent(s: GameState, pid: PlayerId, defender: PlayerId): Action {
   // Blocks that cost mana (Archangel of Tithes) oblige no one (CR 509.1c): none, then.
   if (blockCost(s, 1) || !blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
+  // Brutal Hordechief, Invasion Plans (round 378): creatures that must block each block where they fare worst (an attacker
+  // that kills them and survives), as long as that obeys every requirement it can (CR 509.1c); else the defender's own.
+  const hostile = hostileBlocks(s, defender);
+  if (hostile) return { type: "declareBlockers", player: pid, blocks: hostile };
   const theirs = chooseBlocks(s, defender);
   return { type: "declareBlockers", player: pid, blocks: theirs.type === "declareBlockers" ? theirs.blocks : [] };
+}
+
+/** Round 378: the blocks the player choosing them for `defender` likes best, only creatures that must block, one each on attackers one creature can block. */
+function hostileBlocks(s: GameState, defender: PlayerId): { blocker: ObjectId; attacker: ObjectId }[] | null {
+  const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === defender && blockersNeeded(s, o) === 1 && !cantBeBlockedNow(s, o));
+  const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === defender && objIsType(s, o, "Creature") && characteristics(s, o).mustBlock && !characteristics(s, o).mustBlockEach && untappedForBlocking(s, o) && !cantBlockNow(s, o));
+  if (!theirs.length || !incoming.length) return null;
+  const hit = combatHits(s);
+  const blocks: { blocker: ObjectId; attacker: ObjectId }[] = [];
+  for (const b of theirs) {
+    const able = incoming.filter((at) => !blockProblem(s, b, at));
+    const dies = (at: GameObject) => hit(at, b) >= toughness(s, b) || (objHasKeyword(s, at, "Deathtouch") && hit(at, b) > 0);
+    const at = able.find((a) => dies(a) && hit(b, a) < toughness(s, a)) ?? able.find(dies) ?? able[0];
+    if (at) blocks.push({ blocker: b.id, attacker: at.id });
+  }
+  return blocks.every((b) => !blockProblem(s, obj(s, b.blocker), obj(s, b.attacker))) && !blockRequirementProblem(s, defender, blocks) ? blocks : null;
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {

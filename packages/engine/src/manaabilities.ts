@@ -2,7 +2,7 @@
 // whether it can be activated, and which one to use for a given mana.
 
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaSpend, type ManaTrigger } from "./abilities";
-import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
+import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, lendersOf, objIsType, onceKeyBase } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
 import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, manaActivationTax, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -43,14 +43,28 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   // (rulings on Mirran Safehouse).
   const borrows = c.hasPrintedAbilities && !lendingMana ? compileCard(defOf(s, o)).borrows : undefined;
   if (borrows && !borrows.noMana) {
-    const { objects, cards } = lendersOf(s, o, borrows);
+    const { objects, cards, cardIds } = lendersOf(s, o, borrows);
     lendingMana = true; // a lender's own borrowed mana abilities aren't followed (no loops)
+    const lent: ManaAbility[] = [];
     try {
-      for (const x of objects) out.push(...manaAbilitiesOn(s, x));
+      for (const x of objects) lent.push(...manaAbilitiesOn(s, x));
     } finally {
       lendingMana = false;
     }
-    for (const d of cards) out.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
+    // Mairsil, the Pretender (round 401): each caged card's mana abilities are instances of their own, each once each turn
+    // (rulings), so none is merged with another's.
+    if (borrows.oncePerTurn)
+      cards.forEach((d, ci) => out.push(...[...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana].map((ab, ai) => ({ ...ab, onceKey: `${onceKeyBase(s, cardIds[ci]!)}#m${ai}` }))));
+    else {
+      for (const d of cards) lent.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
+      // The same ability borrowed from several lenders (Manascape Refractor with fourteen basic lands around, round 382) is
+      // the same ability of this permanent, "~" in it being this one: offered once.
+      const seen = new Set(out.map((ab) => ab.text));
+      for (const ab of lent) if (!seen.has(ab.text)) {
+        seen.add(ab.text);
+        out.push(ab);
+      }
+    }
   }
   // Agatha's Soul Cauldron: the exiled creature cards' mana abilities too. Steward of the Harvest: a land card's basic land
   // types' among them (CR 305.6, rulings).
@@ -679,6 +693,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.untapSelf && (o.counters.stun ?? 0) > 0 && countersStay(s, o, "stun")) return `${name}'s stun counter can't be removed`;
   if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`;
   if (ab.sacrificeSelf && !canSacrificeForCost(s, o)) return `${name} can't be sacrificed`; // CR 701.21, 602.2b
+  if (ab.onceKey && o.borrowedUsed?.includes(ab.onceKey)) return `${name}'s ability can be activated only once each turn`; // Mairsil (round 401)
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
   if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
@@ -696,7 +711,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
     if (why) return why;
   }
   const payCost = manaAbilityCostOf(s, pid, o, ab);
-  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o })) return "not enough mana";
+  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o, ...(ab.blueAsAny ? { blueAny: true as const } : {}) })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);

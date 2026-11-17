@@ -947,6 +947,9 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
     else if (clause === "as a sorcery") out.sorcery = true;
     else if (clause.startsWith("during ") && (c = parseDuring(clause.slice(7)))) conds.push(c);
     else if ((c = parseTurnPoint(clause))) conds.push(c);
+    // Berserker's Frenzy (round 378): "before combat or during combat before blockers are declared": either one, the
+    // first a point of the turn's first combat (CR 506.8d), the second any combat's steps before blockers (506.8b-c).
+    else if (/^before combat or during combat before blockers are declared$/.test(clause)) conds.push({ kind: "anyOf", conds: [parseTurnPoint("before combat")!, parseDuring("combat before blockers are declared")!] });
     else if (clause === "if you've been attacked this step") conds.push({ kind: "attackedThisStep" });
     else if (clause.startsWith("if ") && (c = parseActivateCondition(clause.slice(3)))) conds.push(c);
     else return null;
@@ -1556,6 +1559,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you(?:'ve)? discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", yours: true };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
+  // The Book of Vile Darkness (round 398): "if you lost 2 or more life this turn": the life you lost this turn, added up
+  // (CR 119.3), whatever you gained.
+  if ((m = new RegExp(`^you lost ${NUM} or more life this turn$`).exec(text))) return { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: num(m[1]!) };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
   // Nightkin Ambusher: "~ can't be blocked as long as defending player has a rad counter": the player it's attacking.
   if (text === "defending player has a rad counter" && st.affects.kind === "self") return { kind: "defendingHasRad" };

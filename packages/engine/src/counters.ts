@@ -164,6 +164,8 @@ export function putPlayerCounters(s: GameState, pid: PlayerId, kind: "poison" | 
 type TokenKind = Pick<TokenSpec, "types" | "subtypes">;
 /** What an effect creating tokens really creates: `same` of its own token, and `extra` other tokens replacements add. */
 export interface TokenBatch {
+  /** Who creates them, under whose control they enter (Crafty Cutpurse can change it, tokenMaker): every caller creates them for this player. */
+  pid: PlayerId;
   same: number;
   /** `copyOf`: tokens that are copies of that permanent instead (Esix, Mirrormind Crown; createExtraTokens). */
   extra: ({ token: TokenSpec; n: number; copyOf?: undefined; /** Created instead of all the others (Jinnie Fay). */ instead?: true } | { copyOf: ObjectId; n: number; token?: undefined })[];
@@ -216,7 +218,63 @@ function mayInsteads(s: GameState): { mod: Extract<CountMod, { op: "mayInstead" 
 /** Could a token creation now meet an optional replacement (so a resolving instruction must be able to stop and ask)? */
 export function tokenChoicesPossible(s: GameState): boolean {
   const had = s.turnLog?.tokenEvents ?? [];
+  // Crafty Cutpurse: two players' effects this turn can make the would-be controller choose (tokenMaker).
+  if (new Set(liveSteals(s).map((x) => x.player)).size > 1) return true;
   return mayInsteads(s).some(({ mod, controller }) => !mod.first || !had.includes(controller));
+}
+
+/** This turn's Crafty Cutpurse effects of players still in the game (CR 800.4a: a player who left controls nothing). */
+const liveSteals = (s: GameState) => (s.turnLog?.tokenSteals ?? []).filter((x) => !s.players[x.player]?.lost);
+
+/**
+ * Crafty Cutpurse (round 394): "each token that would be created under an opponent's control this turn is created under
+ * your control instead". Such an effect changes under whose control the tokens enter, so it applies before every other
+ * replacement of the event (CR 616.1b): the token doublers and the like of the player who now creates them apply after
+ * it, an opponent's not at all (rulings: "if an opponent controls Anointed Procession, your Crafty Cutpurse's effect
+ * applies before that of Anointed Procession and you won't get twice as many tokens"). The player who creates a token
+ * owns it (CR 111.2). With several players' effects, the would-be controller chooses one to apply, then the new would-be
+ * controller among the rest, and so on, each effect applying once (CR 616.1, 616.1f; rulings): so a player's own effect
+ * can bring the tokens back to them. A real choice (the outcomes differ) is asked like Jinnie Fay's (TokenQuestion);
+ * `probe` and bots take the first option.
+ */
+export function tokenMaker(s: GameState, pid: PlayerId, probe = false): PlayerId {
+  const steals = liveSteals(s);
+  if (!steals.length) return pid;
+  // Where the tokens end up from `cur`, with the effects not yet `used`, always taking the first that applies.
+  const applicable = (cur: PlayerId, used: number[]) => steals.flatMap((x, i) => (!used.includes(i) && x.player !== cur && opponents(s, x.player).includes(cur) ? [i] : []));
+  const settle = (cur: PlayerId, used: number[]): PlayerId => {
+    const next = applicable(cur, used)[0];
+    return next === undefined ? cur : settle(steals[next]!.player, [...used, next]);
+  };
+  let cur = pid;
+  const used: number[] = [];
+  for (let at = applicable(cur, used); at.length; at = applicable(cur, used)) {
+    let pick = at[0]!;
+    const ends = at.map((i) => settle(steals[i]!.player, [...used, i]));
+    if (!probe && new Set(ends).size > 1) {
+      const name = (p: PlayerId) => s.players[p]!.name;
+      const q: TokenQuestion = {
+        player: cur,
+        source: [...new Set(at.map((i) => steals[i]!.source))].join(" and "),
+        prompt: "tokens you would create are created under another player's control instead: whose effect applies first?",
+        options: at.map(String),
+        labels: at.map((i, k) => `${name(steals[i]!.player)}'s ${steals[i]!.source} (they end up under ${name(ends[k]!)}'s control)`),
+        botChoice: String(at[0]),
+      };
+      const ask = tokenAnswers;
+      let answer: string;
+      if (!ask) answer = q.botChoice;
+      else if (ask.used < ask.answers.length) answer = ask.answers[ask.used++]!;
+      else {
+        ask.ask = q;
+        throw new TokenQuestionPause(q.prompt);
+      }
+      if (q.options.includes(answer)) pick = Number(answer);
+    }
+    used.push(pick);
+    cur = steals[pick]!.player;
+  }
+  return cur;
 }
 
 /** What a token or a copy of a permanent is worth to a bot, roughly (tokenInsteadPick). */
@@ -292,7 +350,7 @@ function applyMayInstead(s: GameState, pid: PlayerId, entries: { kind: TokenKind
   }
   if (pick === "none" || !q.options.includes(pick)) return undefined;
   const chosen = results[Number(pick)]!;
-  return { same: 0, extra: ["token" in chosen.result ? { token: chosen.result.token, n: total, instead: true as const } : { copyOf: chosen.result.copyOf, n: total }] };
+  return { pid, same: 0, extra: ["token" in chosen.result ? { token: chosen.result.token, n: total, instead: true as const } : { copyOf: chosen.result.copyOf, n: total }] };
 }
 
 /**
@@ -302,7 +360,9 @@ function applyMayInstead(s: GameState, pid: PlayerId, entries: { kind: TokenKind
  * each (two Manufactors make three of each, rulings), then a token for each token (Chatterfang), then the doublers, then
  * Divine Visitation's Angels.
  */
-export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: number, /** Only how many: not the event itself (no optional replacement is asked about or used up). */ probe = false): TokenBatch {
+export function tokenBatch(s: GameState, pid0: PlayerId, token: TokenKind, n: number, /** Only how many: not the event itself (no optional replacement is asked about or used up). */ probe = false): TokenBatch {
+  // Crafty Cutpurse first (CR 616.1b): then everything else is about the player who now creates them.
+  const pid = n > 0 ? tokenMaker(s, pid0, probe) : pid0;
   // "The first time you would create one or more tokens each turn" (Moonlit Meditation): every such event counts, whether
   // or not something replaced it (rulings).
   let first = false;
@@ -312,8 +372,8 @@ export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: num
     if (first) had.push(pid);
   }
   const mods = modsInPlay(s).flatMap(({ mod, controller }) => (mod.what === "tokens" && mod.op !== "mayInstead" && (mod.who === "any" || controller === pid) ? [mod] : []));
-  if (n <= 0) return { same: n, extra: [] };
-  if (!mods.length) return (!probe && applyMayInstead(s, pid, [{ kind: token, n }], first)) || { same: n, extra: [] };
+  if (n <= 0) return { pid, same: n, extra: [] };
+  if (!mods.length) return (!probe && applyMayInstead(s, pid, [{ kind: token, n }], first)) || { pid, same: n, extra: [] };
   // The original token is the entry with no `spec`.
   const entries: { kind: TokenKind; spec?: TokenSpec; n: number }[] = [{ kind: token, n }];
   const fits = (k: TokenKind, mod: CountMod) => (!("subtype" in mod) || !mod.subtype || k.subtypes.includes(mod.subtype)) && (!("type" in mod) || !mod.type || k.types.includes(mod.type));
@@ -374,7 +434,7 @@ export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: num
   // Jinnie Fay, Esix: optional, chosen last, for all of them (see applyMayInstead).
   const instead = !probe && applyMayInstead(s, pid, entries, first);
   if (instead) return instead;
-  return { same: entries[0]!.n, extra: entries.slice(1).flatMap((e) => (e.n > 0 ? [{ token: e.spec!, n: e.n }] : [])) };
+  return { pid, same: entries[0]!.n, extra: entries.slice(1).flatMap((e) => (e.n > 0 ? [{ token: e.spec!, n: e.n }] : [])) };
 }
 
 /** How many of this token `pid` really creates when an effect would create `n` (without any other tokens added). */

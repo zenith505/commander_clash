@@ -502,6 +502,15 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
     const body = { ...trigger.body, text: `${dealsAny[3]!}.`, effects: JSON.parse(JSON.stringify(trigger.body.effects).replaceAll('{"ref":"self"}', '{"ref":"subject"}')) as Effect[] };
     return { type: "floatingTrigger", trigger: { ...trigger, body }, until: "endOfTurn", about: index };
   }
+  // Melee: "Whenever a creature attacks and isn't blocked this combat, untap it and remove it from combat.": a delayed
+  // trigger until this combat ends (CR 603.7b), once for each attacking creature no creature was declared to block (CR
+  // 509.1h, rulings), put onto the battlefield attacking too (rulings). Only the attacking player's creatures attack (CR
+  // 506.3b, 506.4), and Melee is cast only during combat on its caster's turn, so they're the creatures its controller controls.
+  if (ctx?.spell && !after.length && s === "Whenever a creature attacks and isn't blocked this combat, untap it and remove it from combat") {
+    const trigger = parseTrigger("Whenever a creature you control attacks and isn't blocked, untap it and remove it from combat.");
+    if (!trigger || trigger === "fail" || trigger.event !== "creatureYouControlAttacksUnblocked" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger: { ...trigger, body: { ...trigger.body, text: "untap it and remove it from combat." } }, until: "endOfCombat" };
+  }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -2197,6 +2206,14 @@ function sentenceRun(s: string, sentences: string[], si: number, ctx: Ctx, spell
   // Sigarda's Vanguard: "choose any number of creatures with different powers. Those creatures gain double strike until end
   // of turn.": anyone's creatures, chosen as it resolves, not targeted, no two with the same power (rulings); one alone is
   // a set too.
+  // Berserker's Frenzy (round 378): "Choose any number of creatures. They block this turn if able.": anyone's, chosen as it
+  // resolves, not targeted, none too; each chosen one blocks in each combat this turn if able (CR 509.1c).
+  if (/^[Cc]hoose any number of creatures$/.test(s) && /^They block this turn if able\.?$/.test(sentences[si + 1] ?? "")) {
+    return { effects: [
+      { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 0, action: "choose", anyNumber: true, anyController: true, prompt: "click any number of creatures (anyone's), then choose them: they block this turn if able" },
+      { type: "continuous", what: { ref: "created" }, mods: [{ kind: "mustBlock" }], duration: "endOfTurn" },
+    ], skip: 1 };
+  }
   if (/^[Cc]hoose any number of creatures with different powers$/.test(s)) {
     // Sigardian Zealot: "Each of them gets +X/+X and gains vigilance until end of turn, where X is ~'s power.": X is ~'s
     // power as this resolves, or as it last existed (CR 608.2h), the same for each of them, locked in (CR 611.2c).
@@ -5663,10 +5680,13 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Words of Wilding, Words of Worship: "The next time you would draw a card this turn, create a 2/2 green Bear creature
     // token (you gain 5 life) instead." A replacement effect for the controller's next draw this turn (Player.nextDrawInstead).
     // Words of War: "~ deals 2 damage to any target instead": the target chosen as the ability is activated (CR 115.1c,
-    // 602.2b), and the damage dealt to it when the draw is replaced. Waste and Wind (choices) aren't done.
-    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token|~ deals (\d+) damage to any target) instead$/.exec(s);
+    // 602.2b), and the damage dealt to it when the draw is replaced. Words of Waste (round 383): "each opponent discards a
+    // card instead", each opponent's own choice (CR 701.9b) as the draw is replaced. Wind (each player's choice of a
+    // permanent to return) is a whole line of round 385's (oracle/round385.ts).
+    const wordsOf = /^[Tt]he next time you would draw a card this turn, (you gain (\d+) life|create an? [^.]+? token|~ deals (\d+) damage to any target|(each opponent discards a card)) instead$/.exec(s);
     if (wordsOf && !ctx.spell) {
-      if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
+      if (wordsOf[4]) effects.push({ type: "nextDrawInstead", discard: true });
+      else if (wordsOf[2]) effects.push({ type: "nextDrawInstead", gain: Number(wordsOf[2]) });
       else if (wordsOf[3]) {
         const before = ctx.targets.length;
         const fx = parseOne(capital(wordsOf[1]!), ctx);
@@ -17627,7 +17647,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment|Hero or noncreature) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast an Ally spell from among cards you own exiled with ~$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast a spell from among cards in exile with page counters on them without paying its mana cost$|cast up to three spells from among face-up cards your opponents own from exile without paying their mana costs$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |change any targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)(?: until the next end step)?$|attach any number of Equipment you control to (?:target creature you control|it|that creature)$|play the exiled card |cast the exiled card without paying its mana cost$|play one of the cards exiled with ~ without paying its mana cost$|cast a card exiled with ~ without paying its mana cost$|cast an? (?:(?:instant or sorcery|instant|sorcery|creature|artifact|enchantment|Hero or noncreature) )?spell(?: with mana value X)? from among cards exiled with ~ without paying its mana cost$|cast an Ally spell from among cards you own exiled with ~$|cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$|cast a spell from among cards in exile with page counters on them without paying its mana cost$|cast up to three spells from among face-up cards your opponents own from exile without paying their mana costs$|cast any number of spells from among cards exiled with ~ with total mana value X or less without paying their mana costs$|exile a(?: nonland)? card from your hand with a number of time counters on it equal to its mana value$|exile it and put \w+ time counters? on it$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |change the targets of target |change any targets of target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$|have any number of them phase out$|activate the loyalty abilities of planeswalkers you control twice this turn rather than only once$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -19935,7 +19955,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
-    if (o.type === "reflexive" && (o.xAmount !== undefined || o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xExiledMv || o.xDiscardedTypes || o.xDiscardedMv || o.xPutMv)) return false;
+    if (o.type === "reflexive" && (o.xAmount !== undefined || o.xExcess || o.xSacrificed || o.xDiscarded || o.xRevealedMv || o.xCastMv || o.xExiledMv || o.xDiscardedTypes || o.xDiscardedMv || o.xPutMv)) return false;
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;

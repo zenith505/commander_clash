@@ -126,6 +126,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const types = m[1] ? m[1].split(" or ").map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
     return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, ...(types ? { filter: { kind: "card", types, notTypes: [], notColors: [], text: `${m[1]} card` }, asSpell: true as const } : {}), ...(m[2] ? { exactMv: { count: { kind: "x" as const } } } : {}) }];
   }
+  // Krang & Shredder (round 395): "you may cast a card exiled with ~ without paying its mana cost": the same, one spell now
+  // from the linked cards (a land card can't be cast), timing ignored, X as 0 (rulings, CR 608.2g, 107.3).
+  if (/^[Yy]ou may cast a card exiled with ~ without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1 }];
   // Scarlet Witch, Chaotic Avenger: "You may cast a Hero or noncreature spell from among cards exiled with ~ without paying
   // its mana cost": one spell now, from the linked cards, the spell as it's cast fitting (an Adventure's half, CR 715.3).
   if ((m = /^[Yy]ou may cast a (Hero or noncreature) spell from among cards exiled with ~ without paying its mana cost$/.exec(s)) && !ctx.spell) {

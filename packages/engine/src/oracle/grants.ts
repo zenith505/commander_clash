@@ -1,4 +1,4 @@
-import type { ActivatedAbility, TriggeredAbility, CompiledCard, Modification } from "../abilities";
+import type { ActivatedAbility, TriggeredAbility, CompiledCard, ManaAbility, Modification } from "../abilities";
 import type { CardDef } from "../types";
 import { QUOTED_SOURCE_NAME, compile } from "./compile";
 import { textKeywords, isKeywordLine } from "./keyword-abilities";
@@ -43,6 +43,19 @@ export const casterMark = (p: number | undefined, name: string) => `\u27eacaster
 export const SPELL_CONTROLLER = "\u27eayou\u27eb";
 export const playerMark = (p: number | undefined, name: string) => `\u27eaplayer ${p ?? "none"}|${name}\u27eb`;
 
+/**
+ * Quicksilver Elemental, Grell Philosopher, Havengul Lich (round 400, Effect gainActivatedOf): "gains all activated
+ * abilities of ..." as an `addAbility` text, the abilities as they were then (CR 611.2c) carried in it compiled:
+ * "⟪gained|Name⟫{...}". Brackets in the JSON are escaped, so no other mark (bindGrantSource's) is ever read inside it.
+ */
+const GAINED = /^\u27eagained\|([^\u27eb]*)\u27eb/;
+export function gainedAbilityText(from: string, activated: ActivatedAbility[], mana: ManaAbility[]): string {
+  const json = JSON.stringify({ activated, mana }).replace(/[\u27ea\u27eb]/g, (c) => `\\u${c.charCodeAt(0).toString(16)}`);
+  return `\u27eagained|${from.replace(/[\u27ea\u27eb]/g, "")}\u27eb${json}`;
+}
+/** The name of the object whose abilities a gainedAbilityText text carries, or undefined for any other text. */
+export const gainedFrom = (text: string): string | undefined => GAINED.exec(text)?.[1];
+
 const grantedCache = new Map<string, CompiledCard>();
 /** A granted ability's name for the permanent that gave it, bound to that object: "⟪source t12 3⟫" (see bindGrantSource). */
 const BOUND_SOURCE = /\u27easource (\S+) (\d+)\|([^\u27eb]*)\u27eb/g;
@@ -53,7 +66,7 @@ const BOUND_SOURCE = /\u27easource (\S+) (\d+)\|([^\u27eb]*)\u27eb/g;
  */
 export const bindGrantSource = (text: string, id: string, zc: number, name: string) => text.replaceAll(QUOTED_SOURCE_NAME, `\u27easource ${id} ${zc}|${name}\u27eb`);
 /** A granted ability's text as players read it: the permanent that gave it by its name. */
-export const showGrantSource = (text: string) => text.replace(BOUND_SOURCE, "$3").replace(/\u27eacaster (?:\d|none)\|([^\u27eb]*)\u27eb/g, "the player who cast $1").replace(/\u27eaplayer (?:\d+|none)\|([^\u27eb]*)\u27eb/g, "$1");
+export const showGrantSource = (text: string) => (gainedFrom(text) !== undefined ? `all activated abilities of ${gainedFrom(text)}` : text).replace(BOUND_SOURCE, "$3").replace(/\u27eacaster (?:\d|none)\|([^\u27eb]*)\u27eb/g, "the player who cast $1").replace(/\u27eaplayer (?:\d+|none)\|([^\u27eb]*)\u27eb/g, "$1");
 /** Fills in `id` and `zc` of each ObjRef grantSource in a compiled granted ability, and its name in the text it shows. */
 function bindRefs<T>(x: T, id: string, zc: number, name: string, key?: string): T {
   if (typeof x === "string") return (key === "text" ? x.replaceAll(QUOTED_SOURCE_NAME, name) : x) as T;
@@ -68,6 +81,14 @@ function bindRefs<T>(x: T, id: string, zc: number, name: string, key?: string): 
 export function compileGranted(text: string): CompiledCard {
   let hit = grantedCache.get(text);
   if (!hit) {
+    // Round 400's gained abilities: compiled already, "~" in them the object that has them now.
+    const gained = GAINED.exec(text);
+    if (gained) {
+      const { activated, mana } = JSON.parse(text.slice(gained[0].length)) as { activated: ActivatedAbility[]; mana: ManaAbility[] };
+      hit = { triggers: [], activated, mana, statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
+      grantedCache.set(text, hit);
+      return hit;
+    }
     const bound = [...text.matchAll(BOUND_SOURCE)];
     if (bound.length) {
       const [, id, zc, name] = bound[0]!;
@@ -120,7 +141,7 @@ function namesGrantSource(c: CompiledCard): boolean {
  * keywords (or remove them) join layer 6 once granted (computeLayers in layers.ts); ones that change types, colors or other abilities
  * would have to come out of earlier layers than the one that grants them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop", "damagedCantRegenerate"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop", "combatToPlayerDrawsHalf", "damagedCantRegenerate"]);
 // Earthbind's granted "Enchanted creature loses flying" (removeKeywords) joins layer 6 the same way.
 export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || m.kind === "removeKeywords" || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 
@@ -392,6 +413,8 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
   "castSpell", "permanentEnters", "anotherCreatureYouControlEnters", "landYouControlEnters", "permanentDies", "youGainLife",
   "playerDraws", "creatureYouControlAttacks", "creatureYouControlDealsCombatDamageToPlayer", "permanentBecomesTapped",
   "creaturesYouControlDealCombatDamageToPlayer",
+  // Rowan Kenrith's emblem (round 391): "Whenever you activate an ability that isn't a mana ability, copy it." (triggers.ts).
+  "abilityActivated",
 ]);
 
 /**

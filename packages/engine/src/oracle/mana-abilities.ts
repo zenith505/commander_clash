@@ -607,6 +607,10 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
     const what = mvOrX[1] ? "creature spells" : "spells";
     return { text: sentence, spells: { kind: "spell", ...(mvOrX[1] ? { types: ["Creature"] } : {}), anyOf: [{ kind: "spell", manaValue: { min: Number(mvOrX[2]) }, text: `mana value ${mvOrX[2]} or greater` }, { kind: "spell", xInCost: true, text: "with {X} in its mana cost" }], text: `${what} with mana value ${mvOrX[2]} or greater or with {X} in their mana costs` } };
   }
+  // Ashling, Rimebound (round 387): "Spend this mana only to cast spells with mana value 4 or greater": the spell's mana
+  // value as it's cast, X counted (CR 202.3e, 106.6).
+  const mvMin = /^Spend this mana only to cast spells with mana value (\d+) or greater\.$/.exec(sentence);
+  if (mvMin) return { text: sentence, spells: { kind: "spell", manaValue: { min: Number(mvMin[1]) }, text: `spells with mana value ${mvMin[1]} or greater` } };
   // Titans' Nest: "Spend this mana only to cast a spell that's one or more colors without {X} in its mana cost" (CR
   // 105.2c, 107.3; rulings: an {X} in an additional or alternative cost doesn't stop it).
   if (sentence === "Spend this mana only to cast a spell that's one or more colors without {X} in its mana cost.") return { text: sentence, spells: { kind: "spell", colorCount: "colored", noXInCost: true, text: "spells that are one or more colors without {X} in their mana costs" } };

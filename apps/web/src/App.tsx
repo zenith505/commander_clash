@@ -45,6 +45,7 @@ import {
   costsHaveX,
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
+  playsFromAnyGraveyard,
   mayPlayFromTop,
   topVisible,
   topPlayable,
@@ -159,6 +160,8 @@ import {
   entersRulesOf,
   crewPower,
   potentialAttackers,
+  attackAssignment,
+  chosenAttackersProblem,
   walkersFreeToAttack,
   attackedName,
   returnCandidates,
@@ -217,6 +220,7 @@ import {
   spellManaValue,
   blockWithoutCompany,
   showGrantSource,
+  gainedFrom,
   sameName,
   costChoiceShares,
   mayPayUse,
@@ -516,6 +520,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   craftSlots?: Extract<AdditionalCost, { kind: "craft" }>;
   /** Nethergoyf's escape: the cards picked have at least this many card types among them (cardTypesAmong). */
   cardTypes?: number;
+  /** Fabrication Foundry (round 386): one or more permanents whose mana values add up to this (`n` is how many there are to pick from). */
+  totalMv?: number;
   what: string;
   n: number;
   candidates: string[];
@@ -837,6 +843,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // of the spell on top of the stack when that one does.
       // "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): likewise.
       const mvX = ab.costs?.find((c) => (c.kind === "discard" || c.kind === "sacrifice") && c.mvX);
+      // Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X": only the X
+      // some of them add up to (and a target fits), the greatest first.
+      const totalMv = ab.costs?.find((c) => c.kind === "sacrifice" && c.totalMvX);
+      if (totalMv) {
+        const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
+        const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
+        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes, extra: "exile one or more other artifacts you control with total mana value X" });
+      }
       if (mvX) {
         const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
         const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
@@ -971,6 +985,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId && !(c.selfIf && objectMatches(s, c.selfIf, s.objects[id]!, HUMAN, false))) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
       const what = c.kind === "sacrifice" ? c.filter.text.replace(/~/g, cardOf(s, d.objectId).name) : (c.filter?.text ?? "card");
+      // Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X", X announced.
+      if (c.kind === "sacrifice" && c.totalMvX) return setCostPick({ activate: d, kind: "sacrifice", label: cardOf(s, d.objectId).name, what: `exile one or more ${what}`, n: candidates.length, candidates, chosen: [], exile: true, totalMv: c.totalMv ?? 0 });
       // "Sacrifice a creature with mana value 2 other than Sidisi": its text already says which.
       // Bloodfire Infusion: "Sacrifice enchanted creature": that one permanent.
       const article = c.kind === "sacrifice" && c.filter.objectId !== undefined ? "the" : c.kind === "sacrifice" && c.other && !/ other than /.test(c.filter.text) ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
@@ -1446,6 +1462,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     // Attacking: click a creature, then the player it attacks (an arrow follows the mouse).
     // Clicking an attacking creature again takes it out of the attack.
+    // Master Warcraft (round 379): choosing which of the active player's creatures attack: click them to pick them.
+    if (pending?.kind === "chooseAttackers") {
+      if (potentialAttackers(s, pending.attacker).some((a) => a.id === o.id)) setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id]));
+      return;
+    }
     if (pending?.kind === "declareAttackers") {
       // An opponent's planeswalker can be attacked instead of the player (CR 506.2, 508.1b).
       if (aim && attackablePlaneswalker(o.id)) {
@@ -1456,6 +1477,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return;
       }
       if (controllerOf(s, o) !== HUMAN || !potentialAttackers(s, HUMAN).some((a) => a.id === o.id)) return;
+      // Master Warcraft: only the creatures another player chose attack.
+      if (pending.fixed && !pending.fixed.includes(o.id)) return;
       if (o.id in attacks) {
         const next = { ...attacks };
         delete next[o.id];
@@ -1546,7 +1569,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   }
 
   // Creatures that can still be told to attack or block glow, like playable cards.
-  const attackers = pending?.kind === "declareAttackers" ? new Set(potentialAttackers(s, HUMAN).map((a) => a.id)) : null;
+  const attackers = pending?.kind === "declareAttackers" ? new Set(potentialAttackers(s, HUMAN).map((a) => a.id).filter((id) => !pending.fixed || pending.fixed.includes(id))) : null;
   const blockingFor = pending?.kind === "declareBlockers" ? (pending.defender ?? HUMAN) : HUMAN;
   const attackingMe = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.attacking === blockingFor);
   const canBlockWith = (o: GameObject) =>
@@ -1571,7 +1594,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       (canBlockWith(o) && blocker !== o.id) ||
       (!!tapPick && !tapPick.chosen.includes(o.id) && tapCandidates(s, tapPick).some((c) => c.id === o.id)) ||
       (!!costPick && !costPick.chosen.includes(o.id) && costPick.candidates.includes(o.id)) ||
-      (pending?.kind === "pickPermanents" && pending.player === HUMAN && pending.options.includes(o.id) && !discards.includes(o.id)),
+      (pending?.kind === "pickPermanents" && pending.player === HUMAN && pending.options.includes(o.id) && !discards.includes(o.id)) ||
+      (pending?.kind === "chooseAttackers" && !discards.includes(o.id) && potentialAttackers(s, pending.attacker).some((a) => a.id === o.id)),
   };
   const waiting = waitingOn(s);
   const corners = seatCorners(s);
@@ -1773,7 +1797,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}
             />
           )}
-          {pending?.kind === "chooseOption" && (pending.what === "creatureType" || pending.what === "planeswalkerType" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length > 10)) && pending.player === HUMAN && (
+          {pending?.kind === "chooseOption" && (pending.what === "creatureType" || pending.what === "planeswalkerType" || pending.what === "noteType" || ((pending.what === "textFrom" || pending.what === "textTo") && pending.options.length > 10)) && pending.player === HUMAN && (
             <TypePicker key={pending.source} s={s} pending={pending} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
           )}
           {pending?.kind === "chooseOption" && pending.what === "cardName" && pending.player === HUMAN && (
@@ -2168,6 +2192,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <CostPickBar
               pick={costPick}
               valid={!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)}
+              costPickMv={(id) => characteristics(s, s.objects[id]!).manaValue}
               onDone={() => finishCostPick(costPick)}
               onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
@@ -2347,7 +2372,7 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", nextFree: "Cast it:", nextLife: "Cast it:", linkedFree: "Cast it:", topFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", nextFree: "Cast it:", nextLife: "Cast it:", linkedFree: "Cast it:", topFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:", dreamHalls: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
@@ -2388,6 +2413,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   topFree: "the card Temporal Aperture revealed, while it remains on top of your library, for nothing; X is 0",
   nextLife: "life equal to its mana value instead of its mana cost, for the next spell you cast this turn (Marshland Bloodcaster); X is 0",
   payZero: "{0} instead of its mana cost (As Foretold, Rooftop Storm); X is 0",
+  dreamHalls: "discard a card that shares a color with it instead of paying its mana cost (Dream Halls); X is 0",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", turnPermission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
@@ -2449,7 +2475,8 @@ function exileOptions(s: GameState, id: string): boolean {
 /** You may cast spells from other players' graveyards this turn (The Great Work; Locke, Treasure Hunter's milled cards). */
 /** Jötun Grunt's cumulative upkeep (searchLibrary `pairsPerYard`): an even number of the cards from each graveyard. */
 const evenPerYard = (s: GameState, ids: string[]) => ids.every((id) => ids.filter((x) => s.objects[x]!.owner === s.objects[id]!.owner).length % 2 === 0);
-const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn) || !!s.graveGrants?.some((g) => (g.cards || g.fromYardOf !== undefined) && g.player === HUMAN && g.turn === s.turn);
+// Coram, the Undertaker (round 381): any graveyard's cards put there from libraries this turn.
+const castsFromAnyGraveyard = (s: GameState) => playsFromAnyGraveyard(s, HUMAN) || !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn) || !!s.graveGrants?.some((g) => (g.cards || g.fromYardOf !== undefined) && g.player === HUMAN && g.turn === s.turn);
 
 /** Does this card in your graveyard (or another's, with The Great Work) have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {
@@ -2789,13 +2816,14 @@ function KickPickBar({
 }
 
 /** Sacrificing as an additional cost (CR 601.2h): click the permanents to sacrifice. */
-function CostPickBar({ pick, valid = true, onDone, onSkip, onCancel }: { pick: CostPick; valid?: boolean; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
+function CostPickBar({ pick, valid = true, costPickMv = () => 0, onDone, onSkip, onCancel }: { pick: CostPick; valid?: boolean; /** A permanent's mana value as it is now (Fabrication Foundry's total). */ costPickMv?: (id: string) => number; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
   return (
     <div className="targeting">
       <span>
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
-      <button disabled={pick.chosen.length !== pick.n || !valid} onClick={onDone}>
+      {pick.totalMv !== undefined && <span> total mana value {pick.chosen.reduce((n, id) => n + costPickMv(id), 0)} of {pick.totalMv}</span>}
+      <button disabled={(pick.totalMv !== undefined ? !pick.chosen.length || pick.chosen.reduce((n, id) => n + costPickMv(id), 0) !== pick.totalMv : pick.chosen.length !== pick.n) || !valid} onClick={onDone}>
         {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
@@ -3379,7 +3407,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             </span>
           ))}
           {m.grantedAbilities.length > 0 && (
-            <span className="kw" title={m.grantedAbilities.map((t) => `Has "${showGrantSource(t).replace(/~/g, c.name)}"`).join("\n")}>
+            <span className="kw" title={m.grantedAbilities.map((t) => (gainedFrom(t) !== undefined ? `Has all activated abilities of ${gainedFrom(t)} (as it had them then)` : `Has "${showGrantSource(t).replace(/~/g, c.name)}"`)).join("\n")}>
               +{m.grantedAbilities.length} {m.grantedAbilities.length === 1 ? "ability" : "abilities"}
             </span>
           )}
@@ -3474,6 +3502,12 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             On {s.players[o.attachedToPlayer]!.name}
           </span>
         )}
+        {(s.notedFor?.[`${o.id}@${o.zoneChanges ?? 0}`]?.length ?? 0) > 0 && (
+          // Volo's Journal (round 380): the creature types noted for it.
+          <span className="chip other noted" title={`Noted: ${s.notedFor![`${o.id}@${o.zoneChanges ?? 0}`]!.join(", ")}`}>
+            {s.notedFor![`${o.id}@${o.zoneChanges ?? 0}`]!.length} noted
+          </span>
+        )}
         {o.secretType && o.secretType.by === HUMAN && o.secretType.zc === (o.zoneChanges ?? 0) && (
           <span className="chip other chosen" title={`You secretly chose ${o.secretType.type}; the other players don't know it.`}>
             {o.secretType.type} (secret)
@@ -3487,7 +3521,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
-            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : ""}.`}
+            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : ""}.`}
           >
             Copy
           </span>
@@ -3539,6 +3573,8 @@ function chosenText(s: GameState, o: GameObject): string {
     ...Object.entries(ch.colorsBy ?? {}).map(([pid, c]) => `${name(Number(pid))}: ${COLOR_NAMES[c]}`),
     ch.player !== undefined ? (ch.secret && controllerOf(s, o) !== HUMAN ? "a secret player" : name(ch.player)) : undefined,
     ...(ch.players ?? []).map(name),
+    // Koh, the Face Stealer (round 399): the last chosen card, while it's still that card in exile.
+    ch.card && s.objects[ch.card.id]?.zone === "exile" && (s.objects[ch.card.id]!.zoneChanges ?? 0) === ch.card.zc ? cardOf(s, ch.card.id).name : undefined,
   ];
   return [...new Set(parts.filter((x): x is string => !!x))].join(", ");
 }
@@ -3730,8 +3766,11 @@ function Seat({
         {(s.emblems ?? [])
           .filter((id) => s.objects[id]!.owner === pid)
           .map((id) => {
-            const title = `${cardOf(s, id).name} (in the command zone): ${cardOf(s, id).oracleText.replace(/~/g, "this emblem").replace(/\n/g, " ")}`;
-            const label = <>✦ Emblem: {cardOf(s, id).name.replace(/ emblem$/, "").split(",")[0]}</>;
+            // Oko, Shadowmoor Scion's (round 387): the creature type chosen for it.
+            const type = s.objects[id]!.chosen?.type;
+            const text = cardOf(s, id).oracleText.replace(/~/g, "this emblem").replace(/\n/g, " ");
+            const title = `${cardOf(s, id).name} (in the command zone): ${type ? text.replace(/\bof the chosen type\b/g, `of the chosen type (${type})`) : text}`;
+            const label = <>✦ Emblem: {cardOf(s, id).name.replace(/ emblem$/, "").split(",")[0]}{type ? ` (${type})` : ""}</>;
             // Yours, with an activated ability (Ob Nixilis of the Black Oath's): click it for its menu (CR 114.4).
             if (pid === HUMAN && abilitiesOf(s, s.objects[id]!).activated.length)
               return (
@@ -4486,7 +4525,8 @@ function LibrarySearch({
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
   };
-  const where = (i: number) => (pending.firstTo ? (i < (pending.firstN ?? 1) ? pending.firstTo : pending.othersTo) : null);
+  // Verdant Mastery (round 390): the next `secondN` after the first ones go to `secondTo`, only the rest to `othersTo`.
+  const where = (i: number) => (pending.firstTo ? (i < (pending.firstN ?? 1) ? pending.firstTo : pending.secondTo && i < (pending.firstN ?? 1) + (pending.secondN ?? 0) ? pending.secondTo : pending.othersTo) : null);
   return (
     <div className="modal-backdrop">
       <div className="modal search">
@@ -4524,6 +4564,8 @@ function LibrarySearch({
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from ${pending.anyGraveyard ? "a" : "your"} graveyard`
                   : pending.fromGraveyard === "battlefield" && pending.under !== undefined
                   ? `${pending.source}: put ${pending.what} from your graveyard onto the battlefield under ${s.players[pending.under]!.name}'s control`
+                  : pending.fromGraveyard === "battlefield" && pending.owners
+                  ? `${pending.source}: you may return ${pending.what} to the battlefield under its owner's control`
                   : pending.fromGraveyard === "battlefield" && pending.anyGraveyard
                   ? `${pending.source}: put ${pending.what} from a graveyard onto the battlefield under your control`
                   : pending.fromGraveyard === "castThisTurn"
@@ -4556,6 +4598,8 @@ function LibrarySearch({
               ? `The rest ${dig.rest}.`
               : dig
               ? `The rest go ${dig.rest}.${pending.distinctPowers ? " Each must have a different power." : ""}${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}${dig.lifeEach ? ` You'll lose ${found.length * dig.lifeEach} life.` : ""}${dig.payLife ? ` You'll pay ${found.length * dig.payLife} life.` : ""}`
+              : pending.firstTo && pending.secondTo
+                ? `The first you find goes ${pending.firstTo}, the next ${pending.secondN ?? 0} ${pending.secondTo}, the rest ${pending.othersTo}.`
               : pending.firstTo
                 ? pending.firstN && pending.firstN > 1 ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal
@@ -5299,7 +5343,9 @@ function Controls({
           ) : pending.how === "paid" ? (
             <>
               {/* Chandra, Torch of Defiance: the card just exiled, cast now or not at all. */}
-              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? Only now{o.zone === "exile" ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={(madnessCastOf(s, HUMAN, pending.objectId) ?? "") + (pending.addedMana ?? "")} size="sm" />
+              {/* Ogre Battlecaster (round 401): its mana cost and {R}{R} more, an additional cost (CR 601.2f). */}
+              {pending.addedMana ? <> (its mana cost and <ManaCost cost={pending.addedMana} size="sm" />)</> : null}? Only now{o.zone === "exile" || pending.addedMana ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
             </>
           ) : pending.how === "discover" ? (
             <>
@@ -5362,6 +5408,24 @@ function Controls({
             {pending.must ? "Don't (can't pay)" : "Don't"}
           </button>
         )}
+      </div>
+    );
+  }
+  if (pending?.kind === "drawLook" && pending.lamp && pending.player === HUMAN) {
+    // Aladdin's Lamp (round 385): one of the top cards stays on top, the rest go on the bottom in a random order, then you draw.
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> instead of drawing, keep one of the top {pending.cards.length} cards of your library on top and put the rest on the bottom in a random order, then draw a card.
+        </span>
+        {pending.cards.map((id) => {
+          const d = cardOf(s, id);
+          return (
+            <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, objectId: id }])}>
+              Keep {d.name} on top
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -5515,19 +5579,39 @@ function Controls({
       </div>
     );
   }
+  // Master Warcraft (round 379): you choose which of another player's creatures attack; they choose what each attacks.
+  if (pending?.kind === "chooseAttackers") {
+    const theirs = s.players[pending.attacker]!.name;
+    const why = chosenAttackersProblem(s, HUMAN, discards);
+    return (
+      <div className="controls">
+        <span>{why && discards.length ? `${why.charAt(0).toUpperCase()}${why.slice(1)}.` : `You choose which of ${theirs}'s creatures attack: click them, then confirm. ${theirs} chooses what each attacks.`}</span>
+        <button disabled={!!why} title={why ?? undefined} onClick={() => dispatch([{ type: "chooseAttackers", player: HUMAN, attackers: discards }])}>
+          {discards.length ? `${theirs} attacks with ${discards.length}` : "No attackers"}
+        </button>
+      </div>
+    );
+  }
   if (pending?.kind === "declareAttackers") {
+    // Master Warcraft (round 379): the attackers another player chose; you choose what each attacks, and may refuse to pay
+    // what that costs when every way to attack with them costs something (rulings).
+    const fixed = pending.fixed;
+    const chooserName = pending.chooser !== undefined ? s.players[pending.chooser]!.name : "";
+    const pool = potentialAttackers(s, HUMAN).filter((o) => !fixed || fixed.includes(o.id));
+    const unassigned = fixed ? fixed.filter((id) => !(id in attacks)) : [];
+    const mayDecline = !!fixed && fixed.length > 0 && !attackAssignment(s, HUMAN, fixed, true);
     // Creatures that attack each combat if able have to be declared (CR 508.1d).
     // Not when attacking would cost something (Ghostly Prison): nothing obliges paying (CR 508.1d).
     const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id);
-    const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks) && opponents(s, HUMAN).some((d) => free(o, d)));
+    const must = pool.filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks) && opponents(s, HUMAN).some((d) => free(o, d)));
     // Encore tokens attack their opponent if able (CR 508.1d).
-    const bound = potentialAttackers(s, HUMAN).flatMap((o) => {
+    const bound = pool.flatMap((o) => {
       const able = characteristics(s, o).mustAttack.filter((d) => opponents(s, HUMAN).includes(d) && free(o, d));
       const a = attacks[o.id];
       return able.length && !walkersFreeToAttack(s, o).length && (!a || a.planeswalker || !able.includes(a.defender)) ? [`${cardOf(s, o.id).name} must attack ${able.map((d) => s.players[d]!.name).join(" or ")}.`] : [];
     });
     // Gideon: "attacks ~ if able" (CR 508.1d), when it isn't goaded or bound to a player as well (the engine weighs those).
-    const toWalker = potentialAttackers(s, HUMAN).flatMap((o) => {
+    const toWalker = pool.flatMap((o) => {
       const ws = walkersFreeToAttack(s, o);
       const a = attacks[o.id];
       if (!ws.length || characteristics(s, o).goadedBy.length || characteristics(s, o).mustAttack.length || (a?.planeswalker && ws.includes(a.planeswalker))) return [];
@@ -5547,7 +5631,9 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          {alone && !aim
+          {fixed && unassigned.length && !aim
+            ? `${chooserName} chose your attackers: click ${unassigned.map((id) => cardOf(s, id).name).join(", ")}, then what ${unassigned.length === 1 ? "it attacks" : "each attacks"}.`
+            : alone && !aim
             ? alone
             : bound.length && !aim
             ? bound[0]
@@ -5559,8 +5645,13 @@ function Controls({
               ? "Click your creatures to attack. Click an attacker again to take it back."
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
+        {mayDecline && (
+          <button className="ghost" title={`Attacking with these creatures costs something: ${chooserName} chooses again`} onClick={() => dispatch([{ type: "declareAttackers", player: HUMAN, attacks: [], decline: true }])}>
+            Don't pay
+          </button>
+        )}
         <button
-          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps || lifeShort}
+          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps || lifeShort || unassigned.length > 0}
           title={lifeShort ? `Attacking costs ${lifeTax} life and you can't pay it` : tax && !taxTaps ? `Attacking costs ${tax} and you can't pay it` : tax.includes("/P}") ? "Phyrexian mana: paid with mana in your pool, otherwise 2 life each" : undefined}
           onClick={() => dispatch([...(taxTaps ?? []), { type: "declareAttackers", player: HUMAN, attacks: declared }])}
         >
@@ -5639,7 +5730,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "bid" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy" || pending.what === "evidenceX" || pending.what === "payLifeRound") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "spellDamageBack" || pending.what === "mireLand" || pending.what === "secretType" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "liarGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "triggerSubject" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || pending.what === "redistribute" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "spellDamageBack" || pending.what === "mireLand" || pending.what === "curseMove" || pending.what === "aegisCopy" || pending.what === "kohCard" || pending.what === "secretType" || pending.what === "form" || pending.what === "faceUpForm" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "chosenObject" || pending.what === "anchor" || pending.what === "playerWord" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "unlessWay" || pending.what === "payWhich" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel" || pending.what === "addOrRemoveCounter" || pending.what === "bribeCounter" || pending.what === "eitherToken" || pending.what === "landOrNonland" || pending.what === "predicamentGuess" || pending.what === "toyNumber" || pending.what === "toyGuess" || pending.what === "liarGuess" || pending.what === "splitTargets" || pending.what === "greatestTie" || pending.what === "triggerSubject" || pending.what === "untapType" || pending.what === "giveLife" || pending.what === "targetChooser" || pending.what === "modeChooser" || pending.what === "direction" || pending.what === "skipChoice" || pending.what === "payLifeOrDestroy" || pending.what === "nextTarget" || pending.what === "loseReplacement" || pending.what === "copyTargetFor" || pending.what === "defendingPlayer" || pending.what === "tokenInstead" || pending.what === "redistribute" || ((pending.what === "textFrom" || pending.what === "textTo" || pending.what === "typeOrder") && pending.options.length <= 10)) && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -5858,6 +5949,20 @@ function Controls({
         })}
       </div>
     );
+  // Garth One-Eye (round 377): a button for each name not chosen yet for it.
+  if (pending?.kind === "chooseOption" && pending.what === "namedCopy" && pending.player === HUMAN)
+    return (
+      <div className="controls named-copy-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt ?? "choose a card name"}
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "keyword" && pending.player === HUMAN)
     return (
       <div className="controls keyword-pick">
@@ -6066,7 +6171,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : pending.what === "planeswalkerType" ? "choose a planeswalker type." : "choose a creature type."}
+          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : pending.what === "planeswalkerType" ? "choose a planeswalker type." : pending.what === "noteType" ? `${pending.prompt ?? "note a creature type"}.` : "choose a creature type."}
         </span>
       </div>
     );
@@ -6700,6 +6805,8 @@ function BigCardFace({ d }: { d: CardDef }) {
       <p>
         <RulesText text={d.oracleText} />
       </p>
+      {/* Vecna (The Book of Vile Darkness): the triggered abilities it has from the cards exiled to make it. */}
+      {d.borrowedTriggers?.length ? <p className="muted">Has all triggered abilities of {d.borrowedTriggers.map((b) => b.name).join(", ")}.</p> : null}
       {d.power !== undefined && (
         <div className="big-pt">
           {d.power}/{d.toughness}

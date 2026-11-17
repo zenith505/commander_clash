@@ -2,7 +2,7 @@ import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { defMv } from "../faces";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, endWhileTapped, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, damageUnalterableTo, type DamageEvent, type DamageSource } from "../damage";
@@ -459,6 +459,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, ctx.controller).name}'s spells and abilities can target their opponents and their creatures as though they didn't have hexproof this turn.`);
         return;
       }
+      if (e.rules[0] === "loyaltyTwice") {
+        log(s, `${player(s, ctx.controller).name} may activate the loyalty abilities of planeswalkers they control twice this turn.`);
+        return;
+      }
       if (e.rules[0] === "extraLoyalty") {
         log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
         return;
@@ -489,7 +493,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "graveyardCastThisTurn": {
       // Locke: the cards milled, as they are now (CR 400.7).
-      const cards = e.milled ? [...(s.resolving?.milled ?? [])] : undefined;
+      // Havengul Lich (round 400): the target card, still in its graveyard as that object (CR 400.7).
+      const cards = e.what ? objects(s, e.what, ctx).filter((o) => o.zone === "graveyard").map((o) => ({ id: o.id, zc: o.zoneChanges ?? 0 })) : e.milled ? [...(s.resolving?.milled ?? [])] : undefined;
       if (cards && !cards.length) return;
       const yardOf = e.fromYardOf ? players(s, e.fromYardOf, ctx)[0] : undefined;
       if (e.fromYardOf && yardOf === undefined) return;
@@ -690,9 +695,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "emblem": {
       // Named for its source as it is now, or as it last existed (CR 114.3: most emblems have no name; this is for the log).
       const from = ctxSource(s, ctx).name.split(" // ")[0]!;
+      // Oko, Shadowmoor Scion: the creature type chosen as this resolved (none chosen: nothing to give it, CR 608.2h).
+      const type = e.chosenType ? ctx.chosen?.type : undefined;
+      if (e.chosenType && type === undefined) return;
       for (const pid of players(s, e.who, ctx)) {
-        createEmblem(s, pid, e.abilities, from);
-        log(s, `${player(s, pid).name} gets an emblem with ${e.abilities.map((a) => `"${a.replace(/~/g, "this emblem")}"`).join(" and ")}.`);
+        createEmblem(s, pid, e.abilities, from, type);
+        log(s, `${player(s, pid).name} gets an emblem with ${e.abilities.map((a) => `"${(type !== undefined ? a.replace(/\bof the chosen type\b/g, `of the chosen type (${type})`) : a).replace(/~/g, "this emblem")}"`).join(" and ")}.`);
       }
       invalidateCharacteristics(s);
       return;
@@ -1203,6 +1211,7 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   s.cards[MONARCH.oracleId] ??= MONARCH;
   s.monarch = pid;
   invalidateCharacteristics(s); // "as long as you're the monarch"
+  endWhileTapped(s); // "for as long as they're the monarch" (Garland, Royal Kidnapper, CR 611.2b)
   log(s, `${p.name} becomes the monarch.`);
   fireEvent(s, { type: "becameMonarch", player: pid });
   // Palace Jailer: what it exiled returns as one of its controller's opponents becomes the monarch (CR 610.3).

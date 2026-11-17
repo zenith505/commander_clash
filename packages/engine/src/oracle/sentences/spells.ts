@@ -906,7 +906,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // the X of that spell while it's on the stack (CR 107.3a); no more mana is paid (rulings).
   if (ctx.castSpell && /^[Dd]ouble the value of X$/.test(s)) return [{ type: "doubleX" }];
   // Rings of Brighthearth: "copy that ability", the one activated (CR 707.10).
-  if (ctx.activatedAbility && /^[Cc]opy that ability$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: false }];
+  // Rowan Kenrith's emblem (round 391): "Whenever you activate an ability that isn't a mana ability, copy it."
+  if (ctx.activatedAbility && /^[Cc]opy (?:that ability|it)$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: false }];
   // Thousand-Year Storm: "copy it for each other instant and sorcery spell you've cast before it this turn": those cast
   // before it, not after (counted from when it was cast), countered ones too (rulings).
   if (ctx.castSpell && /^[Cc]opy it for each other instant and sorcery spell you've cast before it this turn$/.test(s)) return [{ type: "copySpell", spell: "cause", n: "stormInstantSorcery", newTargets: false }];

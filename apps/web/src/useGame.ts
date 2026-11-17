@@ -235,7 +235,10 @@ function hasTimedPlay(s: GameState): boolean {
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      if (!timedCondition(ab.activateIf) || (ab.zone ?? "battlefield") !== o.zone || doesNothingNow(s, id, ab.body)) continue;
+      // The Beamtown Bullies (round 380): "target opponent whose turn it is" works only in an opponent's turn: stop for it at
+      // their beginning of combat, in time for the creature it gives them to attack.
+      const forActive = s.activePlayer !== HUMAN && s.step === "beginCombat" && o.zone === "battlefield" && ab.body.targets.some((t) => t.kind === "player" && t.activePlayer);
+      if (!(timedCondition(ab.activateIf) || forActive) || (ab.zone ?? "battlefield") !== o.zone || doesNothingNow(s, id, ab.body)) continue;
       if (planActivate(s, HUMAN, id, i)) return true;
     }
   }

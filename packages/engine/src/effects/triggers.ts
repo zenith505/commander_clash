@@ -2,7 +2,7 @@ import { exiledWithNamed } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
-import { abilitiesOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
+import { abilitiesOf, borrowedTriggersOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
 import { whileTappedHolds, checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
@@ -161,7 +161,7 @@ export type TriggerSourceEvent =
   | { type: "attached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId; /** The controllers before of all the permanents whose control changed at the same time. */ before?: Record<ObjectId, PlayerId> }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; /** It was destroyed, by anything (CR 701.8a, 704.5g-h). */ destroyed?: true; /** Sacrificed for this creature's exploit (CR 702.110a). */ exploitedBy?: { id: ObjectId; zc: number }; /** Exiled as a craft material (CR 702.167a). */ crafted?: true; /** Sacrificed while its controller cast a spell with emerge (Foul Emissary). */ emerged?: true; hadAbilities: boolean; grantedAbilities?: string[]; /** Idris, Koh (round 399): the exiled cards whose triggered abilities it had (CR 603.10a). */ borrowed?: ObjectId[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** Attacking creatures an effect made blocked, by no creature (Effect becomeBlocked, CR 509.1h). */
@@ -259,6 +259,8 @@ export type TriggerSourceEvent =
   | { type: "roomFullyUnlocked"; id: ObjectId; player: PlayerId }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
+  /** A mentor ability whose source is `source` and whose target is `target` resolved (CR 702.134c), round 387. */
+  | { type: "mentored"; source: ObjectId; target: ObjectId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
   | { type: "transformed"; id: ObjectId; face: number }
   /** A permanent's saddle ability resolved (CR 702.171b), its first time this turn. */
@@ -559,6 +561,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if ((once?.type === "castNow" || once?.type === "castFromAmong") && once.once && onceUsed(o, t.zone, "do:castNow")) return;
+      if (once?.type === "returnOneOfThem" && onceUsed(o, t.zone, `do:${once.type}`)) return; // Rinoa, Angel Wing (CR 603.2h)
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
         if (t.onceEver) (o.triggeredEver ??= []).push(everKey);
@@ -685,6 +688,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const you = controllerOf(s, aura);
     if (controllerOf(s, host) !== you || !characteristics(s, host).types.includes("Creature")) return;
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "auraAttachedToYours", undefined, undefined, aura);
+  };
+  // River Song (round 382): "Whenever an opponent scries, surveils, or searches their library": the permanents of that
+  // player's opponents (CR 102.2), once for each of those events, "that player" being the one who did it.
+  const opponentLooks = (pid: PlayerId) => {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (opponents(s, you).includes(pid)) add(o, you, (e) => e === "opponentScriesSurveilsOrSearches", undefined, undefined, undefined, undefined, undefined, undefined, { player: pid });
+    }
   };
   /**
    * The cards in graveyards with abilities that work there, each with its owner, who controls those abilities
@@ -949,7 +961,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
-    const lastAbilities = withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers;
+    const lastAbilities = [...withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers, ...borrowedTriggersOf(s, ev.borrowed)];
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
     if (diesLocked) locked = () => true;
     add(
@@ -1040,7 +1052,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const src = s.objects[left.id];
         if (!src) continue;
         if (src.zone === "battlefield") continue; // it already came back as a new object
-        consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, left.attachedTo, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
       // A delayed trigger about a creature (Touch of Moonglove): the creatures that one dealt damage this turn.
       fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers, (floating as { about?: { id: ObjectId } } | null)?.about?.id));
@@ -1067,7 +1079,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield") continue;
-        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
     }
     // Jaws, Relentless Predator: "Whenever a noncreature artifact is sacrificed or destroyed": anyone's, for whatever
@@ -1081,7 +1093,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield") continue;
-        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
@@ -1100,7 +1112,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield") continue;
-        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, [...withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers, ...borrowedTriggersOf(s, left.borrowed)]);
       }
       // Curious Cadaver: "When you sacrifice a Clue, return ~ from your graveyard to your hand": an ability of the card in
       // its owner's graveyard (CR 113.6m), not of a card that left the battlefield in the same event.
@@ -1395,6 +1407,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.how === "scry" && ev.bottom) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.player) add(obj(s, id), ev.player, (e) => e === "youScryToBottom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.bottom });
     // "Whenever you surveil, if ~ is in your graveyard" (Blood Operative): its owner's.
     fromGraveyards((o, owner) => owner === ev.player && watch(o));
+    // River Song: "Whenever an opponent scries, surveils, or searches their library" (round 382).
+    opponentLooks(ev.player);
   } else if (ev.type === "clashed") {
     // "Whenever you clash" triggers on a clash an opponent's spell started too (rulings on Entangling Trap); "If you
     // won" is about that clash (TriggerEventInfo.wonClash).
@@ -1699,6 +1713,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = obj(s, id);
         if (controllerOf(s, w) === you) add(w, you, (e) => e === "creatureYouControlBecomesRenowned", undefined, undefined, o);
       }
+  } else if (ev.type === "mentored") {
+    // Aegis of the Legion: "Whenever equipped creature mentors a creature": the Equipment attached to the mentor ability's
+    // source as it resolved (rulings: not one that became unattached before, one attached since), the target the subject.
+    const src = s.objects[ev.source];
+    const t = s.objects[ev.target];
+    if (src && t && src.zone === "battlefield") addHosted(src, (e) => e === "selfMentors", undefined, t);
   } else if (ev.type === "evolved") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfEvolves");
@@ -2394,6 +2414,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Loki Laufeyson: "with mana value less than or equal to ~'s power", that power as the spell is cast (CR 603.2), as it
       // last existed on the battlefield once it has left (CR 113.7a, 608.2h).
       if (d.mvMaxPowerOf && (item ? spellManaValue(s, item) : defMv(ev.card)) > sourcePowerNow(s, d.mvMaxPowerOf)) continue;
+      // Havengul Lich (round 400): only that card, cast from the graveyard it was in as that object (CR 400.7, 601.2a; a
+      // spell keeps the zone count it had there, castSpell).
+      if (d.card && !(spell && spell.id === d.card.id && (spell.zoneChanges ?? 0) === d.card.zc && spell.castFrom === "graveyard")) continue;
       if (d.loyalty === "only" || d.exhaust || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
@@ -2421,7 +2444,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Has storm" (Crackling Spellslinger): likewise the spell's own storm ability (CR 702.40a).
         if (spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: STORM_BODY, cause: ev.stackId });
       }
-      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}) });
+      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}), ...(d.sourceZc !== undefined ? { sourceZc: d.sourceZc } : {}) });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired) && (!t.ifSpent || spentMeets(ev.spent, t.ifSpent)) && (!t.castFromHand || spell.castFrom === "hand") && (!t.castNotFromExile || spell.castFrom !== "exile"), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
@@ -2802,6 +2825,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Leori, Sparktouched Hunter: "Until end of turn, whenever you activate an ability of a planeswalker of that type" (a
     // delayed triggered ability, CR 603.7b), matched the same way.
     fromFloating((src, ctrl, triggers) => add(src, ctrl, activatedMatch(src, ctrl), triggers, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
+    // Rowan Kenrith's emblem: its owner's (CR 114.4), from the command zone.
+    fromEmblems((o, owner) => add(o, owner, activatedMatch(o, owner), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
@@ -2829,6 +2854,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e) => e === "opponentSearchesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+    opponentLooks(ev.player);
   } else if (ev.type === "shuffledLibrary") {
     // Cosi's Trickster, Psychic Surgery: each shuffle triggers it once (rulings: twice for Green Sun's Zenith).
     for (const id of s.battlefield) {
@@ -2918,7 +2944,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
         // Tamiyo, the Moon Sage's emblem: "a card is put into your graveyard from anywhere, you may return it": that card is
         // the group, alone.
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard" || (b.what === "leaves" && b.them)) && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };
@@ -2938,7 +2964,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const m of ev.moves) {
       const w = s.objects[m.id];
       if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object
-      batchWatch(w, m.controller!, withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, true);
+      batchWatch(w, m.controller!, [...withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, ...borrowedTriggersOf(s, m.borrowed)], true);
     }
     // Golgari Brownscale: "When ~ is put into your hand from your graveyard": the card's ability, in the hand, under its
     // owner's control (CR 113.8), the same object that arrived.

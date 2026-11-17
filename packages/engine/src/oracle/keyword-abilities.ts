@@ -10,6 +10,9 @@ import { parseTargetPhrase, pickFilter, PLANESWALKER_TYPES } from "./targets";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 
+/** Mentor's ability (CR 702.134a), its text the mark of a mentor ability as it resolves (Aegis of the Legion, CR 702.134c, round 387). */
+export const MENTOR_TEXT = "Mentor: put a +1/+1 counter on target attacking creature with lesser power.";
+
 /** "sacrifice a creature", "discard a card", "pay 3 life", "exile a creature card from your graveyard". */
 /**
  * Keywords about casting from a graveyard and what happens to the spell after: flashback
@@ -1373,7 +1376,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         body: {
           targets: [{ kind: "object", types: ["Creature"], combat: "attacking", lesserPowerThanSource: true, text: "target attacking creature with lesser power" }],
           effects: [{ type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n: 1 }],
-          text: "Mentor: put a +1/+1 counter on target attacking creature with lesser power.",
+          text: MENTOR_TEXT,
         },
       });
     } else if ((m = /^champion an? (.+)$/i.exec(p))) {

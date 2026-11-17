@@ -479,9 +479,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "graveyardTurn": {
       const list = (s.graveyardTurn = (s.graveyardTurn ?? []).filter((g) => g.turn === s.turn));
-      list.push({ player: ctx.controller, turn: s.turn, ...(e.cast ? { cast: e.cast } : {}), ...(e.lands ? { lands: true as const } : {}), ...(e.exileInstead ? { exileInstead: true as const } : {}), ...(e.anyGraveyard ? { anyGraveyard: true as const } : {}), ...(e.exileCast ? { exileCast: true as const } : {}), ...(e.costs ? { costs: e.costs } : {}), ...(e.entersWith ? { entersWith: e.entersWith } : {}), source: src });
+      list.push({ player: ctx.controller, turn: s.turn, ...(e.cast ? { cast: e.cast } : {}), ...(e.lands ? { lands: true as const } : {}), ...(e.exileInstead ? { exileInstead: true as const } : {}), ...(e.anyGraveyard ? { anyGraveyard: true as const } : {}), ...(e.exileCast ? { exileCast: true as const } : {}), ...(e.topOnly ? { topOnly: true as const } : {}), ...(e.costs ? { costs: e.costs } : {}), ...(e.entersWith ? { entersWith: e.entersWith } : {}), source: src });
       const may = [e.lands ? "play lands" : "", e.cast ? `cast ${e.cast.text.replace(/ cards?$/, "")} spells` : ""].filter(Boolean).join(" and ");
-      if (may) log(s, `${player(s, ctx.controller).name} may ${may} from ${e.anyGraveyard ? "any graveyard" : "their graveyard"} this turn${e.costs?.some((c) => c.kind === "forage") ? " by foraging" : ""}${e.entersWith ? `, each entering with a ${e.entersWith.counter} counter` : ""} (${src}).`);
+      if (may) log(s, `${player(s, ctx.controller).name} may ${may} from ${e.anyGraveyard ? "any graveyard" : e.topOnly ? "the top of their graveyard" : "their graveyard"} this turn${e.costs?.some((c) => c.kind === "forage") ? " by foraging" : ""}${e.entersWith ? `, each entering with a ${e.entersWith.counter} counter` : ""} (${src}).`);
       if (e.exileInstead) log(s, `${src}: cards that would be put into ${player(s, ctx.controller).name}'s graveyard this turn are exiled instead.`);
       return;
     }
@@ -847,7 +847,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Tapped for mana (Orcish Lumberjack): Mana Reflection's replacement multiplies it (CR 106.12b).
         const made = [...mix(k).matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType);
         const added = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made, s.resolving.item.manaAbility.instead) : made;
-        for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx) });
+        // Domri, Chaos Bringer: a creature spell it's spent on gains riot (ManaLot.riot).
+        for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx), ...(e.riot ? { riot: src } : {}) });
         log(s, `${p.name} adds ${added.map((m) => `{${m}}`).join("")}.`);
         return;
       }

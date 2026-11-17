@@ -1397,7 +1397,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // A card in exile back to its owner's hand (CR 406): "Return target exiled card with flashback you own to your hand"
   // (Runic Repetition), "... target card with flashback you own from exile ..." (Rootcoil Creeper), "... target instant or
   // sorcery card from your graveyard or exiled card with flashback you own ..." (Sorceress's Schemes).
-  if ((m = /^Return (target (?:.+ )?(?:exiled card .+ you own|card .+ you own from exile)) to (your|its owner's) hand$/.exec(s))) {
+  // Sentinel of Lost Lore (round B246): "Return target card you own in exile that has an Adventure to your hand".
+  if ((m = /^Return (target (?:.+ )?(?:exiled card .+ you own|card .+ you own from exile)|target card you own in exile that has an Adventure) to (your|its owner's) hand$/.exec(s))) {
     const i = ctx.targets.length;
     const what = parseCardTarget(m[1]!, ctx);
     const t = ctx.targets[i];
@@ -1569,7 +1570,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Blade of the Swarm: "Put target exiled card with warp on the bottom of its owner's library": a face-up card in exile,
   // whoever exiled it (CR 406, rulings: not only one its warp exiled).
-  if ((m = /^Put (target (?:face-up )?exiled card(?: with [a-z]+)?) on (top|the bottom) of its owner's library$/.exec(s))) {
+  // Sentinel of Lost Lore (round B246): "Put target card you don't own in exile that has an Adventure on the bottom ...".
+  if ((m = /^Put (target (?:face-up )?exiled card(?: with [a-z]+)?|target card you don't own in exile that has an Adventure) on (top|the bottom) of its owner's library$/.exec(s))) {
     const i = ctx.targets.length;
     const what = parseCardTarget(m[1]!, ctx);
     if (what?.ref !== "target" || !ctx.targets[i]?.inExile) {

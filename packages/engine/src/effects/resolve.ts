@@ -96,6 +96,8 @@ import { runLaneB233Effect } from "./run-laneb233";
 import { runLaneB234Effect } from "./run-laneb234";
 import { runLaneB235Effect } from "./run-laneb235";
 import { runLaneB236Effect } from "./run-laneb236";
+import { runLaneB238Effect } from "./run-laneb238";
+import { runLaneB241Effect } from "./run-laneb241";
 import { runRound327Effect } from "./run-round327";
 import { runRound328Effect } from "./run-round328";
 import { runRound329Effect } from "./run-round329";
@@ -636,7 +638,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }
   // The objects a batch trigger was about, still where they went (CR 400.7): permanents that entered, cards put into a graveyard.
-  if (ref.ref === "eventGroup") return (ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] && (s.objects[g.id]!.zoneChanges ?? 0) === g.zc ? [s.objects[g.id]!] : []));
+  // Pure Intentions (round B240): "those cards from your graveyard": only those still there (CR 400.7), not a madness card
+  // in exile or one Library of Leng put on top of the library.
+  if (ref.ref === "eventGroup") return (ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] && (s.objects[g.id]!.zoneChanges ?? 0) === g.zc && (!ref.inYourGraveyard || (s.objects[g.id]!.zone === "graveyard" && s.objects[g.id]!.owner === ctx.controller)) ? [s.objects[g.id]!] : []));
   if (ref.ref === "pairedWithTarget") {
     const t = objects(s, { ref: "target", index: ref.index }, ctx)[0];
     const other = t && pairedWith(s, t);
@@ -946,6 +950,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "youAndChosenPlayer": {
       const p = s.resolving?.chosen?.player;
       return apnap(s, livingPlayers(s).filter((x) => x === ctx.controller || x === p));
+    }
+    case "yardChosenOwner": {
+      // Deadly Cover-Up (round B245): the owner of the card exiled from an opponent's graveyard (CR 108.3).
+      const c = s.resolving?.chosenFromYard;
+      const o = c ? s.objects[c.id] : undefined;
+      return o && !player(s, o.owner).lost ? [o.owner] : [];
     }
     case "sacrificedThisWay": {
       const by = new Set((s.resolving?.sacrificedThisWay ?? []).filter((x) => !ref.subtype || !!x.subtypes?.includes(ref.subtype)).map((x) => x.controller));
@@ -2087,6 +2097,11 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "servitudeLink":
     case "servitudeExile":
       return runLaneB236Effect(s, e, ctx, src);
+    case "consulateRedirect":
+    case "piracy":
+      return runLaneB238Effect(s, e, ctx, src);
+    case "exileSelfUntilTargetLeaves":
+      return runLaneB241Effect(s, e, ctx, src);
     case "phaseOutExcess":
       return runLaneB222Effect(s, e, ctx, src);
     case "revealPutIfNamedAsPermanent":

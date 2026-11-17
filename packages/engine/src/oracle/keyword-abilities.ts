@@ -597,8 +597,9 @@ export function parseCostKeyword(
     return plainMana(m[2]!) && sac ? { alt: { kind: "emerge", mana: m[2]!, costs: [sac] } } : "fail";
   }
   if (/^Emerge\b/.test(line)) return "fail";
-  // Freerunning [cost] (CR 702.173a); {X} costs aren't modeled.
-  if ((m = /^Freerunning ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) ? { alt: { kind: "freerunning", mana: m[1]! } } : "fail";
+  // Freerunning [cost] (CR 702.173a). "Freerunning {X}{R}" (Monastery Raid): X is announced as it's cast for that cost (CR
+  // 107.3a), as for an {X} foretell cost.
+  if ((m = /^Freerunning ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) || xMana(m[1]!) ? { alt: { kind: "freerunning", mana: m[1]! } } : "fail";
   // "Freerunning—Return a blue creature you control to its owner's hand." (Escape Detection): a freerunning cost that isn't
   // mana (CR 702.173a, 118.8), paid instead of the mana cost.
   if ((m = /^Freerunning—(Return an? [a-z]+ creature you control to its owner's hand)\.?$/.exec(line))) {

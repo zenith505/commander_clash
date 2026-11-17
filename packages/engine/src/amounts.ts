@@ -158,6 +158,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return o?.chosen?.number ?? 0;
     }
+    case "selfNotedExiledMv": {
+      // Bell Borca: only what it noted this turn as the object it is; none noted, or off the battlefield, is 0 (rulings).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const n = o?.zone === "battlefield" ? o.exiledMvNoted : undefined;
+      return n && n.turn === s.turn && n.zc === (o!.zoneChanges ?? 0) ? n.max : 0;
+    }
     case "crewedSource": {
       // The source as the object it is now or, gone, as it last was (CR 400.7, 608.2h); each creature counted once.
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -724,7 +730,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
     case "enteredThisTurn": {
       const sub = c.notSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
-      return (s.turnLog?.entered ?? []).filter((e) => !(sub && e.id === sub.id && e.zc === (sub.zoneChanges ?? 0)) && e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
+      // A changeling entered as every creature type (CR 702.73a, 205.3m): a Goblin, a Mount (round B246).
+      const hasSub = (e: { subtypes?: string[]; allCreatureTypes?: true }, t: string) => !!e.subtypes?.includes(t) || (!!e.allCreatureTypes && CREATURE_TYPES.has(t));
+      return (s.turnLog?.entered ?? []).filter((e) => !(sub && e.id === sub.id && e.zc === (sub.zoneChanges ?? 0)) && e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || hasSub(e, c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => hasSub(e, t))) && !(c.nontoken && e.token)).length;
     }
     case "sacrificedThisTurn": {
       const sacrificed = (s.turnLog?.sacrificed ?? []).filter((t) => (c.anyPlayer || t.player === ctx.controller) && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && (!c.anyType || c.anyType.some((x) => t.types.includes(x))) && !(c.nontoken && t.token));
@@ -1482,6 +1490,8 @@ function describeCount(c: Count): string {
       return "the chosen number";
     case "selfChosenNumber":
       return "the last chosen number";
+    case "selfNotedExiledMv":
+      return "the greatest number noted for it this turn";
     case "permanents":
       return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.counterKinds ? "kinds of counters among " : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":

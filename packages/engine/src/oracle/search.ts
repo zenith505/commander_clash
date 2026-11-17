@@ -98,7 +98,8 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // one of each name offered (oneEach). Several of them only.
   // "Up to X creature cards with different names that each have mana value X" (Uncage the Menagerie): the X it was cast
   // with; a card with {X} in its mana cost counts X as 0 in the library (CR 202.3e, rulings).
-  const eachX = / that each have mana value X$/.exec(m[3]!);
+  // Ecological Appreciation: "... that each have mana value X or less", no more than that X (round B243).
+  const eachX = / that each have mana value X( or less)?$/.exec(m[3]!);
   // "Up to two basic land cards that share a land type" (Myriad Landscape): every card found has a land type in common
   // with each other one; one card alone is fine (rulings).
   const share = / that share a land type$/.exec(m[3]!);
@@ -131,7 +132,7 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   if (filter00 === null || (eachX && (!filter00 || filter00.bound)) || (unlike && !filter00)) return null;
   if (noShare && (!filter00 || filter00.kind !== "card" || !filter00.types?.includes("Land") || unlike || total)) return null;
   const filter0 = unlike ? { ...filter00!, notNamedAsYours: { ...unlikeSpec!, kind: "object" as const, text: `${unlike[1]} you control` }, text: m[3]! } : noShare ? { ...filter00!, noLandTypeOfYours: true as const, text: m[3]! } : filter00;
-  const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
+  const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: eachX[1] ? ("most" as const) : ("exact" as const), amount: X }, text: `${filter0!.text} with mana value X${eachX[1] ?? ""}` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
   if (powers && !filter) return null;

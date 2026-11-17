@@ -766,6 +766,12 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     more("countMods");
     more("othersEnterWithCounters");
     more("entersWithAdditional");
+    // Granted modular N (Blaster, Combat DJ, round B242): its +1/+1 counters are additional ones as the permanent enters (CR
+    // 702.43a-b, 614.12), beside any it enters with of its own.
+    granted.forEach((g, i) => {
+      const n = /^Modular (\d+)$/.exec(g);
+      if (n && extra[i]!.entersWithCounters) hit!.entersWithAdditional = [...(hit!.entersWithAdditional ?? []), { counter: "+1/+1", n: Number(n[1]) }];
+    });
     // The Masamune's granted "that ability triggers an additional time" (CR 603.2d).
     more("triggersAgain");
     // Dungeon Delver's granted "Room abilities ... trigger an additional time": one more per instance (rulings).

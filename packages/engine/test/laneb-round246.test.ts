@@ -264,7 +264,7 @@ describe("Lane B round B246: Sentinel of Lost Lore", () => {
     const { s: s0, ap, opp, ids } = only([sentinel()]);
     const bearsEx = toZone(s0, ap, bears(), "exile");
     const down = toZone(s0, ap, giant(), "exile");
-    s0.objects[down]!.faceDown = true;
+    s0.objects[down]!.faceDown = "manifest";
     let s = castAndSettle(s0, ap, ids[0]!);
     if (s.pending?.kind === "chooseModes") {
       expect(s.pending.legal).toEqual([false, false, true]);

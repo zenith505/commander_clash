@@ -12,10 +12,14 @@ test("The Beamtown Bullies: the game stops at Ana's beginning of combat; Ana get
   s = playUntil(s, (st) => st.activePlayer === 1 && st.step === "upkeep" && st.priority === 0 && !st.pending);
   await open(page, s);
   // Usable only in an opponent's turn: the page passes the upkeep and stops before Ana's attackers.
-  await expect.poll(async () => (await state(page)).step).toBe("beginCombat");
-  const at = await state(page);
+  // Keep the state the poll saw (follow-up #7): in Ana's beginning of combat the bots get priority before you do (CR
+  // 117.3a), so a state read after "beginCombat" alone could still have it with one of them.
+  let at = await state(page);
+  await expect.poll(async () => {
+    at = await state(page);
+    return at.step === "beginCombat" && at.priority === 0;
+  }).toBe(true);
   expect(at.activePlayer).toBe(1);
-  expect(at.priority).toBe(0);
   await page.locator(`[data-obj="${bully}"]`).click();
   await menu(page).locator("button", { hasText: "Target opponent whose turn it is" }).click();
   await clickPlayer(page, 1);

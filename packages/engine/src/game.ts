@@ -911,6 +911,13 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard.`);
   }
   o.exileIfToGraveyard = undefined;
+  // Kylox's Voltstrider (round 401): "put it on the bottom of its owner's library instead" (CR 614.1a).
+  if (o.bottomIfToGraveyard && fromZone === "stack" && to === "graveyard") {
+    to = "library";
+    opts = { ...opts, top: false };
+    log(s, `${defOf(s, o).name} is put on the bottom of its owner's library instead of into a graveyard.`);
+  }
+  o.bottomIfToGraveyard = undefined;
   // "If that creature would die this turn, exile it instead" (CR 614.1a).
   // Malicious Eclipse: only a creature an opponent of that spell's controller controls.
   if (fromZone === "battlefield" && to === "graveyard" && (o.exileIfDiesTurn === s.turn || ((s.exileDyingTurn === s.turn || s.exileDyingOpponents?.some((x) => x.turn === s.turn && controllerOf(s, o) !== x.player)) && objIsType(s, o, "Creature")))) {
@@ -1202,6 +1209,7 @@ export function moveObject(
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
+  o.borrowedUsed = undefined;
   o.activatedEver = undefined; // exhaust (CR 702.177a): a new object can activate it again
   o.targetedThisTurn = undefined;
   o.modesChosen = undefined; // "choose one that hasn't been chosen": a new object starts over (CR 400.7)
@@ -4482,6 +4490,7 @@ function startNextTurn(s: GameState, skipping = false) {
   }
   for (const o of Object.values(s.objects)) {
     o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
+    o.borrowedUsed = undefined; // Mairsil's borrowed abilities (round 401)
     o.triggeredThisTurn = undefined;
   }
   s.damagedThisTurn = undefined;
@@ -6085,6 +6094,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   // A planeswalker's mana ability counts as it "was activated this turn" too (Cut Short's rulings).
   if (ab.oncePerTurn || ab.sacrificeIfActivated || objIsType(s, o, "Planeswalker")) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  if (ab.onceKey) (o.borrowedUsed ??= []).push(ab.onceKey); // Mairsil (round 401)
   // Farrelite Priest: the fourth activation this turn and each one after it make a delayed trigger that sacrifices it
   // (rulings on Dragon Whelp); one made during an end step waits for the next turn's (CR 603.7).
   if (ab.sacrificeIfActivated && o.zone === "battlefield" && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + i).length >= ab.sacrificeIfActivated)
@@ -6895,7 +6905,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   }
   // Colored increases (Ruby Leech) are added to the total cost like an additional cost, also when it's cast without
   // paying its mana cost (CR 601.2f, 118.9d).
-  const moreMana = mods.moreColored.map((c) => `{${c}}`).join("");
+  // Ogre Battlecaster (round 401): "by paying {R}{R} in addition to its other costs", as it's cast while the trigger
+  // resolves: an additional cost (CR 118.8, 601.2f).
+  const added = s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.objectId === o.id ? (s.pending.addedMana ?? "") : "";
+  const moreMana = mods.moreColored.map((c) => `{${c}}`).join("") + added;
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Khalni Hydra: "{G} less for each ...", counted as it's cast (rulings): {G} off while there's {G} to take, then {1}.
@@ -9882,7 +9895,12 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         moveObject(s, id, "exile");
         exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
       }
-    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n, undefined, [], c.filter), c.n, c.notEvidence);
+    } else if (c.kind === "collectEvidence") {
+      const ids = choices.collect ?? autoEvidence(s, p.id, c.n, undefined, [], c.filter);
+      collectEvidence(s, p, ids, c.n, c.notEvidence);
+      // Kylox's Voltstrider (round 401): "cards exiled with it" (CR 607.2a), kept as the ability is activated.
+      if (c.linkSource) for (const id of ids) if (obj(s, id).zone === "exile") exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+    }
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
       if (!ids.length) continue;
@@ -10058,6 +10076,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.untapSelf && (o.counters.stun ?? 0) > 0 && countersStay(s, o, "stun")) return `${d.name}'s stun counter can't be removed`;
   if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 302.6
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canSacrificeForCost(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
+  // Mairsil, the Pretender (round 401): each borrowed ability's instance only once each turn (rulings).
+  if (ab.onceKey && o.borrowedUsed?.includes(ab.onceKey)) return `${d.name}'s ability can be activated only once each turn`;
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   if (ab.keyword === "Power-up" && s.extraTurn?.noPowerUp) return "power-up abilities can't be activated this turn"; // Kang the Conqueror
@@ -10695,6 +10715,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     if (change < 0) countersRemoved(s, o, "loyalty", -change);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
+  // Mairsil, the Pretender (round 401): that borrowed ability's instance, once each turn (rulings).
+  if (ab.onceKey) (o.borrowedUsed ??= []).push(ab.onceKey);
   // Professor Hojo: the first one this turn that targets a creature its activator controls, during their turn.
   if (!ab.mana && s.activePlayer === p.id && !s.turnLog?.ownCreatureTargeted?.includes(p.id) && targets && targetsOwnCreature(s, p.id, ab, targets)) ((s.turnLog ??= {}).ownCreatureTargeted ??= []).push(p.id);
   if (ab.equip && !s.turnLog?.equipped?.includes(p.id)) ((s.turnLog ??= {}).equipped ??= []).push(p.id);
@@ -10753,6 +10775,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const extraCosts = activatedCosts(ab, x, o, s, p.id);
   const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  // Kylox's Voltstrider (round 401): the cards its collect evidence cost exiled are "exiled with it" (CR 607.2a), the
+  // object it is now (CR 400.7).
+  if (costExiled.length && extraCosts.some((c) => c.kind === "collectEvidence" && c.linkSource) && o.zone === "battlefield") ((s.linkedExile ??= {})[`${o.id}@${sourceZc}`] ??= []).push(...costExiled);
   // Vodalian War Machine (round B229): the permanents tapped to pay for its abilities this turn, by the source as the
   // permanent it is (CR 400.7), for its dies trigger.
   if (compileCard(d).logsCostTapped && extraCosts.some((c) => c.kind === "tap" && !c.untap) && costs?.tap?.length) {

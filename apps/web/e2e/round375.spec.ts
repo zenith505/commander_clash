@@ -61,10 +61,13 @@ test("Jon Irenicus: at your end step give Ana your Gray Ogre: two counters, tapp
   let s = scene({ board: ["Jon Irenicus, Shattered One", "Gray Ogre"] });
   const ogre = one(s, "Gray Ogre");
   s = playUntil(s, (st) => st.step === "end" && st.pending?.kind === "chooseTargets" && st.pending.player === 0);
+  // Mana in your pool keeps the page from passing your end step once the trigger resolves (useGame.ts shouldAutoPass):
+  // otherwise Ana's untap step can untap the Ogre before the state below is read (the flake of rounds 375-400).
+  s.players[0]!.manaPool.C = 1;
   await open(page, s);
   await clickPlayer(page, 1);
   await page.locator(`[data-obj="${ogre}"]`).first().click();
-  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && ctl(st, ogre) === 1);
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && ctl(st, ogre) === 1 && st.step === "end" && st.activePlayer === 0);
   expect(after.objects[ogre]!.counters["+1/+1"]).toBe(2);
   expect(after.objects[ogre]!.tapped).toBe(true);
   expect(after.effects.some((e) => e.affected.includes(ogre) && e.duration === "game" && e.mods.some((m) => m.kind === "goad"))).toBe(true);

@@ -540,8 +540,8 @@ const borrowed = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
  * What a permanent with "~ has all activated abilities of ..." (CompiledCard.borrows) borrows from now: the permanents
  * (`objects`) or graveyard cards (`cards`) matching it. A lender's own borrowing isn't followed (no loops).
  */
-export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCard["borrows"]>): { objects: GameObject[]; cards: CardDef[] } {
-  const out = { objects: [] as GameObject[], cards: [] as CardDef[] };
+export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCard["borrows"]>): { objects: GameObject[]; cards: CardDef[]; /** Mairsil (round 401): with `exiledWithCounter`, the card objects behind `cards`, in the same order. */ cardIds: ObjectId[] } {
+  const out = { objects: [] as GameObject[], cards: [] as CardDef[], cardIds: [] as ObjectId[] };
   if (o.zone !== "battlefield" || borrowing) return out;
   const c = characteristics(s, o);
   borrowing = true;
@@ -561,7 +561,12 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
       for (const pid of s.turnOrder)
         for (const id of s.players[pid]!.exile) {
           const card = s.objects[id]!;
-          if ((card.counters[b.exiledWithCounter] ?? 0) > 0 && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
+          // Mairsil, the Pretender (round 401): "all cards you own", its controller's (rulings).
+          if (b.owned && card.owner !== c.controller) continue;
+          if ((card.counters[b.exiledWithCounter] ?? 0) > 0 && printedMatches(b.filter, defOf(s, card))) {
+            out.cards.push(defOf(s, card));
+            out.cardIds.push(card.id);
+          }
         }
     } else if (b.top) {
       const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
@@ -603,18 +608,26 @@ function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledC
     borrowing = false;
   }
   if (!lenders.length) return own;
-  const key = lenders.map(idOf).join(",");
+  // Mairsil, the Pretender (round 401): each card's abilities are instances of their own, once each turn each (rulings).
+  const once = own.borrows!.oncePerTurn ? found.cards.map((_, i) => onceKeyBase(s, found.cardIds[i]!)) : undefined;
+  const key = lenders.map(idOf).join(",") + (once ? `|${once.join(",")}` : "");
   let byKey = borrowed.get(own);
   if (!byKey) borrowed.set(own, (byKey = new Map()));
   let hit = byKey.get(key);
   if (!hit) {
     const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
-    hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l) => l.activated.filter(usable).map((a) => ({ ...a, borrowed: true as const })))] };
+    const base = found.objects.length;
+    hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l, li) => l.activated.map((a, ai) => [a, ai] as const).filter(([a]) => usable(a)).map(([a, ai]) => ({ ...a, borrowed: true as const, ...(once && li >= base ? { onceKey: `${once[li - base]}#${ai}` } : {}) })))] };
     // Idris, Koh (round 399): "all activated and triggered abilities": the lenders' triggered abilities too.
     if (own.borrows!.triggered) hit.triggers = [...own.triggers, ...lenders.flatMap((l) => l.triggers.filter(lendableTrigger))];
     byKey.set(key, hit);
   }
   return hit;
+}
+
+/** Mairsil, the Pretender (round 401): a lender card's part of its borrowed abilities' once-each-turn keys (ActivatedAbility.onceKey): that object as it is now (CR 400.7). */
+export function onceKeyBase(s: GameState, id: ObjectId): string {
+  return `${id}@${s.objects[id]?.zoneChanges ?? 0}`;
 }
 
 /**

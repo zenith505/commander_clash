@@ -1821,6 +1821,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (st.budget !== undefined) st.budget -= cast ? spellManaValue(s, cast) : mvOf(st.casting);
           // Bilbo: only an instant or sorcery spell, its types as it was cast (an Adventure's, CR 715.3).
           if (e.exileCast && s.objects[st.casting]?.zone === "stack" && (!e.exileCastTypes || e.exileCastTypes.some((ty) => objIsType(s, obj(s, st.casting!), ty)))) s.objects[st.casting]!.exileIfToGraveyard = true;
+          // Kylox's Voltstrider (round 401): "put it on the bottom of its owner's library instead" (CR 614.1a).
+          if (e.bottomCast && s.objects[st.casting]?.zone === "stack") s.objects[st.casting]!.bottomIfToGraveyard = true;
           st.cast = (st.cast ?? 0) + 1;
           // Jetsam: one spell from each graveyard, so none more from this one's owner's.
           if (e.onePerOwner) (st.ownersCast ??= []).push(obj(s, st.casting).owner);
@@ -3001,7 +3003,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || (!e.anyOwner && o.owner !== ctx.controller))) return;
         if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
         sc.castNow = { id: o.id };
-        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}) };
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}), ...(e.addedMana ? { addedMana: e.addedMana } : {}) };
         // Mana abilities can still be activated to pay for it (CR 601.2g), so only the mana in the pool may be short.
         const problem = castProblem(s, ctx.controller, o.id);
         if (problem === null || /^not enough mana/.test(problem)) return "paused";
@@ -3016,6 +3018,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.castNow = undefined;
       s.resolving!.did = cast;
       if (cast && e.exileAfter) o.exileIfToGraveyard = true;
+      // Ogre Battlecaster (round 401): "that spell's mana value", as it was cast (CR 202.3).
+      if (cast && e.addedMana) {
+        const item = s.stack.find((x) => x.objectId === o.id);
+        s.resolving!.castThisWayMv = item ? spellManaValue(s, item) : characteristics(s, o).manaValue;
+      }
       // "Do this only once each turn": done (CR 603.2h).
       const source = cast && e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);

@@ -24361,6 +24361,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e7b746c8-1b32-42ed-8328-4e16274209d8",
+  "name": "Kylox's Voltstrider",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Collect evidence 6: This Vehicle becomes an artifact creature until end of turn.\nWhenever this Vehicle attacks, you may cast an instant or sorcery spell from among cards exiled with it. If that spell would be put into a graveyard, put it on the bottom of its owner's library instead.\nCrew 2",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Collect evidence",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bdf476e5-1d57-4b17-b45b-d52fd75aadeb",
   "name": "Lake of the Dead",
   "manaCost": "",
@@ -26202,6 +26237,43 @@
   "set": "plc",
   "releasedAt": "2007-02-02",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ed5fbae0-2dca-44a5-84dc-62674b3a92a6",
+  "name": "Mairsil, the Pretender",
+  "manaCost": "{1}{U}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "When Mairsil enters, you may exile an artifact or creature card from your hand or graveyard and put a cage counter on it.\nMairsil has all activated abilities of all cards you own in exile with cage counters on them. You may activate each of those abilities only once each turn.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -30363,6 +30435,39 @@
   "commanderLegal": "legal",
   "set": "ecc",
   "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "00ba0c24-a671-493e-ba46-13e45d1818f1",
+  "name": "Ogre Battlecaster",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Ogre Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ogre",
+   "Shaman"
+  ],
+  "oracleText": "First strike\nWhenever this creature attacks, you may cast target instant or sorcery card from your graveyard by paying {R}{R} in addition to its other costs. If that spell would be put into a graveyard, exile it instead. When you cast that spell, this creature gets +X/+0 until end of turn, where X is that spell's mana value.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "j22",
+  "releasedAt": "2022-12-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

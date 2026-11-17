@@ -15,6 +15,7 @@ import { round391Sentence } from "./round391";
 import { round392Sentence } from "./round392";
 import { round393Sentence } from "./round393";
 import { round400Sentence } from "./round400";
+import { round401Sentence } from "./round401";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -24,6 +25,9 @@ export function round373Sentence(s: string, sentences: string[], si: number, ctx
   // Round 393's sentences (oracle/round393.ts), then round 392's (oracle/round392.ts), then round 391's (oracle/round391.ts), then round 390's (oracle/round390.ts), then round 389's (oracle/round389.ts), then round 388's (oracle/round388.ts),
   // then round 387's (oracle/round387.ts), first.
   // Round 400's (oracle/round400.ts) before all of them.
+  // Round 401's (oracle/round401.ts) before round 400's.
+  const r401 = round401Sentence(s, sentences, si, ctx, _effects);
+  if (r401) return r401;
   const r400 = round400Sentence(s, sentences, si, ctx, _effects);
   if (r400) return r400;
   const r393 = round393Sentence(s, sentences, si, ctx, _effects);

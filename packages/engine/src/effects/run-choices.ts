@@ -600,6 +600,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Gilgamesh: "When you put one or more Equipment onto the battlefield this way": only if any are there now.
       // Yuna's Whistle: "When you reveal a creature card this way": only if one was found.
       if (e.xRevealedMv && s.resolving!.revealedUntilMv === undefined) return;
+      // Ogre Battlecaster (round 401): "When you cast that spell": only if the castNow before cast one.
+      if (e.xCastMv && s.resolving!.castThisWayMv === undefined) return;
       // Cait Sith, Fortune Teller: "When you exile a card this way": only if the card is there; Hidetsugu, Devouring Chaos's
       // "a nonland card" only if it isn't a land card (CR 603.12).
       const exiled = e.xExiledMv && s.resolving!.exiledTop ? s.objects[s.resolving!.exiledTop.id] : undefined;
@@ -645,7 +647,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "Up to that many target creatures" after "you may sacrifice one or more Treasures" (Swashbuckler Extraordinaire).
         // Jailbreak (round B220): "with equal or lesser mana value" than the permanent put onto the battlefield this way, as it
         // is there now (CR 202.3).
-        ...(e.xPutMv ? { x: put?.[0] && s.objects[put[0].id] ? characteristics(s, s.objects[put[0].id]!).manaValue : 0 } : e.xAmount ? { x: Math.max(0, amountNow(s, e.xAmount, ctx)) } : e.xDiscardedMv ? { x: ((id) => (id && s.objects[id] ? characteristics(s, s.objects[id]!).manaValue : 0))((s.resolving!.discardedAll ?? []).at(-1)) } : e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xDiscarded ? { x: s.resolving!.discardedAll?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
+        ...(e.xPutMv ? { x: put?.[0] && s.objects[put[0].id] ? characteristics(s, s.objects[put[0].id]!).manaValue : 0 } : e.xAmount ? { x: Math.max(0, amountNow(s, e.xAmount, ctx)) } : e.xDiscardedMv ? { x: ((id) => (id && s.objects[id] ? characteristics(s, s.objects[id]!).manaValue : 0))((s.resolving!.discardedAll ?? []).at(-1)) } : e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xDiscarded ? { x: s.resolving!.discardedAll?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : e.xCastMv ? { x: s.resolving!.castThisWayMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),

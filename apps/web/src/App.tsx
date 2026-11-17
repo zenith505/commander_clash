@@ -5324,7 +5324,9 @@ function Controls({
           ) : pending.how === "paid" ? (
             <>
               {/* Chandra, Torch of Defiance: the card just exiled, cast now or not at all. */}
-              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? Only now{o.zone === "exile" ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={(madnessCastOf(s, HUMAN, pending.objectId) ?? "") + (pending.addedMana ?? "")} size="sm" />
+              {/* Ogre Battlecaster (round 401): its mana cost and {R}{R} more, an additional cost (CR 601.2f). */}
+              {pending.addedMana ? <> (its mana cost and <ManaCost cost={pending.addedMana} size="sm" />)</> : null}? Only now{o.zone === "exile" || pending.addedMana ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
             </>
           ) : pending.how === "discover" ? (
             <>

@@ -759,6 +759,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const puts = (id: ObjectId) => (isPermanentCard(defOf(s, obj(s, id))) && printedMatches(named, defOf(s, obj(s, id))) ? 1 : 0);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => puts(b) - puts(a) || (puts(a) ? mv(s, b) - mv(s, a) : mv(s, a) - mv(s, b))).slice(0, 1) }];
     }
+    // Mairsil, the Pretender (round 401): cage the card with the most activated abilities, mana ones among them (its
+    // abilities are what Mairsil gets); none with none.
+    if (pend.kind === "searchLibrary" && pend.fromHand && s.resolving?.body.effects[s.resolving.next]?.type === "exileFromHandOrYard") {
+      const count = (id: ObjectId) => ((c) => c.activated.filter((a) => !a.zone && !a.equip && a.loyalty === undefined).length + c.mana.length)(compileCard(defOf(s, obj(s, id))));
+      const best = [...pend.cards].filter((id) => count(id) > 0).sort((a, b) => count(b) - count(a) || mv(s, b) - mv(s, a))[0];
+      return [{ type: "searchLibrary", player: pid, found: best ? [best] : [] }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
       const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
       const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);

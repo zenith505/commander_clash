@@ -3632,7 +3632,7 @@ line blocks.
    Bots choose the exiled card with the most abilities, and pay Koh's life only for a better card than the one chosen. The
    chosen card shows on Koh. Browser tests click through Koh's pick and the ability it borrows, and Idris's exile pick. +3,
    31,594 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
-   Out after round 399 (looked at, not done): Mairsil, the Pretender (activated abilities of cards with cage counters, each
+   Out after round 399 (looked at, not done): Mairsil, the Pretender (done in round 401) (activated abilities of cards with cage counters, each
    only once each turn: no per-ability use count for borrowed abilities yet); Kylox's Voltstrider and Ogre Battlecaster
    (still out, for the reasons in their earlier lists); Valki, God of Lies and the rest of `npm run popular` above rank
    15,000 (still out, for the reasons in their earlier lists).
@@ -3658,6 +3658,33 @@ line blocks.
    Voltstrider and Ogre Battlecaster (still out, for the reasons in their earlier lists); Guff Rewrites History, Sunken
    Palace, Ulalek, Surge to Victory and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in
    their earlier lists).
+   Round 401 took the three cards rounds 399 and 400 left out. Mairsil, the Pretender's "When Mairsil enters, you may
+   exile an artifact or creature card from your hand or graveyard and put a cage counter on it." (Effect
+   exileFromHandOrYard, effects/run-round401.ts: chosen as it resolves, not targeted) and "Mairsil has all activated
+   abilities of all cards you own in exile with cage counters on them. You may activate each of those abilities only once
+   each turn." (as Rex, Cyber-Hound's borrowing, CompiledCard.borrows exiledWithCounter `owned` and `oncePerTurn`: only
+   cards its controller owns, rulings; each borrowed ability, mana abilities among them, carries a key of its own,
+   ActivatedAbility/ManaAbility `onceKey`, the lender card as the object it is and the ability's index, recorded on the
+   permanent as it's activated, GameObject.borrowedUsed, cleared each turn, CR 602.5b; the same ability on two caged cards
+   is two instances, each once each turn, so mana abilities aren't merged as other borrowing does, rulings). Ogre
+   Battlecaster's "you may cast target instant or sorcery card from your graveyard by paying {R}{R} in addition to its other
+   costs. If that spell would be put into a graveyard, exile it instead. When you cast that spell, this creature gets +X/+0
+   until end of turn, where X is that spell's mana value." (castNow `addedMana`: an additional cost of that cast, CR 118.8,
+   601.2f, added in spellCost while that castFree prompt is up; a reflexive trigger, CR 603.12, Effect reflexive
+   `xCastMv`, its X the spell's mana value as it was cast, ResolvingState.castThisWayMv). Kylox's Voltstrider's "Whenever
+   this Vehicle attacks, you may cast an instant or sorcery spell from among cards exiled with it. If that spell would be
+   put into a graveyard, put it on the bottom of its owner's library instead." (castFromAmong `evidenceLinked`: the cards
+   its "Collect evidence 6:" cost exiled are "exiled with it", CR 607.2a, AdditionalCost collectEvidence `linkSource`,
+   kept in s.linkedExile as the ability is activated; `bottomCast`, GameObject.bottomIfToGraveyard, CR 614.1a; paid, as
+   the trigger resolves, timing ignored, rulings). Bots cage the card with the most activated abilities. Browser tests click
+   through Ogre's target and cast, Mairsil's cage pick and its one activation, and Kylox's evidence, pick and cast. The
+   Jon Irenicus (round 375) and Beamtown Bullies (round 380) browser tests no longer flake: the first read the Ogre after
+   Ana's untap step could untap it (now your floating mana holds your end step), the second read the state again after
+   its poll, while a bot could still have priority in Ana's beginning of combat (now it keeps the state the poll saw). +3,
+   31,600 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 401 (looked at, not done): Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree
+   Vector, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their
+   earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4963,12 +4990,12 @@ line blocks.
    (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (hatching
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
    for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
-   Ogre Battlecaster ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (spells
+   Ogre Battlecaster (done in round 401) ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (done in round 401) (spells
    from the cards its collect evidence exiled); Reversal of Fortune (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
    Unpredictable Cyclone; Bell Borca, Spectral Sergeant (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
-   Sanar, Innovative First-Year; Mairsil, the Pretender (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
+   Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force.
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
@@ -9726,7 +9753,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   your graveyard. If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead": paying
   its costs as the trigger resolves, the spell's types as it's cast, only an instant or sorcery spell exiled, CR 614.1a,
   rulings; a browser test). +6, 31,158 of 31,936 with B189 to B192.
-- Out after round B193 (looked at, not done): Kylox's Voltstrider (a spell cast from among cards collect evidence exiled,
+- Out after round B193 (looked at, not done): Kylox's Voltstrider (done in round 401) (a spell cast from among cards collect evidence exiled,
   put on the bottom of its owner's library if it would go to a graveyard: no such replacement for a spell yet), Wizard's
   Spellbook (a d20 picking among a paid copy, a copy for {1} rather than its mana cost, and every card exiled with it),
   Soundwave, Sonic Spy (a target's mana value equal to the combat damage tokens dealt), Spelltwine ("Cast the copies if

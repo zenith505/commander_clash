@@ -16,8 +16,9 @@ import { objects, runEffectInner, type ResolveCtx } from "./resolve";
  * mana), and not bound to this object's choices (cards.ts abilitiesOf `unbound`).
  */
 const usable = (a: ActivatedAbility) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
-const plainActivated = ({ borrowed: _b, blueAsAny: _u, ...a }: ActivatedAbility): ActivatedAbility => a;
-const plainMana = ({ blueAsAny: _u, ...a }: ManaAbility): ManaAbility => a;
+// Mairsil's once-each-turn key (round 401) is its own too: the gained ability isn't limited by it.
+const plainActivated = ({ borrowed: _b, blueAsAny: _u, onceKey: _k, ...a }: ActivatedAbility): ActivatedAbility => a;
+const plainMana = ({ blueAsAny: _u, onceKey: _k, ...a }: ManaAbility): ManaAbility => a;
 
 /**
  * "`what` gains all activated abilities of `from` until end of turn." `from`'s activated abilities as this resolves (CR

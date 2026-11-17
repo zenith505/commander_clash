@@ -125,6 +125,7 @@ import { round397Line } from "./round397";
 import { round398Line } from "./round398";
 import { round399Line } from "./round399";
 import { round400Line } from "./round400";
+import { round401Line } from "./round401";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1026,6 +1027,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Territory Forge (round 399): "the exiled card" (oracle/round399.ts).
     if (line === "~ has all activated abilities of the exiled card." && round399Line(line, raw, out, isSpell)) continue;
+    // Mairsil, the Pretender (round 401): "all cards you own in exile with cage counters on them" (oracle/round401.ts).
+    if (line.startsWith("~ has all activated abilities of all cards you own in exile with cage counters") && round401Line(line, raw, out, isSpell)) continue;
     // Myr Welder: "~ has all activated abilities of all cards exiled with it"; Dark Impostor, Patchwork Crawler: "all
     // creature cards exiled with it", linked to its one exile ability below (CR 607.2a).
     const borrowLinked = borrow && !borrow[2] && !borrow[3] ? /^all (?:(creature|artifact) )?cards exiled with (?:it|~)$/.exec(borrow[1]!) : null;
@@ -6296,6 +6299,7 @@ export function compile(d: CardDef): CompiledCard {
     if (round399Line(line, raw, out, isSpell)) continue;
     // Round 400's whole lines (oracle/round400.ts).
     if (round400Line(line, raw, out, isSpell)) continue;
+    if (round401Line(line, raw, out, isSpell)) continue;
     // Cloudform, Lightform, Rageform: "When ~ enters, it becomes an Aura with enchant creature. Manifest the top card of your
     // library and attach ~ to it.": the enchantment becomes an Aura with enchant creature from then on (a resolved effect, CR
     // 611.2c), only if it's still the same object on the battlefield (CR 400.7); the card is manifested either way (rulings,
@@ -7708,6 +7712,15 @@ const castsTheExiled = new WeakSet<CompiledCard>();
  * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
  */
 function linkExile(out: CompiledCard) {
+  // Kylox's Voltstrider (round 401): "cards exiled with it" are those its one "Collect evidence N:" cost exiled (CR 607.2a),
+  // with no other exile instruction on the card.
+  const bodies0 = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (bodies0.some((b) => allEffects(b.effects).some((e) => e.type === "castFromAmong" && !!e.evidenceLinked))) {
+    const evidence = out.activated.flatMap((a) => (a.costs ?? []).filter((c): c is Extract<AdditionalCost, { kind: "collectEvidence" }> => c.kind === "collectEvidence"));
+    const others = bodies0.flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "search", "chooseFromGraveyard", "pick", "flicker", "exileUntilNonlandLinked"].includes(e.type));
+    if (out.spell || evidence.length !== 1 || others.length) out.unsupported.push("(casts from cards exiled with it, but no one cost exiles them)");
+    else evidence[0]!.linkSource = true;
+  }
   // Assimilation Aegis (round 396): "a creature card exiled with ~" is one its enters ability exiled (CR 607.2a), its only
   // exile instruction.
   const copyBodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
@@ -8024,7 +8037,7 @@ function linkExile(out: CompiledCard) {
   // Kaho, Minamo Historian; Jeleva, Nephalia's Scourge; Shell of the Last Kappa: "cast a spell from among cards exiled
   // with ~" as it resolves: the cards its one exile instruction exiled (CR 607.2a): Kaho's search, Jeleva's "each player
   // exiles the top X cards", Shell's exiled spell.
-  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted) || e.type === "playLinkedThisTurn"))) {
+  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted && !e.evidenceLinked) || e.type === "playLinkedThisTurn"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);

@@ -1368,6 +1368,8 @@ export function moveObject(
   if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + (insteadOfDying.x.counterN ?? 1);
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
+  // Round B250: whether a Gather Specimens changed the player it entered under (syncControl, CR 506.3c-d).
+  o.gatheredAsEntered = to === "battlefield" && gatherUsed.length ? true : undefined;
   o.attacking = undefined;
   o.attackingPermanent = undefined;
   o.blocking = undefined;
@@ -1931,6 +1933,7 @@ function controlThenEnter(s: GameState, o: GameObject, opts: EnterOpts) {
   const step = s.gatherSpecimens?.some((g) => g.turn === s.turn) ? gatherSteps(s, o.controller, opts.gatherUsed ?? [], asCreature, self) : { controller: o.controller, used: opts.gatherUsed ?? [] };
   if (step.controller !== o.controller) {
     o.controller = step.controller;
+    o.gatheredAsEntered = true;
     invalidateCharacteristics(s);
     log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control instead (Gather Specimens).`);
   }
@@ -11886,6 +11889,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       const g = gatherInstance(s, o.controller, opts.gatherUsed ?? [], Number(choice));
       if (!g) throw new RulesError("choose a player offered");
       o.controller = Number(choice);
+      o.gatheredAsEntered = true;
       invalidateCharacteristics(s);
       log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control instead (Gather Specimens).`);
       controlThenEnter(s, o, { ...opts, gatherUsed: [...(opts.gatherUsed ?? []), g] });
@@ -15715,8 +15719,9 @@ export function syncControl(s: GameState) {
     }
     // Put onto the battlefield attacking under the control of a player who isn't attacking, or blocking under the
     // attacking player's (Gather Specimens, round B250): it's never an attacking or blocking creature (CR 506.3c-d). Only
-    // the active player attacks (CR 506.2).
-    if ((o.attacking !== undefined && now !== s.activePlayer) || (o.blocking?.length && now === s.activePlayer)) {
+    // the active player attacks (CR 506.2). Only for one whose controller a Gather Specimens changed as it entered, the
+    // one way here to put a creature onto the battlefield in combat under the wrong player.
+    if (o.gatheredAsEntered && ((o.attacking !== undefined && now !== s.activePlayer) || (o.blocking?.length && now === s.activePlayer))) {
       log(s, `${nameOf(s, o.id)} isn't ${o.attacking !== undefined ? "attacking" : "blocking"} (it's under ${player(s, now).name}'s control).`);
       removeFromCombat(s, o);
       clearCombat(o);

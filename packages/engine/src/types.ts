@@ -287,6 +287,8 @@ export interface GameObject {
   attachedToPlayer?: PlayerId;
   /** Controller as of the last control check, to notice control changes (summoning sickness, combat). */
   seenController?: PlayerId;
+  /** Round B250: a Gather Specimens changed the player it entered the battlefield under (CR 506.3c-d in syncControl). */
+  gatheredAsEntered?: true;
   tapped: boolean;
   /** Turn number the current controller gained control of it (summoning sickness, CR 302.6). */
   controlledSinceTurn: number;

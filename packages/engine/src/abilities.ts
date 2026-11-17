@@ -6115,7 +6115,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -7311,6 +7311,11 @@ export interface TriggeredAbility {
   /** "When ~ dies, if it's not a Spirit, ..." (Otherworldly Escort): an intervening if (CR 603.4) on its subtypes as it last existed (CR 603.10a). */
   ifNotSubtype?: string;
   ifNotToken?: true;
+  /**
+   * Round B249, Infinite Reflection: "When ~ enters attached to a creature": only if it's attached to a creature as it
+   * enters; that creature is the trigger's subject ("that creature"), even if the Aura is moved before it resolves (rulings).
+   */
+  ifEnteredAttachedCreature?: true;
   /**
    * Decaying Soil (round B234): its threshold-granted "Whenever a nontoken creature is put into your graveyard from the
    * battlefield": it exists only if its controller had at least this many cards in their graveyard just before the event,
@@ -9604,6 +9609,12 @@ export interface CompiledCard {
    * layer 5 before any other effect (613.3). The card data's colors already have it everywhere else (CR 604.3a).
    */
   allColors?: true;
+  /**
+   * Round B249: "If ~ is your commander, choose a color before the game begins. ~ is the chosen color." (The Prismatic
+   * Piper, Faceless One): the choice is made as the deck is built (CR 903.4b), GameObject.pregameColor; the second sentence
+   * is a characteristic-defining ability linked to it (CR 604.3, 607.2p): that color in every zone, none without a choice.
+   */
+  pregameColorIsColor?: true;
   /** "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), applied first in layer 4 (613.3). */
   allNonbasicLandTypes?: true;
   /**
@@ -9636,6 +9647,22 @@ export interface CompiledCard {
    * as the spell is cast; `firstEachTurn`: only its controller's first spell this turn matching `filter`.
    */
   spellsHaveCasualty?: { filter: TargetSpec; n: number; firstEachTurn?: true; text: string }[];
+  /**
+   * Round B248: "Each Sliver spell you cast has replicate. The replicate cost is equal to its mana cost." (Hatchery Sliver,
+   * Djinn Illuminatus, Ian Chesterton), "Each spell you cast that's exactly three colors has replicate {3}." (Threefold
+   * Signal): an instance of replicate for each such spell as it's cast, beside any it has, each paid separately (CR
+   * 702.56a-b, rulings). `cost`: a fixed replicate cost; without it, the spell's own mana cost, with the X chosen for it.
+   */
+  spellsHaveReplicate?: { filter: TargetSpec; cost?: string; text: string }[];
+  /**
+   * Round B249: "Creatures you control enter as a copy of ~." (Essence of the Wild), "Nontoken creatures you control enter as
+   * a copy of enchanted creature." (Infinite Reflection): a copy replacement for each creature entering under this
+   * permanent's controller's control (CR 614.1c, 707.5), judged as it would exist on the battlefield (CR 614.12), applied
+   * after control-changing replacements and before every other one (CR 616.1, rulings), so the entering creature's own
+   * "enters" replacements and triggers don't apply. `of` "self": this permanent's copiable values as it is now (CR 707.2);
+   * "enchanted": the creature it's attached to (none while it isn't attached to a creature). See game.ts entersAsCopyKeys.
+   */
+  creaturesEnterAsCopy?: { of: "self" | "enchanted"; nontoken?: true; text: string }[];
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];

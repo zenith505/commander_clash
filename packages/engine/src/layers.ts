@@ -20,7 +20,7 @@ import { creatureCardAbove, creatureCardsAbove } from "./graveyard";
 import type { AbilityBody, Affects, Amount, DamageMod, Modification, MostStat, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
-import { basePower, baseToughness, castCardAs, defOf, pairedWith } from "./cards";
+import { basePower, baseToughness, castCardAs, defOf, identityOf, pairedWith } from "./cards";
 import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
@@ -400,7 +400,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     subtypes: compileCard(d).allNonbasicLandTypes ? [...new Set([...d.subtypes, ...NONBASIC_LAND_TYPES])] : [...d.subtypes],
     allCreatureTypes: everyCreatureType(d),
     // "~ is all colors" (CR 604.3) applies first in layer 5 (613.3). A copy whose colors an exception set doesn't have it (707.9d).
-    colors: compileCard(d).allColors ? ["W", "U", "B", "R", "G"] : [...d.colors],
+    // The Prismatic Piper's "~ is the chosen color" likewise, for the color chosen before the game (round B249).
+    colors: compileCard(d).allColors ? ["W", "U", "B", "R", "G"] : compileCard(d).pregameColorIsColor ? (o.pregameColor ? [o.pregameColor] : []) : [...d.colors],
     keywords: printedKeywords(d),
     manaValue: o.faceDown ? 0 : defMv(d),
     hasPrintedAbilities: true,
@@ -2788,6 +2789,9 @@ const coloredDefs = new Map<string, CardDef>();
  */
 export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDef {
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return d;
+  // The Prismatic Piper (round B249): its characteristic-defining ability works in every zone (CR 604.3), first (613.3).
+  const cda = compileCard(d).pregameColorIsColor;
+  if (cda) d = coloredDef(d, o.pregameColor ? [o.pregameColor] : []);
   const gs: { timestamp: number; mods: Modification[]; chosenColor?: Color }[] = offFieldGrants(s).filter((g) => g.everyone);
   // The Laces: "target spell becomes green", while it's that spell (CR 105.3, 613.1e).
   if (o.zone === "stack") for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "setColors" || m.kind === "addColors")) gs.push(g);
@@ -2801,6 +2805,11 @@ export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDe
         colors = [...colors, ...add.filter((c) => !colors.includes(c))];
       }
     }
+  return coloredDef(d, colors);
+}
+
+/** `d` with these colors, cached (offFieldColored). */
+function coloredDef(d: CardDef, colors: Color[]): CardDef {
   if (colors.length === d.colors.length && colors.every((c, i) => c === d.colors[i])) return d;
   const key = `${d.oracleId}|${d.name}|${d.subtypes.join(",")}|${d.everyCreatureType ?? ""}|${colors.join("")}`;
   let out = coloredDefs.get(key);
@@ -2846,7 +2855,7 @@ export const controllerOf = (s: GameState, o: GameObject): PlayerId => (o.zone =
 function commandersIdentity(s: GameState, pid: PlayerId | undefined): string[] | undefined {
   if (pid === undefined) return undefined;
   const cmds = Object.values(s.objects).filter((o) => o.isCommander && o.owner === pid);
-  return cmds.length ? [...new Set(cmds.flatMap((o) => s.cards[o.cardId]?.colorIdentity ?? []))] : undefined;
+  return cmds.length ? [...new Set(cmds.flatMap((o) => identityOf(s, o)))] : undefined;
 }
 
 /**

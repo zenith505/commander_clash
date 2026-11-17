@@ -829,11 +829,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
     // "if it was kicked" is an intervening if (CR 603.4), and that can't change by the time it resolves.
     // Evoke's sacrifice trigger only if the evoke cost was paid (CR 702.74a).
+    // Infinite Reflection (round B249): "When ~ enters attached to a creature": the creature it's attached to as it enters,
+    // that ability's "that creature" (its subject), even if the Aura is moved before it resolves (rulings).
+    const enteredOn = entering.attachedTo !== undefined ? s.objects[entering.attachedTo] : undefined;
+    const enteredOnCreature = enteredOn?.zone === "battlefield" && objIsType(s, enteredOn, "Creature") ? enteredOn : undefined;
+    const queuedBefore = s.triggerQueue.length;
     add(
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEscaped || !!entering.escaped) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifCastInMain || (!!entering.wasCast && !!entering.castInMain)) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && !(t.ifEnteredAttachedCreature && !enteredOnCreature) && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEscaped || !!entering.escaped) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifCastInMain || (!!entering.wasCast && !!entering.castInMain)) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -846,6 +851,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         : undefined,
       entering.colorsSpent?.length,
     );
+    if (enteredOnCreature) {
+      const own = abilitiesOf(s, entering).triggers;
+      for (const q of s.triggerQueue.slice(queuedBefore))
+        if (q.sourceId === entering.id && own[q.index]?.ifEnteredAttachedCreature) q.subject = { id: enteredOnCreature.id, zc: enteredOnCreature.zoneChanges ?? 0 };
+    }
     if (objIsType(s, entering, "Creature")) {
       const lki = { power: power(s, entering), toughness: toughness(s, entering) };
       for (const id of s.battlefield) {
@@ -2480,6 +2490,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const n = Math.min(paid, casualtyGranted(s, ev.controller, defOf(s, spell), spell).length);
       for (let i = 0; i < n; i++) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASUALTY_BODY, cause: ev.stackId });
     }
+    // Round B248: replicate a permanent gave the spell (Djinn Illuminatus): the spell's own "when you cast this spell, copy it
+    // for each time its replicate cost was paid", one for each instance paid, copying it for that instance's payments only
+    // (CR 702.56a-b); only if the spell still has it as it becomes cast, its giver still there (as for conspire).
+    if (spell && item?.replicated && !ev.copy) {
+      const d = defOf(s, spell);
+      for (const r of item.replicated) {
+        const g = s.objects[r.source];
+        if (!g || g.zone !== "battlefield" || (g.zoneChanges ?? 0) !== r.zc || controllerOf(s, g) !== ev.controller || !(abilitiesOf(s, g).spellsHaveReplicate ?? []).some((x) => printedMatches(x.filter, d))) continue;
+        s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: replicateBody(r.times), cause: ev.stackId });
+      }
+    }
     // Demonstrate a permanent gives the spell (Silverquill Lecturer): one trigger for each instance (CR 702.144a-b).
     if (spell && !ev.copy) {
       const d = defOf(s, spell);
@@ -3518,6 +3539,8 @@ function speedTrigger(s: GameState, loser: PlayerId) {
 }
 
 const DEMONSTRATE_BODY: AbilityBody = { targets: [], effects: [{ type: "may", effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, demonstrate: true }], text: "copy ~ (an opponent you choose then copies it too)" }], text: "Demonstrate: you may copy ~. If you do, choose an opponent to also copy it. Players may choose new targets for their copies." };
+/** Round B248: a granted replicate's copy trigger, for the times that instance was paid (CR 702.56a-b). */
+const replicateBody = (n: number): AbilityBody => ({ targets: [], effects: [{ type: "copySpell", spell: "cause", n, newTargets: true }], text: `Replicate: copy ~ ${n === 1 ? "once" : n === 2 ? "twice" : `${n} times`}. You may choose new targets for the copies.` });
 const CASUALTY_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Casualty: copy ~. You may choose new targets for the copy." };
 const CONSPIRE_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Conspire: copy ~. You may choose new targets for the copy." };
 const STORM_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." };
@@ -3548,11 +3571,15 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
 
 /** Is this moved object one that `b` counts, for the permanent `w` (as it is now, or as it last existed: `gone`)? */
 /**
- * Kraven the Hunter (round 404): the dying creature's power as it last existed is at least that of each other creature
- * its controller then controlled: those still on the battlefield, and those that left the battlefield in the same event,
- * as they last existed (CR 603.10a).
+ * Kraven the Hunter (round 404): the dying creature's power is at least that of each other creature its controller
+ * controlled just before it left (CR 603.10a), those leaving in the same event too, a tie included: the battlefield as the
+ * event's first permanent left (GameState.leftTogether `before`). Without that snapshot, its power as it last existed
+ * against the others' now and the last known power of those that left with it.
  */
 function hadGreatestPower(s: GameState, dying: { o: GameObject; c: Characteristics }): boolean {
+  const before = s.leftTogether?.find((l) => l.before)?.before;
+  const me = before?.find((b) => b.id === dying.o.id);
+  if (before && me) return before.every((b) => b.controller !== me.controller || b.power <= me.power);
   const who = dying.c.controller;
   const mine = dying.c.power;
   for (const id of s.battlefield) {

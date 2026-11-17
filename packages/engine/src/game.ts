@@ -84,6 +84,13 @@ export const MAX_HAND_SIZE = 7; // CR 402.2
 export interface PlayerSetup {
   name: string;
   commander: CardDef;
+  /**
+   * Round B249: the color chosen for a commander with "If ~ is your commander, choose a color before the game begins" (The
+   * Prismatic Piper, Faceless One) as the deck was built (CR 903.4b): `commander`'s, then `secondCommander`'s. Required
+   * for such a commander, and only for one.
+   */
+  commanderColor?: Color;
+  secondCommanderColor?: Color;
   /** A second commander: partners, or a Background beside a "choose a Background" creature (CR 702.124). */
   secondCommander?: CardDef;
   /** The rest of the 100 cards (98 with two commanders, CR 702.124b). */
@@ -140,9 +147,16 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     };
     s.players.push(player);
     // Both commanders start in the command zone, and each is tracked on its own: tax, damage (CR 702.124b, d).
-    for (const c of p.secondCommander ? [p.commander, p.secondCommander] : [p.commander]) {
+    for (const [i, c] of (p.secondCommander ? [p.commander, p.secondCommander] : [p.commander]).entries()) {
       const cmd = newObject(s, c, pid, "command");
       cmd.isCommander = true;
+      // The Prismatic Piper (round B249): its color, chosen as the deck was built, revealed as it's put into the command
+      // zone (CR 903.4b, 103.2c).
+      const color = i === 0 ? p.commanderColor : p.secondCommanderColor;
+      if (compileCard(c).pregameColorIsColor) {
+        if (!color || !COLORS.includes(color)) throw new RulesError(`${c.name} is a commander: choose its color before the game begins (CR 903.4b)`);
+        cmd.pregameColor = color;
+      } else if (color) throw new RulesError(`${c.name} doesn't have you choose a color before the game begins`);
       player.command.push(cmd.id);
       player.commanderCasts[cmd.id] = 0;
     }
@@ -753,6 +767,62 @@ function reflectionKey(s: GameState, o: GameObject): string | undefined {
 }
 
 /**
+ * Round B249: the copy replacements that apply to a permanent entering now (CR 614.1c, 707.5), each a copy's key and what
+ * makes it: Mystic Reflection's (reflectionKey), and Essence of the Wild's and Infinite Reflection's
+ * (CompiledCard.creaturesEnterAsCopy) for a creature as it would enter (CR 614.12) under the control of one of those
+ * permanents' controller, a token too unless it says "nontoken". Essence of the Wild is copied as it is now (CR 707.2:
+ * none of its counters, Auras or non-copy effects, rulings), Infinite Reflection's enchanted creature likewise; none
+ * while that Aura isn't attached to a creature. A permanent entering at the same time isn't on the battlefield yet,
+ * so it doesn't apply (CR 614.12). With several that differ, the entering permanent's controller chooses the order
+ * and the one applied last decides what it copies (CR 616.1, rulings): one entry for each distinct copy.
+ */
+function entersAsCopyKeys(s: GameState, o: GameObject): { key: string; source: string }[] {
+  const out: { key: string; source: string }[] = [];
+  const add = (key: string, source: string) => {
+    if (!out.some((x) => x.key === key)) out.push({ key, source });
+  };
+  const reflected = reflectionKey(s, o);
+  if (reflected) add(reflected, "Mystic Reflection");
+  // Only with such a permanent around (abilitiesOf below still decides whether it has the ability now).
+  if (!s.battlefield.some((id) => id !== o.id && compileCard(defOf(s, obj(s, id))).creaturesEnterAsCopy)) return out;
+  invalidateCharacteristics(s);
+  if (!objIsType(s, o, "Creature")) return out;
+  const you = controllerOf(s, o);
+  for (const id of s.battlefield) {
+    if (id === o.id) continue;
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== you) continue;
+    for (const g of abilitiesOf(s, p).creaturesEnterAsCopy ?? []) {
+      if (g.nontoken && o.isToken) continue;
+      const host = g.of === "enchanted" && p.attachedTo !== undefined ? s.objects[p.attachedTo] : undefined;
+      const of = g.of === "self" ? p : host && host.zone === "battlefield" && host.id !== o.id && objIsType(s, host, "Creature") ? host : undefined;
+      if (of) add(copyKey(s, copiableDef(s, of)), characteristics(s, p).name);
+    }
+  }
+  return out;
+}
+
+/** Round B249: `o` enters as a copy of what `key` is (entersAsCopyKeys), before how else it enters is worked out. */
+function enterCopying(s: GameState, o: GameObject, key: string) {
+  const was = o.faceDown ? "A face-down creature" : realDefOf(s, o).name;
+  o.copyOf = key;
+  invalidateCharacteristics(s);
+  log(s, `${was} enters as a copy of ${s.cards[key]!.name}.`);
+}
+
+/**
+ * Round B249: after a copy replacement chosen as it enters (entersAsCopyKeys), the rest of how it enters, as what it
+ * now is: the copied permanent's own "you may have ~ enter as a copy" or exchange of text boxes (rulings on Mystic
+ * Reflection: its "as ~ enters" abilities work), then finishEnteringAs.
+ */
+function enterAsCopied(s: GameState, o: GameObject, opts: EnterOpts) {
+  const printed = compileCard(defOf(s, o));
+  if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length >= (printed.entersAsCopy.exileTwo ? 2 : 1)) (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: opts });
+  else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: opts });
+  else finishEnteringAs(s, o, opts);
+}
+
+/**
  * Storyweave (round B221, GameState.nextEntersCounters): the extra counters for a permanent entering now, if it has all of a
  * waiting replacement's types as it would enter (CR 614.12) and enters under that replacement's player's control. Each
  * waiting one applies; it's used up by the first such event, the others entering with it too (enterTogether).
@@ -1141,7 +1211,11 @@ export function moveObject(
   // left, ones leaving at the same time included (they were still in combat then, CR 603.10a).
   const aloneIn = fromZone === "battlefield" ? combatAlone(s, o) : undefined;
   if (fromZone === "battlefield") {
-    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
+    // Kraven the Hunter (round 404): the creatures there just before the first of these left, with their controllers and
+    // powers then, for "the greatest power among creatures that player controls" as it looks back (CR 603.10a), while
+    // something has such an ability.
+    const before = !s.leftTogether?.length && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).triggers.some((t) => t.dies?.greatestPowerOfController)) ? s.battlefield.flatMap((b) => (objIsType(s, obj(s, b), "Creature") ? [{ id: b, controller: controllerOf(s, obj(s, b)), power: power(s, obj(s, b)) }] : [])) : undefined;
+    (s.leftTogether ??= []).push({ ...(before ? { before } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
@@ -1359,6 +1433,8 @@ export function moveObject(
   if (to === "battlefield" && opts.entersAs)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: opts.entersAsBy?.controller ?? o.controller, sourceName: opts.entersAsBy?.source ?? defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs, ...(opts.entersAsBy?.whileCounter ? { whileCounter: opts.entersAsBy.whileCounter } : {}) });
   // The Volvers: kicked with that kicker, it enters with those abilities (CR 614.1c), from an effect as it enters.
+  // The Volvers' abilities are the entering card's own replacement: gone if it enters as a copy (round B249).
+  const kickedEffectsFrom = s.effects.length;
   if (to === "battlefield" && o.kicked?.length)
     for (const k of compileCard(defOf(s, o)).entersKicked ?? [])
       if (k.which !== undefined && o.kicked.includes(k.which)) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: k.mods });
@@ -1424,12 +1500,19 @@ export function moveObject(
   const castTapped = to === "battlefield" && fromZone === "stack" && !!o.castEntersTapped;
   if (to !== "stack") o.castEntersTapped = undefined;
   if (to === "battlefield") {
-    // Mystic Reflection: a creature or planeswalker enters as a copy (CR 614.1c, 707.5), before the rest of how it enters.
-    const reflected = reflectionKey(s, o);
-    if (reflected) {
-      o.copyOf = reflected;
-      invalidateCharacteristics(s);
-      log(s, `${realDefOf(s, o).name} enters as a copy of ${s.cards[reflected]!.name}.`);
+    // Mystic Reflection, Essence of the Wild, Infinite Reflection: a creature (or planeswalker) enters as a copy (CR 614.1c,
+    // 707.5), after control-changing replacements and before the rest of how it enters (CR 616.1, rulings): its own
+    // "enters" replacements don't apply, the copied permanent's do (finishEnteringAs). One that enters under an opponent's
+    // control of your choice (Xantcha) is asked that first (the controlOpponent choice checks again).
+    const own = compileCard(defOf(s, o));
+    const copies = own.entersUnderOpponent && opponents(s, o.controller).length ? [] : entersAsCopyKeys(s, o);
+    if (copies.length === 1) enterCopying(s, o, copies[0]!.key);
+    if (copies.length) {
+      const kicked = new Set(s.effects.slice(kickedEffectsFrom).filter((e) => e.affected.length === 1 && e.affected[0] === id && e.duration === "game").map((e) => e.id));
+      if (kicked.size) {
+        s.effects = s.effects.filter((e) => !kicked.has(e.id));
+        invalidateCharacteristics(s);
+      }
     }
     const printed = compileCard(defOf(s, o));
     // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
@@ -1451,9 +1534,12 @@ export function moveObject(
     const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(opts.countersIfXCost ? { countersIfXCost: opts.countersIfXCost } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
-    if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length >= (printed.entersAsCopy.exileTwo ? 2 : 1)) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    if (copies.length > 1) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copyLast", options: copies.map((c) => c.key), copySources: copies.map((c) => c.source), enterOpts: how });
+    else if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length >= (printed.entersAsCopy.exileTwo ? 2 : 1)) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
+    // Entering as a copy: how the copy enters (its own "enters with" counters, CR 614.12), not the card's.
+    else if (copies.length) finishEnteringAs(s, o, how);
     // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
     else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN, ...(withCounters.also ? { also: withCounters.also } : {}), ...(withCounters.more ? { more: withCounters.more } : {}) } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
@@ -7094,6 +7180,8 @@ export function castProblem(
     return "X can't be greater than the greatest toughness among creatures you control";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
+  const rp = replicateProblem(s, pid, d, choices?.replicate);
+  if (rp) return rp;
   const or = compileCard(d).costOr;
   if (choices?.costOr !== undefined && (!or || !Number.isInteger(choices.costOr) || !or[choices.costOr])) return `${d.name} has no such cost to choose`;
   // Not chosen yet: one of the ways has to be possible (a mana one is, as far as the mana check below goes).
@@ -7159,7 +7247,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -7176,7 +7264,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
   // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
-  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
+  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor, kicks.length > 0 && isRealKicker(kicker));
@@ -8177,6 +8265,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const taxLife = fromCommand ? commanderTaxLife(p, o, d) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
   const xOut: { part?: number; any?: boolean } = {};
+  // Round B248: the instances of replicate permanents give it, as its total cost is locked in (CR 702.56b, 601.2f).
+  const replicateNow = choices.replicate?.some((n) => n > 0) ? replicateGranted(s, p.id, d) : [];
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes, xOut }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
@@ -8370,6 +8460,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
+  // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
+  const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
+  if (replicated.length) item.replicated = replicated;
   for (const t of spentQueue) if (!("spell" in t) || spellMatches(s, t.spell, item)) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
   if (castTrigger) s.triggerQueue.push({ sourceId: castTrigger.sourceId, sourceCardId: castTrigger.sourceCardId, sourceZc: castTrigger.sourceZc, controller: p.id, index: -1, body: castTrigger.body, cause: stackId, subject: { id, zc: o.zoneChanges ?? 0 } });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
@@ -8388,6 +8481,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
+  const replicateText = replicated.map((r) => `, paying replicate ${replicateNow.find((g) => g.source === r.source)!.cost}${r.times === 1 ? " once" : r.times === 2 ? " twice" : ` ${r.times} times`} (from ${nameOf(s, r.source)})`).join("");
   // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
   const payWay = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id ? s.pending.pay : undefined;
   const howText =
@@ -8401,7 +8495,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -9014,6 +9108,47 @@ export function casualtyGranted(s: GameState, pid: PlayerId, d: CardDef, o?: Gam
     for (const g of abilitiesOf(s, p).spellsHaveCasualty ?? []) if (printedMatches(g.filter, d) && (!g.firstEachTurn || (!!o && firstOfKindThisTurn(s, pid, o, g.filter)))) out.push(g.n);
   }
   return out;
+}
+
+/**
+ * Round B248: the instances of replicate permanents `pid` controls give this card as they cast it ("Each instant and
+ * sorcery spell you cast has replicate. The replicate cost is equal to its mana cost.", Djinn Illuminatus; "... has
+ * replicate {3}", Threefold Signal), in the order they're on the battlefield, beside any replicate it has (CR 702.56a-b).
+ * `cost`: null when it's unpayable, the mana cost of a spell that has none (CR 118.6).
+ */
+export function replicateGranted(s: GameState, pid: PlayerId, d: CardDef): { source: ObjectId; cost: string | null; text: string }[] {
+  const out: { source: ObjectId; cost: string | null; text: string }[] = [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).spellsHaveReplicate ?? []) if (printedMatches(g.filter, d)) out.push({ source: id, cost: g.cost ?? (d.manaCost ? d.manaCost : null), text: g.text });
+  }
+  return out;
+}
+
+/** The most times one instance of replicate may be paid here: a cost of {0} could otherwise be paid without end. */
+export const REPLICATE_MAX = 20;
+
+/** Why these replicate payments for the instances permanents give the spell aren't allowed (CR 702.56a, 118.6). */
+function replicateProblem(s: GameState, pid: PlayerId, d: CardDef, times?: number[]): string | null {
+  if (!times?.length) return null;
+  if (times.some((n) => !Number.isInteger(n) || n < 0)) return "replicate is paid a whole number of times";
+  if (times.every((n) => n === 0)) return null;
+  const grants = replicateGranted(s, pid, d);
+  if (times.length > grants.length) return `${d.name} doesn't have that many instances of replicate`;
+  for (const [i, n] of times.entries()) {
+    if (!n) continue;
+    if (grants[i]!.cost === null) return `${d.name} has no mana cost, so its replicate cost can't be paid`;
+    if (n > REPLICATE_MAX) return `replicate is paid no more than ${REPLICATE_MAX} times here`;
+  }
+  return null;
+}
+
+/** The mana paid for the instances of replicate permanents give the spell (CR 702.56a, 601.2f): each cost that many times. */
+function replicateMana(s: GameState, pid: PlayerId, d: CardDef, times?: number[]): string {
+  if (!times?.some((n) => n > 0)) return "";
+  const grants = replicateGranted(s, pid, d);
+  return times.map((n, i) => (grants[i]?.cost ?? "").repeat(Math.max(0, n))).join("");
 }
 
 /** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a); with several instances, the least N. */
@@ -11919,6 +12054,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
+    if (pend.what === "copyLast") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a copy offered");
+      enterCopying(s, o, choice);
+      enterAsCopied(s, o, entry?.enterOpts ?? {});
+      return;
+    }
     if (pend.what === "copy") {
       // The Mimeoplasm: the card it copies first, then the other card to exile with it.
       if (compileCard(defOf(s, o)).entersAsCopy?.exileTwo && choice !== "none") {
@@ -11957,7 +12098,20 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       o.controller = Number(choice);
       invalidateCharacteristics(s);
       log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control.`);
-      finishEnteringAs(s, o, { ...(entry?.enterOpts ?? {}), controlChosen: true });
+      const opts = { ...(entry?.enterOpts ?? {}), controlChosen: true };
+      // Copy replacements after the control-changing one (CR 616.1, rulings), for that player's (round B249). Only the
+      // entering card's own choice comes here first: not after a copy of Xantcha.
+      const copies = entry?.enterOpts?.controlChosen === undefined && !o.copyOf ? entersAsCopyKeys(s, o) : [];
+      if (copies.length > 1) {
+        (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "copyLast", options: copies.map((c) => c.key), copySources: copies.map((c) => c.source), enterOpts: opts });
+        return;
+      }
+      if (copies.length === 1) {
+        enterCopying(s, o, copies[0]!.key);
+        enterAsCopied(s, o, opts);
+        return;
+      }
+      finishEnteringAs(s, o, opts);
       return;
     }
     if (pend.what === "discardInstead") {
@@ -12159,7 +12313,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters" || pend.what === "tapOrder") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyLast" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters" || pend.what === "tapOrder") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -13093,6 +13247,14 @@ function askEntersChoice(s: GameState): boolean {
       const ids = textExchangeCandidates(s, o).filter((id) => !c.together?.includes(id));
       const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "exchangeText", options: [...ids, "none"], labels: [...labels, "Don't exchange"], objectId: o.id, prompt: "you may exchange its text box with another creature's" };
+      return true;
+    }
+    if (c.what === "copyLast") {
+      // Round B249: several different copy replacements apply; its controller chooses their order, and the last one
+      // applied decides what it copies (CR 616.1, rulings).
+      const keys = c.options ?? [];
+      const labels = keys.map((k, i) => `A copy of ${s.cards[k]?.name ?? "?"} (${c.copySources?.[i] ?? "?"})`);
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: o.faceDown ? "A face-down creature" : realDefOf(s, o).name, what: "copyLast", options: keys.map(String), labels, objectId: o.id, prompt: "it enters as a copy: choose which copy effect applies last" };
       return true;
     }
     if (c.what === "copy") {

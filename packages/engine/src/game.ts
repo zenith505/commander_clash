@@ -69,6 +69,7 @@ import {
   STARTING_LIFE,
   type TurnRule,
   type DeferredAct,
+  type UntilLeavesLink,
 } from "./types";
 
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
@@ -1835,7 +1836,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
  * the source leave is over (askAuraReturns), since a choice can't be asked partway through one. It can't enchant
  * anything that returned at the same time, and with nothing it can enchant it stays in exile (CR 303.4g).
  */
-export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string, why = `${source} left`, /** Who puts them back (GameObject.putter): the exile effect's controller, its source's as it left. */ by?: PlayerId) {
+export function returnUntilLeaves(s: GameState, links: UntilLeavesLink[], source: string, why = `${source} left`, /** Who puts them back (GameObject.putter): the exile effect's controller, its source's as it left. */ by?: PlayerId) {
   const back = links.filter((l) => {
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
@@ -1866,6 +1867,26 @@ export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: numbe
       r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
     }
   });
+  returnRiders(s, back);
+}
+
+/**
+ * Lagrella, the Magpie: "When an exiled card enters under your control this way, ...": each delayed trigger (UntilLeavesLink
+ * `rider`) triggers once, for a card that returned to the battlefield under its controller's control this way (CR 603.7b);
+ * when several did at the same time, its controller chooses which one as it's put on the stack (PendingTrigger
+ * `subjectChoices`).
+ */
+function returnRiders(s: GameState, back: UntilLeavesLink[]) {
+  const keys = [...new Set(back.flatMap((l) => (l.rider ? [l.rider.key] : [])))];
+  for (const key of keys) {
+    const rider = back.find((l) => l.rider?.key === key)!.rider!;
+    const entered = back.filter((l) => l.rider?.key === key).flatMap((l) => {
+      const c = s.objects[l.id];
+      return c && c.zone === "battlefield" && controllerOf(s, c) === rider.controller ? [{ id: c.id, zc: c.zoneChanges ?? 0 }] : [];
+    });
+    if (!entered.length) continue;
+    s.triggerQueue.push({ sourceId: rider.sourceId, sourceCardId: rider.sourceCardId, sourceZc: rider.sourceZc, controller: rider.controller, index: -1, body: rider.body, subject: entered[0]!, ...(entered.length > 1 ? { subjectChoices: entered } : {}) });
+  }
 }
 
 /**
@@ -11464,6 +11485,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // A spell's or activated ability's (askChoosers): that opponent chooses it next, as it's cast or activated.
     const prev = chooserChoices(pend.deferred.act.type === "castSpell" ? pend.deferred.act : pend.deferred.act.costs).choosers;
     resumeDeferred(s, pend.deferred, { targetChoosers: [...prev, Number(choice)] });
+    return;
+  }
+  if (pend.what === "triggerSubject") {
+    // Lagrella, the Magpie: which of the cards the delayed trigger is about (CR 603.7b), as it's put on the stack.
+    const t = s.triggerQueue[0];
+    const pick = t?.subjectChoices?.find((c) => c.id === choice);
+    if (!t || !pick) throw new RulesError("choose one of the cards");
+    t.subject = pick;
+    t.subjectChoices = undefined;
+    log(s, `${p.name} chooses ${defOf(s, obj(s, pick.id)).name} (${pend.source}).`);
     return;
   }
   if (pend.what === "targetChooser") {

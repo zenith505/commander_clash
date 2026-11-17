@@ -2967,6 +2967,13 @@ export type Effect =
       /** Palace Jailer: "until an opponent becomes the monarch" (`opponentMonarch`), whoever controls the source then. */
       until?: "sourceLeaves" | "opponentMonarch" | /** Calix, Destiny's Hand: "until target enchantment you control leaves the battlefield": target `untilTarget`. */ "targetLeaves";
       untilTarget?: number;
+      /**
+       * With `until` "sourceLeaves", Lagrella, the Magpie: "When an exiled card enters under your control this way, ...": a
+       * delayed triggered ability made as this resolves (CR 603.7a, rulings), its controller this ability's (603.7e); it
+       * triggers once, for one card that returns under that player's control as ~ leaves (CR 603.7b, 610.3c), its body about
+       * that card ("it").
+       */
+      returnRider?: AbilityBody;
       linked?: boolean;
       /**
        * "For as long as that card remains exiled, its owner may cast it" (Aerial Extortionist), "... may play it" (`play`),

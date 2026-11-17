@@ -1537,6 +1537,15 @@ export function parseTargetPhrase(
     const rest = parseTargetPhrase(`${adv[1] ?? ""}${adv[2]}${adv[3]}`, opts);
     return rest?.kind === "card" && !rest.many ? { ...rest, hasAdventure: true, text: `target ${phrase.trim().replace(/^target /i, "")}` } : null;
   }
+  // Sentinel of Lost Lore (round B246): "target card you own in exile that has an Adventure", "target card you don't own
+  // in exile that has an Adventure": any face-up exiled adventurer card with that owner, whoever exiled it and however
+  // (rulings: cast as an Adventure or not), read as the printed card (CR 715.4, TargetSpec.inExile).
+  const exAdv = /^(target )?card you (own|don't own) in exile that has an Adventure$/.exec(phrase.trim());
+  if (exAdv) {
+    const rest = parseTargetPhrase(`${exAdv[1] ?? ""}card from ${exAdv[2] === "own" ? "your" : "a"} graveyard`, opts);
+    if (rest?.kind !== "card" || rest.types?.length || rest.many || rest.linkedExile || rest.anyOf || (exAdv[2] === "own") !== (rest.owner === "you")) return null;
+    return { ...rest, hasAdventure: true, inExile: true, ...(exAdv[2] === "own" ? {} : { owner: "opponent" as const }), text: `target ${phrase.trim().replace(/^target /, "")}` };
+  }
   // Break the Ice: "target land that is snow or could produce {C}": a snow land, or one whose mana abilities could make {C}
   // (CR 106.7; even one that couldn't be activated now, rulings).
   const snowOr = /^((?:target |each )?land) that is snow or could produce \{([WUBRGC])\}$/i.exec(phrase.trim());

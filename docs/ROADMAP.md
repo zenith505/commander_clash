@@ -3757,7 +3757,8 @@ line blocks.
    through Ranar's {0} foretelling and Eriette's Pacifism. Review follow-up 17: round 384's Toymaker's Trap browser tests
    no longer race the draw step (mana floats in your pool so the page holds priority in the upkeep, and the poll waits for
    that upkeep, as round 401's Jon Irenicus). +4, 31,644 of 31,936 on this stacked branch. The compiled text of
-   every other card is unchanged.
+   every other card is unchanged. Main 2e13ed5 (Lane B B248 and B249) was merged in afterwards: 31,653 of 31,936, every
+   card compiling as on main but the seven of rounds 403 and 404.
    Out after round 404 (looked at, not done): Jasmine Boreal of the Seven ("Spend this mana only to cast creature spells
    with no abilities": abilities given to a spell, such as a granted convoke, cascade or offspring, count, rulings, and the
    mana spending check sees only the card's printed text); Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales,

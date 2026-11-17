@@ -2168,7 +2168,7 @@ export interface GameState {
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
    */
   /** `card`: its copiable values as it last existed (CR 603.10a), a key into `cards`. */
-  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string; /** Round B250, on the first one only: every creature on the battlefield just before the first of them left, with its controller and power then (CR 603.10a), kept while a permanent with TriggeredAbility.dies `greatestPowerOfController` is there. */ before?: { id: ObjectId; controller: PlayerId; power: number }[] }[];
+  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string }[];
   /**
    * Cards put into a graveyard in the current event (one instruction of a resolving spell or ability, one pass of
    * state-based actions, one action's costs), as they are there: their owner arranges them (CR 404.3). See graveyard.ts.

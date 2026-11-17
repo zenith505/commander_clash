@@ -1,8 +1,6 @@
 // Lane B round B250: Gather Specimens ("If a creature would enter the battlefield under an opponent's control this turn, it
 // enters under your control instead."), a control-changing replacement applied before the creature's other replacements of
-// how it enters (CR 614.1c, 616.1b, rulings), and Kraven the Hunter ("Whenever a creature an opponent controls with the
-// greatest power among creatures that player controls dies, ..."), which looks back to just before the creatures died,
-// several at once included (CR 603.10a).
+// how it enters (CR 614.1c, 616.1b, rulings).
 
 import { describe, expect, it } from "vitest";
 import { act, passUntil, plainsCard, putOnBattlefield, setup, swamp } from "./helpers";
@@ -10,12 +8,7 @@ import { applyAction, botActions, characteristics, compileCard, invalidateCharac
 
 // Real card data (Scryfall).
 const gather = (): CardDef => ({"oracleId":"e3b8d70b-17aa-4a31-a4f9-319907d088c2","name":"Gather Specimens","manaCost":"{3}{U}{U}{U}","cmc":6,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"If a creature would enter the battlefield under an opponent's control this turn, it enters under your control instead.","colors":["U"],"colorIdentity":["U"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/b/b/bbadf982-f22e-4f4f-b5c9-ac387f25c15f.jpg?1783942574","artUrl":"https://cards.scryfall.io/art_crop/front/b/b/bbadf982-f22e-4f4f-b5c9-ac387f25c15f.jpg?1783942574","layout":"normal"});
-const kraven = (): CardDef => ({"oracleId":"3e2bfa3a-ae83-453a-8e3f-ca6205a9af12","name":"Kraven the Hunter","manaCost":"{1}{B}{G}","cmc":3,"typeLine":"Legendary Creature — Human Warrior Villain","supertypes":["Legendary"],"types":["Creature"],"subtypes":["Human","Warrior","Villain"],"oracleText":"Trample\nWhenever a creature an opponent controls with the greatest power among creatures that player controls dies, draw a card and put a +1/+1 counter on Kraven the Hunter.","power":"4","toughness":"3","colors":["B","G"],"colorIdentity":["B","G"],"keywords":["Trample"],"imageUrl":"https://cards.scryfall.io/normal/front/a/f/afdab464-3674-449b-be01-1cbd21fced23.jpg?1783905315","artUrl":"https://cards.scryfall.io/art_crop/front/a/f/afdab464-3674-449b-be01-1cbd21fced23.jpg?1783905315","layout":"normal"});
-const goblinKing = (): CardDef => ({"oracleId":"d236b3fc-0d3f-4d99-875d-e32a33fe5767","name":"Goblin King","manaCost":"{1}{R}{R}","cmc":3,"typeLine":"Creature — Goblin","supertypes":[],"types":["Creature"],"subtypes":["Goblin"],"oracleText":"Other Goblins get +1/+1 and have mountainwalk.","power":"2","toughness":"2","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/4/5/455dff34-0ab2-4798-84a9-66dcf37f1789.jpg?1783931623","artUrl":"https://cards.scryfall.io/art_crop/front/4/5/455dff34-0ab2-4798-84a9-66dcf37f1789.jpg?1783931623","layout":"normal"});
-const piker = (): CardDef => ({"oracleId":"50608184-90d3-43d2-a221-deb186c78323","name":"Goblin Piker","manaCost":"{1}{R}","cmc":2,"typeLine":"Creature — Goblin Warrior","supertypes":[],"types":["Creature"],"subtypes":["Goblin","Warrior"],"oracleText":"","power":"2","toughness":"1","colors":["R"],"colorIdentity":["R"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/7/2786834d-dbda-40ce-82a4-e518cd554312.jpg?1783946464","artUrl":"https://cards.scryfall.io/art_crop/front/2/7/2786834d-dbda-40ce-82a4-e518cd554312.jpg?1783946464","layout":"normal"});
-const wrath = (): CardDef => ({"oracleId":"34515b16-c9a4-4f98-8c77-416a7a523407","name":"Wrath of God","manaCost":"{2}{W}{W}","cmc":4,"typeLine":"Sorcery","supertypes":[],"types":["Sorcery"],"subtypes":[],"oracleText":"Destroy all creatures. They can't be regenerated.","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/9/8/98890cd7-ebd5-4fea-814e-4f612abfe3a5.jpg?1783939131","artUrl":"https://cards.scryfall.io/art_crop/front/9/8/98890cd7-ebd5-4fea-814e-4f612abfe3a5.jpg?1783939131","layout":"normal"});
 const hero = (): CardDef => ({"oracleId":"454a8902-8120-4373-96ee-bbf352b04e8d","name":"Hero of Bladehold","manaCost":"{2}{W}{W}","cmc":4,"typeLine":"Creature — Human Knight","supertypes":[],"types":["Creature"],"subtypes":["Human","Knight"],"oracleText":"Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)\nWhenever this creature attacks, create two 1/1 white Soldier creature tokens that are tapped and attacking.","power":"3","toughness":"4","colors":["W"],"colorIdentity":["W"],"keywords":["Battle Cry"],"imageUrl":"https://cards.scryfall.io/normal/front/8/5/8536e50d-81b3-4b1d-9469-22fad35fe145.jpg?1783917185","artUrl":"https://cards.scryfall.io/art_crop/front/8/5/8536e50d-81b3-4b1d-9469-22fad35fe145.jpg?1783917185","layout":"normal"});
-const murder = (): CardDef => ({"oracleId":"938b4e2c-88d9-4637-bc00-e228920c9a78","name":"Murder","manaCost":"{1}{B}{B}","cmc":3,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Destroy target creature.","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/2/c/2c249609-9cf7-46f1-b94c-9329add966bb.jpg?1783909477","artUrl":"https://cards.scryfall.io/art_crop/front/2/c/2c249609-9cf7-46f1-b94c-9329add966bb.jpg?1783909477","layout":"normal"});
 const rager = (): CardDef => ({"oracleId":"e409c9be-0c9a-43c3-adb4-8c47afc1d551","name":"Phyrexian Rager","manaCost":"{2}{B}","cmc":3,"typeLine":"Creature — Phyrexian Horror","supertypes":[],"types":["Creature"],"subtypes":["Phyrexian","Horror"],"oracleText":"When this creature enters, you draw a card and you lose 1 life.","power":"2","toughness":"2","colors":["B"],"colorIdentity":["B"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/6/f/6fd574e7-705f-4a65-aad0-68ff6d63bf0f.jpg?1783921329","artUrl":"https://cards.scryfall.io/art_crop/front/6/f/6fd574e7-705f-4a65-aad0-68ff6d63bf0f.jpg?1783921329","layout":"normal"});
 const essence = (): CardDef => ({"oracleId":"9d105f83-583d-438b-8f26-b39e818ed295","name":"Essence of the Wild","manaCost":"{3}{G}{G}{G}","cmc":6,"typeLine":"Creature — Avatar","supertypes":[],"types":["Creature"],"subtypes":["Avatar"],"oracleText":"Creatures you control enter as a copy of this creature.","power":"6","toughness":"6","colors":["G"],"colorIdentity":["G"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/d/e/dec48cba-1b5d-44e7-9e25-16922dedb67d.jpg?1783940920","artUrl":"https://cards.scryfall.io/art_crop/front/d/e/dec48cba-1b5d-44e7-9e25-16922dedb67d.jpg?1783940920","layout":"normal"});
 const alarm = (): CardDef => ({"oracleId":"5b2364d7-a811-4595-a1b4-224c70555ffa","name":"Raise the Alarm","manaCost":"{1}{W}","cmc":2,"typeLine":"Instant","supertypes":[],"types":["Instant"],"subtypes":[],"oracleText":"Create two 1/1 white Soldier creature tokens.","colors":["W"],"colorIdentity":["W"],"keywords":[],"imageUrl":"https://cards.scryfall.io/normal/front/8/1/81d3e5c5-6531-48e7-9dd6-2db519dd61b1.jpg?1783908838","artUrl":"https://cards.scryfall.io/art_crop/front/8/1/81d3e5c5-6531-48e7-9dd6-2db519dd61b1.jpg?1783908838","layout":"normal"});
@@ -222,76 +215,5 @@ describe("Lane B round B250: Gather Specimens", () => {
     const s = settle(enter(s0, b, third), [third]);
     expect(botActions(s, third)).toEqual([{ type: "chooseOption", player: third, choice: String(opp) }]);
     expect(ap).not.toBe(third);
-  });
-});
-
-describe("Lane B round B250: Kraven the Hunter", () => {
-  const withKraven = (cards: CardDef[]) => {
-    const g = setup(cards);
-    const k = putOnBattlefield(g.s, g.ap, kraven());
-    for (let i = 0; i < 4; i++) putOnBattlefield(g.s, g.ap, swamp);
-    return { ...g, k, third: g.s.turnOrder[(g.s.turnOrder.indexOf(g.ap) + 2) % 4]! };
-  };
-  it("is fully supported", () => {
-    supported(kraven());
-    const t = compileCard(kraven()).triggers;
-    expect(t.map((x) => [x.event, x.dies?.greatestPowerOfController, x.dies?.filter.controller])).toEqual([["permanentDies", true, "opponent"]]);
-  });
-
-  it("an opponent's creature with the greatest power among theirs dies: draw a card and a +1/+1 counter; a smaller one, or one of yours, nothing", () => {
-    const { s: s0, ap, opp, ids, k } = withKraven([murder(), murder(), murder()]);
-    const big = putOnBattlefield(s0, opp, giant());
-    const small = putOnBattlefield(s0, opp, bears());
-    const mine = putOnBattlefield(s0, ap, giant());
-    const start = s0.players[ap]!.hand.length;
-    const hand = () => s.players[ap]!.hand.length - start;
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(small)])));
-    expect(s.objects[small]!.zone).toBe("graveyard");
-    expect([hand(), s.objects[k]!.counters["+1/+1"] ?? 0]).toEqual([-1, 0]);
-    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(mine)])));
-    expect([hand(), s.objects[k]!.counters["+1/+1"] ?? 0]).toEqual([-2, 0]);
-    s = settle(run(s, planCast(s, ap, ids[2]!, [tgt(big)])));
-    expect(s.objects[big]!.zone).toBe("graveyard");
-    expect([hand(), s.objects[k]!.counters["+1/+1"]]).toEqual([-2, 1]);
-    expect(pt(s, k)).toBe("5/4");
-  });
-
-  it("a creature tied for the greatest power counts", () => {
-    const { s: s0, ap, opp, ids, k } = withKraven([murder()]);
-    putOnBattlefield(s0, opp, bears());
-    const b = putOnBattlefield(s0, opp, bears());
-    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(b)])));
-    expect(s.objects[k]!.counters["+1/+1"]).toBe(1);
-  });
-
-  it("several dying at once: their powers just before, a lord's bonus included (CR 603.10a); Kraven dying with them still sees them", () => {
-    const { s: s0, ap, opp, ids, k, third } = withKraven([wrath()]);
-    // Grizzly Bears 2/2, Goblin Piker 3/2 with Goblin King's +1/+1, the King 2/2: only the Piker had the greatest power,
-    // though the Bears had as much as it once the King was gone.
-    putOnBattlefield(s0, opp, bears());
-    const piker2 = putOnBattlefield(s0, opp, piker());
-    putOnBattlefield(s0, opp, goblinKing());
-    expect(pt(s0, piker2)).toBe("3/2");
-    // Two Grizzly Bears tied: both had the greatest power.
-    putOnBattlefield(s0, third, bears());
-    putOnBattlefield(s0, third, bears());
-    const hand = s0.players[ap]!.hand.length;
-    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
-    expect(s.objects[k]!.zone).toBe("graveyard");
-    // Three triggers, each a draw; Kraven is gone, so no counters.
-    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 3);
-  });
-
-  it("the look back is only for the event: a later death compares with what's left then", () => {
-    const { s: s0, ap, opp, ids, k } = withKraven([murder(), murder()]);
-    const king = putOnBattlefield(s0, opp, goblinKing());
-    const pk = putOnBattlefield(s0, opp, piker());
-    putOnBattlefield(s0, opp, giant());
-    // The King dies alone: 2 power against the Piker's 3 and the Giant's 3, no trigger.
-    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(king)])));
-    expect(s.objects[k]!.counters["+1/+1"] ?? 0).toBe(0);
-    // Then the Piker, 2 power now against the Giant's 3: none either.
-    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(pk)])));
-    expect(s.objects[k]!.counters["+1/+1"] ?? 0).toBe(0);
   });
 });

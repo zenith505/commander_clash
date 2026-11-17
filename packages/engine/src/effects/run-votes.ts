@@ -184,7 +184,10 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Each player chooses in turn order, none seeing another's number until all are revealed at once (rulings).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const st = (sc.numbers ??= { queue: turnOrderFrom(s, ctx.controller), chosen: {} });
+      // Expert-Level Safe: only this ability's controller and the target opponent, in turn order from the controller (the
+      // order doesn't matter, nobody sees a number before they're revealed).
+      const among = e.then === "match" ? [ctx.controller, ...(e.with ? players(s, e.with, ctx) : [])] : undefined;
+      const st = (sc.numbers ??= { queue: turnOrderFrom(s, ctx.controller).filter((p) => !among || among.includes(p)), chosen: {} });
       while (st.queue.length && !st.step) {
         const pid = st.queue[0]!;
         if (player(s, pid).lost) {
@@ -192,6 +195,10 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           continue;
         }
         if (st.pick === undefined) {
+          if (e.then === "match") {
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "secretNumber", options: ["1"], numberRange: { min: 1, max: 3 }, prompt: "secretly choose 1, 2, or 3" };
+            return "paused";
+          }
           const least = e.then === "goblin" ? 1 : 0;
           s.pending = { kind: "chooseOption", player: pid, source: src, what: "secretNumber", options: [String(least)], numberRange: { min: least, max: 999 }, prompt: e.then === "goblin" ? "secretly choose how many items you hide (1 or more)" : "secretly choose a number 0 or greater" };
           return "paused";
@@ -208,6 +215,13 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const highest = entries.filter((x) => x.n === high).map((x) => x.pid);
       if (!st.step) {
         log(s, `The numbers are revealed: ${turnOrderFrom(s, ctx.controller).filter((p) => p in st.chosen).map((p) => `${player(s, p).name} ${st.chosen[p]}`).join(", ")}.`);
+        // Expert-Level Safe: "If they match, ...": both numbers the same (with the opponent gone, there's no pair to match).
+        if (e.then === "match") {
+          r.numbersMatched = entries.length >= 2 && high === low;
+          sc.numbers = undefined;
+          log(s, r.numbersMatched ? "The numbers match." : "The numbers don't match.");
+          return;
+        }
         if (e.then === "goblin") {
           // Goblin Game: each player loses life equal to their number, then the one with the fewest (each of them, if
           // tied) loses half their life as it is then, rounded up; half of a negative total is half of 0 (rulings).

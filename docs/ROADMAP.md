@@ -3711,6 +3711,33 @@ line blocks.
    Equipment "those Equipment" are with more than one of a name), Archelos, Lagoon Mystic, Pulmonic Sliver, Capricopian,
    Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular`
    above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 403 went on down `npm run popular`, most played first, to three cards left out before. Capricopian's "{2}: Put a
+   +1/+1 counter on this creature, then you may reselect which player this creature is attacking. Only the player this
+   creature is attacking may activate this ability and only during the declare attackers step." (ActivatedAbility
+   `attackedPlayerOnly` with `anyPlayer`: that player only, who controls the ability, CR 602.2, 113.8; none while it
+   attacks a planeswalker or battle, rulings; Effect reselectAttack `playersOnly` and `may`: another player, never its
+   controller, CR 506.2, or "Keep attacking", still declared at the first, rulings). Archelos, Lagoon Mystic's "As long as
+   Archelos is tapped, other permanents enter tapped." and "As long as Archelos is untapped, other permanents enter
+   untapped." (CompiledCard.othersEnterAsTappedState, game.ts finishEntering, CR 614.1c: not itself nor what enters with
+   it, rulings; put onto the battlefield tapped with no replacement effect, it enters untapped, rulings; with replacement
+   effects of both kinds, an Archelos among them, the entering permanent's controller chooses "Enter untapped" or "Enter
+   tapped", CR 616.1, EntersOption "tapOrder", asked before anything sees it enter). Spelunking with a tapland and no
+   Archelos still enters untapped without asking, as since round 96 (its rulings give the same choice). Wizard's
+   Spellbook's "{T}: Exile target instant or sorcery card from a graveyard. Roll a d20. Activate only as a sorcery. 1—9 |
+   Copy that card. You may cast the copy. 10—19 | Copy that card. You may cast the copy by paying {1} rather than paying
+   its mana cost. 20 | Copy each card exiled with this artifact. You may cast any number of the copies without paying their
+   mana costs." (the exile linked to it, CR 607.2a; castFromAmong `fromExiledThisWay` copies, paid or for {1}, CR 118.9,
+   and `fromLinked` copies free; cast as it resolves or never, CR 707.12, rulings). Bots the Capricopian attacks send it to
+   the player with the most life; bots always enter untapped. Browser tests click through Capricopian's menu and the
+   player it attacks next, Archelos's two choices and the Spellbook's {1} copy. Review follow-up 17: round 375's Endless
+   Whispers browser test no longer asserts the end step after the page's auto-pass may have left it (it checks the turn
+   the Bears returned and the end step's log). +3, 31,640 of 31,936 on this stacked branch. The compiled text of every
+   other card is unchanged.
+   Out after round 403 (looked at, not done): Pulmonic Sliver (still out: an optional "put it on top of its owner's library
+   instead" asked in the middle of a zone change, and several Slivers dying at once ordered by their owner); Filigree Vector
+   (still out: two "any number of target" slots); Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion,
+   Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm
+   run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

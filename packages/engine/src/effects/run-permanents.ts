@@ -1821,6 +1821,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (s.resolving) s.resolving.affected = affected.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }));
       if (s.resolving && e.mods.some((m) => m.kind === "goad")) s.resolving.goadedThisWay = affected.length;
       if (!affected.length) return;
+      // Eriette, the Beguiler (round 404): "for as long as that Aura is attached to it": the trigger's Aura, still that
+      // object, attached to the permanent as it resolves; otherwise nothing happens (rulings, CR 611.2b).
+      let whileAttached: ContinuousEffect["whileAttached"];
+      if (e.whileEventAuraAttached) {
+        const g = ctx.event?.group?.[0];
+        const aura = g ? s.objects[g.id] : undefined;
+        const host = s.objects[affected[0]!]!;
+        if (affected.length !== 1 || !aura || aura.zone !== "battlefield" || (aura.zoneChanges ?? 0) !== g!.zc || aura.attachedTo !== host.id || host.zone !== "battlefield") return;
+        whileAttached = { id: aura.id, zc: g!.zc, host: host.id, hostZc: host.zoneChanges ?? 0 };
+      }
       const mods = fixMods(s, e.mods, ctx);
       // "For as long as ~ remains tapped" (CR 611.2b): if that's already over, the effect does nothing. An activated
       // ability's source must not have untapped since it was activated (rulings on Rubinia Soulsinger, Preacher).
@@ -1902,6 +1912,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           ...(whileControlled ? { whileControlled } : {}),
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
           ...(whileMonarch !== undefined ? { whileMonarch } : {}),
+          ...(whileAttached ? { whileAttached } : {}),
           ...(e.whileEnchanted ? { whileEnchanted: true as const } : {}),
           ...(untilCast ? { untilCast } : {}),
           ...(e.untilCreatureSpellCast ? { untilCreatureSpell: true as const } : {}),
@@ -1909,7 +1920,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           mods: groupMods,
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
-        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : whileMonarch !== undefined ? ` for as long as ${player(s, whileMonarch).name} is the monarch` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "endOfYourNextUpkeep" ? ` until the end of ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "controllersNextUntap" ? ` until ${player(s, controllerOf(s, obj(s, group[0]!))).name}'s next untap step` : untilCast ? ` until ${src} is cast from exile` : e.untilCreatureSpellCast ? " until a player casts a creature spell" : whileAttached ? ` for as long as ${defOf(s, obj(s, whileAttached.id)).name} is attached to it`: whileMonarch !== undefined ? ` for as long as ${player(s, whileMonarch).name} is the monarch` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, whileControlled?.controller ?? ctx.controller).name} controls ${src}`) : ""}.`);
       }
       if (e.setsDid && giveTo !== undefined && s.resolving) {
         invalidateCharacteristics(s);

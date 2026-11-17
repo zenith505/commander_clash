@@ -1686,6 +1686,8 @@ export type DeferredAct = {
  */
 export interface ContinuousEffect {
   id: string;
+  /** Eriette, the Beguiler (round 404): "for as long as that Aura is attached to it": over for good once that Aura (that object) isn't attached to that permanent (that object) (CR 611.2b). */
+  whileAttached?: { id: ObjectId; zc: number; host: ObjectId; hostZc: number };
   timestamp: number; // CR 613.7b
   controller: PlayerId;
   sourceName: string;
@@ -1957,6 +1959,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Ranar the Ever-Watchful (round 404): the players who foretold a card this turn (CR 702.143a), each once. */
+  foretold?: PlayerId[];
   /** Desolation: the players who tapped a land for mana this turn (CR 106.12: activated a mana ability of a land with {T} in its cost), each once. */
   tappedLandForMana?: PlayerId[];
   /** Hedonist's Trove (CompiledCard.playLinkedSpellOnce): the sources ("id@zoneChanges") whose cards a spell was cast from this turn with that permission. */
@@ -2226,6 +2230,8 @@ export interface ZoneMove {
   borrowed?: ObjectId[];
   /** Left the battlefield because its controller sacrificed it (CR 701.21a). */
   sacrificed?: true;
+  /** Hero of Bretagard (round 404): exiled from the battlefield as a spell or ability this player controls was resolving (its effect, not a cost). */
+  exiledBy?: PlayerId;
 }
 
 export interface GameState {

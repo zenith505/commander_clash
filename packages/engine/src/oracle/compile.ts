@@ -139,6 +139,7 @@ import { round400Line } from "./round400";
 import { round401Line } from "./round401";
 import { round402Line } from "./round402";
 import { round403Line } from "./round403";
+import { round404Line } from "./round404";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1022,6 +1023,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Ranar the Ever-Watchful (round 404): free foretelling (oracle/round404.ts).
+    if (/^The first card you foretell each turn /.test(line) && round404Line(line, raw, out, isSpell)) continue;
     // Archelos, Lagoon Mystic (round 403): other permanents entering tapped or untapped (oracle/round403.ts).
     if (/^As long as ~ is (?:un)?tapped, other permanents enter /.test(line) && round403Line(line, raw, out, isSpell)) continue;
     // Scheming Fence (round 402): its chosen permanent (oracle/round402.ts), before the generic borrowing below.

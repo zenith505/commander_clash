@@ -1395,6 +1395,8 @@ export function moveObject(
     if (!toHand.includes(o.owner)) toHand.push(o.owner);
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
+  // Hero of Bretagard (round 404): a permanent exiled while a spell or ability is resolving is exiled by it, that object's
+  // controller's (ZoneMove.exiledBy); a cost paid to cast or activate isn't (as discarding for a cost, CR 701.9).
   // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere. Wan Shi Tong, All-Knowing: "into a library
   // from anywhere", not from a library (rulings).
   if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile") || (to === "library" && fromZone !== "library"))
@@ -1407,7 +1409,7 @@ export function moveObject(
       ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
       ...(opts.milled && fromZone === "library" ? { milled: true as const } : {}),
       card: fromZone === "battlefield" ? snapshotKey : o.cardId,
-      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(borrowed ? { borrowed } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
+      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(borrowed ? { borrowed } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}), ...(to === "exile" && s.resolving ? { exiledBy: s.resolving.item.controller } : {}) } : {}),
     });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
@@ -2699,11 +2701,12 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => s.objects[id]?.zone !== "battlefield" || pw(obj(s, id)) <= pw(me));
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
+  // Eriette, the Beguiler (round 404): control "for as long as that Aura is attached to it" (ContinuousEffect.whileAttached).
   // Round 396: copy effects "for as long as that creature remains tapped" (Zygon Infiltrator) or "for as long as ~ remains
   // attached to it" (Blade of Shared Souls, Assimilation Aegis), over for good once that stops (CR 611.2b), a phased-out
   // copy too (CR 702.26f).
   if (endCopyWhile(s)) lost = true;
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || (e.whileAttached && !copyWhileHolds(s, { whileAttached: e.whileAttached })) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
     return lost;
@@ -16424,6 +16427,9 @@ function cosmosChargers(s: GameState, pid: PlayerId): GameObject[] {
  * less", CR 601.2f applied to the special action), never less than {0} (rulings).
  */
 export function foretellActionCost(s: GameState, pid: PlayerId): string {
+  // Ranar the Ever-Watchful (round 404): the first card they foretell this turn, counting ones foretold before Ranar was
+  // there, costs {0} (CR 601.2f applied to the special action; it's the cost, whatever else changes it).
+  if (!(s.turnLog?.foretold ?? []).includes(pid) && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).firstForetellFree)) return "{0}";
   const less = cosmosChargers(s, pid).reduce((n, p) => n + (abilitiesOf(s, p).foretellActionLess ?? 0), 0);
   return `{${Math.max(0, 2 - less)}}`;
 }
@@ -16461,6 +16467,8 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   // Dream Devourer's foretell: the card keeps the foretell cost it was given, not the ability (rulings).
   const reduce = compileCard(d).foretell ? undefined : grantedForetell(s, p.id, o);
   spendFromPool(s, p.id, parseManaCost(foretellActionCost(s, p.id)), { ability: o, foretell: true });
+  const foretold = ((s.turnLog ??= {}).foretold ??= []);
+  if (!foretold.includes(p.id)) foretold.push(p.id);
   moveObject(s, id, "exile");
   o.foretold = true;
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn, ...(reduce !== undefined ? { foretellReduce: reduce } : {}) };

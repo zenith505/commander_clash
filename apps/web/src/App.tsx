@@ -131,6 +131,7 @@ import {
   autoEvidence,
   evidenceCandidates,
   evidenceValue,
+  targetedPermanentsMv,
   bothModes,
   teamworkCandidates,
   teamworkPower,
@@ -1274,6 +1275,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.bargain === undefined && compiled.bargain) {
       const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.sacrifice?.includes(id) && !d.casualty?.includes(id));
       if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
+    }
+    // Urgent Necropsy (round B247): "collect evidence X", X the total mana value of the permanents it targets (chosen just
+    // before): always paid, nothing to pick for X = 0; without enough in the graveyard the cast is refused with the reason.
+    if (d.evidence === undefined && compiled.evidenceTargetsMv) {
+      const n = targetedPermanentsMv(s, d.targets);
+      const candidates = evidenceCandidates(s, HUMAN, d.objectId, [...(d.exileCards ?? []), ...(d.collect ?? [])]);
+      if (n === 0) return continueCast({ ...d, evidence: [] });
+      if (evidenceValue(s, candidates) >= n) return setEvidencePick({ draft: d, key: "evidence", label: card.name, n, candidates, optional: false });
     }
     // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a): only offered with enough in
     // the graveyard (701.59b).

@@ -103,6 +103,7 @@ import {
   bargainCandidates,
   offeringCandidates,
   autoEvidence,
+  targetedPermanentsMv,
   evidenceProblem,
   altCostsFor,
   isEmerge,
@@ -954,8 +955,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.options.length && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "continuous" && e.what.ref === "created" && e.giveTo?.ref === "chosenPlayer" && e.whileOnBattlefield && e.mods.some((m) => m.kind === "control")))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     // Order of Succession: the best of the creatures we gain control of.
-    if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl"))
-      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
+    // Inniaz, the Gale Force (round B247): we choose for every player. For us, the best one; out of ours, for the player to
+    // our left, the least one; between two other players, the one the player getting it values least.
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "successionControl")) {
+      const to = pend.pickFor ?? pid;
+      const ours = pend.of === pid;
+      const score = (id: ObjectId) => (to === pid ? worth(s, pid, obj(s, id)) : ours ? -worth(s, pid, obj(s, id)) : -worth(s, to, obj(s, id)));
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => score(b) - score(a))[0]!] }];
+    }
     // Guard Dogs: a permanent of ours that shares a color with the creature targeted, so the shield is made.
     const guard = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
     if (pend.kind === "pickPermanents" && guard?.type === "if" && guard.cond.kind === "sharesColor" && guard.cond.a.ref === "target") {
@@ -1255,6 +1262,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "chooseOption" && pend.what === "secretNumber") {
       const sn = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "secretNumbers") : undefined;
+      // Expert-Level Safe (round B247): 1, 2 or 3, spread by what's public (never the other player's hidden number), as
+      // neither player gains by favoring one.
+      if (sn?.type === "secretNumbers" && sn.then === "match") return [{ type: "chooseOption", player: pid, choice: String(1 + ((s.turn * 7 + s.log.length * 13 + pid * 5) % 3)) }];
       const me = player(s, pid);
       // Goblin Game: few items, but not so few that it's likely the fewest when life is high (half of it is the bigger loss).
       const n = sn?.type === "secretNumbers" && sn.then === "goblin" ? (me.life >= 16 ? 3 : 1) : sn?.type === "secretNumbers" && sn.then === "ogre" ? (s.resolving?.item.controller === pid && me.life > 20 ? 3 : 0) : me.hand.length <= 2 && me.life > 10 ? 1 : 0;
@@ -4814,6 +4824,23 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
       if (ids) extra.evidence = ids;
     }
     if (must("evidence") && !extra.evidence) return null;
+    // Urgent Necropsy (round B247): "collect evidence X" for the targets' total mana value: cards we can spare if we have
+    // them, any otherwise; without enough, the most expensive target is left out until it can be paid (none left: not cast).
+    if (c.evidenceTargetsMv && targets) {
+      const taken = [...(extra.exileCards ?? []), ...(extra.collect ?? [])];
+      for (;;) {
+        const n = targetedPermanentsMv(s, targets);
+        const ids = n === 0 ? [] : (spareEvidence(s, pid, n, id, taken) ?? (evidenceProblem(s, pid, n, undefined, id, taken) ? null : autoEvidence(s, pid, n, id, taken)));
+        if (ids) {
+          extra.evidence = ids;
+          break;
+        }
+        const worst = targets.map((t, i) => ({ i, mv: t.kind === "object" && s.objects[t.id] ? characteristics(s, obj(s, t.id)).manaValue : -1 })).filter((x) => x.mv >= 0).sort((a, b) => b.mv - a.mv)[0];
+        if (!worst) return null;
+        targets[worst.i] = { kind: "none" };
+      }
+      if (!targets.some((t) => t.kind !== "none")) return null;
+    }
     const busy = (o: ObjectId) => o === victim?.id || o === spare?.id || !!extra.sacrifice?.includes(o) || (targets ?? []).some((t) => t.kind === "object" && t.id === o);
     // Teamwork: with creatures that wouldn't be attacking or blocking anyway; a "choose both" spell gets it with both modes.
     const tw = teamwork ?? (c.teamwork !== undefined && !c.spell?.modal?.both && must("teamwork") !== false ? spareTappers(s, pid, id, c.teamwork, busy) : undefined);

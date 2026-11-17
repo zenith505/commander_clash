@@ -2987,6 +2987,8 @@ export interface Resolving {
   /** Breath of Fury: an attachToChosen of this resolution attached something ("If you do"). */
   attachedNow?: true;
   wonClash?: boolean;
+  /** Expert-Level Safe (round B247): the numbers just revealed (Effect secretNumbers "match") were the same (Condition numbersMatched). */
+  numbersMatched?: boolean;
   /** A draw of this resolution was replaced (dredge, Alhammarret's Archive): Sindbad's "reveal it" then does nothing (rulings). */
   drawReplaced?: true;
   /** The opponent of its controller's last clash ("that player", CR 701.30b). */

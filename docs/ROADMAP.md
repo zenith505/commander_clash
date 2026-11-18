@@ -1,6 +1,6 @@
 # Roadmap
 
-31,653 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,656 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,912 of
 9,979 (99%).
 
@@ -10739,11 +10739,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Dralnu); Dralnu may be one of them, and with more damage than permanents all of them are (rulings); with fewer cards in the
   graveyard than the damage, none is exiled and the player loses. Browser tests for Dralnu's and Nefarious Lich's choices
   and Lich's sacrifice. +3, 31,656 of 31,936. The compiled text of every other card is unchanged.
-- Out after round B253 (looked at, not done): the lists after round B252 stay out. Judgment calls and known gaps: "If you
-  can't" is read as all or nothing for Lich's sacrifice and Nefarious Lich's exile, as Egon, God of Death's rulings read it
-  (no ruling on either card says so); the order of a gain's replacements is chosen for a Lich's controller (the most cards,
-  CR 616.1), not asked; bots cast Lich and Nefarious Lich by their usual worth, without weighing the risk, and don't aim
-  damage away from Dralnu or a Nefarious Lich player.
+- Out after round B253 (looked at, not done): the lists after round B252 stay out. Judgment calls and known gaps: "If
+  you can't" is read as all or nothing for Lich's sacrifice and Nefarious Lich's exile, as Egon, God of Death's rulings
+  read it (no ruling on either card says so); the order of a gain's replacements is chosen for a Lich's controller (the
+  most cards, CR 616.1), not asked; bots cast Lich and Nefarious Lich by their usual worth, without weighing the risk,
+  and don't aim damage away from Dralnu or a Nefarious Lich player. No ruling settles whether Sigarda, Host of Herons
+  stops Dralnu's sacrifice when an opponent's spell deals the damage: the engine treats it as that spell causing the
+  sacrifice, so a protected player sacrifices nothing and the damage is still replaced.
 - Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (Y counted from the
   toughness so far in layer 7c: other 7c effects apply first, as it depends on them, CR 613.8, but counters apply in
   timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (as before: one

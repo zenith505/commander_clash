@@ -10,7 +10,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, discardShieldOf, opponentForbidsDiscard, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -39,6 +39,7 @@ import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
 import { spendPlan } from "./value";
+import { gatherInstance, gatherSteps } from "./gather";
 import { cardNameOptions, currentName, nameActivationBan, nameCastBan, nameLandBan } from "./names";
 import {
   COLORS,
@@ -971,6 +972,24 @@ export function moveObject(
       return;
     }
   }
+  // Gather Specimens (round B250): a creature that would enter under an opponent's control enters under that player's
+  // instead (CR 614.1c), as it would exist there (CR 614.12), before the other replacements of how it enters (CR 616.1b,
+  // rulings), which are for the player it enters under. Who puts it there doesn't change. Several that could apply: the
+  // player it would enter under chooses (controlFirst, asked as it enters).
+  let gatherChoice: { options: string[]; used: string[] } | undefined;
+  let gatherUsed: string[] = [];
+  if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged" && s.gatherSpecimens?.some((g) => g.turn === s.turn)) {
+    const was = opts.controller ?? o.owner;
+    const mods = [...(opts.entersAs ?? []), ...(opts.becomes ? [{ kind: "setTypes" as const, types: opts.becomes.types, subtypes: opts.becomes.subtypes }] : [])];
+    const self = !!compileCard(defOf(s, o)).entersUnderOpponent;
+    const step = gatherSteps(s, was, [], (c) => entersAsCreature(s, o, c, opts.faceDown, mods.length ? mods : undefined), self);
+    if (step.controller !== was) {
+      log(s, `${opts.faceDown ? "The face-down creature" : defOf(s, o).name} enters under ${player(s, step.controller).name}'s control instead (Gather Specimens).`);
+      opts = { ...opts, controller: step.controller, putBy: opts.putBy ?? was };
+    }
+    gatherUsed = step.used;
+    if (step.choice) gatherChoice = { options: step.choice, used: step.used };
+  }
   // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
   // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
   // token, wasn't cast (rulings).
@@ -1371,6 +1390,8 @@ export function moveObject(
   if (insteadOfDying?.x.counter && to === "exile") o.counters[insteadOfDying.x.counter] = (o.counters[insteadOfDying.x.counter] ?? 0) + (insteadOfDying.x.counterN ?? 1);
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
+  // Round B250: whether a Gather Specimens changed the player it entered under (syncControl, CR 506.3c-d).
+  o.gatheredAsEntered = to === "battlefield" && gatherUsed.length ? true : undefined;
   o.attacking = undefined;
   o.attackingPermanent = undefined;
   o.blocking = undefined;
@@ -1505,7 +1526,8 @@ export function moveObject(
     // "enters" replacements don't apply, the copied permanent's do (finishEnteringAs). One that enters under an opponent's
     // control of your choice (Xantcha) is asked that first (the controlOpponent choice checks again).
     const own = compileCard(defOf(s, o));
-    const copies = own.entersUnderOpponent && opponents(s, o.controller).length ? [] : entersAsCopyKeys(s, o);
+    // Round B250: copy replacements wait for a choice of which control replacement applies first (controlFirst).
+    const copies = gatherChoice || (own.entersUnderOpponent && opponents(s, o.controller).length) ? [] : entersAsCopyKeys(s, o);
     if (copies.length === 1) enterCopying(s, o, copies[0]!.key);
     if (copies.length) {
       const kicked = new Set(s.effects.slice(kickedEffectsFrom).filter((e) => e.affected.length === 1 && e.affected[0] === id && e.duration === "game").map((e) => e.id));
@@ -1531,10 +1553,11 @@ export function moveObject(
     o.sunburstGained = undefined;
     const bloodthirstGained = fromZone === "stack" ? (o.bloodthirstGained ?? 0) : 0;
     o.bloodthirstGained = undefined;
-    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(opts.countersIfXCost ? { countersIfXCost: opts.countersIfXCost } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfSubtype ? { countersIfSubtype: opts.countersIfSubtype } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(opts.countersIfXCost ? { countersIfXCost: opts.countersIfXCost } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}), ...(gatherUsed.length ? { gatherUsed } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
-    if (copies.length > 1) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copyLast", options: copies.map((c) => c.key), copySources: copies.map((c) => c.source), enterOpts: how });
+    if (gatherChoice) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlFirst", options: gatherChoice.options, enterOpts: how });
+    else if (copies.length > 1) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copyLast", options: copies.map((c) => c.key), copySources: copies.map((c) => c.source), enterOpts: how });
     else if (printed.entersAsCopy && (!printed.entersAsCopy.ifAttacked || player(s, o.controller).attackedTurn === s.turn) && copyCandidates(s, o, printed.entersAsCopy.filter).length >= (printed.entersAsCopy.exileTwo ? 2 : 1)) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
@@ -1670,7 +1693,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; /** Counters only if it enters with that subtype (Heroic Return). */ countersIfSubtype?: { subtype: string; counters: Record<string, number> }; countersIfPlaneswalker?: Record<string, number>; countersIfXCost?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
+type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; /** Counters only if it enters with that subtype (Heroic Return). */ countersIfSubtype?: { subtype: string; counters: Record<string, number> }; countersIfPlaneswalker?: Record<string, number>; countersIfXCost?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean; /** Round B250: the Gather Specimens instances already applied to it as it enters (gather.ts). */ gatherUsed?: string[] };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1930,6 +1953,54 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     }
   }
   finishEnteringAs(s, o, opts);
+}
+
+/**
+ * After a control-changing replacement chosen as it enters (controlOpponent, controlFirst): any Gather Specimens that
+ * apply now (gather.ts), its own "enters under the control of an opponent of your choice" if that's still to apply, then
+ * copy replacements (CR 616.1, rulings), for that player's (round B249), and the rest of how it enters. Only the entering
+ * card's own copy replacements come here: not after it became a copy of Xantcha (`copyOf`).
+ */
+function controlThenEnter(s: GameState, o: GameObject, opts: EnterOpts) {
+  const self = !!compileCard(defOf(s, o)).entersUnderOpponent && !opts.controlChosen && opponents(s, o.controller).length > 0;
+  const asCreature = (c: PlayerId) => {
+    const was = o.controller;
+    o.controller = c;
+    invalidateCharacteristics(s);
+    try {
+      return objIsType(s, o, "Creature");
+    } finally {
+      o.controller = was;
+      invalidateCharacteristics(s);
+    }
+  };
+  const step = s.gatherSpecimens?.some((g) => g.turn === s.turn) ? gatherSteps(s, o.controller, opts.gatherUsed ?? [], asCreature, self) : { controller: o.controller, used: opts.gatherUsed ?? [] };
+  if (step.controller !== o.controller) {
+    o.controller = step.controller;
+    o.gatheredAsEntered = true;
+    invalidateCharacteristics(s);
+    log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control instead (Gather Specimens).`);
+  }
+  const now: EnterOpts = { ...opts, ...(step.used.length ? { gatherUsed: step.used } : {}) };
+  if (step.choice) {
+    (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "controlFirst", options: step.choice, enterOpts: now });
+    return;
+  }
+  if (self) {
+    (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: now });
+    return;
+  }
+  const copies = !o.copyOf ? entersAsCopyKeys(s, o) : [];
+  if (copies.length > 1) {
+    (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "copyLast", options: copies.map((c) => c.key), copySources: copies.map((c) => c.source), enterOpts: now });
+    return;
+  }
+  if (copies.length === 1) {
+    enterCopying(s, o, copies[0]!.key);
+    enterAsCopied(s, o, now);
+    return;
+  }
+  finishEnteringAs(s, o, now);
 }
 
 /** Finish entering as what it now is, after "as it enters" copy or text choices (CR 614.12). */
@@ -4188,12 +4259,16 @@ function reedRichards(s: GameState, pid: PlayerId, used = false): ObjectId | und
  */
 function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAfter | undefined, made: number[], entry: number): "paused" | void {
   const p = player(s, pid);
-  const src = nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawChains)!);
+  const chains = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawChains)!;
+  const src = nameOf(s, chains);
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
-  if (!p.hand.length) {
+  // Tamiyo, Collector of Tales (round B251): another player's Chains can't make them discard, so they don't discard a card
+  // this way, and mill one.
+  const spared = opponentForbidsDiscard(s, pid, controllerOf(s, obj(s, chains)));
+  if (!p.hand.length || spared) {
     const ids = p.library.slice(0, millCount(s, pid, 1));
     for (const id of ids) moveObject(s, id, "graveyard", { milled: true });
-    log(s, `${p.name} has no card to discard instead of drawing, and mills ${ids.length === 1 ? nameOf(s, ids[0]!) : `${ids.length} cards`} (${src}).`);
+    log(s, `${p.name} ${spared ? `can't be made to discard by another player's ${src} (${nameOf(s, discardShieldOf(s, pid)!.id)})` : "has no card to discard instead of drawing"}, and mills ${ids.length === 1 ? nameOf(s, ids[0]!) : `${ids.length} cards`} (${src}).`);
     return;
   }
   if (p.hand.length === 1) {
@@ -11202,7 +11277,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const equipment = o.zone === "battlefield" ? s.battlefield.filter((b) => obj(s, b).attachedTo === o.id && characteristics(s, obj(s, b)).subtypes.includes("Equipment")).map((b) => ({ id: b, zc: obj(s, b).zoneChanges ?? 0 })) : [];
-  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(equipment.length ? { equipment } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(equipment.length ? { equipment } : {}), ...(ab.body.effects.some((e) => e.type === "search" && !!e.filter?.sharesColorWithSource) ? { colors: [...characteristics(s, o).colors] } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   if (ab.revealChosen && o.chosen?.player !== undefined) {
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
@@ -12149,26 +12224,30 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterExchangingText(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "controlFirst") {
+      // Round B250: the control replacement the player it would enter under applies first (CR 616.1b): one player's Gather
+      // Specimens, or its own "enters under the control of an opponent of your choice" (Xantcha, "self").
+      const opts = entry?.enterOpts ?? {};
+      if (choice === "self") {
+        (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: opts });
+        return;
+      }
+      const g = gatherInstance(s, o.controller, opts.gatherUsed ?? [], Number(choice));
+      if (!g) throw new RulesError("choose a player offered");
+      o.controller = Number(choice);
+      o.gatheredAsEntered = true;
+      invalidateCharacteristics(s);
+      log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control instead (Gather Specimens).`);
+      controlThenEnter(s, o, { ...opts, gatherUsed: [...(opts.gatherUsed ?? []), g] });
+      return;
+    }
     if (pend.what === "controlOpponent") {
       if (!pend.options.includes(choice)) throw new RulesError("choose an opponent offered");
       // It enters under that player's control (CR 614.1c, 110.2).
       o.controller = Number(choice);
       invalidateCharacteristics(s);
       log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control.`);
-      const opts = { ...(entry?.enterOpts ?? {}), controlChosen: true };
-      // Copy replacements after the control-changing one (CR 616.1, rulings), for that player's (round B249). Only the
-      // entering card's own choice comes here first: not after a copy of Xantcha.
-      const copies = entry?.enterOpts?.controlChosen === undefined && !o.copyOf ? entersAsCopyKeys(s, o) : [];
-      if (copies.length > 1) {
-        (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "copyLast", options: copies.map((c) => c.key), copySources: copies.map((c) => c.source), enterOpts: opts });
-        return;
-      }
-      if (copies.length === 1) {
-        enterCopying(s, o, copies[0]!.key);
-        enterAsCopied(s, o, opts);
-        return;
-      }
-      finishEnteringAs(s, o, opts);
+      controlThenEnter(s, o, { ...(entry?.enterOpts ?? {}), controlChosen: true });
       return;
     }
     if (pend.what === "discardInstead") {
@@ -12370,7 +12449,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyLast" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters" || pend.what === "tapOrder") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyLast" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters" || pend.what === "tapOrder" || pend.what === "controlFirst") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -13291,6 +13370,14 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "attachHost", options, labels: options.map((id) => defOf(s, obj(s, id)).name), objectId: o.id, prompt: "choose a creature you control for it to enter attached to" };
+      return true;
+    }
+    if (c.what === "controlFirst") {
+      // Round B250: several control replacements could apply as it enters (gather.ts): the player it would enter under
+      // chooses which applies first (CR 616.1b, rulings on Gather Specimens).
+      const you = o.controller;
+      const options = c.options ?? [];
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "controlFirst", options, labels: options.map((x) => (x === "self" ? `${defOf(s, o).name}'s own: an opponent of your choice` : `Gather Specimens: ${player(s, Number(x)).name}`)), objectId: o.id, prompt: "which control-changing effect applies first?" };
       return true;
     }
     if (c.what === "controlOpponent") {
@@ -16215,6 +16302,15 @@ export function syncControl(s: GameState) {
         removeFromCombat(s, o);
         clearCombat(o);
       }
+    }
+    // Put onto the battlefield attacking under the control of a player who isn't attacking, or blocking under the
+    // attacking player's (Gather Specimens, round B250): it's never an attacking or blocking creature (CR 506.3c-d). Only
+    // the active player attacks (CR 506.2). Only for one whose controller a Gather Specimens changed as it entered, the
+    // one way here to put a creature onto the battlefield in combat under the wrong player.
+    if (o.gatheredAsEntered && ((o.attacking !== undefined && now !== s.activePlayer) || (o.blocking?.length && now === s.activePlayer))) {
+      log(s, `${nameOf(s, o.id)} isn't ${o.attacking !== undefined ? "attacking" : "blocking"} (it's under ${player(s, now).name}'s control).`);
+      removeFromCombat(s, o);
+      clearCombat(o);
     }
     // An attacking or blocking creature that stops being a creature (a Vehicle whose Aerial Modification fell off) is
     // removed from combat too (CR 506.4).

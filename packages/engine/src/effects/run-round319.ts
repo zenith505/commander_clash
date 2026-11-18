@@ -1,6 +1,6 @@
 // Round 319's effects.
 import type { Effect } from "../abilities";
-import { defOf, isPermanentCard, objIsType } from "../cards";
+import { defOf, isPermanentCard, objIsType, opponentForbidsDiscard } from "../cards";
 import { defMv } from "../faces";
 import { livingPlayers, log, moveObject, enterTogether, obj, player, syncControl, tapPermanent } from "../game";
 import { controllerOf, characteristics, invalidateCharacteristics } from "../layers";
@@ -134,7 +134,8 @@ export function runDiscardOrSacrificeEffect(s: GameState, e: Extract<Effect, { t
     const pid = st.queue[0]!;
     const p = player(s, pid);
     if (st.pick === undefined) {
-      const canDiscard = p.hand.length > 0;
+      // Tamiyo, Collector of Tales (round B251): not a discard another player's spell or ability can make.
+      const canDiscard = p.hand.length > 0 && !opponentForbidsDiscard(s, pid, ctx.controller);
       const canSacrifice = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid);
       if (p.lost || (!canDiscard && !canSacrifice)) {
         st.queue.shift();

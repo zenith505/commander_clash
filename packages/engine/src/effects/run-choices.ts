@@ -3,7 +3,7 @@ import { coloredManaSymbols, manaValue, parseManaCost, spentMeets, type ManaSpen
 import { canPayFromPool, mayPayUse, type ManaUse } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, evidenceCandidates, evidenceValue, livingPlayers, gainLife, inCombatPhase, loseEnergy, processCandidates, adventureExileCards, availableMana, canGainLife, canLoseLife, cantDraw, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, payLife, moveObject, obj, opponents, enterTogether, payableLife, player, shareCreatureType, tapPermanent, whileControlledHolds } from "../game";
-import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, power } from "../cards";
+import { abilitiesOf, realDefOf, canBeSacrificed, cardIdOf, defOf, isType, objIsType, opponentForbidsDiscard, power } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import type { Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, TYPE_ORDERS, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
@@ -1506,6 +1506,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // What a pick picks ("it", Akiri's "that creature") isn't known until it's made.
     if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "created" && effects.some((x) => x.type === "pick" && effects.indexOf(x) < effects.indexOf(e))) continue;
     // Discarding your hand can be done with an empty hand (rulings on Moonveil Regent).
+    // Tamiyo, Collector of Tales (round B251): another player's spell or ability can't give them the option (rulings).
+    if (e.type === "discard" && e.who.ref !== "you" && players(s, e.who, ctx).length && players(s, e.who, ctx).every((pid) => opponentForbidsDiscard(s, pid, ctx.controller))) return false;
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     // "You may discard two cards. If you do, ..." (Thrilling Discovery): discarding fewer isn't doing it (CR 609.3).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && typeof e.n === "number" && e.n > 1 && !e.upTo && player(s, ctx.controller).hand.length < e.n) return false;
@@ -1637,7 +1639,9 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
   }, 0);
   // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
   // "Unless they discard a nonland card": only with one in hand.
-  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) || ("exileFromGraveyard" in o && p.graveyard.length < o.exileFromGraveyard) || ("handToTop" in o && p.hand.length < discarding + o.handToTop) || ("tap" in o && !pickOptions(s, { filter: o.tap }, pid, sourceId).length) ? [] : [i]));
+  // Tamiyo, Collector of Tales (round B251): no discard another player's spell or ability offers them (rulings).
+  const noDiscard = opponentForbidsDiscard(s, pid);
+  return e.options.flatMap((o, i) => (("discard" in o && (noDiscard || (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard)) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) || ("halfLife" in o && halfOfLife(s, pid, o.halfLife) > payableLife(s, pid)) || ("exileFromGraveyard" in o && p.graveyard.length < o.exileFromGraveyard) || ("handToTop" in o && p.hand.length < discarding + o.handToTop) || ("tap" in o && !pickOptions(s, { filter: o.tap }, pid, sourceId).length) ? [] : [i]));
 }
 
 /** Half a player's life total, rounded as the text says; 0 for a total of 0 or less (CR 107.1a-b). */

@@ -12,7 +12,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -593,7 +593,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(cause ? { cause } : {}),
           ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : floating?.about ? { subject: floating.about } : {}),
           ...(lki ? { lki } : {}),
-          ...(t.xKicked ? (kicked?.length ? { x: kicked.length } : {}) : x ? { x } : t.eventX && event?.amount ? { x: event.amount } : {}),
+          ...(t.xKicked ? (kicked?.length ? { x: kicked.length } : {}) : t.cast?.targetsCount ? { x: castTargetsCount(t, o, controller, cause) } : x ? { x } : t.eventX && event?.amount ? { x: event.amount } : {}),
           ...(kicked ? { kicked } : {}),
           ...(colorsSpent ? { colorsSpent } : {}),
           ...(event ? { event } : {}),
@@ -615,6 +615,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
       }
     });
+  };
+  // Arcee, Acrobatic Coupe (round 417): "that many": the different objects the spell (`cause`, its stack id) targeted as it
+  // was cast that match the ability's one "that targets one or more" phrase ("other" not this permanent, as castWatch).
+  const castTargetsCount = (t: TriggeredAbility, o: GameObject, you: PlayerId, cause?: string): number => {
+    const w = t.cast?.targets?.[0];
+    const item = cause !== undefined ? s.castItems?.[cause] : undefined;
+    if (!w || w === "you" || !item) return 0;
+    return targetsMatchCount(s, item.targets ?? [], w.notSource ? { ...w, notId: o.id } : w, you);
   };
   /**
    * Firebender Ascension: "Whenever a creature you control attacking causes a triggered ability of that creature to

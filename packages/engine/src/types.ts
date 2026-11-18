@@ -1238,6 +1238,8 @@ export interface StackItem {
   chosenType?: string;
   /** Liquid Fire: the number chosen as it was cast (CostChoices.number), "the chosen number" as it resolves; copied with it (CR 707.10). */
   chosenNumber?: number;
+  /** Lodestone Bauble (round 417): "a player's graveyard", "that player": the owner of the cards it targeted as it was activated, or with none, the player chosen then (CostChoices.yardPlayer, rulings). */
+  yardPlayer?: PlayerId;
   /** "An opponent chooses one —" (Misfortune): the opponent who chose its mode as it was cast (CostChoices.modeChooser), "that player" as it resolves; copied with it (CR 707.10). */
   modeChooser?: PlayerId;
   /** "Target spell can't be countered" (Vexing Shusher): from then on, while it's this stack object (CR 101.2). */
@@ -1718,6 +1720,8 @@ export interface CostChoices {
   modeChooser?: PlayerId;
   /** The mode that opponent chose: set by the game once they've chosen (the cast's own `modes` are left out). */
   chooserModes?: number[];
+  /** Lodestone Bauble (round 417, ActivatedAbility.choosesYardPlayer): the player chosen as it's activated with no target chosen (rulings); with one, it's their owner. */
+  yardPlayer?: PlayerId;
 }
 
 /**

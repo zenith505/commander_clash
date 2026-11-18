@@ -1158,6 +1158,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = gifteeOf(s, ctx);
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "yardPlayer": {
+      // Lodestone Bauble (round 417): the player chosen as it was activated, if still in the game.
+      const p = s.resolving?.item.yardPlayer;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "modeChooser": {
       // "That player" in a mode an opponent chose (Misfortune, CR 700.2e): them, as they were chosen as it was cast.
       const item = s.resolving?.item;

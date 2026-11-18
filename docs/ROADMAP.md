@@ -1,6 +1,6 @@
 # Roadmap
 
-31,711 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,718 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -4078,6 +4078,32 @@ line blocks.
    several permanents enter from different instructions), and an instruction that stops for a choice part way puts the
    counters before and after it as two events; Invisible Woman reads the Heroes as they are just after the counters are
    put; bots voting with Vault 11 don't weigh the card each player would draw.
+   Round 417 went on down `npm run popular`, most played first, past cards left out before to three whose open questions
+   their rulings settle. Helm of Kaldra's "{1}: If you control Equipment named Helm of Kaldra, Sword of Kaldra, and Shield
+   of Kaldra, create Kaldra, a legendary 4/4 colorless Avatar creature token. Attach those Equipment to it." (the names
+   are names, not this object, CR 201.5: any Equipment you control with each name, checked as it resolves, rulings; each
+   one then moves onto the token, CR 701.3a, one that can't staying where it is, CR 701.3b; attachAll `toCreated`).
+   Judgment call: with two Equipment of one name (the legend rule not applying), "those Equipment" are all of them.
+   Arcee, Sharpshooter // Arcee, Acrobatic Coupe: "{1}, Remove one or more +1/+1 counters from Arcee: It deals that much
+   damage to target creature. Convert Arcee." (X announced as the counters removed, at least one, CR 601.2b, 601.2h) and
+   "Whenever you cast a spell that targets one or more creatures or Vehicles you control, put that many +1/+1 counters on
+   Arcee. Convert Arcee." (TriggeredAbility.cast `targetsCount`: the number of distinct objects of yours it targets as
+   it's cast, as Hinata's rulings count objects and not uses of the word "target"; fixed then, one gone in response
+   still counted; CR 701.28 convert). Lodestone Bauble's "{1}, {T}, Sacrifice ~: Put up to four target basic land cards
+   from a player's graveyard on top of their library in any order. That player draws a card at the beginning of the next
+   turn's upkeep." (all from one graveyard; the player chosen as it's activated even with no target, rulings: "If you
+   choose zero targets, you still choose a player", ActivatedAbility `choosesYardPlayer`, CostChoices and StackItem
+   `yardPlayer`, the cards' owner when there are any; the owner orders the cards, CR 401.4; the delayed draw, CR 603.7,
+   made unless every target is gone, CR 608.2b). The UI asks for the player with the opponent picker when no card is
+   targeted; bots crack the Bauble at the end of the turn before an opponent's, on that opponent's basic lands (two or
+   more). Browser tests click through the Bauble with no target (choose Ana, who draws at her upkeep) and with two of
+   Ana's lands, Arcee's X counters and target, Giant Growth on the Coupe, and Helm of Kaldra's Kaldra. +3, 31,718 of
+   31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 417 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
+   counts once or twice), Lara Croft, Tomb Raider, Filigree Vector, Sunken Palace, Ulalek, Possibility Storm and the rest
+   of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: a converted or transformed
+   permanent shows a "Copy" chip in the UI (App.tsx compares its face's key with its card's; on main too); bots don't
+   use Arcee's counters or aim spells at it for the trigger on purpose; Lodestone's bot use ignores which lands matter.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -2180,6 +2180,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fd19a009-d1ab-4148-a829-3d4c3af1b0b2",
+  "name": "Archelos, Lagoon Mystic",
+  "manaCost": "{1}{B}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Turtle Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Turtle",
+   "Shaman"
+  ],
+  "oracleText": "As long as Archelos is tapped, other permanents enter tapped.\nAs long as Archelos is untapped, other permanents enter untapped.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6beec974-891f-4354-8621-ac403c07509a",
   "name": "Archfiend of Spite",
   "manaCost": "{5}{B}{B}",
@@ -6791,6 +6828,37 @@
   "commanderLegal": "legal",
   "set": "m10",
   "releasedAt": "2009-07-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3a5a6732-bdfa-4b64-b897-6817983dbb0e",
+  "name": "Capricopian",
+  "manaCost": "{X}{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Goat Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goat",
+   "Hydra"
+  ],
+  "oracleText": "This creature enters with X +1/+1 counters on it.\n{2}: Put a +1/+1 counter on this creature, then you may reselect which player this creature is attacking. Only the player this creature is attacking may activate this ability and only during the declare attackers step. (It can't attack its controller.)",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -12213,6 +12281,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "38ece0fa-2c94-4eae-b6ab-74b783862f3e",
+  "name": "Doomskar",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all creatures.\nForetell {1}{W}{W} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Foretell"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "be48877f-97b1-4a10-a618-cbc57515e617",
   "name": "Doubling Chant",
   "manaCost": "{5}{G}",
@@ -13845,6 +13941,45 @@
   "commanderLegal": "legal",
   "set": "vis",
   "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "710a3499-64f8-4d2c-8c9c-d58950e47ea7",
+  "name": "Eriette, the Beguiler",
+  "manaCost": "{1}{W}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Lifelink\nWhenever an Aura you control becomes attached to a nonland permanent an opponent controls with mana value less than or equal to that Aura's mana value, gain control of that permanent for as long as that Aura is attached to it.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -34969,6 +35104,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c73a9939-0742-4919-94d6-c3b537697f17",
+  "name": "Ranar the Ever-Watchful",
+  "manaCost": "{2}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Spirit Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Warrior"
+  ],
+  "oracleText": "Flying, vigilance\nThe first card you foretell each turn costs {0} to foretell.\nWhenever one or more cards are put into exile from your hand or a spell or ability you control exiles one or more permanents from the battlefield, create a 1/1 white Spirit creature token with flying.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "khc",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9d2d6479-531c-4ce1-b52b-00e36fa63b64",
   "name": "Rancor",
   "manaCost": "{G}",
@@ -49922,6 +50095,34 @@
   "releasedAt": "2024-08-02",
   "rarity": "uncommon",
   "layout": "class",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "740fe41a-16bb-4c97-a03c-f678f15a0a0c",
+  "name": "Wizard's Spellbook",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{T}: Exile target instant or sorcery card from a graveyard. Roll a d20. Activate only as a sorcery.\n1—9 | Copy that card. You may cast the copy.\n10—19 | Copy that card. You may cast the copy by paying {1} rather than paying its mana cost.\n20 | Copy each card exiled with this artifact. You may cast any number of the copies without paying their mana costs.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

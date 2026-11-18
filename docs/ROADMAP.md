@@ -3711,6 +3711,60 @@ line blocks.
    Equipment "those Equipment" are with more than one of a name), Archelos, Lagoon Mystic, Pulmonic Sliver, Capricopian,
    Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular`
    above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 403 went on down `npm run popular`, most played first, to three cards left out before. Capricopian's "{2}: Put a
+   +1/+1 counter on this creature, then you may reselect which player this creature is attacking. Only the player this
+   creature is attacking may activate this ability and only during the declare attackers step." (ActivatedAbility
+   `attackedPlayerOnly` with `anyPlayer`: that player only, who controls the ability, CR 602.2, 113.8; none while it
+   attacks a planeswalker or battle, rulings; Effect reselectAttack `playersOnly` and `may`: another player, never its
+   controller, CR 506.2, or "Keep attacking", still declared at the first, rulings). Archelos, Lagoon Mystic's "As long as
+   Archelos is tapped, other permanents enter tapped." and "As long as Archelos is untapped, other permanents enter
+   untapped." (CompiledCard.othersEnterAsTappedState, game.ts finishEntering, CR 614.1c: not itself nor what enters with
+   it, rulings; put onto the battlefield tapped with no replacement effect, it enters untapped, rulings; with replacement
+   effects of both kinds, an Archelos among them, the entering permanent's controller chooses "Enter untapped" or "Enter
+   tapped", CR 616.1, EntersOption "tapOrder", asked before anything sees it enter). Spelunking with a tapland and no
+   Archelos still enters untapped without asking, as since round 96 (its rulings give the same choice). Wizard's
+   Spellbook's "{T}: Exile target instant or sorcery card from a graveyard. Roll a d20. Activate only as a sorcery. 1—9 |
+   Copy that card. You may cast the copy. 10—19 | Copy that card. You may cast the copy by paying {1} rather than paying
+   its mana cost. 20 | Copy each card exiled with this artifact. You may cast any number of the copies without paying their
+   mana costs." (the exile linked to it, CR 607.2a; castFromAmong `fromExiledThisWay` copies, paid or for {1}, CR 118.9,
+   and `fromLinked` copies free; cast as it resolves or never, CR 707.12, rulings). Bots the Capricopian attacks send it to
+   the player with the most life; bots always enter untapped. Browser tests click through Capricopian's menu and the
+   player it attacks next, Archelos's two choices and the Spellbook's {1} copy. Review follow-up 17: round 375's Endless
+   Whispers browser test no longer asserts the end step after the page's auto-pass may have left it (it checks the turn
+   the Bears returned and the end step's log). +3, 31,640 of 31,936 on this stacked branch. The compiled text of every
+   other card is unchanged.
+   Out after round 403 (looked at, not done): Pulmonic Sliver (still out: an optional "put it on top of its owner's library
+   instead" asked in the middle of a zone change, and several Slivers dying at once ordered by their owner); Filigree Vector
+   (still out: two "any number of target" slots); Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion,
+   Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm
+   run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 404 went on down `npm run popular`, most played first, to four cards not looked at before. Hero of Bretagard's
+   and Ranar the Ever-Watchful's "Whenever one or more cards are put into exile from your hand or a spell or ability you
+   control exiles one or more permanents from the battlefield" (BatchTrigger `exiledFromHandOrByYou`, once for each event,
+   CR 603.2c: cards from your hand for any reason, foretelling too, and permanents, tokens too, exiled while a spell or
+   ability you control is resolving, ZoneMove `exiledBy`; a cost paid to cast or activate doesn't count, as with
+   discarding for a cost, rulings; Hero's "that many" counts both). Ranar's "The first card you foretell each turn costs {0}
+   to foretell." (CompiledCard.firstForetellFree: the special action's cost, CR 702.143a, 116.2h, while its controller
+   hasn't foretold this turn, TurnLog `foretold`, counting cards foretold before Ranar was there). Kraven the Hunter's
+   "Whenever a creature an opponent controls with the greatest power among creatures that player controls dies" (dies
+   `greatestPowerOfController`: its power just before the event against every creature its controller controlled then,
+   those dying with it too, a lord's bonus included: the battlefield as the event's first permanent left, GameState.
+   leftTogether `before`, CR 603.10a, as Lane B round B250 found; tied counts). Eriette, the Beguiler's "Whenever an Aura
+   you control becomes attached to a nonland permanent an opponent controls with mana value less than or equal to that
+   Aura's mana value, gain control of that permanent for as long as that Aura is attached to it." (trigger event
+   `auraAttachedToOpponents`, the Aura entering attached or moved; ContinuousEffect `whileAttached`, CR 611.2b; nothing if
+   the Aura isn't attached to it as the ability resolves, rulings; Eriette leaving doesn't end it). Browser tests click
+   through Ranar's {0} foretelling and Eriette's Pacifism. Review follow-up 17: round 384's Toymaker's Trap browser tests
+   no longer race the draw step (mana floats in your pool so the page holds priority in the upkeep, and the poll waits for
+   that upkeep, as round 401's Jon Irenicus). +4, 31,644 of 31,936 on this stacked branch. The compiled text of
+   every other card is unchanged. Main 2e13ed5 (Lane B B248 and B249) was merged in afterwards: 31,653 of 31,936, every
+   card compiling as on main but the seven of rounds 403 and 404.
+   Out after round 404 (looked at, not done): Jasmine Boreal of the Seven ("Spend this mana only to cast creature spells
+   with no abilities": abilities given to a spell, such as a granted convoke, cascade or offspring, count, rulings, and the
+   mana spending check sees only the card's printed text); Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales,
+   Wayta, Trainer Prodigy, Celestial Reunion, Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to
+   Victory, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their
+   earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

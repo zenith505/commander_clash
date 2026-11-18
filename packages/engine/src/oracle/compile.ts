@@ -139,6 +139,8 @@ import { round399Line } from "./round399";
 import { round400Line } from "./round400";
 import { round401Line } from "./round401";
 import { round402Line } from "./round402";
+import { round403Line } from "./round403";
+import { round404Line } from "./round404";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1022,6 +1024,10 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Ranar the Ever-Watchful (round 404): free foretelling (oracle/round404.ts).
+    if (/^The first card you foretell each turn /.test(line) && round404Line(line, raw, out, isSpell)) continue;
+    // Archelos, Lagoon Mystic (round 403): other permanents entering tapped or untapped (oracle/round403.ts).
+    if (/^As long as ~ is (?:un)?tapped, other permanents enter /.test(line) && round403Line(line, raw, out, isSpell)) continue;
     // Scheming Fence (round 402): its chosen permanent (oracle/round402.ts), before the generic borrowing below.
     if ((line === "As ~ enters, you may choose a nonland permanent." || line.startsWith("~ has all activated abilities of the chosen permanent")) && round402Line(line, raw, out, isSpell)) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
@@ -8099,8 +8105,9 @@ function linkExile(out: CompiledCard) {
     // Summon: Esper Valigarmanda: "exile an instant or sorcery card from each graveyard", linked as it's parsed.
     // Krang & Shredder (round 395): its "each opponent exiles cards ... until they exile a nonland card", always linked, one
     // effect shared by the two triggers of its one ability (CR 603.2, 607.2a), counted once.
+    // Wizard's Spellbook (round 403): its rows' "copy that card" (castFromAmong fromExiledThisWay) exile nothing themselves.
     const faceDown = [...new Set(all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked) || e.type === "exileUntilNonlandLinked"))];
-    const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.linked) || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked));
+    const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.linked) || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked && !e.fromExiledThisWay));
     if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
     else if (faceDown.length) {
       // Linked as it's exiled.

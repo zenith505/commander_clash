@@ -1680,6 +1680,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Its own card back on top, to draw it again; someone else's card can't be on our library.
     // Read ahead (CR 702.155): start on chapter I, so every chapter happens.
     if (pend.kind === "chooseOption" && pend.what === "readAhead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Archelos, Lagoon Mystic (round 403): an untapped permanent is never worse for us.
+    if (pend.kind === "chooseOption" && pend.what === "tapOrder") return [{ type: "chooseOption", player: pid, choice: "untapped" }];
     // The Sieges' Khans or Dragons (CR 614.12b): Khans, the long-term value (a card, counters, mana, a returned creature).
     // "Roll two d8 and choose one result" (the Endeavors): the higher one for the first instruction.
     if (pend.kind === "chooseOption" && pend.what === "rollResult") return [{ type: "chooseOption", player: pid, choice: Number(pend.labels?.[1]) > Number(pend.labels?.[0]) ? "1" : "0" }];
@@ -2426,7 +2428,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid) ?? chooseSendAttackerAway(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -7796,6 +7798,27 @@ function choosePayEnchantedCost(s: GameState, pid: PlayerId): Action[] | null {
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
       if (!ab.enchantedControllerOnly || !ab.body.effects.every((e) => e.type === "removeCounters" && e.what.ref === "self" && (o.counters[e.counter] ?? 0) > 0)) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Capricopian (round 403): "{2}: Put a +1/+1 counter on ~, then you may reselect which player ~ is attacking. Only the
+ * player ~ is attacking may activate this ability ...": an opponent's creature attacking us, sent to another player
+ * (reselectPick: the one with the most life), once at a time with nothing on the stack.
+ */
+function chooseSendAttackerAway(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.stack.length || s.step !== "declareAttackers" || s.activePlayer === pid) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (o.attacking !== pid || o.attackingPermanent || controllerOf(s, o) === pid || !reselectPick(s, pid, o)) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (!ab.attackedPlayerOnly || !ab.body.effects.some((e) => e.type === "reselectAttack")) continue;
       const plan = planActivate(s, pid, id, i);
       if (plan) return plan;
     }

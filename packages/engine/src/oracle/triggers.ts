@@ -9,6 +9,7 @@ import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
 import { parseToken } from "./tokens";
 import { round318Trigger } from "./round318";
+import { round404Trigger } from "./round404";
 import { parseChanges } from "./sentence";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
@@ -3137,6 +3138,9 @@ function payToUntapTrigger(raw: string): TriggeredAbility | "fail" | null {
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const untapPaid = payToUntapTrigger(raw);
   if (untapPaid) return untapPaid;
+  // Round 404 (oracle/round404.ts): Hero of Bretagard, Ranar, Kraven the Hunter, Eriette.
+  const r404 = round404Trigger(raw);
+  if (r404) return r404;
   const r312 = round312Trigger(raw) ?? round316Trigger(raw) ?? round317Trigger(raw);
   if (r312) return r312;
   // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,

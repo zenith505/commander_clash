@@ -566,6 +566,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     onlyPlayer = onlyOne[1] === "none" ? -1 : Number(onlyOne[1]);
     effectText = effectText.slice(0, onlyOne.index);
   }
+  // Capricopian (round 403): "Only the player ~ is attacking may activate this ability and only during the declare attackers
+  // step": that player only (CR 602.2), who then controls the ability (CR 113.8); none while it attacks a planeswalker or
+  // battle (rulings).
+  let attackedPlayerOnly = false;
+  const attackedOnly = !anyone && !ownerOnly && !oppOnly && !onlyOne ? / Only the player ~ is attacking may activate this ability( and only during the declare attackers step)?\.$/.exec(effectText) : null;
+  if (attackedOnly) {
+    anyPlayer = attackedPlayerOnly = true;
+    effectText = `${effectText.slice(0, attackedOnly.index)}${attackedOnly[1] ? " Activate only during the declare attackers step." : ""}`;
+  }
   for (let found = true; found; ) {
     found = false;
     if (/ Activate only if ~ is in your graveyard\.$/.test(effectText) && !inYard && !keyword) {
@@ -921,6 +930,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(ownerOnly ? { ownerOnly: true as const } : {}),
     ...(opponentsOnly ? { opponentsOnly: true as const } : {}),
+    ...(attackedPlayerOnly ? { attackedPlayerOnly: true as const } : {}),
     ...(onlyPlayer !== undefined ? { onlyPlayer } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
     ...(spendOnly ? { spendOnly } : {}),

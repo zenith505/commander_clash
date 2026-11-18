@@ -1209,7 +1209,11 @@ export function moveObject(
   // left, ones leaving at the same time included (they were still in combat then, CR 603.10a).
   const aloneIn = fromZone === "battlefield" ? combatAlone(s, o) : undefined;
   if (fromZone === "battlefield") {
-    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
+    // Kraven the Hunter (round 404): the creatures there just before the first of these left, with their controllers and
+    // powers then, for "the greatest power among creatures that player controls" as it looks back (CR 603.10a), while
+    // something has such an ability.
+    const before = !s.leftTogether?.length && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).triggers.some((t) => t.dies?.greatestPowerOfController)) ? s.battlefield.flatMap((b) => (objIsType(s, obj(s, b), "Creature") ? [{ id: b, controller: controllerOf(s, obj(s, b)), power: power(s, obj(s, b)) }] : [])) : undefined;
+    (s.leftTogether ??= []).push({ ...(before ? { before } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
@@ -1467,6 +1471,8 @@ export function moveObject(
     if (!toHand.includes(o.owner)) toHand.push(o.owner);
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
+  // Hero of Bretagard (round 404): a permanent exiled while a spell or ability is resolving is exiled by it, that object's
+  // controller's (ZoneMove.exiledBy); a cost paid to cast or activate isn't (as discarding for a cost, CR 701.9).
   // Stonebinder's Familiar: "one or more cards are put into exile" from anywhere. Wan Shi Tong, All-Knowing: "into a library
   // from anywhere", not from a library (rulings).
   if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (to === "exile" && fromZone !== "exile") || (to === "library" && fromZone !== "library"))
@@ -1479,7 +1485,7 @@ export function moveObject(
       ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
       ...(opts.milled && fromZone === "library" ? { milled: true as const } : {}),
       card: fromZone === "battlefield" ? snapshotKey : o.cardId,
-      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(borrowed ? { borrowed } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
+      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(borrowed ? { borrowed } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}), ...(to === "exile" && s.resolving ? { exiledBy: s.resolving.item.controller } : {}) } : {}),
     });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
@@ -1694,7 +1700,17 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     }
     if (stolen) withCounters = withCounters?.counter === "+1/+1" ? { ...withCounters, n: withCounters.n + stolen } : { counter: "+1/+1", n: stolen, ...(withCounters ? { also: { counter: withCounters.counter, n: withCounters.n } } : {}) };
   }
-  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || (printed.entersTappedIfXAtMost !== undefined && (opts.x ?? 0) <= printed.entersTappedIfXAtMost) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
+  // Archelos, Lagoon Mystic (round 403): another permanent's "enter tapped" or "enter untapped" as it is tapped or not
+  // (CR 614.1c). With replacement effects of both kinds, the entering permanent's controller chooses their order, so
+  // whether it enters tapped (CR 616.1, rulings): asked once it's there, before anything sees it enter (EntersOption
+  // "tapOrder"). Put onto the battlefield tapped with no replacement effect, an untapped Archelos has it enter untapped
+  // (rulings), as Spelunking does. Without Archelos, Spelunking's "enter untapped" is still applied last, as before.
+  const archelos = othersEnterAsTappedState(s, o);
+  const tapping = printed.entersTapped || entersTappedNow(s, o, printed, opts.untapped) || (printed.entersTappedIfXAtMost !== undefined && (opts.x ?? 0) <= printed.entersTappedIfXAtMost) || othersMakeItEnterTapped(s, o) || archelos.tapped;
+  const untapping = othersMakeItEnterUntapped(s, o) || archelos.untapped;
+  const tapOrder = (archelos.tapped || archelos.untapped) && tapping && untapping;
+  if (tapOrder) o.tapped = false;
+  else if (tapping || opts.tapped) o.tapped = !untapping;
   // Brimstone Vandal: day from the moment it enters, with neither (CR 731.1, 614.12).
   if (printed.entersDay && !s.dayNight) setDayNight(s, "day");
   // "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types"
@@ -1809,7 +1825,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // it as it would exist on the battlefield (CR 614.12, rulings). Unleash likewise ("Other Dogs you control have unleash",
   // Tesak), each instance its own choice.
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot" || x === "unleash"));
-  const options: EntersOption[] = [...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersProcess ? (["processExile"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
+  const options: EntersOption[] = [...(tapOrder ? (["tapOrder"] as const) : []), ...(printed.entersExileFromYard ? (["exileFromYard"] as const) : []), ...(printed.entersProcess ? (["processExile"] as const) : []), ...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.entersRemoveCounters ? (["removeCounters"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersDiscardKeywords ? (["discardKeywords"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersForms ? (["form"] as const) : []), ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   // Frankenstein's Monster: "exile X creature cards" with the X it was cast with (CR 107.3m).
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(what === "exileFromYard" && opts.x ? { enterOpts: { x: opts.x } } : {}), ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
@@ -2188,6 +2204,24 @@ export function othersMakeItEnterUntapped(s: GameState, o: GameObject): boolean 
     const you = controllerOf(s, src);
     return rules.some((r) => objectMatches(s, r.filter, o, you, false));
   });
+}
+
+/**
+ * Archelos, Lagoon Mystic (round 403): whether another permanent's "As long as ~ is tapped, other permanents enter tapped"
+ * (`tapped`) or "As long as ~ is untapped, other permanents enter untapped" (`untapped`) applies to `o` as it enters: one
+ * already on the battlefield, not one entering with it (rulings), with its abilities (CR 614.12).
+ */
+export function othersEnterAsTappedState(s: GameState, o: GameObject): { tapped: boolean; untapped: boolean } {
+  const out = { tapped: false, untapped: false };
+  for (const id of s.battlefield) {
+    if (id === o.id) continue;
+    const src = obj(s, id);
+    const rule = compileCard(defOf(s, src)).othersEnterAsTappedState;
+    if (!rule || !characteristics(s, src).hasPrintedAbilities) continue;
+    if (src.tapped && rule.tapped) out.tapped = true;
+    if (!src.tapped && rule.untapped) out.untapped = true;
+  }
+  return out;
 }
 
 function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
@@ -2753,11 +2787,12 @@ export function endWhileTapped(s: GameState): boolean {
     const kept = e.affected.filter((id) => s.objects[id]?.zone !== "battlefield" || pw(obj(s, id)) <= pw(me));
     if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
   }
+  // Eriette, the Beguiler (round 404): control "for as long as that Aura is attached to it" (ContinuousEffect.whileAttached).
   // Round 396: copy effects "for as long as that creature remains tapped" (Zygon Infiltrator) or "for as long as ~ remains
   // attached to it" (Blade of Shared Souls, Assimilation Aegis), over for good once that stops (CR 611.2b), a phased-out
   // copy too (CR 702.26f).
   if (endCopyWhile(s)) lost = true;
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || (e.whileAttached && !copyWhileHolds(s, { whileAttached: e.whileAttached })) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
     return lost;
@@ -10447,6 +10482,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (ab.onlyPlayer !== undefined && ab.onlyPlayer !== pid) return ab.onlyPlayer >= 0 && s.players[ab.onlyPlayer] ? `only ${player(s, ab.onlyPlayer).name} may activate that ability` : "no one may activate that ability";
   // Merseine (round B211): only the player who controls the permanent it's attached to now.
   else if (ab.enchantedControllerOnly && (!o.attachedTo || s.objects[o.attachedTo]?.zone !== "battlefield" || controllerOf(s, obj(s, o.attachedTo)) !== pid)) return `only the controller of the creature ${d.name} enchants may activate that ability`;
+  // Capricopian (round 403): only the player it's attacking now, not while it attacks a planeswalker or battle (rulings).
+  else if (ab.attackedPlayerOnly && (o.attacking !== pid || o.attackingPermanent !== undefined)) return `only the player ${d.name} is attacking may activate that ability`;
   // A Killer Among Us (round B233): only the player who secretly chose the type for this object can reveal it (rulings).
   else if (ab.revealSecretType && !(o.secretType && o.secretType.by === pid && o.secretType.zc === (o.zoneChanges ?? 0))) return `only the player who secretly chose a creature type for ${d.name} can reveal it`;
   // Merseine: "Pay enchanted creature's mana cost" can't be paid for a creature with no mana cost (CR 118.6).
@@ -12165,6 +12202,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry) s.entersChoices!.unshift(entry);
       return;
     }
+    if (pend.what === "tapOrder") {
+      // Archelos, Lagoon Mystic (round 403): entering tapped is part of how it enters (CR 614.1c), not becoming tapped.
+      if (!pend.options.includes(choice)) throw new RulesError("choose tapped or untapped");
+      o.tapped = choice === "tapped";
+      log(s, `${p.name} has ${pend.source} enter ${choice}.`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "readAhead") {
       // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
       const n = Number(choice);
@@ -12240,7 +12286,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyLast" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "form" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "copyLast" || pend.what === "copyOther" || pend.what === "exileFromYard" || pend.what === "processExile" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector" || pend.what === "chosenObject" || pend.what === "playerWord" || pend.what === "removeCounters" || pend.what === "tapOrder") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -13322,6 +13368,12 @@ function askEntersChoice(s: GameState): boolean {
       // "As ~ enters, choose Khans or Dragons" (CR 614.12b).
       const words = compileCard(defOf(s, o)).entersAnchor ?? [];
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "anchor", options: words, objectId: o.id, prompt: `choose ${words.join(" or ")}` };
+      return true;
+    }
+    if (c.what === "tapOrder") {
+      // Archelos, Lagoon Mystic (round 403): replacement effects that have it enter tapped and others that have it enter
+      // untapped; its controller orders them, the last one deciding (CR 616.1, rulings).
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "tapOrder", options: ["untapped", "tapped"], labels: ["Enter untapped", "Enter tapped"], objectId: o.id, prompt: "replacement effects would have it enter tapped and untapped: choose which applies last" };
       return true;
     }
     if (c.what === "readAhead") {
@@ -16537,6 +16589,9 @@ function cosmosChargers(s: GameState, pid: PlayerId): GameObject[] {
  * less", CR 601.2f applied to the special action), never less than {0} (rulings).
  */
 export function foretellActionCost(s: GameState, pid: PlayerId): string {
+  // Ranar the Ever-Watchful (round 404): the first card they foretell this turn, counting ones foretold before Ranar was
+  // there, costs {0} (CR 601.2f applied to the special action; it's the cost, whatever else changes it).
+  if (!(s.turnLog?.foretold ?? []).includes(pid) && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).firstForetellFree)) return "{0}";
   const less = cosmosChargers(s, pid).reduce((n, p) => n + (abilitiesOf(s, p).foretellActionLess ?? 0), 0);
   return `{${Math.max(0, 2 - less)}}`;
 }
@@ -16574,6 +16629,8 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   // Dream Devourer's foretell: the card keeps the foretell cost it was given, not the ability (rulings).
   const reduce = compileCard(d).foretell ? undefined : grantedForetell(s, p.id, o);
   spendFromPool(s, p.id, parseManaCost(foretellActionCost(s, p.id)), { ability: o, foretell: true });
+  const foretold = ((s.turnLog ??= {}).foretold ??= []);
+  if (!foretold.includes(p.id)) foretold.push(p.id);
   moveObject(s, id, "exile");
   o.foretold = true;
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn, ...(reduce !== undefined ? { foretellReduce: reduce } : {}) };

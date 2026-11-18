@@ -1703,6 +1703,8 @@ export type DeferredAct = {
  */
 export interface ContinuousEffect {
   id: string;
+  /** Eriette, the Beguiler (round 404): "for as long as that Aura is attached to it": over for good once that Aura (that object) isn't attached to that permanent (that object) (CR 611.2b). */
+  whileAttached?: { id: ObjectId; zc: number; host: ObjectId; hostZc: number };
   timestamp: number; // CR 613.7b
   controller: PlayerId;
   sourceName: string;
@@ -1974,6 +1976,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Ranar the Ever-Watchful (round 404): the players who foretold a card this turn (CR 702.143a), each once. */
+  foretold?: PlayerId[];
   /** Desolation: the players who tapped a land for mana this turn (CR 106.12: activated a mana ability of a land with {T} in its cost), each once. */
   tappedLandForMana?: PlayerId[];
   /** Hedonist's Trove (CompiledCard.playLinkedSpellOnce): the sources ("id@zoneChanges") whose cards a spell was cast from this turn with that permission. */
@@ -2243,6 +2247,8 @@ export interface ZoneMove {
   borrowed?: ObjectId[];
   /** Left the battlefield because its controller sacrificed it (CR 701.21a). */
   sacrificed?: true;
+  /** Hero of Bretagard (round 404): exiled from the battlefield as a spell or ability this player controls was resolving (its effect, not a cost). */
+  exiledBy?: PlayerId;
 }
 
 export interface GameState {
@@ -2261,7 +2267,7 @@ export interface GameState {
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
    */
   /** `card`: its copiable values as it last existed (CR 603.10a), a key into `cards`. */
-  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string; /** Idris, Koh (round 399): the exiled cards whose triggered abilities it had as it left (cards.ts borrowedTriggerSources, CR 603.10a). */ borrowed?: ObjectId[] }[];
+  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string; /** Idris, Koh (round 399): the exiled cards whose triggered abilities it had as it left (cards.ts borrowedTriggerSources, CR 603.10a). */ borrowed?: ObjectId[]; /** Kraven the Hunter (round 404), on the first one only: every creature on the battlefield just before the first of them left, with its controller and power then (CR 603.10a), kept while a permanent with TriggeredAbility.dies `greatestPowerOfController` is there. */ before?: { id: ObjectId; controller: PlayerId; power: number }[] }[];
   /**
    * Cards put into a graveyard in the current event (one instruction of a resolving spell or ability, one pass of
    * state-based actions, one action's costs), as they are there: their owner arranges them (CR 404.3). See graveyard.ts.

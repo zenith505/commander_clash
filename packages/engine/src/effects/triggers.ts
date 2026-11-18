@@ -2644,6 +2644,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.targetsOnly && !targetsOnlyOne(s, item?.targets ?? [], t.cast.targetsOnly, o, you)) return false;
         // Beamsplitter Mage: "if you control one or more other creatures that spell could target" (CR 603.4).
         if (t.cast.otherYoursCouldTarget && !(item && eachOtherTargets(s, item, { among: t.cast.otherYoursCouldTarget, self: true }, { sourceId: o.id, controller: you }).length)) return false;
+        // Exterminator Magmarch (round 415): "if another opponent controls one or more nonland permanents that spell could
+        // target" (CR 603.4), checked again as it resolves (the copy's choice then finds none).
+        if (t.cast.otherOpponentsCouldTarget && !(item && eachOtherTargets(s, item, { among: t.cast.otherOpponentsCouldTarget, otherOpponentOfTarget: true }, { sourceId: o.id, controller: you }).length)) return false;
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;
@@ -2748,6 +2751,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (w.spell && item!.kind !== "spell") return false;
         if (w.ability && item!.kind !== "ability") return false;
         if (w.activatedOnly && (item!.kind !== "ability" || !!item!.triggered)) return false;
+        // Agrus Kos, Eternal Soldier (round 415): "an ability that targets only it" (rulings: several targets all naming it).
+        if (w.onlySelf && !targetsOnlyOne(s, item!.targets ?? [], "self", o, watcher)) return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
         // Skophos Maze-Warden: an ability whose source is a land you control named Labyrinth of Skophos.
@@ -3482,7 +3487,16 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   if (body.targets.some((x) => x.opponentOfSubjectController)) {
     const subj = t.subject && s.objects[t.subject.id];
     const chooser = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? controllerOf(s, subj) : (s.lastKnown?.[t.subject?.id ?? ""]?.controller ?? t.controller);
-    return { ...body, targets: body.targets.map((x) => (x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
+    // Confusion in the Ranks (round 414): "that shares a card type with it": a card type of the subject as it is, or last
+    // was, on the battlefield (CR 608.2h); none known, nothing matches.
+    const here = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc;
+    const kin = (x: TargetSpec): TargetSpec => {
+      if (!x.sharesCardTypeWithSubject) return x;
+      const { sharesCardTypeWithSubject: _, ...rest } = x;
+      const types = here ? characteristics(s, subj!).types : (s.lastKnown?.[t.subject?.id ?? ""]?.source?.types ?? []);
+      return { ...rest, types: types.length ? [...types] : ["(none)"] };
+    };
+    return { ...body, targets: body.targets.map((x) => kin(x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
   }
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;

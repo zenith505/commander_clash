@@ -3450,6 +3450,8 @@ export interface Resolving {
     unlessWay?: string;
     targetSlot?: number; // "change a target of target spell or ability to ~": which of its targets (Spellskite)
     retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
+    /** Boltbender (round 414, Effect newTargetsAny): the stack items still to be asked about, top first. */
+    retargetQueue?: string[];
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     exploresLeft?: number; // explores still to do for one instruction (Topography Tracker doubles them)
     exploreScries?: number; // scries still to do before an explore (Twists and Turns, one each)

@@ -8,7 +8,7 @@ import { castProblem, collectEvidence, destroyPermanent, enterTogether, evidence
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal, itemQuality } from "./targeting";
+import { bindChosen, canChooseTarget, isLegalTarget, legalTargets, objectMatches, onlyPermanentOrPlayer, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal, itemQuality } from "./targeting";
 import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -23,6 +23,24 @@ import { copyKey, type CopyExcept } from "../copies";
  */
 export function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract<Effect, { type: "copySpell" }>["eachOther"]>, ctx: Pick<ResolveCtx, "sourceId" | "controller" | "sourceZc">): ObjectId[] {
   const chosen = (orig.targets ?? []).map((t, i) => ({ t, spec: orig.body?.targets[i] })).filter((x) => x.t.kind !== "none");
+  // Radiate, Radiant Performer, Agrus Kos (round 415): the copies are this ability's controller's, so each new target must
+  // be one every target of the spell or ability could legally name for them (CR 707.10c, rulings on Agrus Kos), with the
+  // spell (or the ability's source) as the source of the targeting (CR 115.4, 113.7a). A player is "p<id>".
+  if (eo.orPlayers || eo.copier) {
+    const one = onlyPermanentOrPlayer(s, orig.targets ?? []);
+    if (!one || chosen.some((x) => !x.spec) || (!eo.orPlayers && one.kind !== "object")) return [];
+    const specs = orig.body!.targets;
+    const q = itemQuality(s, orig);
+    const from = orig.kind === "spell" ? orig.objectId : orig.sourceId;
+    const ok = (t: TargetChoice) => {
+      const aimed = (orig.targets ?? []).map((x): TargetChoice => (x.kind === "none" ? x : t));
+      return aimed.every((x, i) => x.kind === "none" || canChooseTarget(s, specs, aimed, i, x, ctx.controller, q, from));
+    };
+    const perms = s.battlefield.filter((id) => !(one.kind === "object" && one.id === id) && (eo.orPlayers || objectMatchesFor(s, eo.among, id, ctx.controller)) && ok({ kind: "object", id }));
+    if (!eo.orPlayers) return perms;
+    const people = s.players.filter((p) => !p.lost && !(one.kind === "player" && one.id === p.id) && ok({ kind: "player", id: p.id })).map((p) => `p${p.id}`);
+    return [...perms, ...people];
+  }
   const first = chosen[0]?.t;
   if (first?.kind !== "object" || chosen.some((x) => x.t.kind !== "object" || x.t.id !== first.id || !x.spec)) return [];
   const me = ctx.sourceId;
@@ -36,9 +54,14 @@ export function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<
   // every target of the spell (CR 707.10e).
   if (eo.toCreated) return (s.resolving?.created ?? []).filter((id) => id !== first.id && s.objects[id]?.zone === "battlefield" && s.objects[id]!.isToken && chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id }, ctx.controller, src)));
   if (eo.toSource) return me && me !== first.id && s.objects[me]?.zone === "battlefield" && (ctx.sourceZc === undefined || (s.objects[me]!.zoneChanges ?? 0) === ctx.sourceZc) && chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id: me }, ctx.controller, src)) ? [me] : [];
+  // Exterminator Magmarch (round 415): "another opponent": not the player who controls the one it targets (as it last
+  // existed on the battlefield if it has left, CR 608.2h).
+  const firstObj = s.objects[first.id];
+  const targetsOwn = eo.otherOpponentOfTarget ? (firstObj?.zone === "battlefield" && (first.zc === undefined || (firstObj.zoneChanges ?? 0) === first.zc) ? controllerOf(s, firstObj) : s.lastKnown?.[first.id]?.controller) : undefined;
   return s.battlefield.filter((id) => {
     if (id === first.id || (eo.self && id === me)) return false;
     if (!objectMatchesFor(s, eo.among, id, eo.casterControls ? orig.controller : ctx.controller)) return false;
+    if (eo.otherOpponentOfTarget && (targetsOwn === undefined || controllerOf(s, obj(s, id)) === targetsOwn || controllerOf(s, obj(s, id)) === ctx.controller)) return false;
     return chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id }, orig.controller, src));
   });
 }
@@ -530,7 +553,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (e.n === "eachOther") {
           // Zada, Ink-Treader Nephilim, Precursor Golem: no copy is made if the spell has left the stack.
           // Ivy, Gleeful Spellthief's is made from the spell as it last was (rulings).
-          if (orig.kind !== "spell" || (!e.eachOther!.toSource && !e.eachOther!.toCreated && !e.eachOther!.choosePay && !s.stack.some((x) => x.id === orig.id))) return;
+          // Radiant Performer, Agrus Kos (round 415): an ability too, while it's on the stack. Exterminator Magmarch: even
+          // if the spell has left the stack (rulings).
+          const eo = e.eachOther!;
+          if ((orig.kind !== "spell" && !eo.orPlayers && !eo.copier) || (!eo.toSource && !eo.toCreated && !eo.choosePay && !eo.evenIfGone && !s.stack.some((x) => x.id === orig.id))) return;
           const all = eachOtherTargets(s, orig, e.eachOther!, ctx);
           const by = e.eachOther!.caster ? orig.controller : ctx.controller;
           // Feather, Radiant Arbiter: its controller picks any of them, paying for each (pickPermanents `payEach`).
@@ -547,7 +573,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             sc.chosen = undefined;
           }
           if (!each.length) return;
-          const extra = extraSpellCopies(s, by);
+          const extra = orig.kind === "spell" ? extraSpellCopies(s, by) : 0;
           // Frontline Heroism: one copy, aimed at one of the tokens, its controller's choice if a replacement made more
           // than one it could target (CR 707.10e).
           // Beamsplitter Mage: one copy, aimed at the creature its controller chooses among them (rulings).
@@ -588,21 +614,26 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // The copies' controller chooses the order they go on the stack (rulings on Zada, Ink-Treader Nephilim and
         // Precursor Golem): which creature the next copy targets. Copies put on the stack later resolve first.
         if (c.each && c.pickOne && !c.picked) {
-          const names = c.each.map((id) => characteristics(s, obj(s, id)).name);
+          const names = c.each.map((id) => (/^p\d+$/.test(id) ? player(s, Number(id.slice(1)) as PlayerId).name : characteristics(s, obj(s, id)).name));
           const labels = names.map((n, i) => (names.filter((x) => x === n).length > 1 ? `${n} ${names.slice(0, i + 1).filter((x) => x === n).length}` : n));
-          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: [...c.each], labels, prompt: `choose the ${e.n === "eachOther" && e.eachOther?.chooseOne ? "creature" : "token"} the copy of ${orig.description} targets` };
+          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: [...c.each], labels, prompt: `choose the ${e.n === "eachOther" && e.eachOther?.chooseOne ? (e.eachOther.otherOpponentOfTarget ? "permanent" : "creature") : "token"} the copy of ${orig.description} targets` };
           return "paused";
         }
         if (c.each && c.left > 1 && !c.picked) {
           const rest = c.each.slice(c.each.length - c.left);
-          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: rest, labels: rest.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`), prompt: `choose the creature the next copy of ${orig.description} targets (copies put on the stack later resolve first)` };
+          // Radiate (round 415): a player is "p<id>".
+          const label = (id: string) => (/^p\d+$/.test(id) ? player(s, Number(id.slice(1)) as PlayerId).name : `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
+          const what = e.n === "eachOther" && e.eachOther?.orPlayers ? "permanent or player" : "creature";
+          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: rest, labels: rest.map(label), prompt: `choose the ${what} the next copy of ${orig.description} targets (copies put on the stack later resolve first)` };
           return "paused";
         }
         c.picked = undefined;
         // "Each copy targets a different one of those creatures": that one in each target the spell has.
         const one = c.each?.[c.each.length - c.left];
-        const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
-        if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
+        // Radiate (round 415): a player or a permanent, in place of every target (all of them named the one it copies for).
+        const asChoice = (id: string): TargetChoice => (/^p\d+$/.test(id) ? { kind: "player", id: Number(id.slice(1)) as PlayerId } : { kind: "object", id });
+        const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (e.n === "eachOther" && e.eachOther?.orPlayers ? (t.kind === "none" ? t : asChoice(one)) : t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
+        if (orig.kind === "ability") putAbilityCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets);
         else {
           putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
           if (e.thoseGain) thoseGain(s, e.thoseGain, s.stack[s.stack.length - 1]!, ctx.controller, src);
@@ -1098,6 +1129,20 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Sudden Substitution: the spell's controller as this resolves, after any exchange (rulings).
       const chooser = e.bySpellController ? s.stack.find((x) => x.id === t.id)?.controller : undefined;
       return newTargets(s, ctx, t.id, src, e.allOrNone, e.changeAny, chooser);
+    }
+    case "newTargetsAny": {
+      // Boltbender (round 414): each other spell and ability on the stack, from the top down, its controller here keeping
+      // or changing each of its targets (CR 115.7d); one without targets, or with nothing else to change to, isn't asked
+      // about. Not targeted, so nothing is "targeted" by it.
+      const sc = (s.resolving!.scratch ??= {});
+      const queue = (sc.retargetQueue ??= [...s.stack].reverse().filter((x) => x.id !== s.resolving?.item.id).map((x) => x.id));
+      while (queue.length) {
+        if (newTargets(s, ctx, queue[0]!, src) === "paused") return "paused";
+        sc.retargets = undefined;
+        queue.shift();
+      }
+      sc.retargetQueue = undefined;
+      return;
     }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded

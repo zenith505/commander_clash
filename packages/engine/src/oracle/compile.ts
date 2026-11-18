@@ -156,6 +156,8 @@ import { round410Line } from "./round410";
 import { round411Line } from "./round411";
 import { round412Line } from "./round412";
 import { round413Line } from "./round413";
+import { round414Line } from "./round414";
+import { round415Line } from "./round415";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1040,6 +1042,10 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Mischievous Quanar, Radiate, Radiant Performer, Agrus Kos, Exterminator Magmarch (round 415): oracle/round415.ts.
+    if (round415Line(line, raw, out, isSpell)) continue;
+    // Elrond of the White Council, Boltbender, Confusion in the Ranks (round 414): oracle/round414.ts.
+    if (round414Line(line, raw, out, isSpell)) continue;
     // Perplexing Chimera, Sudden Substitution (round 413): oracle/round413.ts.
     if (round413Line(line, raw, out, isSpell)) continue;
     // Xanathar, Guild Kingpin, Sen Triplets (round 412): oracle/round412.ts.

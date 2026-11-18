@@ -1,7 +1,7 @@
 # Roadmap
 
-31,703 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,933 of
+31,711 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3982,6 +3982,71 @@ line blocks.
    whether the spell's current target is among those it can be reselected to, as Grip of Chaos's rulings say for its own
    reselection; still out); the lists after round 412 stay out. Known gap: a spell owned by a player who leaves the game
    while another player controls it stays on the stack (CR 800.4a says it leaves the game), as before.
+   Round 414 went on down `npm run popular`, most played first, past cards left out before to three cards that give
+   control or targets away. Elrond of the White Council's "Secret council — When ~ enters, each player secretly votes for
+   fellowship or aid, then those votes are revealed. For each fellowship vote, the voter chooses a creature they control.
+   You gain control of each creature chosen this way, and they gain "This creature can't attack its owner." Then for each
+   aid vote, put a +1/+1 counter on each creature you control." (the secret vote as Círdan's, extra votes included, CR
+   701.38; then, starting with the player whose turn it is, each fellowship voter chooses a creature they control for each
+   such vote, the same one again allowed, rulings; Effect controlFromEach `voterChooses`; control for good and the granted
+   static at once; then the counters on each creature you control, the gained ones too: all of one creature's at once, as
+   Lieutenants of the Guard's "for each strength vote", a judgment call: with Hardened Scales that's one more, not one
+   more for each vote). Boltbender's "When ~ is turned face up, you may choose new targets for any number of other spells
+   and/or abilities." (Effect newTargetsAny: each other spell and ability on the stack with targets, from the top down,
+   its targets kept or changed to legal ones for its controller, CR 115.7d; a division of damage stays, rulings; not
+   targeted). Confusion in the Ranks' "Whenever an artifact, creature, or enchantment enters, its controller chooses
+   target permanent another player controls that shares a card type with it. Exchange control of those permanents."
+   (any player's, itself too; the entering permanent's controller chooses the target as the trigger goes on the stack,
+   CR 603.3d, TargetSpec.chosenBy "subjectController" with `opponentOfSubjectController`, every other player being an
+   opponent with no teams, CR 102.3; `sharesCardTypeWithSubject` binds the card types it has then, so an artifact land can
+   take a land, rulings; not optional, and with no legal target it's removed; Effect exchangeWithSubject exchanges only if
+   both are still on the battlefield and still share a card type, rulings, CR 701.12). Bots: Elrond's controller votes
+   aid, an opponent votes fellowship only when it has no creature to give (else the one it values least); Boltbender's
+   new targets as for any "choose new targets" (harmful ones off theirs); Confusion's chooser takes the most valuable
+   permanent it can. The app's permanent picker now starts fresh when the same pick is asked again with a new prompt
+   (Elrond's second fellowship vote). Browser tests click through Elrond's two fellowship votes (Brago's Representative)
+   and both picks, Boltbender turned face up against Ana's Murder and Murder's new target, and the target you choose for
+   Ana's Confusion when your Grizzly Bears enters. +3, 31,693 of 31,936 on this stacked branch (31,706 with main 99e27a4,
+   Lane B through B258, merged in). The compiled text of every other card is unchanged.
+   Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
+   the cost picks the Equipment whose mana value it divides, no ruling); Kefnet, Taskmaster, Niko, Mirror of the
+   Forebears, Wayta, Draugr Necromancer, Apple of Eden, Missy and the rest of `npm run popular` above rank 15,000 (still
+   out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
+   it face up; a bot voting with Elrond counts only creatures, not what the new controller can do with them.
+   Round 415 went on down `npm run popular`, most played first, past cards left out before to five cards that copy a
+   spell or ability at the other things it could target. Mischievous Quanar's "When ~ is turned face up, copy target
+   instant or sorcery spell. You may choose new targets for that copy." (as Twincast's, its target chosen as the trigger
+   goes on the stack). Radiate's "Choose target instant or sorcery spell that targets only a single permanent or player.
+   Copy that spell for each other permanent or player the spell could target. Each copy targets a different one of those
+   permanents and players." and Radiant Performer's the same for "target spell or ability", from "When ~ enters, if you
+   cast it from your hand" (TargetSpec.targetsOnlyPermanentOrPlayer: at least one target, every one naming the same
+   player still in the game or permanent still on the battlefield, rulings on Radiant Performer; copySpell eachOther
+   `orPlayers`: a copy for every other permanent and player that every one of its targets could legally name for the
+   copies' controller, CR 707.10c, a player as "p<id>" in the copy-order prompt, which you answer one copy at a time, the
+   original resolving last, rulings; an ability is copied the same way, CR 707.10). Agrus Kos, Eternal Soldier's
+   "Whenever ~ becomes the target of an ability that targets only it, you may pay {1}{R/W}. If you do, copy that ability
+   for each other creature you control that ability could target. Each copy targets a different one of those creatures."
+   (any player's activated or triggered ability, not a spell, all of whose targets are it, TriggeredAbility.targeted
+   `onlySelf`; copySpell eachOther `copier`: the copies yours, each creature checked as your copy would target it,
+   rulings; none if the ability has left the stack). Exterminator Magmarch's "Whenever you cast an instant or sorcery
+   spell that targets only a single nonland permanent an opponent controls, if another opponent controls one or more
+   nonland permanents that spell could target, choose one of those permanents. Copy that spell. The copy targets the
+   chosen permanent." (an intervening if, CR 603.4, cast.otherOpponentsCouldTarget; eachOther `otherOpponentOfTarget`:
+   not the player who controls the targeted permanent, as it last existed if it has left; `evenIfGone`: the copy is made
+   even if the spell was countered, rulings). Judgment call: Radiate's "could target" is judged for the copies'
+   controller (Radiate's), since each copy is theirs and must be a legal target for it (CR 707.10c); no ruling says
+   otherwise. Bots cast Radiate (or flash in Radiant Performer) in answer to a spell or ability whose copies would hit
+   clearly more of the opponents' than theirs, aim Performer's trigger at the best such one, pay for Agrus Kos only when
+   the copies help them, and give Magmarch's copy to the most valuable permanent. Browser tests click through Radiate
+   against Ana's Lightning Bolt (her Bolt, then Ben and her Hill Giant as the next copies' targets), Radiant Performer
+   against Ana's Prodigal Pyromancer, Agrus Kos's Pay, Magmarch's pick (Ben's Serra Angel) and Quanar turned face up (its
+   target and the copy's new one). +5, 31,705 of 31,936 on this stacked branch (31,711 with round 414's main 99e27a4 merge, B257 and
+   B258). The compiled text of every other card is unchanged.
+   Out after round 415 (looked at, not done): Sunken Palace (its mana's copy trigger for an ability it's spent on: spent
+   mana triggers only spells now), Filigree Vector (two "any number of target" groups in one ability), Ulalek, Possibility
+   Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known
+   gaps: with many copies (Radiate on a Lightning Bolt in a full game) you answer the copy-order prompt once per copy; bots
+   weigh each copy's target by a rough value, not what the spell actually does to it.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

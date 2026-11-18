@@ -81,7 +81,12 @@ function wordScore(s: GameState, pid: PlayerId, controller: PlayerId, effects: E
       }
       // Expropriate's money vote: the caster takes one of the voter's permanents (the best one, say).
       if (e.type === "controlFromEach" && e.votedFor === option) {
-        if (pid !== controller) v -= Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid).map((o) => worth(s, pid, o)));
+        // Elrond of the White Council (round 414): the voter gives away a creature of their choice (the least one); with
+        // none, the vote costs nothing.
+        if (pid !== controller && e.voterChooses) {
+          const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && characteristics(s, o).types.includes("Creature")).map((o) => Math.max(1, worth(s, pid, o)));
+          v -= mine.length ? Math.min(...mine) : 0;
+        } else if (pid !== controller) v -= Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid).map((o) => worth(s, pid, o)));
         continue;
       }
       // Travel Through Caradhras (round 383): one more vote for a word is one more basic land onto the battlefield, or one
@@ -110,6 +115,9 @@ function perVoteValue(s: GameState, pid: PlayerId, controller: PlayerId, es: Eff
     // exiled to play until the end of the caster's next turn is about as good as a card drawn.
     if (e.type === "mill" && c.library.length) d += opponents(s, controller).length;
     if (e.type === "impulse" && c.library.length) d += 2;
+    // Elrond of the White Council (round 414): a +1/+1 counter on each creature the controller controls.
+    const each = e.type === "counters" && e.what.ref === "each" ? e.what.filter : undefined;
+    if (each?.controller === "you") d += s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === controller && objectMatches(s, each, obj(s, id), controller, false)).length;
   }
   return pid === controller ? d : -d / 2;
 }

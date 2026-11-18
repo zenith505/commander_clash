@@ -34,6 +34,8 @@ import {
   restingDef,
   faceUpWays,
   faceUpFormsOf,
+  faceUpAttaches,
+  faceUpAttachOptions,
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
@@ -508,7 +510,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[]; instead?: ManaType }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell" | /** Gift of Doom: the creature it's attached to as it's turned face up (round B255). */ "attachFaceUp";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
@@ -545,7 +547,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
 /** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
-type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[] };
+type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[]; /** Gift of Doom (round B255): the creature it's attached to as it's turned face up, or "none". */ attach?: string };
 type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[]; instead?: ManaType };
 
@@ -1041,8 +1043,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const verb = c.kind === "returnToHand" ? "return" : c.kind;
       return setCostPick({ faceUp: d, kind: c.kind, label, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "returnToHand" ? " to hand" : ""}`, n: c.n, candidates, chosen: [] });
     }
+    // Gift of Doom: "As this Aura is turned face up, you may attach it to a creature", chosen with the special action, not
+    // one sacrificed for it.
+    const o = s.objects[d.objectId]!;
+    if (faceUpAttaches(s, o) && d.attach === undefined)
+      return setCostPick({ faceUp: d, kind: "attachFaceUp", label, what: "attach it to a creature, or don't (it's then put into your graveyard)", n: 1, candidates: faceUpAttachOptions(s, o, d.sacrifice ?? []), chosen: [] });
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}) };
-    dispatch(planTurnFaceUp(s, HUMAN, d.objectId, d.way, 0, costs) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: d.objectId, ...(d.way ? { way: d.way } : {}), costs }]);
+    dispatch(planTurnFaceUp(s, HUMAN, d.objectId, d.way, 0, costs, undefined, d.attach) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: d.objectId, ...(d.way ? { way: d.way } : {}), costs, ...(d.attach ? { attach: d.attach } : {}) }]);
   }
 
   /** Done picking what to sacrifice, discard or exile: carry on casting or activating. */
@@ -1059,7 +1066,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (plan) dispatch(plan);
       return;
     }
-    if (pick.faceUp) continueFaceUp({ ...pick.faceUp, [pick.kind]: pick.chosen });
+    if (pick.faceUp && pick.kind === "attachFaceUp") continueFaceUp({ ...pick.faceUp, attach: pick.chosen[0] ?? "none" });
+    else if (pick.faceUp) continueFaceUp({ ...pick.faceUp, [pick.kind]: pick.chosen });
     else if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
     else if (pick.setsX && s) continueCast({ ...pick.draft, [pick.kind]: pick.chosen, x: manaValue(parseManaCost(cardOf(s, pick.chosen[0]!).manaCost)) });
     else if (pick.kind === "casualty" && pick.draft) {
@@ -2244,13 +2252,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
+          {costPick && (costPick.kind === "attachFaceUp" || costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
             <CostPickBar
               pick={costPick}
               valid={!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)}
               costPickMv={(id) => characteristics(s, s.objects[id]!).manaValue}
               onDone={() => finishCostPick(costPick)}
-              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
+              onSkip={costPick.kind === "attachFaceUp" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -2319,7 +2327,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSkip={() => dispatch([{ type: "collectEvidence", player: HUMAN, ids: [] }])}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && costPick.kind !== "counterOn" && (
+          {costPick && costPick.kind !== "attachFaceUp" && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && costPick.kind !== "counterOn" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -2944,9 +2952,9 @@ function CostPickBar({ pick, valid = true, costPickMv = () => 0, onDone, onSkip,
       </span>
       {pick.totalMv !== undefined && <span> total mana value {pick.chosen.reduce((n, id) => n + costPickMv(id), 0)} of {pick.totalMv}</span>}
       <button disabled={(pick.totalMv !== undefined ? !pick.chosen.length || pick.chosen.reduce((n, id) => n + costPickMv(id), 0) !== pick.totalMv : pick.chosen.length !== pick.n) || !valid} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "attachFaceUp" ? "Attach and turn face up" : pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
-      {onSkip && <button onClick={onSkip}>Cast without</button>}
+      {onSkip && <button onClick={onSkip}>{pick.kind === "attachFaceUp" ? "Turn face up without attaching" : "Cast without"}</button>}
       <button className="ghost" onClick={onCancel}>
         Cancel
       </button>
@@ -5853,7 +5861,7 @@ function Controls({
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
   // the legend rule's "keep which one?" (CR 704.5j); Gilgamesh's "attach one of them": hovering shows each card.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "lookedCard" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "auraForToken" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "reblockAttacker" || pending.what === "cityCard" || pending.what === "faceUpAttach" || pending.what === "castFromHand" || pending.what === "lookedCard" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "auraForToken" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -5993,7 +6001,7 @@ function Controls({
           ) : null}
         </span>
         <button disabled={!ok} onClick={() => dispatch([...(payTaps ?? []), { type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.payEach && pending.action === "copyFor" ? (n ? `Pay ${pending.payEach.repeat(n)} and copy ${n}` : "Copy none") : pending.payEach ? (n ? `Pay ${pending.payEach.repeat(n)} and untap ${n}` : "Untap none") : pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" && pending.payLife !== undefined && pending.prompt ? (n ? `Pay ${n * pending.payLife} life` : "Pay no life"): pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "damageCreature" ? (n ? "Damage that creature" : "Damage the player") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "discard" ? (n ? `Discard ${n}` : "Discard none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.action === "flicker" ? (n ? `Exile and return ${n}` : "Exile none") : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : pending.action === "bounce" ? "Return none" : pending.action === "exile" ? "Exile none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "libraryTop" ? "Put on top" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.payEach && pending.action === "copyFor" ? (n ? `Pay ${pending.payEach.repeat(n)} and copy ${n}` : "Copy none") : pending.payEach ? (n ? `Pay ${pending.payEach.repeat(n)} and untap ${n}` : "Untap none") : pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" && pending.payLife !== undefined && pending.prompt ? (n ? `Pay ${n * pending.payLife} life` : "Pay no life"): pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "damageCreature" ? (n ? "Damage that creature" : "Damage the player") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "discard" ? (n ? `Discard ${n}` : "Discard none") : pending.action === "pile" && pending.piles3 === 1 ? `First pile: ${n}` : pending.action === "pile" && pending.piles3 === 2 ? `Second pile: ${n}, third pile: ${pending.count - n}` : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.action === "flicker" ? (n ? `Exile and return ${n}` : "Exile none") : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : pending.action === "bounce" ? "Return none" : pending.action === "exile" ? "Exile none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "libraryTop" ? "Put on top" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

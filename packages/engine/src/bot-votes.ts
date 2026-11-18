@@ -116,7 +116,8 @@ function perVoteValue(s: GameState, pid: PlayerId, controller: PlayerId, es: Eff
     if (e.type === "mill" && c.library.length) d += opponents(s, controller).length;
     if (e.type === "impulse" && c.library.length) d += 2;
     // Elrond of the White Council (round 414): a +1/+1 counter on each creature the controller controls.
-    if (e.type === "counters" && e.what.ref === "each" && e.what.filter.controller === "you") d += s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === controller && objectMatches(s, e.what.filter, obj(s, id), controller, false)).length;
+    const each = e.type === "counters" && e.what.ref === "each" ? e.what.filter : undefined;
+    if (each?.controller === "you") d += s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === controller && objectMatches(s, each, obj(s, id), controller, false)).length;
   }
   return pid === controller ? d : -d / 2;
 }

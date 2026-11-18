@@ -847,14 +847,14 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
 }
 
 /** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */
-export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number): Action[] | null {
+export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number, attach?: ObjectId | "none"): Action[] | null {
   const o = s.objects[id];
   const fd = o && faceUpCost(s, o, way);
   if (!fd) return null;
   const problem = turnFaceUpProblem(s, pid, id, way, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(faceUpManaCost(fd.cost, x)), 0, undefined, [], { ability: o, faceUp: fd.kind }) : [];
-  return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id, ...(way ? { way } : {}), ...(x ? { x } : {}), ...(costs && Object.keys(costs).length ? { costs } : {}), ...(form !== undefined ? { form } : {}) }] : null;
+  return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id, ...(way ? { way } : {}), ...(x ? { x } : {}), ...(costs && Object.keys(costs).length ? { costs } : {}), ...(form !== undefined ? { form } : {}), ...(attach !== undefined ? { attach } : {}) }] : null;
 }
 
 /** Tap mana for a card's suspend cost, then suspend it (CR 702.62a), or null if that can't be done now. */

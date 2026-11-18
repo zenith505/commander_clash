@@ -1528,6 +1528,13 @@ export type ObjRef =
        */
       sharesColor?: { filter: TargetSpec };
       /**
+       * Killer (Coward // Killer, round B255): "target creature and each other creature that shares a creature type with it":
+       * also every other permanent matching `filter` that has at least one of the target's creature types as this resolves
+       * (a changeling has all of them, CR 702.73a; a creature with none shares none, CR 205.3d); none if the target is
+       * illegal (rulings, CR 608.2b).
+       */
+      sharesType?: { filter: TargetSpec };
+      /**
        * "Return target nonland permanent and each other nonland permanent with the same mana value as that permanent"
        * (Mists of Lórien): also every other permanent matching `filter` with the target's mana value as this resolves (a
        * face-down one's is 0, CR 708.2). Only the target is targeted; none are affected if it's illegal (CR 608.2b, rulings).
@@ -5043,6 +5050,28 @@ export type Effect =
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
   /** Peace Talks (round B254): "This turn and next turn, creatures can't attack, and players and permanents can't be the targets of spells or activated abilities." (GameState.peaceTalksTurns). */
   | { type: "peaceTalks" }
+  /**
+   * Whims of the Fates (round B255): "Starting with you, each player separates all permanents they control into three piles.
+   * Then each player chooses one of their piles at random and sacrifices those permanents." (CR 700.3; effects/run-laneb255.ts).
+   */
+  | { type: "whimsPiles" }
+  /**
+   * False Orders, Balduvian Warlord (round B256): "Remove target ... from combat. Creatures it was blocking that had become
+   * blocked by only that creature this combat become unblocked. [You may have it / then it] block[s] an attacking creature of
+   * your choice." (CR 506.4, 509.3a-d; effects/run-laneb256.ts). `may`: False Orders' "You may".
+   */
+  | { type: "reblock"; what: ObjRef; may?: true }
+  /**
+   * Raiding Party (round B256): "Each player may tap any number of untapped white creatures they control. For each creature
+   * tapped this way, that player chooses up to two Plains. Then destroy all Plains that weren't chosen this way by any player."
+   */
+  | { type: "raidingParty" }
+  /**
+   * Search the City (round B256): "you may put one of those cards with that name into its owner's hand. Then if there are no
+   * cards exiled with ~, sacrifice it. If you do, take an extra turn after this one.": the cards its enters ability exiled
+   * (CR 607.2a) with the name of the card played (the trigger's event `played`).
+   */
+  | { type: "searchTheCity" }
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number; /** Overencumbered: "creatures can't attack this combat": only in the combat phase it's made in (GameState.combatsThisTurn). */ combat?: true }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }
@@ -8828,6 +8857,12 @@ export interface CompiledCard {
   entersFormsFlip?: true;
   /** Aquamorph Entity: "As ~ enters or is turned face up, it becomes your choice of ...": `entersForms` chosen as it's turned face up too (CR 614.1e), part of that special action or of the effect that turns it face up. */
   faceUpForms?: true;
+  /**
+   * Gift of Doom (round B255): "As this Aura is turned face up, you may attach it to a creature." Chosen as part of the
+   * special action (CR 702.37e, Action turnFaceUp `attach`) or of the effect that turns it face up, not targeted: any
+   * creature it could legally enchant face up (rulings). Not attached, it's put into its owner's graveyard (CR 704.5m).
+   */
+  faceUpAttach?: true;
   /** Gaea's Liege: its "*" power and toughness are 0 off the battlefield (CR 208.2) and set by its own conditional static abilities on it, one of which always applies there. */
   starsSetOnBattlefield?: true;
   /** Fear of Abduction: the card exiled to pay its "exile a creature you control" cost is linked to its leaves ability too, with the card its enters ability exiles (CR 607.2q). */

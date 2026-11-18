@@ -3554,6 +3554,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f73d1525-ab0b-4772-9dfa-66e1c84c3ea4",
+  "name": "Balduvian Warlord",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Barbarian",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Barbarian"
+  ],
+  "oracleText": "{T}: Remove target blocking creature from combat. Creatures it was blocking that hadn't become blocked by another creature this combat become unblocked, then it blocks an attacking creature of your choice. Activate only during the declare blockers step.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e8df915f-f509-4c6c-9261-a5a16c3f06c5",
   "name": "Ballot Broker",
   "manaCost": "{2}{W}",
@@ -15552,6 +15583,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "38c5c952-8153-4d98-89b5-a75260383345",
+  "name": "False Orders",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Cast this spell only during the declare blockers step.\nRemove target creature defending player controls from combat. Creatures it was blocking that had become blocked by only that creature this combat become unblocked. You may have it block an attacking creature of your choice.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f1072af9-9e6f-45ce-8c4b-8e678e7da8ce",
   "name": "Fanatic of Xenagos",
   "manaCost": "{1}{R}{G}",
@@ -18205,6 +18262,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a4109138-5d69-4510-a228-7c1f88c0c8c0",
+  "name": "Giant Badger",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Badger",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Badger"
+  ],
+  "oracleText": "Whenever this creature blocks, it gets +2/+2 until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "8ed",
+  "releasedAt": "2003-07-28",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
   "name": "Giant Growth",
   "manaCost": "{G}",
@@ -18320,6 +18407,37 @@
   "set": "e01",
   "releasedAt": "2017-06-16",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2dd1450e-902e-480a-9c42-1c47549d2eeb",
+  "name": "Gift of Doom",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has deathtouch and indestructible.\nMorph—Sacrifice another creature. (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nAs this Aura is turned face up, you may attach it to a creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Morph",
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28266,6 +28384,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9bc5ed59-ae13-40df-94b9-c56c32673857",
+  "name": "Mardu Outrider",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Orc Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orc",
+   "Warrior"
+  ],
+  "oracleText": "As an additional cost to cast this spell, discard a card.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "anb",
+  "releasedAt": "2020-08-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5f1fdc23-9af0-41a1-aeba-7288f9642734",
   "name": "Mari, the Killing Quill",
   "manaCost": "{1}{B}{B}",
@@ -35966,6 +36115,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1d9b8859-14e3-4bbe-ad92-916b25a37b31",
+  "name": "Raiding Party",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "This enchantment can't be the target of white spells or abilities from white sources.\nSacrifice an Orc: Each player may tap any number of untapped white creatures they control. For each creature tapped this way, that player chooses up to two Plains. Then destroy all Plains that weren't chosen this way by any player.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "854cac11-9a22-4dea-8c1b-c49a4858a754",
   "name": "Raiding Schemes",
   "manaCost": "{3}{R}{G}",
@@ -39079,6 +39254,32 @@
   "commanderLegal": "legal",
   "set": "ogw",
   "releasedAt": "2016-01-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fe1b0b19-0994-4bc7-ab6c-d1419d274f40",
+  "name": "Search the City",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile the top five cards of your library.\nWhenever you play a card with the same name as one of the exiled cards, you may put one of those cards with that name into its owner's hand. Then if there are no cards exiled with this enchantment, sacrifice it. If you do, take an extra turn after this one.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -50990,6 +51191,32 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7d359434-eb1b-478e-a745-10e2c564d89f",
+  "name": "Whims of the Fates",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Starting with you, each player separates all permanents they control into three piles. Then each player chooses one of their piles at random and sacrifices those permanents. (Piles can be empty.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bng",
+  "releasedAt": "2014-02-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

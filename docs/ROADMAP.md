@@ -1,7 +1,7 @@
 # Roadmap
 
-31,693 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,934 of
+31,700 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3977,7 +3977,7 @@ line blocks.
    with Sudden Substitution, giving their least useful creature (a token or one cheaper than the spell, never their
    commander). Browser tests click through the Chimera's Yes and Murder's new target, and Sudden Substitution's two
    targets (Ana's Murder on the stack, your Grizzly Bears) and Murder's new target. +2, 31,690 of 31,936 on this stacked
-   branch. The compiled text of every other card is unchanged.
+   branch (31,697 with main's B255 and B256 merged in). The compiled text of every other card is unchanged.
    Out after round 413 (looked at, not done): Chef's Kiss ("reselect the targets at random": no rule or ruling says
    whether the spell's current target is among those it can be reselected to, as Grip of Chaos's rulings say for its own
    reselection; still out); the lists after round 412 stay out. Known gap: a spell owned by a player who leaves the game
@@ -4006,8 +4006,8 @@ line blocks.
    permanent it can. The app's permanent picker now starts fresh when the same pick is asked again with a new prompt
    (Elrond's second fellowship vote). Browser tests click through Elrond's two fellowship votes (Brago's Representative)
    and both picks, Boltbender turned face up against Ana's Murder and Murder's new target, and the target you choose for
-   Ana's Confusion when your Grizzly Bears enters. +3, 31,693 of 31,936 on this stacked branch. The compiled text of every
-   other card is unchanged.
+   Ana's Confusion when your Grizzly Bears enters. +3, 31,693 of 31,936 on this stacked branch (31,700 with round 413's
+   main 5c793d6 merge, B255 and B256). The compiled text of every other card is unchanged.
    Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
    the cost picks the Equipment whose mana value it divides, no ruling); Kefnet, Taskmaster, Niko, Mirror of the
    Forebears, Wayta, Draugr Necromancer, Apple of Eden, Missy and the rest of `npm run popular` above rank 15,000 (still
@@ -5297,7 +5297,7 @@ line blocks.
    +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
-   Orders, Balduvian Warlord, General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
+   Orders (done in round B256), Balduvian Warlord (done in round B256), General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (noted
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
@@ -5309,7 +5309,7 @@ line blocks.
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
-   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City; Minamo's Meddling (spliced
+   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (spliced
    cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
@@ -6008,7 +6008,7 @@ line blocks.
    - "It" in a cast trigger is the spell only as the first instruction ("Whenever you cast an Elf spell, it gains
      haste"); "untap ~. It gains ..." (Pristine Skywise, Bloodsky Berserker) is about the permanent and isn't parsed.
    - Tap any number still out: as an additional cost (Burn at the Stake (done in round 315), Explosive Singularity (done in round 315)), "each player may tap"
-     (Raiding Party), "If you do, ... each of those Vampires" (Urge to Feed). Bots tap every creature offered except,
+     (Raiding Party, done in round B256), "If you do, ... each of those Vampires" (Urge to Feed). Bots tap every creature offered except,
      on their own turn before combat, ones that could still attack.
    - "With different names" still out: Emergent Ultimatum and Ecological Appreciation (an opponent chooses cards to
      shuffle back, then casting or putting the rest), Burning-Rune Demon ("exactly two cards ... that have different
@@ -11058,6 +11058,64 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated, and on the stack an ability that wasn't triggered, a copy of one too, CR 707.10), so triggered abilities still
   target; spells on the stack and cards in other zones can still be targeted. Browser tests for Rhystic Cave's menu button and
   its Pay and Don't pay question. +3, 31,679 of 31,936 with main through round 408. The compiled text of every other card is unchanged.
+- Round B255 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Coward // Killer. A
+  card's face named for a creature type (CR 205.3m) is no longer read as the card in "becomes a Coward in addition to its
+  other types" (compile.ts normalizeSelf); Coward makes its target unable to block this turn and a Coward in addition to its
+  other types until end of turn, then time travels. Killer's "target creature and each other creature that shares a creature
+  type with it" (ObjRef target `sharesType`, like Radiance's colors): every other creature with one of the target's creature
+  types as it resolves, a changeling with all of them (CR 702.73a), a face-down creature with none (CR 708.2a), and none if
+  the target is illegal (rulings). Whims of the Fates ("Starting with you, each player separates all permanents they control
+  into three piles. Then each player chooses one of their piles at random and sacrifices those permanents.": Effect
+  `whimsPiles`, effects/run-laneb255.ts): in turn order from the caster, each player picks a first pile from every permanent
+  they control, then a second from the rest, the rest being the third (piles can be empty, CR 700.3); a player with no
+  permanents isn't asked; then one pile of each is chosen at random (each equally likely, no die rolled: rulings) and all of
+  the chosen piles are sacrificed at once. Gift of Doom ("Morph—Sacrifice another creature.": a sacrifice cost other than the
+  face-down permanent; "As this Aura is turned face up, you may attach it to a creature.": CompiledCard `faceUpAttach`): the
+  creature is chosen with the special action (Action turnFaceUp `attach`, CR 702.37e, rulings: no one acts in between), or,
+  turned face up by an effect, as the effect does it (a "faceUpAttach" question); any creature it could enchant face up, not
+  targeted (hexproof doesn't stop it, protection from black does: game.ts faceUpAttachOptions works it out on a copy of the
+  game with it face up), never the creature sacrificed for it; not attached, it's put into its owner's graveyard (CR 704.5m).
+  Browser tests for Whims of the Fates' three piles and Gift of Doom's attach choice, both ways. +3, 31,662 of 31,936. The
+  compiled text of every other card is unchanged.
+- Round B256 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): False Orders and
+  Balduvian Warlord ("Remove target creature defending player controls from combat. Creatures it was blocking that had
+  become blocked by only that creature this combat become unblocked. You may have it block an attacking creature of your
+  choice." and the Warlord's "{T}: Remove target blocking creature from combat. Creatures it was blocking that hadn't become
+  blocked by another creature this combat become unblocked, then it blocks an attacking creature of your choice. Activate
+  only during the declare blockers step.": Effect `reblock`, effects/run-laneb256.ts): removed from combat (CR 506.4), the
+  attackers only it had blocked this combat stay blocked unless no other creature blocked them (CR 509.1h, Ydwen Efreet's
+  `unblockOnly`); then its controller is asked which attacker it blocks (a "reblockAttacker" question, False Orders' with a
+  "doesn't block" answer): any attacker attacking the creature's controller or their planeswalkers or battles (as CR 802.4a
+  and 506.3e), a whole band if it's banded (CR 702.22i). The block is made by the effect, not declared: blocking
+  restrictions, requirements and costs aren't checked, and a tapped creature can block this way (CR 509.1b-d apply only as
+  blockers are declared). It fires "blocks" and "becomes blocked" triggers (new trigger event `blockedByEffect`, CR
+  509.3a-d): "blocks" only for a creature that wasn't blocking, "becomes blocked" only for an attacker that wasn't blocked,
+  and "becomes blocked by N or more creatures" when this block makes it N. Raiding Party ("Each player may tap any number
+  of untapped white creatures they control. For each creature tapped this way, that player chooses up to two Plains. Then
+  destroy all Plains that weren't chosen this way by any player.": Effect `raidingParty`): in turn order from the active
+  player (CR 101.4), each player picks the white creatures to tap, then up to twice that many Plains, anyone's (rulings);
+  the creatures are tapped together once every player has chosen, then every Plains not chosen is destroyed. Search the
+  City ("Whenever you play a card with the same name as one of the exiled cards, you may put one of those cards with that
+  name into its owner's hand. Then if there are no cards exiled with ~, sacrifice it. If you do, take an extra turn after
+  this one.": compile.ts roundB256Line, Effect `searchTheCity`): its enters ability's exile is linked to it (CR 607.2a); a
+  card played, cast or played as a land (CR 305.1, 601.2), a card only (a copy isn't played), with the name it has as it's
+  played (none face down, CR 708.2a); a "cityCard" question to take one of the exiled cards with that name; then with none
+  left exiled with it and it still on the battlefield, it's sacrificed and its controller takes an extra turn. Browser tests
+  for both reblock questions, Raiding Party's tap and Plains picks, and Search the City's question. +4, 31,693 of 31,936 with main through round 411 and B255.
+  The compiled text of every other card is unchanged.
+- Out after round B256 (looked at, not done): the lists after round B255 stay out, and General Jarkeld (two blockers
+  swapped between attackers, each needing a legal block). Judgment calls and known gaps: an effect's block isn't checked
+  against blocking restrictions or costs and a tapped creature can block this way (no ruling on either card covers it; CR
+  509.1b-d only govern declared blocks); the attackers offered are only those attacking the creature's controller (no rule
+  limits a block by an effect, this follows CR 802.4a); Search the City still returns cards after it has left the
+  battlefield but gives no extra turn then (nothing to sacrifice); bots use False Orders and Balduvian Warlord to free their
+  own blocked attacker or to make a block their creature wins, tap half as many white creatures as their own Plains for
+  Raiding Party and spare their own Plains, always take Search the City's card, and don't weigh Search the City beyond its
+  usual worth.
+- Out after round B255 (looked at, not done): the lists after round B254 stay out. Known gaps: bots aim Killer by its target
+  alone, not the creatures sharing its types; bots cast Whims of the Fates only when their own board is well behind the
+  opponents' average, and split theirs into three even piles (any split loses a third on average, rulings); bots turn Gift of
+  Doom face up only with a creature of theirs to attach it to.
 - Out after round B254 (looked at, not done): the lists after round B253 stay out. Judgment calls and known gaps: Rhystic
   Cave doesn't ask its own controller (who would never pay to stop their own mana, though "any player" includes them); bots
   never pay to stop another player's Rhystic Cave and never tap their own (automatic payment can't use it); new targets chosen
@@ -11430,7 +11488,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   hand), Kodama of the Center Tree (done in round B213), Reflecting Mirror.
 - Out after round B150 (looked at, not done): Boneyard Mycodrax (done in round B198) (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
-  Quay and the other banding grants, Cyclopean Tomb, False Orders, Mirror-Shield Hoplite, Chorus of the Conclave, Temporal
+  Quay and the other banding grants, Cyclopean Tomb, False Orders (done in round B256), Mirror-Shield Hoplite, Chorus of the Conclave, Temporal
   Aperture, All Hallow's Eve (done in round B214), Idris, The Master, Alhammarret, Tazri, Sasaya, Nathan Drake, Feather, Rosheen, Ore-Rich
   Stalactite, Zevlor, Kellan, Leori, Mavinda): each needs a mechanic of its own (outside-the-game cards, banding, copies of
   abilities, exile-zone upkeeps, mana spent only on {X} costs).

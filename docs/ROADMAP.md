@@ -1,7 +1,7 @@
 # Roadmap
 
-31,646 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,911 of
+31,657 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,914 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3765,6 +3765,34 @@ line blocks.
    Wayta, Trainer Prodigy, Celestial Reunion, Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to
    Victory, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their
    earlier lists).
+   Round 405 went on down `npm run popular`, most played first, to four cards left out before. Glorious Purpose's "When the
+   sixth plan counter is put on this enchantment, sacrifice it. If you do, exile the top four cards of your library. You
+   may cast any number of spells from among them without paying their mana costs. Put the rest into your hand." (every
+   instruction after "If you do" depends on the sacrifice, CR 608.2c, oracle/round405.ts round405Sentence; castFromAmong
+   rest `dest: "hand"`: lands and spells not cast into your hand). Eye of Duskmantle's "You may play lands and cast spells
+   from among cards in your graveyard you've surveilled this turn. If you cast a spell this way, you pay life equal to its
+   mana value rather than paying its mana cost." (GameObject.surveilledTurn, set as a surveil puts a card into its owner's
+   graveyard, CR 701.25a, and gone with any later zone change, CR 400.7: not a card seen while surveilling and put there
+   another way, rulings; surveilled before the Eye was there counts; graveyardGrants `arrived: "surveilled"` with a
+   permission whose `alt` is "citadel": life only, no other alternative cost, X at 0, additional costs paid, CR 118.9,
+   rulings; a card with no mana cost for 0 life, CR 118.6a; with a plain permission too, such as Yawgmoth's Agenda, its
+   mana cost or the life, game.ts yardCitadel; CompiledCard.landsFromGraveyardSurveilled for the land cards, with a land
+   play). Lazav, Wearer of Faces's "Whenever you sacrifice a Clue, you may have Lazav become a copy of a creature card
+   exiled with it until end of turn." (the card its attack trigger exiled, linked, CR 607.2a, compile.ts linkExile) and
+   Spirit of Resilience's "Whenever one or more cards leave your graveyard, put a +1/+1 counter on this creature, then you
+   may have this creature become a copy of an artifact or creature card from among those cards until end of turn." (once
+   for each event, CR 603.2c, rulings; the cards of the event wherever they went, each still that object, CR 400.7): Effect
+   becomeCopyOfAmong, a card chosen as it resolves, or none (chooseOption "copyAmong"), copied exactly as printed and judged
+   artifact or creature by its printed types (CR 707.2, rulings; the front face of a double-faced card, CR 712.8a), with no
+   enters or leaves abilities triggering (rulings). Bots copy the biggest card offered when it's bigger than what the
+   permanent is now, or stay as they are. Browser tests click through the Eye's "pay 3 life" cast from the graveyard
+   (the mana-cost button disabled) and the copy choice of the Spirit and of Lazav. +4, 31,657 of 31,936 on this stacked
+   branch (with round 404, B248 and B249). The compiled text of every other card is unchanged.
+   Out after round 405 (looked at, not done): Spirit of Resilience copies a card judged by its printed types, not by an
+   effect that changed them in the graveyard (Encroaching Mycosynth; no ruling either way); Jasmine Boreal of the Seven,
+   Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion, Helm of Kaldra,
+   Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular` above
+   rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

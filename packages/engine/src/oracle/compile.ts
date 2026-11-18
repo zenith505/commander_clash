@@ -141,6 +141,7 @@ import { round401Line } from "./round401";
 import { round402Line } from "./round402";
 import { round403Line } from "./round403";
 import { round404Line } from "./round404";
+import { round405Line } from "./round405";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1024,6 +1025,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Eye of Duskmantle (round 405): cards surveilled this turn (oracle/round405.ts).
+    if (line.startsWith("You may play lands and cast spells from among cards in your graveyard you've surveilled") && round405Line(line, raw, out, isSpell)) continue;
     // Ranar the Ever-Watchful (round 404): free foretelling (oracle/round404.ts).
     if (/^The first card you foretell each turn /.test(line) && round404Line(line, raw, out, isSpell)) continue;
     // Archelos, Lagoon Mystic (round 403): other permanents entering tapped or untapped (oracle/round403.ts).
@@ -7787,6 +7790,14 @@ function linkExile(out: CompiledCard) {
     const others = copyBodies.flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick", "flicker", "exileUntilNonlandLinked"].includes(e.type) || (e.type === "discard" && !!e.exile));
     if (out.spell || enters.length !== 1 || others.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one exile ability)");
     else enters[0]!.linked = true;
+  }
+  // Lazav, Wearer of Faces (round 405): "a creature card exiled with it" is one its attack trigger's "exile target card from
+  // a graveyard" exiled (CR 607.2a), its only exile instruction.
+  if (copyBodies.some((b) => allEffects(b.effects).some((e) => e.type === "becomeCopyOfAmong" && e.from === "linked"))) {
+    const exiles = out.triggers.flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until && e.what.ref === "target");
+    const others = copyBodies.flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick", "flicker", "exileUntilNonlandLinked"].includes(e.type) || (e.type === "discard" && !!e.exile));
+    if (out.spell || exiles.length !== 1 || others.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
   }
   // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
   // linked to the one ability that exiles it as it enters (CR 607.2a).

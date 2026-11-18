@@ -8828,6 +8828,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4c9bcba6-87b5-4fb3-97ee-6fe5b739337d",
+  "name": "Consider",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Surveil 1. (Look at the top card of your library. You may put it into your graveyard.)\nDraw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2026-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8ac493f2-9519-44d7-b6ac-8c020ad2cede",
   "name": "Consign to Dust",
   "manaCost": "{2}{G}",
@@ -14993,6 +15021,39 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "04e7f739-fe50-440d-aa3d-e547295044a8",
+  "name": "Eye of Duskmantle",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Eye",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eye"
+  ],
+  "oracleText": "Flying, lifelink\nYou may play lands and cast spells from among cards in your graveyard you've surveilled this turn. If you cast a spell this way, you pay life equal to its mana value rather than paying its mana cost.",
+  "power": "3",
+  "toughness": "8",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -25606,6 +25667,43 @@
   "commanderLegal": "legal",
   "set": "iko",
   "releasedAt": "2020-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4ec0b64d-c793-47a6-9c26-9ad4d9e9c182",
+  "name": "Lazav, Wearer of Faces",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Shapeshifter Detective",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter",
+   "Detective"
+  ],
+  "oracleText": "Whenever Lazav attacks, exile target card from a graveyard, then investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nWhenever you sacrifice a Clue, you may have Lazav become a copy of a creature card exiled with it until end of turn.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Investigate"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -41238,6 +41336,37 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ddc85b23-113a-46e9-ab09-fae9312c72fa",
+  "name": "Spirit of Resilience",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Warrior"
+  ],
+  "oracleText": "Whenever one or more cards leave your graveyard, put a +1/+1 counter on this creature, then you may have this creature become a copy of an artifact or creature card from among those cards until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

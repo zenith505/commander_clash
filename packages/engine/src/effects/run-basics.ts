@@ -437,7 +437,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.who) {
         for (const pid of players(s, e.who, ctx)) {
           for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: pid, rule });
-          log(s, `${player(s, pid).name}${e.rules.map((r) => (r === "noActivations" ? " can't activate abilities that aren't mana abilities" : "")).join(",")} this turn.`);
+          log(s, `${player(s, pid).name}${e.rules.map((r) => (r === "noActivations" ? " can't activate abilities that aren't mana abilities" : r === "noAbilities" ? " can't activate abilities" : "")).join(",")} this turn.`);
         }
         return;
       }
@@ -485,9 +485,29 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.exileInstead) log(s, `${src}: cards that would be put into ${player(s, ctx.controller).name}'s graveyard this turn are exiled instead.`);
       return;
     }
+    case "handTurn": {
+      // Sen Triplets (round 412): that player's hand, for the rest of this turn (none if they've left the game, CR 800.4a).
+      for (const of of players(s, e.of, ctx)) {
+        if (of === ctx.controller) continue;
+        (s.handTurn ??= []).push({ player: ctx.controller, of, turn: s.turn, source: src });
+        log(s, `${player(s, ctx.controller).name} may play lands and cast spells from ${player(s, of).name}'s hand this turn (${src}).`);
+      }
+      return;
+    }
+    case "revealHandTurn":
+      for (const pid of players(s, e.who, ctx)) {
+        player(s, pid).handRevealedTurn = s.turn;
+        log(s, `${player(s, pid).name} plays with their hand revealed this turn (${src}).`);
+      }
+      return;
     case "topTurn": {
+      // Xanathar, Guild Kingpin (round 412): that player's library, not yours; none if they've left the game (CR 800.4a).
+      const of = e.of ? players(s, e.of, ctx)[0] : undefined;
+      if (e.of && of === undefined) return;
       const list = (s.topTurn = (s.topTurn ?? []).filter((g) => g.turn === s.turn));
-      list.push({ player: ctx.controller, turn: s.turn, top: e.top, source: src });
+      list.push({ player: ctx.controller, turn: s.turn, top: e.top, source: src, ...(of !== undefined && of !== ctx.controller ? { of } : {}), ...(e.anyColor ? { anyColor: true as const } : {}) });
+      if (of !== undefined && of !== ctx.controller)
+        return void log(s, `Until end of turn, ${player(s, ctx.controller).name} may look at the top card of ${player(s, of).name}'s library any time and may play that card${e.anyColor ? ", spending mana as though it were mana of any color to cast spells this way" : ""} (${src}).`);
       log(s, `${player(s, ctx.controller).name} may look at the top card of their library any time and play cards from the top of their library this turn${e.top.payLife ? ", paying life rather than mana costs for spells" : ""} (${src}).`);
       return;
     }

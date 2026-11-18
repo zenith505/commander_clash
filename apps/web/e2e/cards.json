@@ -34072,6 +34072,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7d075b8a-a606-4590-b52b-b4ef3a9e342f",
+  "name": "Perplexing Chimera",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment Creature — Chimera",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Chimera"
+  ],
+  "oracleText": "Whenever an opponent casts a spell, you may exchange control of this creature and that spell. If you do, you may choose new targets for the spell. (If the spell becomes a permanent, you control that permanent.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6e49a5b8-6bc4-4c7b-82c1-957f1fb0ca5f",
   "name": "Personal Incarnation",
   "manaCost": "{3}{W}{W}{W}",
@@ -39759,6 +39790,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f0c5864f-83c3-4d99-8f97-0ab92608fff3",
+  "name": "Sen Triplets",
+  "manaCost": "{2}{W}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Artifact Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "At the beginning of your upkeep, choose target opponent. This turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play lands and cast spells from that player's hand this turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arb",
+  "releasedAt": "2009-04-30",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8c489e39-b9ff-400f-a855-3cddf7e112e6",
   "name": "Sensational Spider-Man",
   "manaCost": "{1}{W}{U}",
@@ -43765,6 +43834,34 @@
   "set": "mh2",
   "releasedAt": "2021-06-18",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e5ddacfb-e5a8-4885-a4c9-fa117f321293",
+  "name": "Sudden Substitution",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nExchange control of target noncreature spell and target creature. Then the spell's controller may choose new targets for it.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Split second"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -52328,6 +52425,40 @@
   "set": "mps",
   "releasedAt": "2016-09-30",
   "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a168ba5-8e11-41dd-8f8a-8cb23bbde056",
+  "name": "Xanathar, Guild Kingpin",
+  "manaCost": "{4}{U}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Beholder",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beholder"
+  ],
+  "oracleText": "At the beginning of your upkeep, choose target opponent. Until end of turn, that player can't cast spells, you may look at the top card of their library any time, you may play the top card of their library, and you may spend mana as though it were mana of any color to cast spells this way.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

@@ -1081,6 +1081,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const t = ctx.targets[e.index];
       const item = t?.kind === "stack" && ctx.legal[e.index] ? s.stack.find((x) => x.id === t.id) : undefined;
       if (!item || item.controller === ctx.controller) return;
+      item.controlledBefore = [...(item.controlledBefore ?? []), item.controller];
       item.controller = ctx.controller;
       item.controlTaken = true;
       const o = item.objectId ? s.objects[item.objectId] : undefined;
@@ -1094,7 +1095,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? newTargets(s, ctx, ctx.cause, src) : undefined;
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return newTargets(s, ctx, t.id, src, e.allOrNone, e.changeAny);
+      // Sudden Substitution: the spell's controller as this resolves, after any exchange (rulings).
+      const chooser = e.bySpellController ? s.stack.find((x) => x.id === t.id)?.controller : undefined;
+      return newTargets(s, ctx, t.id, src, e.allOrNone, e.changeAny, chooser);
     }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
@@ -1830,7 +1833,7 @@ function changeATargetToSelf(s: GameState, ctx: ResolveCtx, stackId: string, by:
  * keeping any, legal or not, and changing others to legal ones. Its new targets become targets of it ("becomes the
  * target" triggers, ward); the ones it keeps don't again. With nothing it could change to, nothing is asked.
  */
-function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true, changeAny?: true): "paused" | void {
+function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true, changeAny?: true, chooser?: PlayerId): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -1844,13 +1847,13 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, 
       log(s, `${item.description} has no other legal targets, so its targets stay the same.`);
       return;
     }
-    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}), ...(changeAny ? { changeAny } : {}) };
+    s.pending = { kind: "newTargets", player: chooser ?? ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}), ...(changeAny ? { changeAny } : {}) };
     return "paused";
   }
   const next = sc.retargets;
   const changed = next.flatMap((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? [t] : []));
   if (!changed.length) {
-    log(s, `${player(s, ctx.controller).name} keeps the targets of ${item.description}.`);
+    log(s, `${player(s, chooser ?? ctx.controller).name} keeps the targets of ${item.description}.`);
     return;
   }
   item.targets = next.map((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? stampTargets(s, [t])![0]! : t));

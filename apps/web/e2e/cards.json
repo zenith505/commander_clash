@@ -1271,6 +1271,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fc8ee6e1-a2e1-4033-a164-7968fc79dd27",
+  "name": "Amateur Hero",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Hero",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "When this creature enters, you gain 2 life.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spe",
+  "releasedAt": "2025-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
   "name": "Aminatou's Augury",
   "manaCost": "{6}{U}{U}",
@@ -1938,6 +1969,44 @@
   "commanderLegal": "legal",
   "set": "spm",
   "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1b841e8f-9484-4737-bd37-dfa11bd06883",
+  "name": "Aragorn, Company Leader",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ranger",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ranger"
+  ],
+  "oracleText": "Whenever the Ring tempts you, if you chose a creature other than Aragorn as your Ring-bearer, put your choice of a counter from among first strike, vigilance, deathtouch, and lifelink on Aragorn.\nWhenever you put one or more counters on Aragorn, put one of each of those kinds of counters on up to one other target creature.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -4544,6 +4613,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4f958678-2a32-4a30-8fe7-47df9ada6b2f",
+  "name": "Birthday Escape",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw a card. The Ring tempts you.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "37a5ab64-12e4-4aad-9a09-46a26fe9953b",
   "name": "Birthing Ritual",
   "manaCost": "{1}{G}",
@@ -4989,6 +5084,42 @@
   "set": "2xm",
   "releasedAt": "2020-08-07",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c7cf9574-e2cf-4137-a224-73f76c5d11d7",
+  "name": "Blim, Comedic Genius",
+  "manaCost": "{2}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Imp",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Imp"
+  ],
+  "oracleText": "Flying\nWhenever Blim deals combat damage to a player, that player gains control of target permanent you control. Then each player loses life and discards cards equal to the number of permanents they control but don't own.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21117,6 +21248,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c9efec35-823f-4c78-be36-d1a57d8b6f44",
+  "name": "Hawkeye, Clint Barton",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Archer Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Archer",
+   "Hero"
+  ],
+  "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845b40b1-dc09-44fa-9910-22544c1424ba",
   "name": "Hazel of the Rootbloom",
   "manaCost": "{2}{B}{G}",
@@ -22845,6 +23012,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "96cf2810-35b8-437e-b609-f9765604b8cf",
+  "name": "Inspiring Roar",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Put a +1/+1 counter on each creature you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "554df866-3dbb-4811-8573-6033481591aa",
   "name": "Inspirit, Flagship Vessel",
   "manaCost": "{U}{R}{W}",
@@ -23265,6 +23458,41 @@
   "set": "slz",
   "releasedAt": "2026-09-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e9d20b6d-fa4f-473b-9866-230fd92a1319",
+  "name": "Invisible Woman, Sue Storm",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Lifelink\nWhenever you put one or more +1/+1 counters on one or more other Heroes you control, you may create a 0/4 colorless Wall creature token with defender.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -49638,6 +49866,36 @@
   "keywords": [
    "Food"
   ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e2c00aff-696c-4b20-acd4-95b71b5f8b10",
+  "name": "Vault 11: Voter's Dilemma",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — For each opponent, you create a 1/1 white Human Soldier creature token.\nII, III — Each player secretly votes for up to one creature, then those votes are revealed. If no creature got votes, each player draws a card. Otherwise, destroy each creature with the most votes or tied for most votes.",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
   "commanderLegal": "legal",
   "set": "pip",
   "releasedAt": "2024-03-08",

@@ -158,6 +158,7 @@ import { round412Line } from "./round412";
 import { round413Line } from "./round413";
 import { round414Line } from "./round414";
 import { round415Line } from "./round415";
+import { round416Line } from "./round416";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1042,6 +1043,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Vault 11: Voter's Dilemma's sentences (round416Sentence), Blim, Invisible Woman, Aragorn, Company Leader (round 416): oracle/round416.ts.
+    if (round416Line(line, raw, out, isSpell)) continue;
     // Mischievous Quanar, Radiate, Radiant Performer, Agrus Kos, Exterminator Magmarch (round 415): oracle/round415.ts.
     if (round415Line(line, raw, out, isSpell)) continue;
     // Elrond of the White Council, Boltbender, Confusion in the Ranks (round 414): oracle/round414.ts.

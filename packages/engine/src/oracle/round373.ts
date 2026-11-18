@@ -20,6 +20,7 @@ import { round402Sentence } from "./round402";
 import { round403Sentence } from "./round403";
 import { round405Sentence } from "./round405";
 import { round406Sentence } from "./round406";
+import { round416Sentence } from "./round416";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -33,6 +34,9 @@ export function round373Sentence(s: string, sentences: string[], si: number, ctx
   // Round 403's (oracle/round403.ts) before round 402's.
   // Round 405's (oracle/round405.ts) before round 403's.
   // Round 406's (oracle/round406.ts) before round 405's.
+  // Round 416's (oracle/round416.ts) before round 406's.
+  const r416 = round416Sentence(s, sentences, si, ctx, _effects);
+  if (r416) return r416;
   const r406 = round406Sentence(s, sentences, si, ctx, _effects);
   if (r406) return r406;
   const r405 = round405Sentence(s, sentences, si, ctx, _effects);

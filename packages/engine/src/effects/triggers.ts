@@ -237,6 +237,12 @@ export type TriggerSourceEvent =
   | { type: "tappedTogether"; ids: ObjectId[] }
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
+  /**
+   * Round 416: the counters put at the same time, by one instruction (counters.ts batchCountersPut), each permanent and
+   * kind once, after their own "countersPut" events: "whenever you put one or more counters on one or more ..." triggers
+   * once for them (Invisible Woman, Sue Storm; Aragorn, Company Leader).
+   */
+  | { type: "countersPutBatch"; puts: { id: ObjectId; zc: number; counter: string; amount: number; by: PlayerId }[] }
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
   /** Counters were put on a player (poison, energy), by `by` (All Will Be One's "whenever you put ... on a player"). */
   | { type: "playerCountersPut"; player: PlayerId; counter: string; amount: number; by: PlayerId }
@@ -1699,6 +1705,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Moss-Pit Skeleton: "Whenever one or more +1/+1 counters are put on a creature you control, if this card is in your
     // graveyard, ...": only if it's there already (rulings), its owner controlling the ability (CR 113.8).
     if (o.zone === "battlefield") fromGraveyards((w, owner) => add(w, owner, (e, t) => e === "permanentCountersPut" && !t.countersEach && !t.countersFirstTime && kindOk(t, owner) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, owner, false), undefined, undefined, o, undefined, undefined, undefined, info));
+  } else if (ev.type === "countersPutBatch") {
+    // Round 416: counters put at the same time (counters.ts batchCountersPut), as one event. "Whenever you put one or more
+    // +1/+1 counters on one or more other Heroes you control" (Invisible Woman, Sue Storm): once for the event, if any of
+    // them went on a permanent like that (as it is now, just after); "whenever you put one or more counters on ~"
+    // (Aragorn, Company Leader): once, whatever kinds, the kinds noted for "one of each of those kinds" (CR 122.6, 603.2c).
+    const live = ev.puts.filter((p) => s.objects[p.id]?.zone === "battlefield" && (s.objects[p.id]!.zoneChanges ?? 0) === p.zc);
+    const fits = (t: TriggeredAbility, p: (typeof live)[number], you: PlayerId) => (t.countersKind === undefined || t.countersKind === p.counter) && (!t.countersByYou || p.by === you);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "countersPutBatch" && !!t.tappedFilter && live.some((p) => fits(t, p, ctrl) && !(t.tappedFilter!.notSource && p.id === id) && objectMatches(s, t.tappedFilter!, obj(s, p.id), ctrl, false)));
+      const mine = live.filter((p) => p.id === id && p.by === ctrl);
+      if (mine.length) add(w, ctrl, (e, t) => e === "countersPutBatch" && !t.tappedFilter && !!t.countersByYou && mine.some((p) => fits(t, p, ctrl)), undefined, undefined, undefined, undefined, undefined, undefined, { amount: mine.reduce((n, p) => n + p.amount, 0), counterKinds: [...new Set(mine.map((p) => p.counter))], player: ctrl });
+    }
   } else if (ev.type === "playerCountersPut") {
     // "Whenever you put one or more counters on a permanent or player" (All Will Be One): "that much" is how many.
     const info = { amount: ev.amount, player: ev.player };

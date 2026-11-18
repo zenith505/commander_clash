@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
-import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers } from "../counters";
+import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers, batchCountersPut } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { seatOrder, addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, damageDrawsMade, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
@@ -1236,8 +1236,8 @@ function sameDamageEvent(a: Effect, b: Effect | undefined): Effect | undefined {
 }
 
 export function runEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
-  // Counters an effect puts on are put by the ability's controller (Vorinclex rulings).
-  const result = withPutter(ctx.controller, () => runEffectInner(s, e, ctx));
+  // Counters an effect puts on are put by the ability's controller (Vorinclex rulings), all at once (round 416).
+  const result = withPutter(ctx.controller, () => batchCountersPut(s, () => runEffectInner(s, e, ctx)));
   invalidateCharacteristics(s);
   return result;
 }

@@ -2915,6 +2915,8 @@ export interface TriggerEventInfo {
   sourceOf?: { id: ObjectId; zc: number };
   /** A counters-put trigger: the kind of counter put (Bold Plagiarist's "the same number and kind of counters"). */
   counter?: string;
+  /** Round 416 (event "countersPutBatch"): the kinds of counters put on the trigger's object in that one event (Aragorn, Company Leader). */
+  counterKinds?: string[];
   /** "Whenever players finish voting" (Erestor of the Council): the votes cast (CR 701.38). */
   votes?: { voter: PlayerId; choice: string }[];
   /** "Whenever you roll one or more dice": the highest of the dice's results ("if any of those results was 10 or higher", Farideh). */

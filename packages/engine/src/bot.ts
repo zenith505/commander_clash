@@ -3553,6 +3553,15 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (!cards.length && !forced) return null;
     return [{ kind: "player", id: best.q }, ...(cards.length ? cards.map((id): TargetChoice => ({ kind: "object", id })) : [{ kind: "none" as const }])];
   }
+  // Blim, Comedic Genius (round 416): "that player gains control of target permanent you control": the permanent we'd
+  // miss least (a token or the cheapest thing, never our commander while there's another), since each one they control
+  // but don't own costs them life and a card.
+  const gift0 = printed.effects[0];
+  if (gift0?.type === "continuous" && gift0.giveTo?.ref === "eventPlayer" && gift0.what.ref === "target" && gift0.what.index === 0 && gift0.mods.some((m) => m.kind === "control") && printed.targets.length === 1 && many < 0) {
+    const mine = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" ? [obj(s, t.id)] : []));
+    const pick = [...mine].sort((a, b) => Number(!!a.isCommander) - Number(!!b.isCommander) || Number(!!b.isToken) - Number(!!a.isToken) || worth(s, pid, a) - worth(s, pid, b))[0];
+    return pick ? [{ kind: "object", id: pick.id }] : null;
+  }
   // Coveted Falcon: "target opponent gains control of any number of target permanents you control. Draw a card for each
   // one ...": a bot gives away none of its permanents (a card isn't worth a permanent to it); the opponent with the least
   // life gets nothing.

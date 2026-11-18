@@ -1142,6 +1142,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const by = e.by && players(s, e.by, ctx)[0];
       // "A +1/+1 counter or a loyalty counter": its controller chooses which as this resolves (rulings on Elspeth Conquers Death).
       // Bold Plagiarist: the kind its trigger's event put.
+      // Aragorn, Company Leader (round 416): "one of each of those kinds of counters": each kind its trigger's event put on
+      // it, all at once (one instruction, CR 122.6), on what this targets.
+      if (e.eventCounterKinds) {
+        for (const o of objects(s, e.what, ctx))
+          for (const k of ctx.event?.counterKinds ?? []) {
+            invalidateCharacteristics(s);
+            const put = putCounters(s, o, k, n);
+            if (put > 0) log(s, `${defOf(s, o).name} gets ${put} ${k} counter${put > 1 ? "s" : ""}.`);
+            if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: k, n: put });
+          }
+        return;
+      }
       let kind = e.eventCounter ? ctx.event?.counter : e.counter;
       if (kind === undefined) return;
       if (e.orCounter) {

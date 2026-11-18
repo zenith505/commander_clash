@@ -4741,7 +4741,7 @@ function LibrarySearch({
                 : pending.fromHand && pending.swap
                 ? `${pending.source}: you may exchange it with ${pending.what} from your hand (aura swap)`
                 : pending.fromHand
-                ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
+                ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield${pending.blocking && s.objects[pending.blocking] ? ` blocking ${cardOf(s, pending.blocking).name}` : ""}`
                 : pending.fromGraveyard === "exile" && pending.copiedBy !== undefined
                   ? `${pending.source}: exile ${pending.what} from your graveyard. ${pending.copiedBy === pending.player ? "You copy it and may cast the copy" : `${s.players[pending.copiedBy]!.name} copies it and may cast the copy`} without paying its mana cost`
                 : pending.fromGraveyard === "exile"

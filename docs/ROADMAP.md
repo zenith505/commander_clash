@@ -2355,7 +2355,7 @@ line blocks.
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River,
    Defensive Formation, Sorrow's Path (done in round B258), Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
-   don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
+   don't control for mana); Aetherplasm (done in round B261) (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome (done in round 385) and Aladdin's Lamp (done in round 385) (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (done in round B223) (permanents can't phase in);
    Advancing the Spirit (power-up costs); Spy Kit (all names); Lightning Storm (an ability activated while it's on the
@@ -7314,7 +7314,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   choice of flying, first strike, or trample" (Walking Sponge; browser test), Hail Storm's two amounts at once (an
   attacking creature of yours is dealt 3), "Target Assembly-Worker creature" (the type, not the card's name). +20
   (27,347 of 31,936 with B32 and rounds 199-201).
-- Out after round B33: Mangara's Equity (damage to "you or a white creature" grouped per event), Thick-Skinned Goblin
+- Out after round B33: Mangara's Equity (done in round B261) (damage to "you or a white creature" grouped per event), Thick-Skinned Goblin
   (echo paid as {0} inside the upkeep's may-pay), Grim Reminder (done in round B159) (a search that reveals and leaves the card in the
   library, then a check against the names of spells each opponent cast this turn), Cycle of Life (a target "creature
   you cast this turn", "has base power and toughness 0/1 until your next upkeep", and a delayed counter at that
@@ -7364,7 +7364,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player may exile a card from their graveyard. If a player does"), Flameskull (done in round B192) (rejuvenation: "play one of those
   cards" until the end of your next turn), Mindreaver (done in round B126) (a counter by name among the cards it exiled), Lethal Exploit
   and Flame Discharge ("modified creature you controlled as you cast ~"), Ardent Dustspeaker (done in round B153) (an instant or sorcery
-  card to the bottom as a may-cost), Break Out (a revealed card's mana value deciding a second may), Turf War
+  card to the bottom as a may-cost), Break Out (a revealed card's mana value deciding a second may), Turf War (done in round B261)
   (contested counters), Capricious Efreet (done in round B153) (destroy one of three targets at random), Touch of Moonglove (a creature
   dealt damage by that creature dying this turn), Thelon's Curse (done in round B145) (each player's upkeep may-pay per tapped blue
   creature), Pick Up the Pace ("a creature you control that entered this turn attacks" and play "as long as you
@@ -11154,6 +11154,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the spell's or ability's own sacrifices, one for each when a land and Swamps are both asked for. Browser tests for the
   pick when casting, activating and using a mana ability. +3, 31,709 of 31,936 with main through round 413 and B255-B259.
   The compiled text of every other card is unchanged.
+- Round B261 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 414-416): Mangara's Equity
+  ("As this enchantment enters, choose black or red." and "Whenever a creature of the chosen color deals damage to you or a
+  white creature you control, this enchantment deals that much damage to that creature."): one of the two colors as it
+  enters (CR 614.12); a creature permanent (CR 109.2) of the chosen color, both as the damage is dealt, triggers once for
+  each recipient, you and each white creature you control, "that much" what that one was dealt (the rulings on Flameblade
+  Angel and Elesh Norn: "you or a permanent you control" triggers for each), and a creature gone from the battlefield is
+  dealt none (CR 400.7; TriggerEvent creatureDamagesYouOrYours). Turf War ("When this enchantment enters, for each player,
+  put a contested counter on target land that player controls." and "Whenever a creature deals combat damage to a player,
+  if that player controls one or more lands with contested counters on them, that creature's controller gains control of
+  one of those lands of their choice and untaps it."): one target for each player, yours first, all required, so with a
+  player who controls no land the ability is removed from the stack (CR 601.2c, 603.3d; the rulings on Vaevictis Asmadi, the
+  Dire, of the same template); anyone's creature, an intervening if checked again as it resolves (CR 603.4), the creature's
+  controller choosing among that player's contested lands (not targeted) and gaining control for the rest of the game.
+  Aetherplasm ("Whenever this creature blocks a creature, you may return this creature to its owner's hand. If you do, you
+  may put a creature card from your hand onto the battlefield blocking that creature."): any creature card, Aetherplasm
+  itself too (rulings), enters blocking the attacker if it's still attacking you (CR 509.4, 509.4a; enterBlocking in
+  run-laneb256.ts); it never "blocked", so none of its "blocks" abilities trigger (CR 509.3a-b), while the attacker's
+  "becomes blocked by a creature" ones do (CR 509.3d); the attacker stays blocked if nothing is put (CR 509.1h, rulings).
+  Bots choose the color their opponents' creatures have, always return Aetherplasm and put in a creature card that survives
+  the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
+  pick, and Aetherplasm's question and hand pick. +3, 31,712 of 31,936 with main through round 413 and B255-B260. The
+  compiled text of every other card is unchanged.
+- Out after round B261 (looked at, not done): the lists after round B260 stay out. Judgment calls and known gaps: Turf
+  War's has no rulings of its own, so with a player who controls no land its enters ability follows Vaevictis Asmadi's
+  rulings (no legal choice, removed from the stack); a token put onto the battlefield blocking (Brimaz, Mirror Match) still
+  doesn't trigger the attacker's "becomes blocked by a creature" abilities (only Aetherplasm's cards do, through
+  enterBlocking); a creature put onto the battlefield blocking isn't in TurnLog.blocks (it never blocked, CR 509.4); bots
+  judge Aetherplasm's card by its printed power and toughness.
 - Out after round B260 (looked at, not done): the lists after round B259 stay out. Judgment calls and known gaps: a
   spell's copy has no spliced cards, so Minamo's Meddling discards nothing for one; plans made without a pick (autopay,
   the legal actions list) take the first permanents that fit, tapped ones first; bots never use a mana ability with an
@@ -11209,7 +11237,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (Y counted from the
   toughness so far in layer 7c: other 7c effects apply first, as it depends on them, CR 613.8, but counters apply in
   timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (as before: one
-  creature in two target slots), Mangara's Equity (as before), Ghostly Flame (its rulings make only the damage colorless,
+  creature in two target slots), Mangara's Equity (done in round B261) (as before), Ghostly Flame (its rulings make only the damage colorless,
   not the source for triggers, and leave prevention by color open) and North Star ("for one spell": which spell, and only
   its mana cost, not additional or alternative costs). Known gaps: Elemental Resonance's {2/W} reading follows its reminder
   text, no ruling covers it; bots don't aim spells at Swans of Bryn Argoll to draw, nor avoid attacking into it.
@@ -11279,7 +11307,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a card and reveal it": once another replacement, such as an Archive's two draws or dredge, applies to that draw, which card
   "it" is isn't settled). Known gaps: Chains of Mephistopheles' discard doesn't ask Library of Leng; bots pay Zur's Weirding's 2
   life for an opponent's nonland card while at 12 life or more, the first in turn order who can.
-- Out after round B236 (looked at, not done): the lists after round B235 stay out, and Turf War (still out: a player with no
+- Out after round B236 (looked at, not done): the lists after round B235 stay out, and Turf War (done in round B261) (still out: a player with no
   land to target), Emblazoned Golem (one mana of each color on its kicker X, not tracked by the kicker's payment), Snowblind and
   Titania's Song (as before). Known gaps: another player can use Mana Cache only through automatic payment (not by clicking it),
   and bots don't count another player's Cache as mana they have when planning; Enduring
@@ -11318,9 +11346,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
-  target whose legality depends on another target), Runesword, Mangara's Equity, Silhouette (done in round B239), Ghostly Flame, Torrent of Lava
+  target whose legality depends on another target), Runesword, Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
-  effects) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
+  effects; Aetherplasm done in round B261) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
 - Out after round B229 (looked at, not done): Divine Intervention (done in round B259) (still out: who removed the last counter isn't kept on
   the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel and Research // Development (nothing outside
@@ -11373,7 +11401,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   value than the enchanted creature as it last existed), Lodestone Bauble and Sanctuary Blade (still out for the reasons in
   the earlier lists). Known gap: Jailbreak's X is the returned permanent's mana value as its trigger is put on the stack,
   not checked again as it resolves (only a copy effect in between could change it).
-- Out after round B219 (looked at, not done): Turf War ("for each player, put a contested counter on target land that
+- Out after round B219 (looked at, not done): Turf War (done in round B261) ("for each player, put a contested counter on target land that
   player controls": with a player who controls no land, Vaevictis Asmadi's rulings remove such an ability from the stack
   while Sylvan Primordial's only say a target must be chosen where there is one; nothing settles which applies), Blood
   Scrivener and Breathstealer's Crypt (a draw replacement whose own draws other replacements and the drawing player's
@@ -11431,7 +11459,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Despoiler (face-down cards in exile chosen by group and then at random, rulings) stay out.
 - Out after round B188 (looked at, not done): Kang Dynasty (chapters I and II goad creatures of each opponent's choosing
   and draw for their combat damage until your next turn; III is done), Drizzt Do'Urden (done in round 368) (its short name "Drizzt" isn't read
-  as ~), Long Rest (done in round B217), Time Reaper, Pulsemage Advocate (done in round B191), Heart of Kiran (done in round B217) and Turf War stay out.
+  as ~), Long Rest (done in round B217), Time Reaper, Pulsemage Advocate (done in round B191), Heart of Kiran (done in round B217) and Turf War (done in round B261) stay out.
 - Out after round B187 (looked at, not done): Kraven the Hunter (the greatest power among a player's creatures as one died,
   several dying at once), Corrosive Ooze (done in round B213), Trove of Temptation (done in round B219), Rain of Gore and Blood Scrivener stay out for the reasons in
   the earlier lists.

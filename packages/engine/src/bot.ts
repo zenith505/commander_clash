@@ -323,6 +323,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
+    // Aetherplasm (round B261): back to the hand, always: the attacker stays blocked whatever is put in (rulings).
+    const plasmMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects : undefined;
+    if (pend.kind === "chooseMay" && plasmMay?.[s.resolving!.next]?.type === "may" && plasmMay.some((x) => x.type === "if" && x.effects.some((y) => y.type === "putFromHand" && y.blockingSubject))) return [{ type: "chooseMay", player: pid, yes: true }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
@@ -811,6 +814,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.fromHand && s.resolving?.body.effects[s.resolving.next]?.type === "exileFromHandOrYard") {
       const count = (id: ObjectId) => ((c) => c.activated.filter((a) => !a.zone && !a.equip && a.loyalty === undefined).length + c.mana.length)(compileCard(defOf(s, obj(s, id))));
       const best = [...pend.cards].filter((id) => count(id) > 0).sort((a, b) => count(b) - count(a) || mv(s, b) - mv(s, a))[0];
+      return [{ type: "searchLibrary", player: pid, found: best ? [best] : [] }];
+    }
+    // Aetherplasm (round B261): a creature card that survives the attacker's damage, one that also kills it first; none when
+    // no card would survive (the attacker stays blocked anyway, rulings). Powers and toughnesses as printed.
+    const plasmAt = pend.kind === "searchLibrary" && pend.fromHand ? s.resolving?.body.effects[s.resolving.next] : undefined;
+    const plasm = plasmAt?.type === "if" ? plasmAt.effects.find((x) => x.type === "putFromHand") : plasmAt;
+    if (pend.kind === "searchLibrary" && plasm?.type === "putFromHand" && plasm.blockingSubject) {
+      const sub = s.resolving?.item.subject;
+      const at = sub ? s.objects[sub.id] : undefined;
+      if (!at || at.zone !== "battlefield") return [{ type: "searchLibrary", player: pid, found: [] }];
+      const hit = power(s, at);
+      const tough = toughness(s, at) - at.damage;
+      const pt = (id: ObjectId) => ({ p: Number(defOf(s, obj(s, id)).power ?? 0) || 0, t: Number(defOf(s, obj(s, id)).toughness ?? 0) || 0 });
+      const lives = pend.cards.filter((id) => pt(id).t > hit && !objHasKeyword(s, at, "Deathtouch"));
+      const best = [...lives].sort((a, b) => Number(pt(b).p >= tough) - Number(pt(a).p >= tough) || mv(s, a) - mv(s, b))[0];
       return [{ type: "searchLibrary", player: pid, found: best ? [best] : [] }];
     }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
@@ -6451,6 +6469,8 @@ function choiceHurts(c: CompiledCard): boolean {
     for (const [k, x] of Object.entries(o)) if (k !== "chosen") visit(x, h);
   };
   visit([c.spell, c.triggers, c.activated, c.statics], false);
+  // Mangara's Equity (round B261): damage back to creatures of the chosen color, so the opponents' color.
+  if (c.triggers.some((t) => t.event === "creatureDamagesYouOrYours")) return true;
   return hurts && !own;
 }
 

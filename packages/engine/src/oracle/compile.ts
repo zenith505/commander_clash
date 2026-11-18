@@ -16,6 +16,7 @@ import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseC
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { addedCostLine } from "./laneb260-lines";
+import { roundB261Line } from "./laneb261-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2366,6 +2367,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB256Line(line, out, isSpell)) continue;
     // Arcum's Whistle (round B257).
     if (roundB257Line(line, out, isSpell)) continue;
+    // Mangara's Equity, Turf War, Aetherplasm (round B261).
+    if (roundB261Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

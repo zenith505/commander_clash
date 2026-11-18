@@ -407,7 +407,7 @@ export function dealDamage(
         fireEvent(s, { type: "dealtDamageToCreatures", source: src.id });
       }
     }
-    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}), ...(c.types.includes("Creature") ? { toughness: c.toughness } : {}) });
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, colors: [...src.colors], types: [...src.types], ...(opts.combat ? { combat: true } : {}), ...(c.types.includes("Creature") ? { toughness: c.toughness } : {}) });
     // Imodane, the Pyrohammer: "an instant or sorcery spell you control that targets only a single creature deals damage to
     // that creature".
     if (c.types.includes("Creature")) spellDealt(s, src, { creature: o.id }, n);
@@ -459,7 +459,7 @@ export function dealDamage(
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n, combat: !!opts.combat });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat, colors: [...src.colors], types: [...src.types] });
-    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, colors: [...src.colors], types: [...src.types], ...(opts.combat ? { combat: true } : {}) });
     noteDealt(s, src, opts.combat, { player: p.id }, n);
     spellDealt(s, src, { player: p.id }, n);
     if (opts.combat) {

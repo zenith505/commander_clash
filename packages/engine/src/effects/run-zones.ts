@@ -10,6 +10,7 @@ import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../ty
 import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, playerProtectedFrom, printedMatches, spellManaValue } from "./targeting";
 import { phaseOut } from "../phasing";
 import { ResolveCtx, apnap, startingWith, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
+import { enterBlocking } from "./run-laneb256";
 import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
@@ -316,13 +317,16 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       const after = e.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
       // Drop of Honey, Purging Scythe: one of those tied for the least power or toughness, anyone's.
       const tied = e.anyController && e.least ? `click a creature tied for the least ${e.least} (anyone's). ${src} ${after?.type === "destroy" ? "destroys it" : after?.type === "damage" ? `deals ${describeAmount(after.amount)} damage to it` : "chooses it"}.` : undefined;
-      const lose = after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control") && after.duration === "game";
+      // Turf War (round B261): not when the picker chooses among another player's permanents (`among`) and gains control.
+      const lose = !e.among && after?.type === "continuous" && after.what.ref === "created" && after.mods.some((m) => m.kind === "control") && after.duration === "game";
       // The Horus Heresy: anyone's creature, in the ability's own words.
       const fate = tied ?? ((e.anyController || e.amongLeft) && e.prompt ? undefined : (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : lose ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${player(s, ctx.controller).name} gains control of it.` : undefined);
       // Chaos Defiler: you pick among each opponent's permanents in turn ("{player}": whose these are).
       const picker = e.youChoose ? ctx.controller : pid;
       // The ability's own words otherwise (Sunder the Gateway: "click an Incubator token you control to transform it").
-      const own = e.prompt?.replace(/~/g, src).replace("{player}", picker === pid ? "yours" : `${player(s, pid).name}'s`).replace("{left}", left === undefined ? "" : player(s, left).name);
+      // With `among` (Turf War, round B261), "{player}" is the player whose permanents the picker chooses among.
+      const whose = among ?? pid;
+      const own = e.prompt?.replace(/~/g, src).replace("{player}", picker === whose ? "yours" : `${player(s, whose).name}'s`).replace("{left}", left === undefined ? "" : player(s, left).name);
       s.pending = { kind: "pickPermanents", player: picker, source: src, action: e.action, ...(fate && picker === pid ? { prompt: fate } : own ? { prompt: own } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}), ...(picker !== pid ? { of: pid, pickFor: pid } : {}), ...(e.differentPowers ? { differentPowers: true as const } : {}) };
       return "paused";
     }
@@ -3141,7 +3145,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const what = `${e.upTo !== undefined ? `up to ${upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}${e.orGraveyard ? (e.any || e.upTo !== undefined ? " from your hand and/or graveyard" : " from your hand or graveyard") : ""}`;
           // Another player's hand: all of it shown, the cards that fit to choose from.
           if (from !== p.id) s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: 1, hand: from, dig: { looked: [...player(s, from).hand], to: `from ${player(s, from).name}'s hand to put onto the battlefield under your control${e.tapped ? ", tapped" : ""}${e.attacking ? " and attacking" : ""}`, rest: `stay in ${player(s, from).name}'s hand` } };
-          else s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
+          else {
+            // Aetherplasm (round B261): the attacker it would block, shown with the question.
+            const blocking = e.blockingSubject ? objects(s, { ref: "subject" }, ctx)[0] : undefined;
+            s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(blocking ? { blocking: blocking.id } : {}) };
+          }
           return "paused";
         }
       }
@@ -3235,6 +3243,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
         }
       });
+      // Aetherplasm (round B261): "blocking that creature", the trigger's attacker, if it's still that object attacking
+      // this player, a planeswalker they control or a battle they protect (CR 506.3e, 509.4a), and the permanent a creature
+      // that isn't a battle (CR 506.3a, 506.3f).
+      if (e.blockingSubject) {
+        const at = objects(s, { ref: "subject" }, ctx)[0];
+        for (const o of cards) if (at && o.zone === "battlefield" && at.attacking !== undefined) enterBlocking(s, o, at, src);
+      }
       s.resolving!.did = cards.some((o) => o.zone === "battlefield");
       // Cultivator Colossus: a card was put, so draw and go again (its triggers wait until this resolves, rulings).
       if (e.drawRepeat && cards.some((o) => o.zone === "battlefield")) {

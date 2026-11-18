@@ -170,7 +170,7 @@ export type TriggerSourceEvent =
    * An effect made `blocker` block these attackers (False Orders, Balduvian Warlord, round B256; CR 509.3a-d): `newlyBlocked`
    * were unblocked creatures until then, `newBlocker` says it wasn't a blocking creature until then.
    */
-  | { type: "blockedByEffect"; blocker: ObjectId; attackers: ObjectId[]; newlyBlocked: ObjectId[]; newBlocker: boolean; /** Sorrow's Path (round B258): blockers swapped, each attacker blocked by as many creatures as before. */ swap?: true }
+  | { type: "blockedByEffect"; blocker: ObjectId; attackers: ObjectId[]; newlyBlocked: ObjectId[]; newBlocker: boolean; /** Sorrow's Path (round B258): blockers swapped, each attacker blocked by as many creatures as before. */ swap?: true; /** Aetherplasm (round B261): put onto the battlefield blocking (CR 509.4): only the attackers' abilities trigger (CR 509.3d), none of the blocker's "blocks" ones. */ entered?: true }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
   | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -306,7 +306,7 @@ export type TriggerSourceEvent =
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean; /** The source's colors as it dealt the damage (Circle of Affliction). */ colors?: Color[]; /** Its card types then (Chandra's Phoenix, CR 113.7a). */ types?: string[] }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
-  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true; /** Damage to a creature: its toughness as the damage was dealt (Taii Wakeen). */ toughness?: number }
+  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true; /** Mangara's Equity (round B261): the source's colors and card types as it dealt the damage. */ colors?: Color[]; types?: string[]; /** Damage to a creature: its toughness as the damage was dealt (Taii Wakeen). */ toughness?: number }
   /**
    * One source's damage in one damage event, to any number of permanents and players (The Red Terror, Tamanoa, Justice):
    * `amount` all it dealt then; `creature` it was a creature permanent, `stackSpell` a spell on the stack; `ref` the
@@ -1308,13 +1308,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     for (const at of ats) {
       const atYou = controllerOf(s, at);
-      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, controllerOf(s, w), false)) && !!t.blockFilter && objectMatches(s, t.blockFilter, at, controllerOf(s, w), false), undefined, undefined, bl);
+      // Aetherplasm (round B261): one put onto the battlefield blocking never "blocked" (CR 509.4): only the attacker's
+      // "becomes blocked by a creature" abilities trigger (CR 509.3d), No Quarter's "becomes blocked by a creature with
+      // lesser power" among them.
+      if (!ev.entered) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, controllerOf(s, w), false)) && !!t.blockFilter && objectMatches(s, t.blockFilter, at, controllerOf(s, w), false), undefined, undefined, bl);
       for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "blockerLess" && power(s, bl) < power(s, at), undefined, undefined, bl);
-      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "attackerLess" && power(s, at) < power(s, bl), undefined, undefined, at);
-      add(bl, blYou, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, blYou, false)), undefined, undefined, at);
-      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, ctrl, false)), triggers, undefined, at), bl);
-      addHosted(bl, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, w, false)), undefined, at, { group: [bl, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
-      addHosted(bl, (e, t, w) => e === "selfBlocksCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, w, false)), undefined, at);
+      if (!ev.entered) {
+        for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "attackerLess" && power(s, at) < power(s, bl), undefined, undefined, at);
+        add(bl, blYou, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, blYou, false)), undefined, undefined, at);
+        fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, ctrl, false)), triggers, undefined, at), bl);
+        addHosted(bl, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, w, false)), undefined, at, { group: [bl, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
+        addHosted(bl, (e, t, w) => e === "selfBlocksCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, w, false)), undefined, at);
+      }
       // The attacker: "becomes blocked by a creature" for this blocker (CR 509.3d).
       add(at, atYou, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, atYou, false)), undefined, undefined, bl);
       fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, ctrl, false)), triggers, undefined, bl), at);
@@ -2262,6 +2267,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         if (controllerOf(s, w) === hurt) add(w, hurt, (e) => e === "opponentSourceDamagesYouOrYours", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
+      }
+    // Mangara's Equity (round B261): "Whenever a creature of the chosen color deals damage to you or a white creature you
+    // control": a creature permanent (CR 109.2) of the color chosen as it entered, both as the damage is dealt; once for each
+    // creature and each recipient (rulings on Flameblade Angel and Elesh Norn), the creature the subject, "that much" what
+    // it dealt that recipient.
+    const from = s.objects[ev.source];
+    if (from?.zone === "battlefield" && ev.types?.includes("Creature") && ev.colors?.length)
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        const chosen = w.chosen?.color;
+        if (!chosen || !ev.colors.includes(chosen)) continue;
+        add(w, wc, (e, t) => e === "creatureDamagesYouOrYours" && !!t.creatureDamagesYours && (ev.player !== undefined ? ev.player === wc : !!hit && hit.zone === "battlefield" && controllerOf(s, hit) === wc && objIsType(s, hit, "Creature") && characteristics(s, hit).colors.includes(t.creatureDamagesYours.creatureColor)), undefined, undefined, from, undefined, undefined, undefined, { amount: ev.amount });
       }
     // Hooded Blightfang: a creature its controller controls dealing damage to a planeswalker (or a player), with deathtouch
     // as it deals it (rulings); the subject is the creature or the planeswalker.

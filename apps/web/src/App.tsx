@@ -49,6 +49,7 @@ import {
   mayPlayLandFromGraveyard,
   playsFromAnyGraveyard,
   mayPlayFromTop,
+  mayPlayFromHandOf,
   topVisible,
   topPlayable,
   handRevealed,
@@ -1569,7 +1570,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (o.zone === "battlefield" && ignorableBy(s, HUMAN, o.id)) return setMenu(o.id);
     // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
     if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer && (!ab.ownerOnly || o.owner === HUMAN) && (!ab.opponentsOnly || opponents(s, controllerOf(s, o)).includes(HUMAN)) && (ab.onlyPlayer === undefined || ab.onlyPlayer === HUMAN) && (!ab.enchantedControllerOnly || enchantsYours(s, o)) && (!ab.attackedPlayerOnly || o.attacking === HUMAN))) return setMenu(o.id);
-    if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
+    // Xanathar, Guild Kingpin (round 412): the top card of another player's library you may play is yours to click.
+    if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN && !(o.zone === "library" && mayPlayFromTop(s, o, HUMAN))) return;
     // An emblem of yours with an activated ability (Karn, Living Legacy's): its menu, from the command zone (CR 114.4).
     if (o.emblem) {
       if (o.owner === HUMAN && abilitiesOf(s, o).activated.length) setMenu(o.id);
@@ -2367,7 +2369,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           view={viewing}
           onClose={() => setViewing(null)}
           onHover={setHover}
-          canPick={(id) => !pending && viewing.zone !== "hand" && (viewing.zone === "graveyard" ? (viewing.pid === HUMAN || castsFromAnyGraveyard(s)) && graveyardOptions(s, id) : exileOptions(s, id))}
+          canPick={(id) => !pending && (viewing.zone === "hand" ? othersHandOptions(s, id) : viewing.zone === "graveyard" ? (viewing.pid === HUMAN || castsFromAnyGraveyard(s)) && graveyardOptions(s, id) : exileOptions(s, id))}
           onPick={(id) => {
             setViewing(null);
             setMenu(id);
@@ -2533,6 +2535,13 @@ function exileOptions(s: GameState, id: string): boolean {
   // Valgavoth's cards: only for life (its "pay life equal to its mana value").
   // An alternative cost: Valgavoth's life, Warped Space's {0}.
   return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind))) || canUseFace(s, id);
+}
+
+/** Sen Triplets (round 412): a card in another player's hand you may play now. */
+function othersHandOptions(s: GameState, id: string): boolean {
+  const o = s.objects[id]!;
+  if (!mayPlayFromHandOf(s, o, HUMAN)) return false;
+  return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, o).some((a) => canCastAlt(s, id, a.kind))) || canUseFace(s, id);
 }
 
 /** You may cast spells from other players' graveyards this turn (The Great Work; Locke, Treasure Hunter's milled cards). */
@@ -3809,8 +3818,12 @@ function Seat({
   const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
   // The top of a library is shown when it's revealed (CR 401.5), to you when you may look at it any time (Vizier of
   // the Menagerie), or when you may play it.
-  const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind))));
-  const topShown = topVisible(s, pid, HUMAN) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
+  // Xanathar, Guild Kingpin (round 412): the top card of another player's library you may play this turn, in their seat.
+  const topHere = topPlayable(s, HUMAN).filter((id) => s.objects[id]!.owner === pid);
+  const topCanPlay = !s.pending && topHere.some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind))));
+  const topShown = topVisible(s, pid, HUMAN) || topHere.length > 0;
+  // Sen Triplets (round 412): a card in this player's hand you may play this turn.
+  const handCanPlay = pid !== HUMAN && !s.pending && p.hand.some((id) => othersHandOptions(s, id));
   // Auras and Equipment sit with whatever they're attached to, even in another player's area; a Curse with the
   // player it enchants.
   const onField = new Set(s.battlefield);
@@ -3963,8 +3976,13 @@ function Seat({
         )}
         {pid !== HUMAN &&
           (handRevealed(s, pid, HUMAN) || pid === YOU ? (
-            <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title={pid === YOU && pid !== HUMAN ? "Your hand. Click to see it." : "This hand is revealed (Telepathy, Revelation). Click to see it."}>
-              Hand {p.hand.length} 👁
+            <button
+              className={`hand-peek${handCanPlay ? " has-options" : ""}`}
+              data-hand={pid}
+              onClick={(e) => (e.stopPropagation(), onViewZone("hand"))}
+              title={handCanPlay ? "This hand is revealed, and you may play cards from it this turn. Click to see it." : pid === YOU && pid !== HUMAN ? "Your hand. Click to see it." : "This hand is revealed (Telepathy, Revelation). Click to see it."}
+            >
+              Hand {p.hand.length} 👁{handCanPlay ? " ✦" : ""}
             </button>
           ) : (
             <span className="muted" data-hand={pid}>
@@ -5042,11 +5060,13 @@ function AbilityMenu({
   // play from your graveyard (Crucible of Worlds).
   const inHand = o.zone === "hand" || o.zone === "command" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN) || mayPlayFromTop(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
-  const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
+  // Another player's hand (Sen Triplets, round 412): only casting or playing it, nothing that needs your own hand.
+  const ownHand = o.zone === "hand" && o.owner === HUMAN;
+  const suspend = ownHand ? compileCard(d).suspend : undefined;
   // Fblthp, Lost on the Range: the top card of your library too.
-  const plot = o.zone === "hand" || o.zone === "library" ? plotCost(s, HUMAN, d, o) : undefined;
-  const foretell = o.zone === "hand" ? foretellCostOf(s, o, d) : undefined;
-  const discardAnyTime = o.zone === "hand" && !!compileCard(d).discardAnyTime;
+  const plot = ownHand || o.zone === "library" ? plotCost(s, HUMAN, d, o) : undefined;
+  const foretell = ownHand ? foretellCostOf(s, o, d) : undefined;
+  const discardAnyTime = ownHand && !!compileCard(d).discardAnyTime;
   // A foretold card: cast only for its foretell cost (CR 702.143a).
   const foretold = foretoldCast(s, HUMAN, o) ? foretellCostOf(s, o, d) : undefined;
   // A manifested card with morph can be turned face up either way (CR 701.40c).

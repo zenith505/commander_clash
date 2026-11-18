@@ -5262,6 +5262,8 @@ export type Effect =
       allOrNone?: true;
       /** Sideswipe: "You may change any targets of target Arcane spell" (CR 115.7c): any number of them, each to another legal one, never to none. */
       changeAny?: true;
+      /** Sudden Substitution (round 413): "Then the spell's controller may choose new targets for it": its controller as this resolves decides, not this ability's. */
+      bySpellController?: true;
     }
   /**
    * "Gain control of target spell" (Commandeer): its controller becomes this ability's controller; a permanent spell
@@ -5593,7 +5595,18 @@ export type Effect =
    * this turn, exile it instead" (CR 614.1a), not a token (rulings).
    */
   /** "Until end of turn, you may look at the top card of your library any time and you may play ... from the top of your library" (Gwenom): GameState.topTurn. */
-  | { type: "topTurn"; top: FromTop }
+  | {
+      type: "topTurn";
+      top: FromTop;
+      /** Xanathar, Guild Kingpin (round 412): "the top card of their library": that player's library, not yours. */
+      of?: PlayerRef;
+      /** Xanathar: "you may spend mana as though it were mana of any color to cast spells this way" (CR 609.4b). */
+      anyColor?: true;
+    }
+  /** Sen Triplets (round 412): "You may play lands and cast spells from that player's hand this turn" (GameState.handTurn). */
+  | { type: "handTurn"; of: PlayerRef }
+  /** Sen Triplets (round 412): "that player ... plays with their hand revealed" this turn (CR 402.3; Player.handRevealedTurn). */
+  | { type: "revealHandTurn"; who: PlayerRef }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: "by foraging in addition to paying their other costs" (CR 601.2f-h): the costs of a spell cast this way. */ costs?: AdditionalCost[]; /** Osteomancer Adept: "If you cast a spell this way, that creature enters with a finality counter on it" (CR 614.1c). */ entersWith?: { counter: CounterKind; n: number }; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true; /** Bösium Strip (round B240): "from the top of your graveyard": only the card on top of its owner's graveyard as it's cast (CR 404.1, 404.2). */ topOnly?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** Will Kenrith: "Until your next turn, instant, sorcery, and planeswalker spells that player casts cost {2} less to cast": the spells this player casts (the target player), until this ability's controller's next turn (with `untilYourNextTurn`). */ who?: PlayerRef; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount; /** Cheering Fanatic: "spells with the chosen name": the card name chosen as it resolves, locked into `mod.filter.named`. */ chosenName?: true }
@@ -5899,6 +5912,14 @@ export type Effect =
    * without paying its mana cost." See effects/run-round411.ts.
    */
   | { type: "guffRewrite"; what: ObjRef }
+  /**
+   * Perplexing Chimera, Sudden Substitution (round 413): "exchange control of ~ and that spell", "exchange control of target
+   * noncreature spell and target creature" (CR 701.12a): the spell (a target, or with `cause` the spell whose casting
+   * triggered this) and the permanent swap controllers, each still on the stack or the battlefield and still that object;
+   * neither changes zones, and the exchange lasts indefinitely (rulings). With either gone or illegal, or both under one
+   * player's control, nothing happens (CR 701.12b). Sets "if you do" (ResolvingState.did). See effects/run-round413.ts.
+   */
+  | { type: "exchangeSpellControl"; spell: number; cause?: true; perm: ObjRef }
   /** Midnight Crusader Shuttle: "If you gain control of a creature this way, tap it, and it's attacking that player": only
    * while you control it now, and during combat; it's attacking without having been declared an attacker (CR 506.3,
    * rulings). */

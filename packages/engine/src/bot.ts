@@ -103,6 +103,7 @@ import {
   availableMana,
   exilePlayable,
   topPlayable,
+  othersHandPlayable,
   castDef,
   casualtyCandidates,
   cardTypesPick,
@@ -2447,6 +2448,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (alt && alt[alt.length - 1]!.type === "castSpell") return alt;
       }
     }
+    const swap = chooseSpellSwap(s, pid, top);
+    if (swap) return swap;
     // Spell Queller, Smirking Spelljacker: a flash creature whose enters ability exiles a spell, cast while the spell it
     // can take is on top (its trigger then aims at it).
     for (const id of player(s, pid).hand) {
@@ -2517,7 +2520,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Coram, the Undertaker (round 381): every graveyard's, its own permission deciding which.
     const fromYard = [...new Set([...(anyYard || playsFromAnyGraveyard(s, pid) ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
-    const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
+    // Sen Triplets (round 412): the cards in another player's hand it may play this turn.
+    const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...othersHandPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land") || castableFaces(s, obj(s, id)).length)
       // Damage prevention waits for damage coming (chooseDamageShield); Desperate Gambit for an unblocked attacker (chooseGambit).
@@ -3200,7 +3204,7 @@ function canAlsoPayWard(s: GameState, pid: PlayerId, plan: Action[], targets: Ta
   const used = plan.flatMap((a) => (a.type === "activateMana" ? [a.objectId] : a.type === "castSpell" ? (a.convoke ?? []) : []));
   return !!planMana(s, pid, parseManaCost(ward), 0, undefined, used);
 }
-const isCounterOnly = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "counterSpell" || e.type === "controlSpell");
+const isCounterOnly = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "counterSpell" || e.type === "controlSpell" || (e.type === "exchangeSpellControl" && !e.cause));
 /** A battle: we don't aim spells at them, only creatures (damage to a Siege helps its controller flip it, CR 310.12b). */
 const isBattleTarget = (s: GameState, t: ChosenTarget) => t.kind === "object" && !!s.objects[t.id] && objIsType(s, obj(s, t.id), "Battle");
 /**
@@ -4157,6 +4161,32 @@ function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecisio
   // "Change the targets" (CR 115.7a): every target or none, so a partial change is kept as it was.
   if (changed && pend.allOrNone && next.some((t, j) => t.kind !== "none" && sameTarget(pend.current[j], t))) return undefined;
   return changed ? next : undefined;
+}
+
+/**
+ * Sudden Substitution (round 413): "Exchange control of target noncreature spell and target creature": an opponent's
+ * spell on top (mana value 3 or more, checked by the caller) for our least useful creature, never our commander, worth
+ * less than the spell; then we choose its new targets (newTargetsFor).
+ */
+function chooseSpellSwap(s: GameState, pid: PlayerId, top: StackItem): Action[] | null {
+  for (const id of player(s, pid).hand) {
+    const body = compileCard(defOf(s, obj(s, id))).spell;
+    const e = body?.effects.find((x) => x.type === "exchangeSpellControl" && !x.cause);
+    if (!body || e?.type !== "exchangeSpellControl" || e.perm.ref !== "target") continue;
+    const [specSpell, specPerm] = [body.targets[e.spell], body.targets[e.perm.index]];
+    if (!specSpell || !specPerm || !spellMatches(s, specSpell, top)) continue;
+    const mine = s.battlefield
+      .map((x) => obj(s, x))
+      .filter((o) => controllerOf(s, o) === pid && !o.isCommander && objectMatches(s, specPerm, o, pid, false) && (o.isToken || defMv(defOf(s, o)) < spellManaValue(s, top)))
+      .map((o): ChosenTarget => ({ kind: "object", id: o.id }));
+    if (!mine.length) continue;
+    const targets: TargetChoice[] = [];
+    targets[e.spell] = { kind: "stack", id: top.id };
+    targets[e.perm.index] = worst(s, pid, mine);
+    const plan = planCast(s, pid, id, targets, undefined, "auto");
+    if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
 }
 
 /** Is this target ours: our permanent or spell, a card we own, or us? */
@@ -5893,6 +5923,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const t = r.item.targets?.[thiefExile.what.index];
     const o = t?.kind === "object" ? s.objects[t.id] : undefined;
     return !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;
+  }
+  // Perplexing Chimera (round 413): "you may exchange control of ~ and that spell": an opponent's spell worth more than
+  // the Chimera (mana value 4 or more), or one aimed at us or ours (its new targets go to theirs).
+  if (r && e?.type === "may" && e.effects[0]?.type === "exchangeSpellControl" && e.effects[0].cause) {
+    const spell = s.stack.find((x) => x.id === r.item.cause && x.kind === "spell");
+    if (!spell || spell.controller === pid) return false;
+    const me = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield" || controllerOf(s, me) !== pid) return false;
+    return spellManaValue(s, spell) >= 4 || (spell.targets ?? []).some((t) => t.kind !== "none" && isMine(s, pid, t));
   }
   // Puca's Mischief: "you may exchange control of ...": only for one of theirs clearly worth more than ours.
   const exch = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "exchangeControl" ? e.effects[0]! : undefined;

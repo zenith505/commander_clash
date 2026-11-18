@@ -764,8 +764,12 @@ export interface GameObject {
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
   phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield; Out of Time: `noTap`, not tapped. */ until?: { id: ObjectId; zc: number; noTap?: true }; /** Teferi, Timeless Voyager: it can't phase in until the end of `turnOf`'s next turn after turn `sinceTurn` (cleared in that cleanup step, CR 514.2, or once that player has left the game, CR 800.4m). */ lock?: { turnOf: PlayerId; sinceTurn: number }; /** The Phasing of Zhalfir: it can't phase in while `controller` controls `id` (as that object, CR 400.7); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhile?: { id: ObjectId; zc: number; controller: PlayerId }; /** The Pandorica (round 389): it can't phase in while `id` is still that object on the battlefield, tapped, without having untapped since (`untaps`); over for good once that stops (CR 611.2b; game.ts endWhileTapped). */ lockWhileTapped?: { id: ObjectId; zc: number; untaps: number } };
-  /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
-  castFrom?: ZoneName;
+  /**
+   * As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. "anotherHand": from
+   * the hand of a player other than its caster (Sen Triplets, round 412), which is never "from your hand" or "from their
+   * hand" (rebound, CR 702.88a; "if you cast it from your hand").
+   */
+  castFrom?: ZoneName | "anotherHand";
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
   castFromHand?: true;
   /** On the battlefield: it entered as a spell cast from a graveyard (Kotis: "was cast from a graveyard"). */
@@ -995,6 +999,8 @@ export interface Player {
   noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
   /** Stromgald Spy: "play with their hand revealed for as long as ~ remains on the battlefield" (CR 402.3, 611.2b): while that object is. */
   handRevealedWhile?: { id: ObjectId; zc: number }[];
+  /** Sen Triplets (round 412): "plays with their hand revealed" this turn (CR 402.3), the turn it was set. */
+  handRevealedTurn?: number;
   /** "You have no maximum hand size until your next turn" (Enter the Infinite): until that player's next turn begins. */
   noMaxHandSizeUntilNextTurn?: true;
   /**
@@ -1240,6 +1246,12 @@ export interface StackItem {
   controller: PlayerId;
   /** Another player gained control of this spell (Commandeer): its controller didn't cast it (Cunning Nightbonder's rulings). */
   controlTaken?: true;
+  /**
+   * Each player who controlled this before an effect gave another player control of it (Commandeer, Perplexing Chimera),
+   * oldest first: the first is its caster's. When a player who gained control leaves the game, that effect ends (CR
+   * 800.4a) and its controller is the one before.
+   */
+  controlledBefore?: PlayerId[];
   description: string;
   /** For a triggered ability: the spell or ability on the stack that triggered it ("that spell", ward). */
   cause?: string;
@@ -2579,7 +2591,21 @@ export interface GameState {
    * "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
    * your library" (Gwenom, Remorseless; Effect topTurn): `player` may, during `turn`, as a permanent's FromTop lets them.
    */
-  topTurn?: { player: PlayerId; turn: number; top: FromTop; source: string }[];
+  topTurn?: {
+    player: PlayerId;
+    turn: number;
+    top: FromTop;
+    source: string;
+    /** Xanathar, Guild Kingpin (round 412): the top card of this player's library, not `player`'s own. */
+    of?: PlayerId;
+    /** Xanathar: "you may spend mana as though it were mana of any color to cast spells this way" (CR 609.4b). */
+    anyColor?: true;
+  }[];
+  /**
+   * Sen Triplets (round 412; Effect handTurn): "You may play lands and cast spells from that player's hand this turn":
+   * `player` may, during `turn`, play the cards in `of`'s hand, at their usual timing and with their usual costs (rulings).
+   */
+  handTurn?: { player: PlayerId; of: PlayerId; turn: number; source: string }[];
   /** Plagiarize: "Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a card" (CR 614.1a): `victim`'s draws are `by`'s, until the cleanup step (CR 514.2). `id` names it for CR 614.5. */
   drawSteals?: { id: string; victim: PlayerId; by: PlayerId; source: string }[];
   /**
@@ -2858,7 +2884,8 @@ export interface TurnRule {
   /** "noActivations": Abeyance's "that player can't activate abilities that aren't mana abilities" this turn, in any zone (rulings). */
   /** "castFromHandFree": Chandra, Flame's Catalyst's "Until end of turn, you may cast spells from your hand without paying their mana costs" (Omniscience's alternative cost for this turn, CR 118.9). */
   /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings); with no `object` (Urza Assembles the Titans), of every planeswalker `player` controls this turn. */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "castFromHandFree" | "loyaltyTwice" | /** Piracy (round B238): this player may tap lands they don't control for mana (CR 106.12), that mana spendable only to cast spells. */ "tapOthersLands";
+  /** "noAbilities": Sen Triplets' "that player can't ... activate abilities" this turn: mana abilities too (rulings), in any zone (round 412). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "noAbilities" | "castFromHandFree" | "loyaltyTwice" | /** Piracy (round B238): this player may tap lands they don't control for mana (CR 106.12), that mana spendable only to cast spells. */ "tapOthersLands";
   /** The permanent the rule is about ("loyaltyTwice"), as the object it was then (CR 400.7). */
   object?: { id: ObjectId; zc: number };
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */

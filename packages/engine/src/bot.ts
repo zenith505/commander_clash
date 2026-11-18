@@ -11,7 +11,7 @@ import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
 import { redistributions } from "./effects/run-round362";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { activatedQuality, manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -524,6 +524,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Retriever Phoenix back on the battlefield rather than learning (discarding a card to draw one): always.
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.insteadOfLearn ? true : pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
+    // Rhystic Cave (round B254): {1} to keep another player from one mana is an even trade at best, and a third player gains
+    // from it, so never.
+    if (pend.kind === "payUnless" && pend.manaUnless) return [{ type: "payUnless", player: pid, pay: false }];
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
     // Grip of Amnesia: keep the spell unless the graveyard holds more than a few cards (they may be worth more).
     if (pend.kind === "payUnless" && pend.exileGraveyard) return [{ type: "payUnless", player: pid, pay: player(s, pid).graveyard.length <= 3 }];
@@ -6890,6 +6893,14 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "counterSpell":
         v += 9;
         break;
+      // Round B254, Peace Talks: two turns without attacks, worth it only when the opponents' creatures threaten us more than
+      // ours threaten them.
+      case "peaceTalks": {
+        const powerOf = (q: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === q && objIsType(s, o, "Creature")).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+        const theirs = opponents(s, pid).reduce((n, q) => n + powerOf(q), 0);
+        v += theirs >= player(s, pid).life / 3 && theirs > 2 * powerOf(pid) ? 5 : -10;
+        break;
+      }
       // Round B250, Gather Specimens: worth it only with an opponent's creature spell on the stack to take as it resolves
       // (its mana value), not as a sorcery-speed nothing.
       case "gatherSpecimens": {
@@ -8469,7 +8480,7 @@ function chooseDeathReturn(s: GameState, pid: PlayerId): Action[] | null {
       if (ab.tap || ab.sacrificeSelf || ab.costs?.length) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
-      for (const c of legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id)) {
+      for (const c of legalTargets(s, ab.body.targets[0]!, pid, undefined, activatedQuality(s, id), id)) {
         if (c.kind !== "object") continue;
         const t = obj(s, c.id);
         if (controllerOf(s, t) !== pid || !objIsType(s, t, "Creature") || objHasKeyword(s, t, "Indestructible") || t.isToken || !doomedNow(s, pid, t)) continue;
@@ -8501,7 +8512,7 @@ function chooseCommanderReturn(s: GameState, pid: PlayerId): Action[] | null {
       if (ab.body.effects.length !== 1 || ab.body.effects[0]!.type !== "bounce" || ab.sacrificeSelf || ab.costs?.length) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
-      for (const c of legalTargets(s, t, pid, undefined, sourceQuality(s, id), id)) {
+      for (const c of legalTargets(s, t, pid, undefined, activatedQuality(s, id), id)) {
         if (c.kind !== "object") continue;
         const cmd = obj(s, c.id);
         if (controllerOf(s, cmd) === pid && !doomedNow(s, pid, cmd)) continue;
@@ -8540,7 +8551,7 @@ function chooseRedirect(s: GameState, pid: PlayerId): Action[] | null {
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
-      const options = legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id);
+      const options = legalTargets(s, ab.body.targets[0]!, pid, undefined, activatedQuality(s, id), id);
       let target: TargetChoice | undefined;
       if (e.from.ref === "self" && inDanger(o)) {
         // Away from it: to an opponent, an opponent's creature, or one of ours that survives it.
@@ -8850,7 +8861,7 @@ function choosePhaseAway(s: GameState, pid: PlayerId): Action[] | null {
       if (e?.type !== "phaseOut" || e.what.ref !== "target" || ab.body.targets.length !== 1 || ab.mana) continue;
       for (const want of aimed) {
         if (want === id) continue;
-        const ok = legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id).find((t) => t.kind === "object" && t.id === want);
+        const ok = legalTargets(s, ab.body.targets[0]!, pid, undefined, activatedQuality(s, id), id).find((t) => t.kind === "object" && t.id === want);
         if (!ok) continue;
         const costs = abilityCosts(s, pid, o, ab, [ok]);
         const plan = costs !== null && planActivate(s, pid, id, i, [ok], undefined, undefined, undefined, costs ?? undefined);

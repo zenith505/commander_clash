@@ -93,6 +93,8 @@ import { roundB246Line } from "./laneb246";
 import { roundB247Line } from "./laneb247";
 import { roundB249Line } from "./laneb249";
 import { roundB251Line, roundB251Loyalty } from "./laneb251";
+import { roundB252Line } from "./laneb252";
+import { roundB253Line } from "./laneb253";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2334,6 +2336,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB249Line(line, raw, out, isSpell)) continue;
     // Sharkey, Tyrant of the Shire, Kasmina, Enigma Sage, Tamiyo, Collector of Tales (round B251).
     if (roundB251Line(line, out, isSpell)) continue;
+    // Swans of Bryn Argoll, Elemental Resonance (round B252).
+    if (roundB252Line(line, out, isSpell)) continue;
+    // Lich, Nefarious Lich, Dralnu, Lich Lord (round B253).
+    if (roundB253Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

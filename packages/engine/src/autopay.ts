@@ -50,7 +50,7 @@ interface Source {
   creature: boolean;
 }
 
-function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: ManaUse): Source[] {
+function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: ManaUse, cost?: ParsedCost): Source[] {
   const onlyTreasures = use !== "other" && "spell" in use && !!use.treasureOnly;
   // Myr Superion: only creatures' mana abilities help (CR 106.3; rulings).
   const onlyCreatures = use !== "other" && "spell" in use && !!use.creatureOnly;
@@ -80,13 +80,13 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Battery gives its one mana without removing any.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
         // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && !abs[x.ability]!.returnSelf && !abs[x.ability]!.untapSelf && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!pirated(o, abs[x.ability]!) || spendAllows(s, pid, PIRACY_SPEND, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && !abs[x.ability]!.unlessAnyPays && !abs[x.ability]!.returnSelf && !abs[x.ability]!.untapSelf && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use, cost)) && (!pirated(o, abs[x.ability]!) || spendAllows(s, pid, PIRACY_SPEND, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
           return { id: o.id, ...x, cost: manaAbilityCostOf(s, pid, o, ab), penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly || pirated(o, ab) ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
-      if ((!onlyTreasures || treasure) && controllerOf(s, o) === pid) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use)) && (!only || x.adds.every((m) => only.includes(m)))));
+      if ((!onlyTreasures || treasure) && controllerOf(s, o) === pid) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use, cost)) && (!only || x.adds.every((m) => only.includes(m)))));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
       return { id: o.id, options, colors: makes.length, makes, creature: isCreature(o.id) };
     })
@@ -370,7 +370,7 @@ export function planCast(
   // aren't tapped for its mana.
   const tapping = [...(choices.teamwork ?? []), ...(choices.conspire ?? []), ...(choices.harmonize !== undefined ? [choices.harmonize] : []), ...(choices.tap ?? [])];
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
-  const pool = poolFor(s, pid, use).pool;
+  const pool = poolFor(s, pid, use, cost).pool;
   const rainbow = (compileCard(d).countsColors || gainsSunburst(s, pid, d)) && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
   // "If {U} was spent to cast ~", adamant: ask for those colors where its generic or hybrid mana allows, as many as can be,
   // when that helps; where it hurts (Rolling Spoil's -1/-1 to their own creatures), keep those colors off it instead.
@@ -771,14 +771,14 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
   const life = (use === "other" ? payableLife(s, pid) : sylexed(s, payableLife(s, pid))) - lifeLess;
   // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
   // on anything else, such as a Signet's cost. `snow`: how much of it is snow mana (CR 107.4h).
-  const start = poolFor(s, pid, use);
+  const start = poolFor(s, pid, use, cost0);
   if (bonus) for (const m of Object.keys(bonus) as ManaType[]) start.pool[m] += bonus[m];
   const colorOnly = start.colorOnly ?? emptyPool();
   if (payFromPool(cost0, start.pool, extraGeneric, life, { snow: start.snow, wantSnow, colorOnly })) return [];
   // K'rrik's "you may pay 2 life rather than pay that mana" for {B}: mana from the player's sources first, life once
   // they can't make it (planFree).
   const cost = payableCost(s, pid, cost0, use);
-  const sources = manaSources(s, pid, excluded, use);
+  const sources = manaSources(s, pid, excluded, use, cost0);
   const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);
   const demand = colorDemand(s, pid, use);

@@ -82,16 +82,30 @@ const creatureOnly = (use: ManaUse) => use !== "other" && "spell" in use && (!!u
 const onlyOrigin = (use: ManaUse): ManaOrigin | undefined => (use !== "other" && "spell" in use ? (use.creatureOnly ? "creature" : use.basicLandOnly ? "basicLand" : undefined) : undefined);
 
 /** The lots of `pid`'s pool that can be spent on `use`. With Security Rhox's cost, only unrestricted mana from Treasures. */
-function usableLots(s: GameState, pid: PlayerId, use: ManaUse): ManaLot[] {
+function usableLots(s: GameState, pid: PlayerId, use: ManaUse, cost?: ParsedCost): ManaLot[] {
   const lots = s.players[pid]!.manaLots ?? [];
   if (treasureOnly(use)) return lots.filter((l) => !l.only && l.from?.includes("treasure"));
   const origin = onlyOrigin(use);
-  if (origin) return lots.filter((l) => l.from?.includes(origin) && (!l.only || spendAllows(s, pid, l.only, use)));
-  return lots.filter((l) => !l.only || spendAllows(s, pid, l.only, use));
+  if (origin) return lots.filter((l) => l.from?.includes(origin) && (!l.only || spendAllows(s, pid, l.only, use, cost)));
+  return lots.filter((l) => !l.only || spendAllows(s, pid, l.only, use, cost));
 }
 
-/** Can mana restricted this way be spent on `use`? */
-export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse): boolean {
+/** Does this cost have a {C} symbol (CR 107.4c), for Cultivator Drone's "a cost that contains {C}"? */
+export const costHasC = (cost?: ParsedCost): boolean => !!cost?.symbols.some((x) => x.kind === "colored" && x.color === "C");
+
+/** Can mana restricted this way be spent on `use`? `cost`: the cost being paid, when it's known. */
+export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse, cost?: ParsedCost): boolean {
+  // Cultivator Drone (round B254): "Spend this mana only to cast a colorless spell, activate an ability of a colorless
+  // permanent, or pay a cost that contains {C}" (CR 106.6): any cost with a {C} symbol (CR 107.4c), all of it, its generic
+  // mana too, a cost paid as something resolves among them (rulings: Bearer of Silence's "you may pay {1}{C}"); otherwise a
+  // spell that's colorless as it's cast (CR 105.2c), a face-down spell among them (CR 708.2a, rulings), or an ability of a
+  // colorless permanent (CR 109.2).
+  if (only.costsWithC) {
+    if (costHasC(cost)) return true;
+    if (use === "other") return false;
+    if ("spell" in use) return !!use.faceDown || (use.object ? characteristics(s, use.object).colors.length === 0 : use.spell.colors.length === 0);
+    return !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell && use.ability.zone === "battlefield" && characteristics(s, use.ability).colors.length === 0;
+  }
   // Elementalist's Palette: a spell with {X} in its mana cost, an ability with {X} in its activation cost. A cost paid as
   // something resolves isn't known to have one here, so it isn't paid this way.
   // "Spend this mana only on costs that contain {X}": a spell's total cost or an ability's cost with {X} in it, X 0 or
@@ -154,14 +168,14 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
  * The mana `pid` can spend on `use`, how much of it is restricted mana that's best spent first (`prefer`), and how much
  * of it a Treasure (`treasure`) or a snow source (`snow`, for {S}, CR 107.4h) made.
  */
-export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: ManaPool; prefer: ManaPool; treasure: ManaPool; snow: ManaPool; colorOnly?: ManaPool } {
+export function poolFor(s: GameState, pid: PlayerId, use: ManaUse, cost?: ParsedCost): { pool: ManaPool; prefer: ManaPool; treasure: ManaPool; snow: ManaPool; colorOnly?: ManaPool } {
   const pool = treasureOnly(use) || creatureOnly(use) ? emptyPool() : plainMana(s, pid);
   const prefer = emptyPool();
   const treasure = emptyPool();
   const snow = emptyPool();
   const colorOnly = emptyPool();
   let anyColorOnly = false;
-  for (const l of usableLots(s, pid, use)) {
+  for (const l of usableLots(s, pid, use, cost)) {
     pool[l.mana] += l.n;
     if (l.only) prefer[l.mana] += l.n;
     if (l.from?.includes("treasure")) treasure[l.mana] += l.n;
@@ -274,7 +288,7 @@ function anyColorPays(cost: ParsedCost): ParsedCost {
 /** Could `pid` pay this from their pool for `use`? */
 export function canPayFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity): boolean {
   const cost = payableCost(s, pid, cost0, use);
-  const { pool, snow, colorOnly } = poolFor(s, pid, use);
+  const { pool, snow, colorOnly } = poolFor(s, pid, use, cost0);
   return !!payFromPool(cost, pool, extraGeneric, life, { snow, ...(colorOnly ? { colorOnly } : {}) });
 }
 
@@ -290,12 +304,12 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact" | "desert" |
 export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number; creatureCounters?: number; sources?: string[]; riot?: string[] }) | null {
   const p = s.players[pid]!;
   const cost = payableCost(s, pid, cost0, use);
-  const { pool, prefer, treasure, snow, colorOnly } = poolFor(s, pid, use);
+  const { pool, prefer, treasure, snow, colorOnly } = poolFor(s, pid, use, cost0);
   const first = { ...prefer };
   if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] = Math.min(pool[m], first[m] + treasure[m]);
   const paid = payFromPool(cost, pool, extraGeneric, life, { ...opts, prefer: first, snow, ...(colorOnly ? { colorOnly } : {}) });
   if (!paid) return null;
-  const lots = usableLots(s, pid, use);
+  const lots = usableLots(s, pid, use, cost0);
   const plain = treasureOnly(use) || creatureOnly(use) ? emptyPool() : plainMana(s, pid);
   const spent = emptyPool();
   const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0, desert: 0, cave: 0 };

@@ -2643,6 +2643,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.targetsOnly && !targetsOnlyOne(s, item?.targets ?? [], t.cast.targetsOnly, o, you)) return false;
         // Beamsplitter Mage: "if you control one or more other creatures that spell could target" (CR 603.4).
         if (t.cast.otherYoursCouldTarget && !(item && eachOtherTargets(s, item, { among: t.cast.otherYoursCouldTarget, self: true }, { sourceId: o.id, controller: you }).length)) return false;
+        // Exterminator Magmarch (round 415): "if another opponent controls one or more nonland permanents that spell could
+        // target" (CR 603.4), checked again as it resolves (the copy's choice then finds none).
+        if (t.cast.otherOpponentsCouldTarget && !(item && eachOtherTargets(s, item, { among: t.cast.otherOpponentsCouldTarget, otherOpponentOfTarget: true }, { sourceId: o.id, controller: you }).length)) return false;
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;
@@ -2747,6 +2750,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (w.spell && item!.kind !== "spell") return false;
         if (w.ability && item!.kind !== "ability") return false;
         if (w.activatedOnly && (item!.kind !== "ability" || !!item!.triggered)) return false;
+        // Agrus Kos, Eternal Soldier (round 415): "an ability that targets only it" (rulings: several targets all naming it).
+        if (w.onlySelf && !targetsOnlyOne(s, item!.targets ?? [], "self", o, watcher)) return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
         // Skophos Maze-Warden: an ability whose source is a land you control named Labyrinth of Skophos.

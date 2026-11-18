@@ -1,6 +1,6 @@
 # Roadmap
 
-31,700 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,705 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -4013,6 +4013,40 @@ line blocks.
    Forebears, Wayta, Draugr Necromancer, Apple of Eden, Missy and the rest of `npm run popular` above rank 15,000 (still
    out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
    it face up; a bot voting with Elrond counts only creatures, not what the new controller can do with them.
+   Round 415 went on down `npm run popular`, most played first, past cards left out before to five cards that copy a
+   spell or ability at the other things it could target. Mischievous Quanar's "When ~ is turned face up, copy target
+   instant or sorcery spell. You may choose new targets for that copy." (as Twincast's, its target chosen as the trigger
+   goes on the stack). Radiate's "Choose target instant or sorcery spell that targets only a single permanent or player.
+   Copy that spell for each other permanent or player the spell could target. Each copy targets a different one of those
+   permanents and players." and Radiant Performer's the same for "target spell or ability", from "When ~ enters, if you
+   cast it from your hand" (TargetSpec.targetsOnlyPermanentOrPlayer: at least one target, every one naming the same
+   player still in the game or permanent still on the battlefield, rulings on Radiant Performer; copySpell eachOther
+   `orPlayers`: a copy for every other permanent and player that every one of its targets could legally name for the
+   copies' controller, CR 707.10c, a player as "p<id>" in the copy-order prompt, which you answer one copy at a time, the
+   original resolving last, rulings; an ability is copied the same way, CR 707.10). Agrus Kos, Eternal Soldier's
+   "Whenever ~ becomes the target of an ability that targets only it, you may pay {1}{R/W}. If you do, copy that ability
+   for each other creature you control that ability could target. Each copy targets a different one of those creatures."
+   (any player's activated or triggered ability, not a spell, all of whose targets are it, TriggeredAbility.targeted
+   `onlySelf`; copySpell eachOther `copier`: the copies yours, each creature checked as your copy would target it,
+   rulings; none if the ability has left the stack). Exterminator Magmarch's "Whenever you cast an instant or sorcery
+   spell that targets only a single nonland permanent an opponent controls, if another opponent controls one or more
+   nonland permanents that spell could target, choose one of those permanents. Copy that spell. The copy targets the
+   chosen permanent." (an intervening if, CR 603.4, cast.otherOpponentsCouldTarget; eachOther `otherOpponentOfTarget`:
+   not the player who controls the targeted permanent, as it last existed if it has left; `evenIfGone`: the copy is made
+   even if the spell was countered, rulings). Judgment call: Radiate's "could target" is judged for the copies'
+   controller (Radiate's), since each copy is theirs and must be a legal target for it (CR 707.10c); no ruling says
+   otherwise. Bots cast Radiate (or flash in Radiant Performer) in answer to a spell or ability whose copies would hit
+   clearly more of the opponents' than theirs, aim Performer's trigger at the best such one, pay for Agrus Kos only when
+   the copies help them, and give Magmarch's copy to the most valuable permanent. Browser tests click through Radiate
+   against Ana's Lightning Bolt (her Bolt, then Ben and her Hill Giant as the next copies' targets), Radiant Performer
+   against Ana's Prodigal Pyromancer, Agrus Kos's Pay, Magmarch's pick (Ben's Serra Angel) and Quanar turned face up (its
+   target and the copy's new one). +5, 31,705 of 31,936 on this stacked branch. The compiled text of every other card is
+   unchanged.
+   Out after round 415 (looked at, not done): Sunken Palace (its mana's copy trigger for an ability it's spent on: spent
+   mana triggers only spells now), Filigree Vector (two "any number of target" groups in one ability), Ulalek, Possibility
+   Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known
+   gaps: with many copies (Radiate on a Lightning Bolt in a full game) you answer the copy-order prompt once per copy; bots
+   weigh each copy's target by a rough value, not what the spell actually does to it.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

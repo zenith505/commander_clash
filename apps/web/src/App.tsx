@@ -5868,7 +5868,7 @@ function Controls({
           <strong>{pending.source}:</strong> {pending.prompt}
         </span>
         {pending.options.map((o, i) => (
-          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && o !== "top" && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && o !== "top" && s.objects[o] && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
             {pending.labels?.[i] ?? o}
           </button>
         ))}

@@ -803,6 +803,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const item = s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined);
     if (!item) return false;
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
+    // Radiate, Radiant Performer (round 415): "that targets only a single permanent or player".
+    if (spec.targetsOnlyPermanentOrPlayer && !onlyPermanentOrPlayer(s, item.targets ?? [])) return false;
     if (spec.castNth !== undefined && item.castNth !== spec.castNth) return false; // A copy that wasn't cast has no castNth (CR 707.10).
     if (spec.hasTargets && !(item.targets ?? []).some((x) => x.kind !== "none")) return false;
     // "Target triggered ability you control" (Strionic Resonator).
@@ -924,6 +926,21 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
     const o = s.objects[t.id];
     return !!o && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) && objectMatches(s, what, o, controller, false);
   });
+}
+
+/**
+ * Radiate, Radiant Performer (round 415): "a spell or ability that targets only a single permanent or player": the one
+ * player (still in the game) or permanent (still that object on the battlefield, CR 400.7) every one of its targets names,
+ * with at least one target (rulings on Radiant Performer: several targets all naming it count; a card in a graveyard or a
+ * spell isn't a permanent or player). Undefined if there's no such one.
+ */
+export function onlyPermanentOrPlayer(s: GameState, targets: TargetChoice[]): TargetChoice | undefined {
+  const chosen = targets.filter((t) => t.kind !== "none");
+  const first = chosen[0];
+  if (!first || (first.kind !== "player" && first.kind !== "object") || chosen.some((t) => t.kind !== first.kind || (t as { id: unknown }).id !== first.id)) return undefined;
+  if (first.kind === "player") return s.players[first.id] && !s.players[first.id]!.lost ? first : undefined;
+  const o = s.objects[first.id];
+  return o && o.zone === "battlefield" && chosen.every((t) => t.kind !== "object" || t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) ? first : undefined;
 }
 
 /**

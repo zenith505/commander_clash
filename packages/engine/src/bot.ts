@@ -1615,6 +1615,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
+    // Round B250: which control replacement applies first as a creature enters (Gather Specimens): the player taking it
+    // who has the least life, the least threat; Xantcha's own choice only when nothing else is offered.
+    if (pend.kind === "chooseOption" && pend.what === "controlFirst") {
+      const players = pend.options.filter((x) => x !== "self");
+      const pick = players.sort((a, b) => player(s, Number(a)).life - player(s, Number(b)).life)[0] ?? pend.options[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     // Xantcha, Captive Audience: the opponent with the least life, who loses the most from controlling it.
     if (pend.kind === "chooseOption" && pend.what === "controlOpponent") {
       const pick = [...pend.options].sort((a, b) => player(s, Number(a)).life - player(s, Number(b)).life)[0]!;
@@ -6883,6 +6890,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "counterSpell":
         v += 9;
         break;
+      // Round B250, Gather Specimens: worth it only with an opponent's creature spell on the stack to take as it resolves
+      // (its mana value), not as a sorcery-speed nothing.
+      case "gatherSpecimens": {
+        const theirs = s.stack.filter((it) => it.kind === "spell" && it.controller !== pid && opponents(s, pid).includes(it.controller) && !!it.objectId && !!s.objects[it.objectId] && objIsType(s, obj(s, it.objectId), "Creature"));
+        v += theirs.length ? 3 + Math.max(...theirs.map((it) => mv(s, it.objectId!))) : -10;
+        break;
+      }
       // Jhoira of the Ghitu: a card we can't afford now, cast for free in a few turns.
       case "suspendCard":
         v += 4;

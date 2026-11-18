@@ -204,7 +204,16 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   const activation = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell;
   const blue = activation && (!!use.blueAny || (use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendBlueAnyColorOwnAbilities));
   const c = blue ? blueAsAny(c1) : c1;
-  return orrery ? anyColorPays(c) : c;
+  // Sharkey, Tyrant of the Shire (round B251): "Mana of any type can be spent to activate ~'s abilities." (CR 609.4b): any
+  // mana pays its colored and {C} symbols, as Manascape Refractor's "any color" pays the colored ones; {S} still needs mana
+  // from a snow source (rulings: snow isn't a type of mana).
+  const anyType = activation && use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendAnyTypeOwnAbilities;
+  return anyType ? anyColorPays(colorlessAsGeneric(c)) : orrery ? anyColorPays(c) : c;
+}
+
+/** Sharkey, Tyrant of the Shire (round B251): a {C} paid by mana of any type, as though it were generic (CR 609.4b). */
+function colorlessAsGeneric(cost: ParsedCost): ParsedCost {
+  return { ...cost, symbols: cost.symbols.map((x): CostSymbol => (x.kind === "colored" && x.color === "C" ? { kind: "generic", amount: 1 } : x)) };
 }
 
 /**

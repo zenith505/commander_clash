@@ -3,6 +3,7 @@
 import type { AbilityBody, CompiledCard, Effect, TargetSpec } from "../abilities";
 import { parseBody } from "./body";
 import { X } from "./words";
+import { roundB250Spell } from "./laneb250";
 
 /** One line of a card's text, compiled into `out`; false when it isn't one of these. */
 export function roundB245Line(line: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -57,5 +58,5 @@ export function roundB245Spell(text: string): AbilityBody | null | undefined {
     ];
     return { targets: [], effects: [...wipe.effects, { type: "if", cond: { kind: "evidence" }, effects: rest }], text };
   }
-  return undefined;
+  return roundB250Spell(text);
 }

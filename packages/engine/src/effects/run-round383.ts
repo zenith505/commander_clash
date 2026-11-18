@@ -3,7 +3,7 @@ import { continueDraws, log, opponents, player } from "../game";
 import type { DrawAfter, GameState, ObjectId, Player, PlayerId, WasteDraw } from "../types";
 import { RulesError } from "../types";
 import { apnap } from "./resolve";
-import { discardCards, lengName } from "./run-library";
+import { discardCards, lengName, sparedFromDiscard } from "./run-library";
 
 /**
  * Words of Waste: "The next time you would draw a card this turn, each opponent discards a card instead." The draw doesn't
@@ -14,7 +14,8 @@ import { discardCards, lengName } from "./run-library";
 export function wasteInstead(s: GameState, pid: PlayerId, source: string, left: number, after: DrawAfter | undefined, made: number[]): "paused" | void {
   if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   log(s, `${player(s, pid).name} doesn't draw that card; each opponent discards a card instead (${source}).`);
-  const w: WasteDraw = { drawer: pid, source, order: apnap(s, opponents(s, pid)), queue: [], chosen: {}, left, made: [...made], ...(after ? { after } : {}) };
+  // Tamiyo, Collector of Tales (round B251): an opponent the Words' ability can't make discard isn't asked.
+  const w: WasteDraw = { drawer: pid, source, order: sparedFromDiscard(s, apnap(s, opponents(s, pid)), pid), queue: [], chosen: {}, left, made: [...made], ...(after ? { after } : {}) };
   for (const q of w.order) {
     const hand = player(s, q).hand;
     if (hand.length > 1) w.queue.push(q);

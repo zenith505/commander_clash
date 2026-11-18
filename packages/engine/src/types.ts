@@ -337,6 +337,8 @@ export interface GameObject {
   attachedToPlayer?: PlayerId;
   /** Controller as of the last control check, to notice control changes (summoning sickness, combat). */
   seenController?: PlayerId;
+  /** Round B250: a Gather Specimens changed the player it entered the battlefield under (CR 506.3c-d in syncControl). */
+  gatheredAsEntered?: true;
   tapped: boolean;
   /** Turn number the current controller gained control of it (summoning sickness, CR 302.6). */
   controlledSinceTurn: number;
@@ -2559,6 +2561,12 @@ export interface GameState {
    * exileReturnThisTurn): for `player`'s permanents during `turn`, each with its own delayed trigger (rulings).
    */
   exileReturnTurn?: { player: PlayerId; turn: number; source: string; sourceCardId: string }[];
+  /**
+   * Gather Specimens (round B250, Effect gatherSpecimens): during `turn`, a creature that would enter under an opponent of
+   * `player`'s control enters under `player`'s instead (CR 614.1c), each instance a replacement of its own that applies once
+   * to an event (CR 614.5); see gather.ts.
+   */
+  gatherSpecimens?: { id: string; player: PlayerId; turn: number; source: string }[];
   graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; /** Osteomancer Adept: the costs and counter of a spell cast this way (Effect graveyardTurn). */ costs?: AdditionalCost[]; entersWith?: { counter: CounterKind; n: number }; exileCast?: true; /** Bösium Strip (round B240): only the top card of `player`'s graveyard. */ topOnly?: true; source: string }[];
   /**
    * "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
@@ -2724,7 +2732,7 @@ export interface GameState {
   pendantMana?: { player: PlayerId; combos: ManaType[][]; from: ManaOrigin[]; source: string; id: ObjectId };
   /** The replacement a player chose for the game loss they're about to have (CR 616.1): an option of loseReplacements. */
   loseChoice?: { player: PlayerId; choice: string };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; /** With "copyLast": what makes each option's copy (Essence of the Wild, Mystic Reflection). */ copySources?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; /** With "copyLast": what makes each option's copy (Essence of the Wild, Mystic Reflection). */ copySources?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean; /** Round B250: the Gather Specimens instances (GameState.gatherSpecimens ids) already applied to it as it enters (CR 614.5). */ gatherUsed?: string[] } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,

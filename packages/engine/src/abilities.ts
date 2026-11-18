@@ -5011,6 +5011,23 @@ export type Effect =
    * Then each player chooses one of their piles at random and sacrifices those permanents." (CR 700.3; effects/run-laneb255.ts).
    */
   | { type: "whimsPiles" }
+  /**
+   * False Orders, Balduvian Warlord (round B256): "Remove target ... from combat. Creatures it was blocking that had become
+   * blocked by only that creature this combat become unblocked. [You may have it / then it] block[s] an attacking creature of
+   * your choice." (CR 506.4, 509.3a-d; effects/run-laneb256.ts). `may`: False Orders' "You may".
+   */
+  | { type: "reblock"; what: ObjRef; may?: true }
+  /**
+   * Raiding Party (round B256): "Each player may tap any number of untapped white creatures they control. For each creature
+   * tapped this way, that player chooses up to two Plains. Then destroy all Plains that weren't chosen this way by any player."
+   */
+  | { type: "raidingParty" }
+  /**
+   * Search the City (round B256): "you may put one of those cards with that name into its owner's hand. Then if there are no
+   * cards exiled with ~, sacrifice it. If you do, take an extra turn after this one.": the cards its enters ability exiled
+   * (CR 607.2a) with the name of the card played (the trigger's event `played`).
+   */
+  | { type: "searchTheCity" }
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number; /** Overencumbered: "creatures can't attack this combat": only in the combat phase it's made in (GameState.combatsThisTurn). */ combat?: true }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }

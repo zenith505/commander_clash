@@ -1,5 +1,6 @@
 import { bindBound, cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
+import { reblockOptions } from "./effects/run-laneb256";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -693,6 +694,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = takeoverPick(s, pid, pend.options);
       return [{ type: "pickPermanents", player: pid, ids: [pick ?? pend.options[0]!].slice(0, pend.count) }];
     }
+    // Raiding Party (round B256): enough of our cheapest white creatures to spare all our Plains (two each), then our own
+    // Plains (another player's would only help them).
+    if (pend.kind === "pickPermanents" && pend.raid === "tap") {
+      const ours = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).subtypes.includes("Plains")).length;
+      const ids = [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, Math.ceil(ours / 2));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
+    if (pend.kind === "pickPermanents" && pend.raid === "plains") return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).slice(0, pend.count) }];
     // Whims of the Fates (round B255): one pile in three is sacrificed at random, so any split loses a third of the worth on
     // average; even piles keep the worst case smallest. The first pile about a third of the worth, the rest halved after.
     if (pend.kind === "pickPermanents" && pend.action === "pile" && pend.piles3 === 1) return [{ type: "pickPermanents", player: pid, ids: thirdPile(pend.options, (id) => permanentWorth(s, pid, id)) }];
@@ -1433,6 +1442,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // that attacks best, flying first, never defender, then the most power.
     // Aquamorph Entity turned face up by an effect: as for the special action (botFaceUpForm).
     // Gift of Doom turned face up by an effect: our most valuable creature, else none (an opponent's would gain from it).
+    // False Orders, Balduvian Warlord (round B256): the attacker for the creature to block, by botReblock; Search the City:
+    // always take the card.
+    if (pend.kind === "chooseOption" && pend.what === "reblockAttacker") return [{ type: "chooseOption", player: pid, choice: botReblock(s, pid, pend.about, pend.options) }];
+    if (pend.kind === "chooseOption" && pend.what === "cityCard") return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => o !== "none") ?? "none" }];
     if (pend.kind === "chooseOption" && pend.what === "faceUpAttach") {
       const mine = pend.options.filter((id) => id !== "none" && controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
       return [{ type: "chooseOption", player: pid, choice: mine[0] ?? "none" }];
@@ -6916,6 +6929,31 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         v += mine < 0.7 * avg ? 4 + (avg - mine) / 3 : -10;
         break;
       }
+      // Round B256, False Orders and Balduvian Warlord: an opponent's creature blocking ours taken away (ours unblocked, as
+      // it's the only blocker), or our own creature made to block an attacker it kills and survives; nothing else.
+      case "reblock": {
+        const t = e.what.ref === "target" ? targets[e.what.index] : undefined;
+        const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+        if (!o || o.zone !== "battlefield") {
+          v -= 10;
+          break;
+        }
+        const freed = controllerOf(s, o) !== pid && (o.blocking ?? []).some((a) => !!s.objects[a] && controllerOf(s, obj(s, a)) === pid && (obj(s, a).blockedBy ?? []).length === 1);
+        const mine = controllerOf(s, o) === pid && !o.blocking?.length && reblockOptions(s, o).some((a) => power(s, o) >= toughness(s, obj(s, a)) && power(s, obj(s, a)) < toughness(s, o));
+        v += freed || mine ? 4 : -10;
+        break;
+      }
+      // Round B256, Raiding Party: the opponents' Plains it would destroy (those their untapped white creatures can't spare)
+      // against ours, for the Orc it costs.
+      case "raidingParty": {
+        const lost = (q: PlayerId) => {
+          const plains = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && characteristics(s, obj(s, id)).subtypes.includes("Plains")).length;
+          const white = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && !obj(s, id).tapped && objIsType(s, obj(s, id), "Creature") && characteristics(s, obj(s, id)).colors.includes("W")).length;
+          return Math.max(0, plains - 2 * white);
+        };
+        v += 2 * opponents(s, pid).reduce((n, q) => n + lost(q), 0) - 3 * lost(pid) - 3;
+        break;
+      }
       // Round B250, Gather Specimens: worth it only with an opponent's creature spell on the stack to take as it resolves
       // (its mana value), not as a sorcery-speed nothing.
       case "gatherSpecimens": {
@@ -9810,4 +9848,26 @@ function craftSlotPicks(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, 
 function withoutBound(f: TargetSpec): TargetSpec {
   const { bound: _bound, ...rest } = f;
   return rest;
+}
+
+/**
+ * False Orders, Balduvian Warlord (round B256): the attacker `about` blocks. Our own creature blocks one it kills and survives,
+ * else one it survives (the most power first), else the biggest threat if it must; someone else's creature blocks one that
+ * kills it and survives, else one that survives it, else none if we may (the least valuable attacker if we must).
+ */
+export function botReblock(s: GameState, pid: PlayerId, about: ObjectId | undefined, options: string[]): string {
+  const b = about ? s.objects[about] : undefined;
+  const ats = options.filter((o) => o !== "none").map((id) => obj(s, id));
+  const may = options.includes("none");
+  if (!b || !ats.length) return "none";
+  const bp = power(s, b);
+  const bt = toughness(s, b) - (b.damage ?? 0);
+  const byPower = [...ats].sort((x, y) => power(s, y) - power(s, x));
+  if (controllerOf(s, b) === pid) {
+    const pick = byPower.find((a) => bp >= toughness(s, a) - (a.damage ?? 0) && power(s, a) < bt) ?? byPower.find((a) => power(s, a) < bt);
+    return (pick ?? (may && player(s, pid).life > 10 ? undefined : byPower[0]))?.id ?? "none";
+  }
+  const pick = byPower.find((a) => power(s, a) >= bt && bp < toughness(s, a) - (a.damage ?? 0)) ?? byPower.find((a) => bp < toughness(s, a) - (a.damage ?? 0));
+  if (pick) return pick.id;
+  return may ? "none" : [...ats].sort((x, y) => worth(s, pid, x) - worth(s, pid, y))[0]!.id;
 }

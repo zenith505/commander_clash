@@ -99,6 +99,7 @@ import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB238Effect } from "./run-laneb238";
 import { runLaneB254Effect } from "./run-laneb254";
 import { runLaneB255Effect } from "./run-laneb255";
+import { runLaneB256Effect } from "./run-laneb256";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -2113,6 +2114,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB254Effect(s, e, ctx, src);
     case "whimsPiles":
       return runLaneB255Effect(s, e, ctx, src);
+    case "reblock":
+    case "raidingParty":
+    case "searchTheCity":
+      return runLaneB256Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

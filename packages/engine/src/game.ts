@@ -12660,6 +12660,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "reblockAttacker" || pend.what === "cityCard") {
+    // False Orders, Balduvian Warlord (round B256): the attacker the creature blocks; Search the City: the exiled card put
+    // into its owner's hand. Then the effect goes on.
+    if (!r?.scratch || !pend.options.includes(choice) || (pend.what === "reblockAttacker" && !r.scratch.reblock)) throw new RulesError("choose one of the options");
+    if (pend.what === "reblockAttacker") r.scratch.reblock!.choice = choice;
+    else r.scratch.city = choice;
+    log(s, pend.what === "reblockAttacker" ? (choice === "none" ? `${p.name} chooses not to have ${nameOf(s, pend.about!)} block.` : `${p.name} chooses ${nameOf(s, choice)} for ${nameOf(s, pend.about!)} to block.`) : choice === "none" ? `${p.name} leaves the cards exiled.` : `${p.name} chooses ${nameOf(s, choice)}.`);
+    s.pending = null;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "faceUpAttach") {
     // Gift of Doom turned face up by an effect: the creature it's attached to as it's turned face up, then the effect goes on.
     if (!pend.about || !r || !pend.options.includes(choice)) throw new RulesError("choose a creature to attach it to, or none");
@@ -15279,7 +15290,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
 }
 
 /** The two creatures' creature types and supertypes as a block is declared, kept only when someone could ask (a Zombie or a legendary creature in it). */
-function blockQualities(s: GameState, bl: GameObject, at: GameObject): { bq?: BlockQualities; aq?: BlockQualities } {
+export function blockQualities(s: GameState, bl: GameObject, at: GameObject): { bq?: BlockQualities; aq?: BlockQualities } {
   const q = (o: GameObject): BlockQualities => {
     const c = characteristics(s, o);
     return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}), ...(c.colors.length ? { col: [...c.colors] } : {}) };

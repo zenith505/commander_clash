@@ -12,6 +12,7 @@ import { round318Trigger } from "./round318";
 import { round404Trigger } from "./round404";
 import { round405Trigger } from "./round405";
 import { round406Trigger } from "./round406";
+import { round407Trigger } from "./round407";
 import { parseChanges } from "./sentence";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
@@ -3149,6 +3150,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Round 406 (oracle/round406.ts): Lazav, Dimir Mastermind.
   const r406 = round406Trigger(raw);
   if (r406) return r406;
+  // Round 407 (oracle/round407.ts): The Flood of Mars, Grub, Notorious Auntie, Optimus Prime, Autobot Leader.
+  const r407 = round407Trigger(raw);
+  if (r407) return r407;
   const r312 = round312Trigger(raw) ?? round316Trigger(raw) ?? round317Trigger(raw);
   if (r312) return r312;
   // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,

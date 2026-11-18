@@ -19537,6 +19537,95 @@
   "gameChanger": false
  },
  {
+  "oracleId": "180286e4-67fa-44d5-9e90-4a4e99c016a7",
+  "name": "Grub, Storied Matriarch // Grub, Notorious Auntie",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Goblin Warlock // Legendary Creature — Goblin Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warlock"
+  ],
+  "oracleText": "Menace\nWhenever this creature enters or transforms into Grub, Storied Matriarch, return up to one target Goblin card from your graveyard to your hand.\nAt the beginning of your first main phase, you may pay {R}. If you do, transform Grub.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Blight",
+   "Transform",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Grub, Storied Matriarch",
+    "manaCost": "{2}{B}",
+    "typeLine": "Legendary Creature — Goblin Warlock",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Goblin",
+     "Warlock"
+    ],
+    "oracleText": "Menace\nWhenever this creature enters or transforms into Grub, Storied Matriarch, return up to one target Goblin card from your graveyard to your hand.\nAt the beginning of your first main phase, you may pay {R}. If you do, transform Grub.",
+    "power": "2",
+    "toughness": "1",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468"
+   },
+   {
+    "name": "Grub, Notorious Auntie",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Goblin Warrior",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Goblin",
+     "Warrior"
+    ],
+    "oracleText": "Menace\nWhenever Grub attacks, you may blight 1. If you do, create a tapped and attacking token that's a copy of the blighted creature, except it has \"At the beginning of the end step, sacrifice this token.\"\nAt the beginning of your first main phase, you may pay {B}. If you do, transform Grub.",
+    "power": "2",
+    "toughness": "1",
+    "colors": [
+     "R"
+    ],
+    "colorIndicator": [
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468"
+   }
+  ]
+ },
+ {
   "oracleId": "d38476e9-2e47-4c0c-8129-483c0bd09ec0",
   "name": "Gruul Guildgate",
   "manaCost": "",
@@ -32088,6 +32177,105 @@
   "gameChanger": false
  },
  {
+  "oracleId": "199c4a1a-2082-417c-a174-f479d7334d15",
+  "name": "Optimus Prime, Hero // Optimus Prime, Autobot Leader",
+  "manaCost": "{3}{U}{R}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {2}{U}{R}{W} (You may cast this card converted for {2}{U}{R}{W}.)\nAt the beginning of each end step, bolster 1. (Choose a creature with the least toughness among creatures you control and put a +1/+1 counter on it.)\nWhen Optimus Prime dies, return it to the battlefield converted under its owner's control.",
+  "power": "4",
+  "toughness": "8",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Living metal",
+   "Trample",
+   "Convert",
+   "More Than Meets the Eye",
+   "Bolster"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Optimus Prime, Hero",
+    "manaCost": "{3}{U}{R}{W}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {2}{U}{R}{W} (You may cast this card converted for {2}{U}{R}{W}.)\nAt the beginning of each end step, bolster 1. (Choose a creature with the least toughness among creatures you control and put a +1/+1 counter on it.)\nWhen Optimus Prime dies, return it to the battlefield converted under its owner's control.",
+    "power": "4",
+    "toughness": "8",
+    "colors": [
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902"
+   },
+   {
+    "name": "Optimus Prime, Autobot Leader",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nTrample\nWhenever you attack, bolster 2. The chosen creature gains trample until end of turn. When that creature deals combat damage to a player this turn, convert Optimus Prime.",
+    "power": "6",
+    "toughness": "8",
+    "colors": [
+     "R",
+     "U",
+     "W"
+    ],
+    "colorIndicator": [
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902"
+   }
+  ]
+ },
+ {
   "oracleId": "367faa8c-617a-41a0-901c-f65106e86d56",
   "name": "Oracle en-Vec",
   "manaCost": "{1}{W}",
@@ -43149,6 +43337,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bc681ecf-2a52-4782-9a47-90f5a9f435d8",
+  "name": "Symbiote Spider-Man",
+  "manaCost": "{2}{U/B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Symbiote Spider Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Symbiote",
+   "Spider",
+   "Hero"
+  ],
+  "oracleText": "Whenever this creature deals combat damage to a player, look at that many cards from the top of your library. Put one of them into your hand and the rest into your graveyard.\nFind New Host — {2}{U/B}, Exile this card from your graveyard: Put a +1/+1 counter on target creature you control. It gains this card's other abilities. Activate only as a sorcery.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Find New Host"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c40c823c-5954-457a-81a6-02683da57f7f",
   "name": "Szadek, Lord of Secrets",
   "manaCost": "{3}{U}{U}{B}{B}",
@@ -44487,6 +44713,42 @@
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "677bd655-b240-4862-912c-29209fb295e1",
+  "name": "The Flood of Mars",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Alien Zombie Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Alien",
+   "Zombie",
+   "Horror"
+  ],
+  "oracleText": "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWater Always Wins — Whenever this creature attacks, put a flood counter on another target creature or land. If it's a creature, it becomes a copy of this creature. If it's a land, it becomes an Island in addition to its other types.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Water Always Wins",
+   "Islandwalk"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

@@ -1,4 +1,4 @@
-import { isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
+import { allEffects, isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
@@ -744,6 +744,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
           ...(whileTapped ? { whileTapped } : {}),
+          // A delayed trigger that transforms its source does so only if it hasn't transformed since this was made (CR
+          // 701.27f), not since the trigger was put on the stack.
+          ...(allEffects(e.trigger.body.effects).some((x) => x.type === "transform" && x.what.ref === "self") ? { transformsAt: o.transforms ?? 0 } : {}),
         });
       }
       return;

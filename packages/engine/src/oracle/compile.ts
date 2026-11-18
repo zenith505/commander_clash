@@ -143,6 +143,7 @@ import { round403Line } from "./round403";
 import { round404Line } from "./round404";
 import { round405Line } from "./round405";
 import { round406Line } from "./round406";
+import { round407Line } from "./round407";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1026,6 +1027,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Symbiote Spider-Man (round 407): "It gains this card's other abilities", the card's other lines (oracle/round407.ts).
+    if (line.includes(": Put a +1/+1 counter on target creature you control. It gains ~'s other abilities.") && round407Line(line, raw, out, isSpell, lines.filter((_, i) => i !== li))) continue;
     // Maralen, Fae Ascendant (round 406): once each turn, a free cast from among cards exiled with it this turn (oracle/round406.ts).
     if (line.startsWith("Once each turn, you may cast a spell with mana value less than or equal to ") && round406Line(line, raw, out, isSpell)) continue;
     // Eye of Duskmantle (round 405): cards surveilled this turn (oracle/round405.ts).

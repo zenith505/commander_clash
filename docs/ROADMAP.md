@@ -1,7 +1,7 @@
 # Roadmap
 
-31,660 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,917 of
+31,664 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,921 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3818,6 +3818,27 @@ line blocks.
    Pulmonic Sliver, Filigree Vector, Wayta, Trainer Prodigy, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory,
    Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier
    lists).
+   Round 407 went on down `npm run popular`, most played first, to four cards left out before. The Flood of Mars's "Whenever
+   ~ attacks, put a flood counter on another target creature or land. If it's a creature, it becomes a copy of ~. If it's
+   a land, it becomes an Island in addition to its other types." (each "if" checked on the target as it is then, CR
+   608.2c: a creature land becomes a copy first, which isn't a land, so no Island, rulings; the Island type's {T}: Add {U},
+   CR 305.6; for the rest of the game). Grub, Notorious Auntie's "Whenever ~ attacks, you may blight 1. If you do, create
+   a tapped and attacking token that's a copy of the blighted creature, except it has "At the beginning of the end step,
+   sacrifice ~."" (the creature the blight picked, CR 701.68c, ObjRef "created"; copiable values only, rulings; whom the
+   token attacks its controller's choice, CR 508.4). Optimus Prime, Autobot Leader's "Whenever you attack, bolster 2. The
+   chosen creature gains trample until end of turn. When that creature deals combat damage to a player this turn, convert
+   ~." (a delayed trigger about the bolstered creature for this turn, CR 603.7b-c; a floating trigger that transforms its
+   source now remembers the source's transform count when it's made, `transformsAt`, so a double striker's second trigger
+   doesn't convert it back, CR 701.27f). Symbiote Spider-Man's "Find New Host — {2}{U/B}, Exile ~ from your graveyard: Put a
+   +1/+1 counter on target creature you control. It gains ~'s other abilities. Activate only as a sorcery." (the card's
+   other lines, gained for the rest of the game, CR 611.2a, "this creature" in them being that creature, CR 201.5b; no
+   rulings yet). Browser tests click through the Flood's target, Grub's blight pick and the token's attack choice,
+   Optimus's bolster and convert, and Find New Host from the graveyard with the gained trigger's pick. +4, 31,664 of 31,936
+   on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 407 (looked at, not done): Havengul Laboratory // Havengul Mystery (its back face's link to "the creature
+   put onto the battlefield with ~" across transforming, no rulings), Taskmaster, Niko, Abstruse Appropriation, Pulmonic
+   Sliver, Filigree Vector, Wayta, Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the
+   reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -15,7 +15,7 @@ import { batchCountersRemoved, batchPlayerCounters, countersRemoved, putPlayerCo
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, inRange, objectMatches, playerProtectedFrom } from "./effects/targeting";
-import { canPreventDamage, destroyPermanent, enterTogether, gainLife, log, loseLife, simultaneousLifeLoss, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, damageDrawsMade, destroyPermanent, enterTogether, gainLife, log, loseLife, simultaneousLifeLoss, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -655,6 +655,8 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     // Gloom Surgeon: "prevent that damage and exile that many cards from the top of your library": the cards are exiled
     // even if the damage can't be prevented, and all of it is prevented however many cards there are (rulings, CR 615.12).
     const surgeon = abilitiesOf(s, cover).preventToSelfExileTop;
+    // Swans of Bryn Argoll (round B252): damage from any source to it, as the object it is (CR 400.7), combat or not.
+    if (abilitiesOf(s, cover).preventToSelfDrawsSource) out.push({ id: `static-drawsource:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { object: { id, zc: cover.zoneChanges ?? 0 } }, drawsSource: true });
     if (surgeon) out.push({ id: `static-exiletop:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(surgeon.combat ? { combat: surgeon.combat } : {}), to: { object: { id, zc: cover.zoneChanges ?? 0 } }, mill: true, millSelf: 1, exileTop: true });
     // Weeping Angel: its own combat damage to a creature (as the same object, CR 400.7), prevented, and that creature's owner
     // shuffles it into their library right after (CR 615.5); even when the damage can't be prevented (CR 615.12).
@@ -1089,7 +1091,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
-      let rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.exileTopPrevented || r.mill || r.counterOn || r.countersOn || r.dealTo || r.reflect || r.shuffleIn || r.drawHalf) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      let rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.exileTopPrevented || r.mill || r.counterOn || r.countersOn || r.dealTo || r.reflect || r.shuffleIn || r.drawHalf || r.drawsSource) ?? (preventedAll(s, e) ? undefined : rules[0]);
       // Weeping Angel's prevention shuffles the creature away: when another prevention effect, protection or a shield
       // counter would apply to the damage too, the creature's controller chooses which applies (CR 616.1); a bot (and the
       // default) takes the other one.
@@ -1100,7 +1102,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if (other) {
           const i = choose({ player: chooserOf(to), prompt: `Damage from ${e.src.name} to ${toName}: which applies?`, labels: ["Prevent the damage another way", `${cardName(s, rule)}: prevent it and shuffle ${toName} into its owner's library`] });
           if (i === null) return { ask, ops, final, used: next };
-          if (i === 0) rule = others.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.exileTopPrevented || r.mill || r.counterOn || r.countersOn || r.dealTo || r.reflect || r.drawHalf) ?? (preventedAll(s, e) ? undefined : others[0]);
+          if (i === 0) rule = others.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.exileTopPrevented || r.mill || r.counterOn || r.countersOn || r.dealTo || r.reflect || r.drawHalf || r.drawsSource) ?? (preventedAll(s, e) ? undefined : others[0]);
         }
       }
       if (rule) {
@@ -1108,7 +1110,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
         let n = e.n;
         const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
-        if ((rule.gainLife || rule.dealBack || rule.tokens || rule.exileTopPrevented || rule.countersOn || rule.dealTo || rule.reflect) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
+        if ((rule.gainLife || rule.dealBack || rule.tokens || rule.exileTopPrevented || rule.countersOn || rule.dealTo || rule.reflect || (rule.drawsSource && e.src.controller === rule.controller)) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
         if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}), ...(rule.exileTop ? { exile: true as const } : {}) });
@@ -1524,6 +1526,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (r.tokens) madeLater.set(r.id, { r, n: (madeLater.get(r.id)?.n ?? 0) + n });
     // Bone Mask: that many cards exiled from the top of its controller's library, once the damage is prevented.
     if (r.exileTopPrevented) exileTopLater.set(r.id, { r, n: (exileTopLater.get(r.id)?.n ?? 0) + n });
+    // Swans of Bryn Argoll: the source's controller as the damage is prevented (rulings), drawing once the damage is dealt.
+    if (r.drawsSource && n > 0) (s.damageDraws ??= []).push({ player: src.controller, n, card: cardName(s, r) });
     // Temper: "For each 1 damage prevented this way, put a +1/+1 counter on that creature", at the same time (rulings);
     // Sacred Boon's end step counters count it up for then.
     if (r.countersOn?.tally) (s.preventedTally ??= {})[r.id] = (s.preventedTally?.[r.id] ?? 0) + n;
@@ -1775,7 +1779,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.combatToPlayerDrawsHalf || a.spellDamageToOpponentsTokens || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop || a.combatToCreatureShuffles);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.attachedDamageToController || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.combatToPlayerDrawsHalf || a.spellDamageToOpponentsTokens || a.damageToYouMillsTwice || a.preventToYou || a.preventToYouCounter || a.preventToSelfCounters || a.spellDamageToYouToController || a.preventToSelfExileTop || a.combatToCreatureShuffles || a.preventToSelfDrawsSource);
   });
 }
 
@@ -1804,7 +1808,7 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 }
 
 /** Commit a finished plan and deal its damage. `lifelink`: add the life up for the caller instead of gaining it per event. */
-export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }) } = {}): (DamageEvent & { dealt: number })[] {
+export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }); /** The combat damage step's (game.ts dealCombatDamage), which makes GameState.damageDraws itself. */ combatStep?: true } = {}): (DamageEvent & { dealt: number })[] {
   const back = commitShields(s, plan);
   const witherCounters = new Map<string, number>();
   // What would be lethal for each permanent just before (CR 120.10): from a source with deathtouch, any 1 damage is
@@ -1903,6 +1907,9 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });
   firePlayersDealt(s, out);
   for (const d of dealers.values()) fireSourceDealt(s, d.src, d.amount, d.stackSpell);
+  // Swans of Bryn Argoll (round B252): damage dealt outside a resolution and outside combat (whose own step makes them,
+  // game.ts dealCombatDamage; a resolution makes them after the instruction, resolve.ts): the draws right after it.
+  if (s.damageDraws?.length && !opts.combatStep && !s.resolving) damageDrawsMade(s);
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {
     const d = s.cards[b.cardId];

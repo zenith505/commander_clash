@@ -3554,6 +3554,8 @@ export type Effect =
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
   /** Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (GameState.exileUncastTurn). */
+  /** Don't Blink (round B252): "Until end of turn, if one or more creatures would enter from exile or after being cast from exile, their owners shuffle them into their libraries instead." (GameState.dontBlinkTurn) */
+  | { type: "shuffleFromExileThisTurn" }
   | { type: "exileUncastThisTurn"; /** Hallowed Moonlight: "if a creature would enter": tokens too (GameState.exileUncastAnyTurn). */ tokens?: true }
   | { type: "exileDyingThisTurn"; /** Malicious Eclipse: only creatures the controller's opponents control. */ opponentsOfYou?: true }
   /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
@@ -4984,6 +4986,12 @@ export type Effect =
       riot?: true;
       /** Squandered Resources: "Add one mana of any type the sacrificed land could produce": a type its cost's sacrificed land could make as it last existed (LastKnown.couldProduce, CR 106.7), chosen as it resolves; none if none (rulings). */
       sacrificedType?: true;
+      /**
+       * Elemental Resonance (round B252): "add mana equal to enchanted permanent's mana cost": a mana of each colored symbol's
+       * color, {C} for each generic one, one of the colors of each hybrid symbol chosen as it resolves, nothing for {X}
+       * (rulings, CR 107.4).
+       */
+      costOf?: "attached";
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
@@ -8872,6 +8880,8 @@ export interface CompiledCard {
   spellDamageToYouToController?: TargetSpec;
   /** Gloom Surgeon: "If combat damage would be dealt to ~, prevent that damage and exile that many cards from the top of your library" (CR 615.5). */
   preventToSelfExileTop?: { combat?: "only" | "non" };
+  /** Swans of Bryn Argoll (round B252): "If a source would deal damage to ~, prevent that damage. The source's controller draws cards equal to the damage prevented this way." (CR 615.5) */
+  preventToSelfDrawsSource?: true;
   /**
    * Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it
    * into their library" (CR 615.5): see staticRules in damage.ts.

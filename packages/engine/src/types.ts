@@ -118,6 +118,8 @@ export interface DamageRule {
   shuffleIn?: true;
   /** Sokrates's granted ability (round 381): its controller and the player the damage would be dealt to each draw half that much, rounded down, prevented or not (CR 615.5, 615.12). */
   drawHalf?: true;
+  /** Swans of Bryn Argoll (round B252): the source's controller draws as many cards as this rule prevents, once the damage event is over (CR 615.5, GameState.damageDraws). */
+  drawsSource?: true;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
@@ -2590,6 +2592,8 @@ export interface GameState {
   exileUncastTurn?: number;
   /** Hallowed Moonlight: the same for every creature that wasn't cast, tokens and copies of spells too (CR 614.1a). */
   exileUncastAnyTurn?: number;
+  /** Don't Blink (round B252): the turn creatures entering from exile, or after being cast from exile, are shuffled into their owners' libraries instead. */
+  dontBlinkTurn?: number;
   /** "If a creature an opponent controls would die this turn, exile it instead" (Malicious Eclipse): whose opponents' creatures, and the turn. */
   exileDyingOpponents?: { turn: number; player: PlayerId }[];
   /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */

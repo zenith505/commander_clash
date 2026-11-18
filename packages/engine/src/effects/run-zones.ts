@@ -4527,6 +4527,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `This turn, ${player(s, ctx.controller).name}'s permanents are exiled instead of being put into a graveyard, and return at the beginning of the next end step.`);
       return;
     }
+    case "shuffleFromExileThisTurn":
+      s.dontBlinkTurn = s.turn;
+      log(s, "Until end of turn, creatures that would enter from exile or after being cast from exile are shuffled into their owners' libraries instead.");
+      return;
     case "exileUncastThisTurn":
       if (e.tokens) s.exileUncastAnyTurn = s.turn;
       else s.exileUncastTurn = s.turn;

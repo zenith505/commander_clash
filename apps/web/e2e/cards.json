@@ -13119,6 +13119,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1f4ff059-e505-4746-ba4f-6b78a502f523",
+  "name": "Elemental Resonance",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant permanent\nAt the beginning of your first main phase, add mana equal to enchanted permanent's mana cost. (Mana cost includes color. If a mana symbol has multiple colors, choose one.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b3b9a87d-cb95-435c-90b6-037406cab32e",
   "name": "Elite Vanguard",
   "manaCost": "{W}",
@@ -42673,6 +42710,41 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b187aeeb-5cf5-4b73-a3ef-f39188d2ba33",
+  "name": "Swans of Bryn Argoll",
+  "manaCost": "{2}{W/U}{W/U}",
+  "cmc": 4,
+  "typeLine": "Creature — Bird Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Spirit"
+  ],
+  "oracleText": "Flying\nIf a source would deal damage to this creature, prevent that damage. The source's controller draws cards equal to the damage prevented this way.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -988,6 +988,16 @@ export function moveObject(
     gatherUsed = step.used;
     if (step.choice) gatherChoice = { options: step.choice, used: step.used };
   }
+  // Don't Blink (round B252): "Until end of turn, if one or more creatures would enter from exile or after being cast from
+  // exile, their owners shuffle them into their libraries instead" (CR 614.1a): a card from exile, or a spell cast from
+  // exile as it resolves (a copy wasn't cast, CR 707.10), that would be a creature there (CR 614.12). Its owner shuffles
+  // (below), as a commander may go to the command zone instead (CR 903.9a).
+  let dontBlink = false;
+  if (to === "battlefield" && s.dontBlinkTurn === s.turn && (fromZone === "exile" || (fromZone === "stack" && !o.spellCopy && o.castFrom === "exile")) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
+    log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} is shuffled into its owner's library instead of entering (Don't Blink).`);
+    to = "library";
+    dontBlink = true;
+  }
   // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
   // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
   // token, wasn't cast (rulings).
@@ -1631,6 +1641,7 @@ export function moveObject(
   // Darksteel Colossus: its own replacement ability shuffled it in, controlled by whoever controlled it (by its owner
   // from another zone, CR 113.8).
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner), fromZone === "battlefield" ? lastController : o.owner);
+  if (dontBlink && o.zone === "library") shuffleLibrary(s, player(s, o.owner), o.owner);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name, undefined, lastController);
   if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
   // Cosmic Intervention: each card exiled this way gets its own delayed trigger (rulings); a token ceases to exist and
@@ -3761,7 +3772,10 @@ function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", sou
 /** Draws a replacement's question stopped are all made: carry on with what was drawing (`after`, or the resolving spell or ability). */
 function drawsDone(s: GameState, after: DrawAfter | undefined) {
   if (after === "drawStep") drawStepDrawn(s);
-  else if (after === "damageDraws") damageDrawsMade(s);
+  // Inside a resolution (Swans of Bryn Argoll, round B252), the rest of it follows the draws.
+  else if (after === "damageDraws") {
+    if (!damageDrawsMade(s) && s.resolving && !s.pending) continueResolution(s);
+  }
   else if (s.resolving) continueResolution(s);
 }
 
@@ -15685,7 +15699,7 @@ function finishCombatDamage(s: GameState): boolean {
   // Each source's lifelink is one life-gain event however many things it damaged (CR 119.10).
   const lifelink = new Map<string, { n: number }>();
   const key = (e: DamageEvent) => e.src.id!;
-  const done = dealPlanned(s, plan, { lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
+  const done = dealPlanned(s, plan, { combatStep: true, lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
   const dealt = new Map<ObjectId, number>();
   // Arashin War Beast: the sources that dealt some of it to a creature that's blocking (CR 509.1g, 506.4).
   const toBlocker = new Set<ObjectId>();

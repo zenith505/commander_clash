@@ -42,10 +42,12 @@ export function tokenCopies(s: GameState, pid0: PlayerId, base: CardDef, n: numb
         delete s.objects[o.id];
         continue;
       }
-      made++;
       // "Except it enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
       const counters = copyEnterCounters(opts.except, (type) => isType(s.cards[key]!, type));
       moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(host ?? {}) });
+      // Worms of the Earth (round B258): a copy of a land that can't enter isn't created (CR 111.5).
+      if (!s.objects[o.id]) continue;
+      made++;
       const at = opts.attackAt?.[i];
       // A noncreature one enters, but not attacking (CR 506.3a).
       if (defender !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature") && attackingPlayer(s, pid, at?.player ?? defender)) o.attacking = at?.player ?? defender;
@@ -489,9 +491,12 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
     const tapped = e.tapped || (e.attacking && !e.untapped);
     const opts = { tapped, attacking: defender, ...(counters ? { counters } : {}), ...(blocking ? { blocking } : {}) };
     const whom = new Set<string>();
+    // Worms of the Earth (round B258): those not created aren't counted in the log.
+    let made = 0;
     for (let i = 0; i < k; i++) {
       const at = attackAt?.[i];
       const o = createToken(s, pid, e.token, { ...opts, ...(at ? { attacking: at.player } : {}) });
+      if (s.objects[o.id]) made++;
       // A planeswalker or battle chosen for it, if it's still there to be attacked (CR 506.3c).
       const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
       if (pw && o.zone === "battlefield" && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
@@ -499,7 +504,7 @@ function createTokensFor(s: GameState, e00: Extract<Effect, { type: "createToken
     }
     // Another player's tokens (Gluntch's "choose a third player to create two Treasure tokens"): they create them.
     const maker = pid === ctx.controller ? src : player(s, pid).name;
-    if (k) log(s, `${maker} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${whom.size && livingPlayers(s).length > 2 ? ` (attacking ${[...whom].join(" and ")})` : ""}${pid === ctx.controller ? "" : ` (${src})`}.`);
+    if (made) log(s, `${maker} creates ${made === 1 ? "a" : made}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${made > 1 ? "s" : ""}${whom.size && livingPlayers(s).length > 2 ? ` (attacking ${[...whom].join(" and ")})` : ""}${pid === ctx.controller ? "" : ` (${src})`}.`);
     createExtraTokens(s, pid, extra, opts, attackAt?.slice(k));
   }
 }
@@ -533,6 +538,7 @@ function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }
           continue;
         }
         moveObject(s, o.id, "battlefield", { attachTo: host });
+        if (!s.objects[o.id]) continue; // a land token Worms of the Earth stops (CR 111.5)
         s.resolving?.created?.push(o.id);
         noteCreated(s, pid, o);
         made++;
@@ -613,6 +619,8 @@ export function createToken(s: GameState, pid: PlayerId, t0: TokenSpec, opts: { 
   o.isToken = true;
   // It enters like any permanent, so ETB triggers see it, with any counters it's created with (CR 122.6, 614.1c).
   moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
+  // Worms of the Earth (round B258): a land token that can't enter isn't created at all (CR 111.5).
+  if (!s.objects[o.id]) return o;
   if (opts.attacking !== undefined && o.zone === "battlefield" && attackingPlayer(s, pid, opts.attacking)) o.attacking = opts.attacking;
   // Put onto the battlefield blocking (Brimaz): it blocks that attacker, never declared as a blocker (CR 509.1, rulings).
   const at = opts.blocking;
@@ -667,6 +675,7 @@ function copiesInstead(s: GameState, pid: PlayerId, of: ObjectId, n: number, opt
     const o = newObject(s, s.cards[key]!, pid, "exile");
     o.isToken = true;
     moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
+    if (!s.objects[o.id]) continue; // a land token Worms of the Earth stops (CR 111.5)
     if (opts.attacking !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature") && attackingPlayer(s, pid, opts.attacking)) o.attacking = opts.attacking;
     const at = opts.blocking;
     if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined && objIsType(s, o, "Creature") && defendingAgainst(s, pid, at)) {

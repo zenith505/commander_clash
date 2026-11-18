@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource, itemQuality } from "./targeting";
+import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sharingACreatureType, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource, itemQuality } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runGameOfChaosEffect, runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -102,6 +102,8 @@ import { runLaneB235Effect } from "./run-laneb235";
 import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB238Effect } from "./run-laneb238";
 import { runLaneB254Effect } from "./run-laneb254";
+import { runLaneB255Effect } from "./run-laneb255";
+import { runLaneB256Effect } from "./run-laneb256";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -601,6 +603,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
     if (ref.sameNameYardsAndPermanents && out[0]) out.push(...sameNamedAnywhere(s, out[0]));
     if (ref.sharesColor && out[0]) out.push(...sharingAColor(s, out[0], ref.sharesColor, ctx.controller));
+    if (ref.sharesType && out[0]) out.push(...sharingACreatureType(s, out[0], ref.sharesType, ctx.controller));
     if (ref.sameMv && out[0]) out.push(...sameManaValued(s, out[0], ref.sameMv, ctx.controller));
     if (ref.attachedToo) {
       const hosts = new Set(out.map((o) => o.id));
@@ -2125,6 +2128,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB238Effect(s, e, ctx, src);
     case "peaceTalks":
       return runLaneB254Effect(s, e, ctx, src);
+    case "whimsPiles":
+      return runLaneB255Effect(s, e, ctx, src);
+    case "reblock":
+    case "raidingParty":
+    case "searchTheCity":
+      return runLaneB256Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

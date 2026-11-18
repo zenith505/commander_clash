@@ -360,7 +360,11 @@ export function parseCostKeyword(
   // hand.": a morph cost that isn't mana (CR 702.37a, 118.8), paid as it's turned face up (702.37e).
   if ((m = /^Morph—([A-Z][^{}]+?)\.?$/.exec(line))) {
     const text = m[1]!.replace(/^./, (c) => c.toLowerCase());
-    const cost = parseAdditionalCost(text.replace(/ in your hand$/, " from your hand"));
+    // Gift of Doom (round B255): "Morph—Sacrifice another creature.": a creature other than the face-down permanent (CR
+    // 702.37e), which is a 2/2 creature as the cost is paid.
+    const another = /^sacrifice another (creature)$/.exec(text);
+    const one = another ? parseAdditionalCost(`sacrifice a ${another[1]}`) : null;
+    const cost: AdditionalCost | null = one?.kind === "sacrifice" ? { ...one, other: true } : another ? null : parseAdditionalCost(text.replace(/ in your hand$/, " from your hand"));
     if (!cost || !["payLife", "discard", "reveal", "sacrifice", "returnToHand"].includes(cost.kind) || ("x" in cost && cost.x) || (cost.kind === "discard" && cost.random) || (cost.kind === "reveal" && cost.orControl)) return "fail";
     return { faceDown: { kind: "morph", cost: "", costs: [cost], text } };
   }

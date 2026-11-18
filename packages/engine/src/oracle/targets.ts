@@ -605,6 +605,12 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const type = radiance[1] === "creature" ? "Creature" : "Enchantment";
     return { ...t, sharesColor: { filter: { kind: "object", types: [type], text: radiance[2]! } } };
   }
+  // Killer (Coward // Killer, round B255): "target creature and each other creature that shares a creature type with it".
+  if (/^target creature and each other creature that shares a creature type with it$/i.test(x) && !cards) {
+    const t = parseObjectNow("target creature", ctx, cards);
+    if (t?.ref !== "target" || t.n) return null;
+    return { ...t, sharesType: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } } };
+  }
   // "Target creature and all other creatures with the same name as that creature" (Maelstrom Pulse, Homing Lightning,
   // Declaration in Stone's "all other creatures its controller controls", Legions to Ashes' "all tokens that player
   // controls"): one target, and the others by name as it resolves.

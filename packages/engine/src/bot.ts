@@ -1,5 +1,6 @@
 import { bindBound, cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
+import { reblockOptions } from "./effects/run-laneb256";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -30,6 +31,8 @@ import {
   definedCastX,
   faceUpWays,
   faceUpFormsOf,
+  faceUpAttaches,
+  faceUpAttachOptions,
   faceUpManaCost,
   dredgeAmount,
   assistedRemaining,
@@ -703,6 +706,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = takeoverPick(s, pid, pend.options);
       return [{ type: "pickPermanents", player: pid, ids: [pick ?? pend.options[0]!].slice(0, pend.count) }];
     }
+    // Raiding Party (round B256): enough of our cheapest white creatures to spare all our Plains (two each), then our own
+    // Plains (another player's would only help them).
+    if (pend.kind === "pickPermanents" && pend.raid === "tap") {
+      const ours = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).subtypes.includes("Plains")).length;
+      const ids = [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, Math.ceil(ours / 2));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
+    if (pend.kind === "pickPermanents" && pend.raid === "plains") return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).slice(0, pend.count) }];
+    // Whims of the Fates (round B255): one pile in three is sacrificed at random, so any split loses a third of the worth on
+    // average; even piles keep the worst case smallest. The first pile about a third of the worth, the rest halved after.
+    if (pend.kind === "pickPermanents" && pend.action === "pile" && pend.piles3 === 1) return [{ type: "pickPermanents", player: pid, ids: thirdPile(pend.options, (id) => permanentWorth(s, pid, id)) }];
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
@@ -1439,6 +1453,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "As ~ enters, it becomes your choice of a 3/3 creature with flying, ... or a 0/12 creature with defender": the one
     // that attacks best, flying first, never defender, then the most power.
     // Aquamorph Entity turned face up by an effect: as for the special action (botFaceUpForm).
+    // Gift of Doom turned face up by an effect: our most valuable creature, else none (an opponent's would gain from it).
+    // False Orders, Balduvian Warlord (round B256): the attacker for the creature to block, by botReblock; Search the City:
+    // always take the card.
+    if (pend.kind === "chooseOption" && pend.what === "reblockAttacker") return [{ type: "chooseOption", player: pid, choice: botReblock(s, pid, pend.about, pend.options) }];
+    if (pend.kind === "chooseOption" && pend.what === "cityCard") return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => o !== "none") ?? "none" }];
+    if (pend.kind === "chooseOption" && pend.what === "faceUpAttach") {
+      const mine = pend.options.filter((id) => id !== "none" && controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      return [{ type: "chooseOption", player: pid, choice: mine[0] ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "faceUpForm") return [{ type: "chooseOption", player: pid, choice: pend.options[botFormIndex(pend.labels ?? [])] ?? pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "form") {
       const score = (label: string) => (/defender/.test(label) ? -100 : 0) + (/flying/.test(label) ? 10 : 0) + Number(/(\d+)\//.exec(label)?.[1] ?? 0);
@@ -2481,7 +2504,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const extra = faceUpWays(s, o)[w.i]!.costs;
         const costs = extra ? faceUpCosts(s, pid, o, extra) : undefined;
         if (costs === null) continue;
-        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs, botFaceUpForm(s, o));
+        // Gift of Doom: only with a creature of ours to attach it to.
+        const attach = botFaceUpAttach(s, pid, o, costs?.sacrifice);
+        if (attach === null) continue;
+        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs, botFaceUpForm(s, o), attach);
         if (plan) return plan;
       }
     }
@@ -2793,6 +2819,16 @@ function botFormIndex(labels: string[]): number {
 }
 
 /** Aquamorph Entity: the form it's turned face up as (CompiledCard.faceUpForms), undefined for the rest. */
+/**
+ * Gift of Doom (round B255): the creature of ours worth the most to attach it to as it's turned face up (deathtouch and
+ * indestructible), not one sacrificed to pay for it; undefined for a permanent with no such choice, null when there's none.
+ */
+function botFaceUpAttach(s: GameState, pid: PlayerId, o: GameObject, sacrificed: readonly ObjectId[] = []): ObjectId | undefined | null {
+  if (!faceUpAttaches(s, o)) return undefined;
+  const mine = faceUpAttachOptions(s, o, sacrificed).filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+  return mine[0] ?? null;
+}
+
 function botFaceUpForm(s: GameState, o: GameObject): number | undefined {
   const forms = faceUpFormsOf(s, o);
   return forms ? botFormIndex(forms.map((f) => f.text)) : undefined;
@@ -2814,7 +2850,7 @@ function faceUpX(s: GameState, pid: PlayerId, o: GameObject, way: number): numbe
   // counts. What leaves the battlefield is scored by its worth now (Bane's face up): an opponent's for us, ours 1.5 times against.
   const before = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") || id === o.id).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0, v: (controllerOf(s, obj(s, id)) === pid ? -1.5 : 1) * (id === o.id ? Math.max(1, Number(card.power ?? 0) + Number(card.toughness ?? 0)) + 1 : worth(s, pid, obj(s, id))) }));
   const score = (x: number): number | null => {
-    const plan = planTurnFaceUp(s, pid, o.id, way, x, undefined, botFaceUpForm(s, o));
+    const plan = planTurnFaceUp(s, pid, o.id, way, x, undefined, botFaceUpForm(s, o), botFaceUpAttach(s, pid, o) ?? "none");
     if (!plan) return null;
     const u = cloneState(s);
     try {
@@ -4743,7 +4779,7 @@ function chooseSilencerFaceUp(s: GameState, pid: PlayerId): Action[] | null {
     const ways = faceUpWays(s, o);
     for (let i = 0; i < ways.length; i++) {
       if (ways[i]!.costs) continue;
-      const plan = planTurnFaceUp(s, pid, id, i, faceUpX(s, pid, o, i), undefined, botFaceUpForm(s, o));
+      const plan = planTurnFaceUp(s, pid, id, i, faceUpX(s, pid, o, i), undefined, botFaceUpForm(s, o), botFaceUpAttach(s, pid, o) ?? "none");
       if (plan) return plan;
     }
   }
@@ -6980,6 +7016,41 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         v += theirs >= player(s, pid).life / 3 && theirs > 2 * powerOf(pid) ? 5 : -10;
         break;
       }
+      // Round B255, Whims of the Fates: each player loses a third of their permanents' worth on average, so only when our
+      // board is well behind the opponents' on average.
+      case "whimsPiles": {
+        const boardOf = (q: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q).reduce((n, id) => n + Math.max(0, permanentWorth(s, q, id)), 0);
+        const opps = opponents(s, pid);
+        const avg = opps.length ? opps.reduce((n, q) => n + boardOf(q), 0) / opps.length : 0;
+        const mine = boardOf(pid);
+        v += mine < 0.7 * avg ? 4 + (avg - mine) / 3 : -10;
+        break;
+      }
+      // Round B256, False Orders and Balduvian Warlord: an opponent's creature blocking ours taken away (ours unblocked, as
+      // it's the only blocker), or our own creature made to block an attacker it kills and survives; nothing else.
+      case "reblock": {
+        const t = e.what.ref === "target" ? targets[e.what.index] : undefined;
+        const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+        if (!o || o.zone !== "battlefield") {
+          v -= 10;
+          break;
+        }
+        const freed = controllerOf(s, o) !== pid && (o.blocking ?? []).some((a) => !!s.objects[a] && controllerOf(s, obj(s, a)) === pid && (obj(s, a).blockedBy ?? []).length === 1);
+        const mine = controllerOf(s, o) === pid && !o.blocking?.length && reblockOptions(s, o).some((a) => power(s, o) >= toughness(s, obj(s, a)) && power(s, obj(s, a)) < toughness(s, o));
+        v += freed || mine ? 4 : -10;
+        break;
+      }
+      // Round B256, Raiding Party: the opponents' Plains it would destroy (those their untapped white creatures can't spare)
+      // against ours, for the Orc it costs.
+      case "raidingParty": {
+        const lost = (q: PlayerId) => {
+          const plains = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && characteristics(s, obj(s, id)).subtypes.includes("Plains")).length;
+          const white = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && !obj(s, id).tapped && objIsType(s, obj(s, id), "Creature") && characteristics(s, obj(s, id)).colors.includes("W")).length;
+          return Math.max(0, plains - 2 * white);
+        };
+        v += 2 * opponents(s, pid).reduce((n, q) => n + lost(q), 0) - 3 * lost(pid) - 3;
+        break;
+      }
       // Round B250, Gather Specimens: worth it only with an opponent's creature spell on the stack to take as it resolves
       // (its mana value), not as a sorcery-speed nothing.
       case "gatherSpecimens": {
@@ -9043,6 +9114,17 @@ function permanentWorth(s: GameState, pid: PlayerId, id: string): number {
 }
 
 /** The first of two piles that splits `cards` as evenly as can be by handWorth (every split tried, up to 12 cards). */
+/** Whims of the Fates: greedy, the most valuable first, each into the lightest of three piles; the first of them. */
+function thirdPile(ids: string[], worthOf: (id: string) => number): string[] {
+  const bins: { ids: string[]; w: number }[] = [{ ids: [], w: 0 }, { ids: [], w: 0 }, { ids: [], w: 0 }];
+  for (const c of ids.map((id) => ({ id, w: worthOf(id) })).sort((a, b) => b.w - a.w)) {
+    const bin = bins.reduce((a, b) => (b.w < a.w ? b : a));
+    bin.ids.push(c.id);
+    bin.w += c.w;
+  }
+  return bins[0]!.ids;
+}
+
 function evenPiles(s: GameState, pid: PlayerId, cards: string[], worthOf: (id: string) => number = (id) => handWorth(s, id)): string[] {
   void pid;
   const worth = cards.map(worthOf);
@@ -9895,4 +9977,26 @@ function craftSlotPicks(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, 
 function withoutBound(f: TargetSpec): TargetSpec {
   const { bound: _bound, ...rest } = f;
   return rest;
+}
+
+/**
+ * False Orders, Balduvian Warlord (round B256): the attacker `about` blocks. Our own creature blocks one it kills and survives,
+ * else one it survives (the most power first), else the biggest threat if it must; someone else's creature blocks one that
+ * kills it and survives, else one that survives it, else none if we may (the least valuable attacker if we must).
+ */
+export function botReblock(s: GameState, pid: PlayerId, about: ObjectId | undefined, options: string[]): string {
+  const b = about ? s.objects[about] : undefined;
+  const ats = options.filter((o) => o !== "none").map((id) => obj(s, id));
+  const may = options.includes("none");
+  if (!b || !ats.length) return "none";
+  const bp = power(s, b);
+  const bt = toughness(s, b) - (b.damage ?? 0);
+  const byPower = [...ats].sort((x, y) => power(s, y) - power(s, x));
+  if (controllerOf(s, b) === pid) {
+    const pick = byPower.find((a) => bp >= toughness(s, a) - (a.damage ?? 0) && power(s, a) < bt) ?? byPower.find((a) => power(s, a) < bt);
+    return (pick ?? (may && player(s, pid).life > 10 ? undefined : byPower[0]))?.id ?? "none";
+  }
+  const pick = byPower.find((a) => power(s, a) >= bt && bp < toughness(s, a) - (a.damage ?? 0)) ?? byPower.find((a) => bp < toughness(s, a) - (a.damage ?? 0));
+  if (pick) return pick.id;
+  return may ? "none" : [...ats].sort((x, y) => worth(s, pid, x) - worth(s, pid, y))[0]!.id;
 }

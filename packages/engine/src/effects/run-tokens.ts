@@ -596,7 +596,7 @@ function attackingPlayer(s: GameState, pid: PlayerId, at: PlayerId): boolean {
  * One put onto the battlefield blocking `attacker` blocks it only if that creature is attacking `pid`, a planeswalker
  * `pid` controls or a battle `pid` protects (CR 506.3e; Crafty Cutpurse's rulings).
  */
-function defendingAgainst(s: GameState, pid: PlayerId, attacker: GameObject): boolean {
+export function defendingAgainst(s: GameState, pid: PlayerId, attacker: GameObject): boolean {
   const p = attacker.attackingPermanent ? s.objects[attacker.attackingPermanent.id] : undefined;
   if (p?.zone === "battlefield") return controllerOf(s, p) === pid || p.protector === pid;
   return attacker.attacking === pid;

@@ -111,7 +111,7 @@ import {
   altCostsFor,
   isEmerge,
   payZeroSource,
-  linkedFreeGrant,
+  linkedFreeAny,
   commanderTax,
   legendBotKeep,
   loseReplacements,
@@ -1690,6 +1690,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Its own card back on top, to draw it again; someone else's card can't be on our library.
     // Read ahead (CR 702.155): start on chapter I, so every chapter happens.
     if (pend.kind === "chooseOption" && pend.what === "readAhead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Archelos, Lagoon Mystic (round 403): an untapped permanent is never worse for us.
+    if (pend.kind === "chooseOption" && pend.what === "tapOrder") return [{ type: "chooseOption", player: pid, choice: "untapped" }];
     // The Sieges' Khans or Dragons (CR 614.12b): Khans, the long-term value (a card, counters, mana, a returned creature).
     // "Roll two d8 and choose one result" (the Endeavors): the higher one for the first instruction.
     if (pend.kind === "chooseOption" && pend.what === "rollResult") return [{ type: "chooseOption", player: pid, choice: Number(pend.labels?.[1]) > Number(pend.labels?.[0]) ? "1" : "0" }];
@@ -2133,6 +2135,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "kohCard") {
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => lendWorth(s, b) - lendWorth(s, a))[0]! }];
     }
+    // Lazav, Wearer of Faces and Spirit of Resilience (round 405): the biggest card, if it's bigger than the permanent now.
+    if (pend.kind === "chooseOption" && pend.what === "copyAmong") {
+      const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
+      const best = pend.options.filter((o) => o !== "none").sort((a, b) => size(b) - size(a))[0];
+      const host = s.resolving ? s.objects[s.resolving.item.sourceId ?? ""] : undefined;
+      const now = host && host.zone === "battlefield" ? defWorth(defOf(s, host)) : 0;
+      return [{ type: "chooseOption", player: pid, choice: best !== undefined && size(best) > now ? best : "none" }];
+    }
     // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
     if (pend.kind === "chooseOption" && pend.what === "aegisCopy") {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
@@ -2436,7 +2446,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid) ?? chooseSendAttackerAway(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -2522,7 +2532,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Brutal Hordechief (round 378): the opponents' blocks before we attack.
       // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
       // Koh, the Face Stealer (round 399): its card chosen before combat, so a borrowed attack ability works this turn.
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Valki, God of Lies (round 408): its copy before combat too.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard" || e.type === "becomeCopyOfLinkedX")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -4347,8 +4358,8 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     const plan = castPlan(s, pid, id, false, undefined, "topFree");
     if (plan) return plan;
   }
-  // Court of Locthwain: a card exiled with it, for nothing.
-  if (linkedFreeGrant(s, o, pid) >= 0) {
+  // Court of Locthwain: a card exiled with it, for nothing; Maralen, Fae Ascendant (round 406): one exiled with it this turn.
+  if (linkedFreeAny(s, o, pid)) {
     const plan = castPlan(s, pid, id, false, undefined, "linkedFree");
     if (plan) return plan;
   }
@@ -6192,6 +6203,13 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
     return d.supertypes.includes("Legendary") ? -1 : defWorth(d) - defWorth(defOf(s, host));
   }
   if (e.what.ref !== "self") return 0;
+  // Lazav, Dimir Mastermind (round 406): the creature card put into an opponent's graveyard, as printed; it keeps its own
+  // name, so the legend rule doesn't come into it.
+  if (e.of.ref === "eventGroup" && e.of.printed) {
+    const g = item.event?.group?.[0];
+    const card = g ? s.objects[g.id] : undefined;
+    return card && !card.isToken ? defWorth(restingDef(s.cards[card.cardId]!)) - defWorth(defOf(s, me)) : 0;
+  }
   const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
   const sub = item.subject && s.objects[item.subject.id];
   const d =
@@ -7166,6 +7184,17 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (plan) return plan;
         continue;
       }
+      // Valki, God of Lies (round 408): once, in our main phase with the stack empty, X the mana value of the biggest creature
+      // card exiled with it that's bigger than Valki is now and that we can pay for.
+      if (ab.body.effects.some((e) => e.type === "becomeCopyOfLinkedX")) {
+        const room = availableMana(s, pid) - (ab.tap ? 1 : 0);
+        const now = defWorth(defOf(s, o));
+        const best = linkedCards(s, id).map((l) => restingDef(s.cards[obj(s, l.id).cardId]!)).filter((d) => isType(d, "Creature") && defMv(d) <= room && defWorth(d) > now).sort((a, b) => defWorth(b) - defWorth(a))[0];
+        if (!best || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length || o.activatedThisTurn?.includes(i)) continue;
+        const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, defMv(best));
+        if (plan) return plan;
+        continue;
+      }
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3) && !(counterX > 0)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
@@ -7821,6 +7850,27 @@ function choosePayEnchantedCost(s: GameState, pid: PlayerId): Action[] | null {
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
       if (!ab.enchantedControllerOnly || !ab.body.effects.every((e) => e.type === "removeCounters" && e.what.ref === "self" && (o.counters[e.counter] ?? 0) > 0)) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Capricopian (round 403): "{2}: Put a +1/+1 counter on ~, then you may reselect which player ~ is attacking. Only the
+ * player ~ is attacking may activate this ability ...": an opponent's creature attacking us, sent to another player
+ * (reselectPick: the one with the most life), once at a time with nothing on the stack.
+ */
+function chooseSendAttackerAway(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.stack.length || s.step !== "declareAttackers" || s.activePlayer === pid) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (o.attacking !== pid || o.attackingPermanent || controllerOf(s, o) === pid || !reselectPick(s, pid, o)) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (!ab.attackedPlayerOnly || !ab.body.effects.some((e) => e.type === "reselectAttack")) continue;
       const plan = planActivate(s, pid, id, i);
       if (plan) return plan;
     }

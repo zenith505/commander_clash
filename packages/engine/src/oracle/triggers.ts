@@ -9,6 +9,10 @@ import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
 import { parseToken } from "./tokens";
 import { round318Trigger } from "./round318";
+import { round404Trigger } from "./round404";
+import { round405Trigger } from "./round405";
+import { round406Trigger } from "./round406";
+import { round407Trigger } from "./round407";
 import { parseChanges } from "./sentence";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
@@ -3137,6 +3141,18 @@ function payToUntapTrigger(raw: string): TriggeredAbility | "fail" | null {
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const untapPaid = payToUntapTrigger(raw);
   if (untapPaid) return untapPaid;
+  // Round 404 (oracle/round404.ts): Hero of Bretagard, Ranar, Kraven the Hunter, Eriette.
+  const r404 = round404Trigger(raw);
+  if (r404) return r404;
+  // Round 405 (oracle/round405.ts): Lazav, Wearer of Faces and Spirit of Resilience.
+  const r405 = round405Trigger(raw);
+  if (r405) return r405;
+  // Round 406 (oracle/round406.ts): Lazav, Dimir Mastermind.
+  const r406 = round406Trigger(raw);
+  if (r406) return r406;
+  // Round 407 (oracle/round407.ts): The Flood of Mars, Grub, Notorious Auntie, Optimus Prime, Autobot Leader.
+  const r407 = round407Trigger(raw);
+  if (r407) return r407;
   const r312 = round312Trigger(raw) ?? round316Trigger(raw) ?? round317Trigger(raw);
   if (r312) return r312;
   // Johan: "At the beginning of combat on your turn, you may have ~ gain "~ can't attack" until end of combat. If you do,

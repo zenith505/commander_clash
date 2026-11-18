@@ -399,6 +399,9 @@ function diesMatches(
   if (d.blockingSelf && !dying.o.blocking?.includes(srcId)) return false;
   // Thijarian Witness: attacking or blocking alone as it left (CR 506.5), noted then (LastKnown aloneIn).
   if (d.aloneInCombat && !s.lastKnown?.[dying.o.id]?.aloneIn) return false;
+  // Kraven the Hunter (round 404): "with the greatest power among creatures that player controls": as it last existed,
+  // against the creatures its controller controlled then (CR 603.10a), those leaving with it too; tied counts.
+  if (d.greatestPowerOfController && !hadGreatestPower(s, dying)) return false;
   // Dance of Many: a token this object created, as the object it is now (CR 400.7).
   if (d.createdWithSelf) return dying.o.createdWith?.id === srcId && dying.o.createdWith.zc === (s.objects[srcId]?.zoneChanges ?? 0);
   // Diabolic Servitude (round B236): the creature its enters ability put onto the battlefield, linked to the object the
@@ -575,7 +578,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           index,
           // A delayed one is about its source as it was when it was made (CR 603.7c).
           sourceZc: floating ? floating.sourceZc : (o.zoneChanges ?? 0),
-          ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}) } : {}),
+          ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}), ...(floating.transformsAt !== undefined ? { transformsAt: floating.transformsAt } : {}) } : {}),
           ...(cause ? { cause } : {}),
           ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : floating?.about ? { subject: floating.about } : {}),
           ...(lki ? { lki } : {}),
@@ -688,6 +691,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const you = controllerOf(s, aura);
     if (controllerOf(s, host) !== you || !characteristics(s, host).types.includes("Creature")) return;
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "auraAttachedToYours", undefined, undefined, aura);
+  };
+  // Eriette, the Beguiler (round 404): "Whenever an Aura you control becomes attached to a nonland permanent an opponent
+  // controls with mana value less than or equal to that Aura's mana value": the Aura's controller's permanents, about that
+  // permanent, with the Aura as the event's group (an {X} in a mana cost counts as 0 there, CR 202.3e, rulings).
+  const auraToOpponents = (aura: GameObject, host: GameObject) => {
+    const you = controllerOf(s, aura);
+    const hc = characteristics(s, host);
+    if (!opponents(s, you).includes(hc.controller) || hc.types.includes("Land") || hc.manaValue > characteristics(s, aura).manaValue) return;
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "auraAttachedToOpponents", undefined, undefined, host, undefined, undefined, undefined, { group: [{ id: aura.id, zc: aura.zoneChanges ?? 0 }] });
   };
   // River Song (round 382): "Whenever an opponent scries, surveils, or searches their library": the permanents of that
   // player's opponents (CR 102.2), once for each of those events, "that player" being the one who did it.
@@ -895,6 +907,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (host?.zone === "battlefield" && characteristics(s, entering).subtypes.includes("Aura")) {
       add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, entering);
       auraToYours(entering, host);
+      auraToOpponents(entering, host);
     }
     // Enormous Energy Blade: entering attached to a creature, it becomes attached to it.
     if (host?.zone === "battlefield" && objIsType(s, host, "Creature")) add(entering, you, (e) => e === "selfBecomesAttached", undefined, undefined, host);
@@ -919,6 +932,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield" && host?.zone === "battlefield" && o.attachedTo === host.id && characteristics(s, o).subtypes.includes("Aura")) {
       add(host, controllerOf(s, host), (e) => e === "auraAttachedToSelf", undefined, undefined, o);
       auraToYours(o, host);
+      auraToOpponents(o, host);
     }
     // "Whenever ~ becomes attached to a creature" (Enormous Energy Blade): the Aura's or Equipment's trigger, about that creature.
     if (o?.zone === "battlefield" && host?.zone === "battlefield" && o.attachedTo === host.id && objIsType(s, host, "Creature")) add(o, controllerOf(s, o), (e) => e === "selfBecomesAttached", undefined, undefined, host);
@@ -3556,6 +3570,29 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
 }
 
 /** Is this moved object one that `b` counts, for the permanent `w` (as it is now, or as it last existed: `gone`)? */
+/**
+ * Kraven the Hunter (round 404): the dying creature's power is at least that of each other creature its controller
+ * controlled just before it left (CR 603.10a), those leaving in the same event too, a tie included: the battlefield as the
+ * event's first permanent left (GameState.leftTogether `before`). Without that snapshot, its power as it last existed
+ * against the others' now and the last known power of those that left with it.
+ */
+function hadGreatestPower(s: GameState, dying: { o: GameObject; c: Characteristics }): boolean {
+  const before = s.leftTogether?.find((l) => l.before)?.before;
+  const me = before?.find((b) => b.id === dying.o.id);
+  if (before && me) return before.every((b) => b.controller !== me.controller || b.power <= me.power);
+  const who = dying.c.controller;
+  const mine = dying.c.power;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (id !== dying.o.id && objIsType(s, o, "Creature") && controllerOf(s, o) === who && characteristics(s, o).power > mine) return false;
+  }
+  for (const l of s.leftTogether ?? []) {
+    const k = s.lastKnown?.[l.id];
+    if (l.id !== dying.o.id && k && k.controller === who && k.source?.types.includes("Creature") && k.power > mine) return false;
+  }
+  return true;
+}
+
 function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObject, you: PlayerId, gone: boolean): boolean {
   const whose = (p: PlayerId | undefined) => !b.whose || (b.whose === "you" ? p === you : p !== undefined && p !== you);
   if (b.what === "enters") {
@@ -3585,6 +3622,9 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (m.createdBy === undefined || !whose(m.createdBy)) return false;
     return !b.filter || (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === m.zc ? objectMatches(s, b.filter, o, you, false) : printedMatches(b.filter, s.cards[m.card]!));
   }
+  // Hero of Bretagard, Ranar the Ever-Watchful (round 404): cards put into exile from your hand, for any reason (foretell
+  // too), and permanents, tokens too, a spell or ability you control exiled from the battlefield (rulings).
+  if (b.what === "exiledFromHandOrByYou") return m.to === "exile" && ((m.from === "hand" && m.owner === you && !m.notCard) || (m.from === "battlefield" && m.exiledBy === you));
   if (m.createdBy !== undefined) return false;
   // The rest are about cards (not tokens or copies of spells, CR 111.1, 707.10), as they are in that zone.
   if (m.notCard) return false;

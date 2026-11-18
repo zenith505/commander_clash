@@ -139,6 +139,7 @@ import {
   conspireCandidates,
   conspireInstances,
   replicateGranted,
+  offspringGranted,
   REPLICATE_MAX,
   dredgeOptions,
   madnessCastOf,
@@ -403,6 +404,8 @@ type CastDraft = {
   kicks?: number[];
   /** Round B248: how many times each instance of replicate a permanent gives it is paid (CostChoices.replicate). */
   replicate?: number[];
+  /** Round 410: whether each instance of offspring a permanent gives it is paid, 1 or 0 (CostChoices.offspring). */
+  offspring?: number[];
   x?: number;
   targets?: TargetChoice[];
   sacrifice?: string[];
@@ -496,6 +499,9 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost t
 /** Choosing which kicker costs to pay (CR 702.33). */
 /** Round B248: how many times to pay each instance of replicate permanents give the spell (CR 702.56a-b). */
 type ReplicatePick = { draft: CastDraft; label: string; grants: { cost: string; from: string }[]; counts: number[] };
+
+/** Round 410: which instances of offspring permanents give the spell to pay, each once (CR 702.175a-b). */
+type OffspringPick = { draft: CastDraft; label: string; grants: { cost: string; from: string }[]; paid: number[] };
 
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[]; /** "Kicker—Sacrifice two lands": the cost in words. */ text?: string };
 
@@ -638,6 +644,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [mixPick, setMixPick] = useState<MixPick | null>(null);
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
   const [replicatePick, setReplicatePick] = useState<ReplicatePick | null>(null);
+  const [offspringPick, setOffspringPick] = useState<OffspringPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [xOppPick, setXOppPick] = useState<XOpponentPick | null>(null);
@@ -690,7 +697,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || replicatePick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || castTypePick || buybackPick);
+  const picking = !!(xPick || kickPick || replicatePick || offspringPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || castTypePick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -704,6 +711,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setXPick(null);
         setKickPick(null);
         setReplicatePick(null);
+        setOffspringPick(null);
         setCostPick(null);
         setCostOrPick(null);
         setNumberPick(null);
@@ -1082,7 +1090,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
     const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}), ...(d.offering?.length ? { offering: d.offering[0]! } : {}) };
-    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}) };
+    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}), ...(d.offspring?.some((n) => n > 0) ? { offspring: d.offspring } : {}) };
     // Offering: the permanent to sacrifice is chosen as the spell is announced (CR 702.48b), and sets its cost and when
     // it can be cast. Skipping isn't offered when it couldn't be cast now without it.
     if (d.offering === undefined && compiled.offering && !free) {
@@ -1110,6 +1118,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const grants = replicateGranted(s, HUMAN, card);
       if (grants.some((g) => g.cost !== null))
         return setReplicatePick({ draft: d, label: card.name, grants: grants.map((g) => ({ cost: g.cost ?? "", from: cardOf(s, g.source).name })), counts: grants.map(() => 0) });
+    }
+    // Round 410: offspring a permanent gives it (Zinnia, Valley's Voice), each instance paid once or not (CR 702.175a-b),
+    // announced with the other additional costs (CR 601.2b).
+    if (d.offspring === undefined) {
+      const grants = offspringGranted(s, HUMAN, card);
+      if (grants.length) return setOffspringPick({ draft: d, label: card.name, grants: grants.map((g) => ({ cost: g.cost, from: cardOf(s, g.source).name })), paid: grants.map(() => 0) });
     }
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
     const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;
@@ -2204,6 +2218,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setReplicatePick(null)}
             />
           )}
+          {offspringPick && (
+            <OffspringPickBar
+              s={s}
+              pick={offspringPick}
+              onChange={(paid) => setOffspringPick({ ...offspringPick, paid })}
+              onDone={(paid) => {
+                setOffspringPick(null);
+                continueCast({ ...offspringPick.draft, offspring: paid.some((n) => n > 0) ? paid : [] });
+              }}
+              onCancel={() => setOffspringPick(null)}
+            />
+          )}
           {kickPick && (
             <KickPickBar
               s={s}
@@ -2400,7 +2426,7 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", nextFree: "Cast it:", nextLife: "Cast it:", linkedFree: "Cast it:", topFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:", dreamHalls: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", grantedEvoke: "Evoke", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", nextFree: "Cast it:", nextLife: "Cast it:", linkedFree: "Cast it:", topFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:", dreamHalls: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth, Eye of Duskmantle); X is 0",
@@ -2424,6 +2450,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   grantedWebSlinging: "return a tapped creature you control to its owner's hand",
   grantedBlitz: "haste, and you draw a card when it dies; sacrificed at the end step",
   grantedEmerge: "its mana cost, sacrificing a creature as you cast it: the cost is reduced by its mana value",
+  grantedEvoke: "it's sacrificed as it enters (evoke from Ashling, the Limitless)",
   foretell: "a foretold card is cast for its foretell cost",
   sneak: "during your declare blockers step: return an unblocked attacker to your hand; a creature enters tapped and attacking",
   surge: "only if you've cast another spell this turn",
@@ -2756,6 +2783,30 @@ function ReplicatePickBar({ s, pick, onChange, onDone, onCancel }: { s: GameStat
         </span>
       ))}
       <button onClick={() => onDone(pick.counts)}>{total ? `Replicate ${total === 1 ? "once" : `${total} times`}` : "Don't replicate"}</button>
+      <button className="ghost" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+/** Round 410: offspring given by permanents (Zinnia, Valley's Voice): each instance paid once or not (CR 702.175a-b). */
+function OffspringPickBar({ s, pick, onChange, onDone, onCancel }: { s: GameState; pick: OffspringPick; onChange: (paid: number[]) => void; onDone: (paid: number[]) => void; onCancel: () => void }) {
+  const d = pick.draft;
+  const can = (paid: number[]) => [undefined, 1].some((x) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", x, { ...(d.via ? { via: d.via } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}), offspring: paid }) !== null);
+  const total = pick.paid.filter((n) => n > 0).length;
+  return (
+    <div className="targeting x-pick" data-offspring-pick>
+      <span>
+        <strong>{pick.label}</strong>: offspring (pay to create a 1/1 token copy of it as it enters)?
+      </span>
+      {pick.grants.map((g, i) => (
+        <label key={i} className="kick-cost">
+          <input type="checkbox" checked={pick.paid[i]! > 0} disabled={!pick.paid[i] && !can(pick.paid.map((n, j) => (j === i ? 1 : n)))} onChange={(e) => onChange(pick.paid.map((n, j) => (j === i ? (e.target.checked ? 1 : 0) : n)))} aria-label={`Pay offspring from ${g.from}`} />
+          <ManaCost cost={g.cost} size="sm" /> <span className="muted">({g.from})</span>
+        </label>
+      ))}
+      <button onClick={() => onDone(pick.paid)}>{total ? (total === 1 ? "Pay offspring" : `Pay offspring ${total} times`) : "Don't pay offspring"}</button>
       <button className="ghost" onClick={onCancel}>
         Cancel
       </button>

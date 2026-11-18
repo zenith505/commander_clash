@@ -1589,6 +1589,11 @@ export interface CostChoices {
    * Signal), in the order `replicateGranted` lists them; the spell's own replicate is `kicks` (CR 702.56a-b).
    */
   replicate?: number[];
+  /**
+   * Round 410: whether to pay each instance of offspring a permanent gives the spell (Zinnia, Valley's Voice), 1 or 0, in the
+   * order `offspringGranted` lists them; the spell's own offspring is `kicks` (CR 702.175a-b, paid once each).
+   */
+  offspring?: number[];
   /** Casting from a graveyard: which way (flashback, jump-start, retrace, escape). */
   via?: CastFromGraveyardKind;
   /** Pay the buyback cost (CR 702.27a). */

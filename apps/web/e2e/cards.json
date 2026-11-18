@@ -2687,6 +2687,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "77a9e7cf-76e9-4323-8504-a5b831de00be",
+  "name": "Ashling, the Limitless",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elemental Sorcerer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Sorcerer"
+  ],
+  "oracleText": "Elemental permanent spells you cast from your hand gain evoke {4} as you cast them. (If you cast a spell for its evoke cost, it's sacrificed when it enters.)\nWhenever you sacrifice a nontoken Elemental, create a token that's a copy of it. The token gains haste until end of turn. At the beginning of your next end step, sacrifice it unless you pay {W}{U}{B}{R}{G}.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecc",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d18bcba-a346-445e-a182-6cc30b7e066d",
   "name": "Ashnod's Altar",
   "manaCost": "{3}",
@@ -52140,6 +52177,45 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8c16a3a-dd9d-410c-a5d5-06339a89970f",
+  "name": "Zinnia, Valley's Voice",
+  "manaCost": "{U}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Bird Bard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Bard"
+  ],
+  "oracleText": "Flying\nZinnia gets +X/+0, where X is the number of other creatures you control with base power 1.\nCreature spells you cast gain offspring {2} as you cast them. (You may pay an additional {2} as you cast a creature spell. If you do, when that creature enters, create a 1/1 token copy of it.)",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

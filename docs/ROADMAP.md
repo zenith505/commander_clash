@@ -1,7 +1,7 @@
 # Roadmap
 
-31,673 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,924 of
+31,675 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,926 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -125,7 +125,7 @@ line blocks.
    blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
    separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (exchanging control of a
    permanent and a spell), Karn, Living Legacy (done in round 330) ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
-   that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (spells that gain evoke as
+   that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (done in round 410) (spells that gain evoke as
    they're cast), Omnath, Locus of All (done in round 277) ("three mana in any combination of its colors" from a trigger), Crypt Rats
    ("spend only black mana on X": a spend rule for part of a cost). Round 168 went down the list to Glen Elendra Guardian (rank 5,741), skipping over the cards still listed by
    `npm run popular`.
@@ -1246,7 +1246,7 @@ line blocks.
    Out after round 225 (looked at, not done): Wayta, Trainer Prodigy (damage triggers doubled across many events);
    Auntie Ool (done in round 266); Fell Beast's Shriek (done in round 373) (splice onto instant or sorcery); Jasmine Boreal of the Seven
    (mana for creature spells with no abilities); Kethis, the Hidden Hand (graveyard cards gain "you may play"); Cult of
-   the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (creature spells gain offspring);
+   the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (done in round 410) (creature spells gain offspring);
    Elsha of the Infinite (cast noncreature spells from the top as though they had flash); Najal, the Storm Runner (copy
    the next instant or sorcery); Garland, Knight of Cornelia (done in round 320) (return transformed from the graveyard).
    Round 226 (fresh cards from the top): "once during each of your turns, you may play a land or cast a permanent spell
@@ -3888,6 +3888,28 @@ line blocks.
    Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
    Triplets, Xanathar, Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 410 took two cards back off the "Out after round N" lists, most played first: keyword costs a permanent gives the
+   spells you cast "as you cast them". Zinnia, Valley's Voice's "Creature spells you cast gain offspring {2} as you cast
+   them." (CompiledCard.spellsGainOffspring, game.ts offspringGranted: an instance beside any offspring of the spell's own,
+   CostChoices `offspring`, each paid once and making its own 1/1 token copy, CR 702.175a-b) and Ashling, the Limitless's
+   "Elemental permanent spells you cast from your hand gain evoke {4} as you cast them." (CompiledCard.spellsGainEvoke,
+   AltCostKind "grantedEvoke": an alternative cost beside any evoke of its own, CR 702.74a, only for a card in its
+   caster's own hand, judged by the spell's characteristics, a changeling an Elemental). Either way the permanent the spell
+   becomes keeps the enters trigger that goes with what was paid for the rest of the game, even once the giver has left
+   (CR 400.7b, 611.3d, rulings; GameObject.spellGains, Zinnia's with its own timestamp, CR 613.7a), and has none if it has
+   lost its abilities as it enters (rulings: Humility). The token copy is of what's printed, so it has no offspring of its
+   own (rulings). Ashling's "Whenever you sacrifice a nontoken Elemental, create a token that's a copy of it. The token
+   gains haste until end of turn. At the beginning of your next end step, sacrifice it unless you pay {W}{U}{B}{R}{G}."
+   (a copy of it as it last existed, CR 707.2, 608.2h; a delayed trigger about that token, CR 603.7, paid or sacrificed
+   as it resolves, oracle/round410.ts). Bots pay offspring with spare mana (not for a legendary creature, CR 704.5j) and
+   evoke an Elemental for Ashling's {4} when its mana cost is out of reach. Browser tests click through the offspring pick
+   and Ashling's evoke and keep payment. +2, 31,675 of 31,936 on this stacked branch. The compiled text of every other card
+   is unchanged.
+   Out after round 410 (looked at, not done): the lists after round 409 stay out. Known gaps: offspring isn't offered for a
+   face-down creature spell (its token copy would be a face-down copy of a face-down permanent, CR 708.10); bots weigh only
+   their spare mana when paying offspring, not whether the token is worth it; with two evoke costs (its own and Ashling's),
+   paying either one triggers only that one's sacrifice (CR 702.74a doesn't say which "its evoke cost" means; the permanent
+   is sacrificed once either way).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4374,7 +4396,7 @@ line blocks.
    Bots: for Retraced Image a bot reveals its costliest card that would be put onto the battlefield, or else its
    cheapest card.
    Out after round 327 (looked at, not done): Hatchery Sliver (done in round B248), Djinn Illuminatus (done in round B248), Ian Chesterton (done in round B248), Threefold Signal (done in round B248)
-   ("each ... spell you cast has replicate") and Zinnia, Valley's Voice ("gain offspring {2} as you cast them"): a card
+   ("each ... spell you cast has replicate") and Zinnia, Valley's Voice (done in round 410) ("gain offspring {2} as you cast them"): a card
    has one kicker-like optional cost (CompiledCard.kicker), so a given one needs every cost, autopay, bot and UI path to
    see it, and a spell with a kicker of its own would have two; Consume Spirit and Drain Life (done in round B179) ("Spend only black mana on
    X" in a spell whose mana cost is more than {X}); Invisible Woman, Sue Storm (one trigger for +1/+1 counters put on one
@@ -4868,7 +4890,7 @@ line blocks.
    player untaps all nonland permanents they control" (Curse of Bounty). +8, 30,516 of 31,936 with B145.
    Out after round 307 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
    spell": whether "Phyrexian" also qualifies "artifact creature" isn't settled by its rulings); Zinnia, Valley's Voice
-   and Ashling, the Limitless (a keyword cost a spell gains "as you cast" it, and whether the permanent keeps the
+   and Ashling, the Limitless (done in round 410) (a keyword cost a spell gains "as you cast" it, and whether the permanent keeps the
    ability its trigger needs); Hatchery Sliver (done in round B248) (a granted replicate whose cost is each spell's own mana cost, beside its
    printed one); Geyadrone Dihada (protection from permanents with corruption counters on them); Moxite Refinery ("Remove
    X counters from an artifact or creature you control" as a cost, any kinds); Ashiok, Nightmare Muse's −7 (casting from
@@ -5063,7 +5085,7 @@ line blocks.
    to cast it" (Molten Exhale, CR 601.3c: a browser test in another player's end step). +14, 30,376 of 31,936 with
    B135 to B137.
    Out after round 299 (looked at, not done): Yurlok of Scorch Thrash, Curse of Bounty and Enchanter's Bane (as after
-   round 298); Hatchery Sliver (done in round B248), Zinnia, Valley's Voice and Ian Chesterton (done in round B248) (replicate or offspring given to other spells:
+   round 298); Hatchery Sliver (done in round B248), Zinnia, Valley's Voice (done in round 410) and Ian Chesterton (done in round B248) (replicate or offspring given to other spells:
    one kicker-like cost each, not a second one); Mirrormind Crown, Esix, Moonlit Meditation and Jinnie Fay
    (tokens created instead as copies of something else: a token-creation replacement); Spectral Searchlight (another
    player chooses the color of mana it adds); Firkraag, Cunning Instigator ("had to attack this combat": attack
@@ -10891,7 +10913,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   still apply in timestamp order rather than asking (only different kinds of copy effect are asked); the app's decks have
   no way to choose a color for a commander like The Prismatic Piper yet (no sample deck has one).
 - Out after round B248 (looked at, not done): the lists after round B247 stay out, and Zinnia, Valley's Voice and Ashling, the
-  Limitless (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
+  Limitless (done in round 410) (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
   its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
 - Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich and Swans of
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done

@@ -2335,6 +2335,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "de691eed-d90b-48f9-bae4-f982767f2bfd",
+  "name": "Arcum's Whistle",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Choose target non-Wall creature the active player has controlled continuously since the beginning of the turn. That player may pay {X}, where X is that creature's mana value. If they don't pay, the creature attacks this turn if able, and at the beginning of the next end step, destroy it if it didn't attack this turn. Activate only before attackers are declared.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "628f2deb-519e-4810-a7e5-e31316e9a4e0",
   "name": "Arcus Acolyte",
   "manaCost": "{G}{W}",
@@ -15352,6 +15374,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "22647b1a-5a7c-41b5-b820-b2e9f49c7aad",
+  "name": "Eye for an Eye",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "The next time a source of your choice would deal damage to you this turn, instead that source deals that much damage to you and Eye for an Eye deals that much damage to that source's controller.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "04e7f739-fe50-440d-aa3d-e547295044a8",
   "name": "Eye of Duskmantle",
   "manaCost": "{5}{B}{B}",
@@ -18084,6 +18132,39 @@
   "set": "eos",
   "releasedAt": "2025-08-01",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "64df77f6-4f7e-442a-971c-8ad3f7d1c979",
+  "name": "General Jarkeld",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "{T}: Choose two target blocked attacking creatures. If each of those creatures could be blocked by all creatures that the other is blocked by, each creature that's blocking exactly one of those attacking creatures stops blocking it and is blocking the other attacking creature. Activate only during the declare blockers step.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -38550,6 +38631,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dfa459a1-b065-4488-88d3-4da388261b52",
+  "name": "Safe Passage",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Prevent all damage that would be dealt to you and creatures you control this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d6c008c7-6c87-4677-ba0e-6d95f10d10bc",
   "name": "Sages of the Anima",
   "manaCost": "{3}{G}{U}",
@@ -40221,6 +40328,30 @@
   ]
  },
  {
+  "oracleId": "a8b24b38-019c-45e7-a5f4-a1bc3014f7a2",
+  "name": "Shell of the Last Kappa",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Exile target instant or sorcery spell that targets you. (The spell has no effect.)\n{3}, {T}, Sacrifice Shell of the Last Kappa: You may cast a spell from among cards exiled with Shell of the Last Kappa without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",
   "name": "Shelldock Isle",
   "manaCost": "",
@@ -41797,6 +41928,28 @@
   "commanderLegal": "legal",
   "set": "ltc",
   "releasedAt": "2023-11-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5419eae0-3c12-4748-9cf8-d927752e527e",
+  "name": "Sorrow's Path",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Choose two target blocking creatures controlled by the same opponent. If each of those creatures could block all creatures that the other is blocking, remove both of them from combat. Each one then blocks all creatures the other was blocking.\nWhenever this land becomes tapped, it deals 2 damage to you and each creature you control.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -52074,6 +52227,32 @@
   "set": "jud",
   "releasedAt": "2002-05-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9638ec0c-c8bf-4aa5-a7ca-8677e4b9f241",
+  "name": "Worms of the Earth",
+  "manaCost": "{2}{B}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Players can't play lands.\nLands can't enter the battlefield.\nAt the beginning of each upkeep, any player may sacrifice two lands of their choice or have this enchantment deal 5 damage to that player. If a player does either, destroy this enchantment.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -1919,6 +1919,8 @@ export interface DamageRuleSpec {
   dealBack?: { colors?: Color[]; creatureToIt?: true };
   /** Bone Mask: "Exile cards from the top of your library equal to the damage prevented this way" (CR 615.5): its controller exiles that many, all their library with fewer (rulings), only for damage really prevented. */
   exileTopPrevented?: true;
+  /** Eye for an Eye (round B257): "instead that source deals that much damage to you and ~ deals that much damage to that source's controller": not a prevention (CR 614.1a), the damage is dealt and the same amount added to the same event (DamageRule.echo). */
+  echoToSourceController?: true;
   /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
   tokens?: TokenSpec;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, Temper, Brace for Impact): on the creature it protects, as the damage is prevented (rulings: before state-based actions). `endStep`: "at the beginning of the next end step" (Sacred Boon), by a delayed trigger counting all it prevented (CR 603.7); `ifCreature`: only if what it protects is a creature then (Scars of the Veteran's "If it's a creature"). */
@@ -5072,6 +5074,18 @@ export type Effect =
    * (CR 607.2a) with the name of the card played (the trigger's event `played`).
    */
   | { type: "searchTheCity" }
+  /**
+   * Sorrow's Path (round B258): "Choose two target blocking creatures controlled by the same opponent. If each of those
+   * creatures could block all creatures that the other is blocking, remove both of them from combat. Each one then blocks all
+   * creatures the other was blocking." (CR 506.4, 509.1b, 509.3; rulings; effects/run-laneb258.ts).
+   */
+  | { type: "swapBlockers"; a: ObjRef; b: ObjRef }
+  /**
+   * General Jarkeld (round B258): "Choose two target blocked attacking creatures. If each of those creatures could be blocked
+   * by all creatures that the other is blocked by, each creature that's blocking exactly one of those attacking creatures stops
+   * blocking it and is blocking the other attacking creature." (CR 509.1b; rulings; effects/run-laneb258.ts).
+   */
+  | { type: "swapBlocked"; a: ObjRef; b: ObjRef }
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number; /** Overencumbered: "creatures can't attack this combat": only in the combat phase it's made in (GameState.combatsThisTurn). */ combat?: true }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }
@@ -9477,6 +9491,11 @@ export interface CompiledCard {
    * graveyards ..." (Soulless Jailer), "Nonland permanent cards ..." (Weathered Runestone): such a card stays where it is.
    */
   cantEnterFrom?: { zones: ("graveyard" | "library")[]; what: "creature" | "permanent" | "nonlandPermanent" };
+  /**
+   * Worms of the Earth (round B258): "Lands can't enter the battlefield.": a land stays where it is (rulings), a permanent
+   * spell that would be one is put into its owner's graveyard (CR 608.3e), and a land token isn't created (CR 111.5).
+   */
+  landsCantEnter?: true;
   /** "Players can't cast spells from graveyards or libraries." (Grafdigger's Cage), "... noncreature spells from graveyards or exile" (Soulless Jailer). */
   cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
   /** Ashes of the Abhorrent: "Players can't ... activate abilities of cards in graveyards." Triggered abilities still work (rulings). */

@@ -170,7 +170,7 @@ export type TriggerSourceEvent =
    * An effect made `blocker` block these attackers (False Orders, Balduvian Warlord, round B256; CR 509.3a-d): `newlyBlocked`
    * were unblocked creatures until then, `newBlocker` says it wasn't a blocking creature until then.
    */
-  | { type: "blockedByEffect"; blocker: ObjectId; attackers: ObjectId[]; newlyBlocked: ObjectId[]; newBlocker: boolean }
+  | { type: "blockedByEffect"; blocker: ObjectId; attackers: ObjectId[]; newlyBlocked: ObjectId[]; newBlocker: boolean; /** Sorrow's Path (round B258): blockers swapped, each attacker blocked by as many creatures as before. */ swap?: true }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
   | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -1294,7 +1294,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const blYou = controllerOf(s, bl);
     const watchers = s.battlefield.map((id) => obj(s, id));
     const ats = ev.attackers.map((id) => s.objects[id]).filter((a): a is GameObject => !!a && a.zone === "battlefield");
-    const crossed = (t: TriggeredAbility, a: GameObject) => !t.blockedByAtLeast || ((a.blockedBy?.length ?? 0) >= t.blockedByAtLeast && (a.blockedBy?.length ?? 0) - 1 < t.blockedByAtLeast);
+    // Sorrow's Path (round B258): a swap leaves the count as it was, so no "blocked by N or more" is reached now.
+    const crossed = (t: TriggeredAbility, a: GameObject) => !t.blockedByAtLeast || (!ev.swap && (a.blockedBy?.length ?? 0) >= t.blockedByAtLeast && (a.blockedBy?.length ?? 0) - 1 < t.blockedByAtLeast);
     const fits = (t: TriggeredAbility, subject: GameObject, you: PlayerId) => (!t.subjectFilter || objectMatches(s, t.subjectFilter, subject, you, false)) && crossed(t, subject);
     if (ev.newBlocker) {
       for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocks" && !(t.subjectNotSelf && w.id === bl.id) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, controllerOf(s, w), false)), undefined, undefined, bl);

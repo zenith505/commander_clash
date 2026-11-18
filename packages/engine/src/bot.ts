@@ -1,6 +1,7 @@
 import { bindBound, cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
+import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -7062,6 +7063,21 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         v += freed || mine ? 4 : -10;
         break;
       }
+      // Round B258, Sorrow's Path and General Jarkeld: the swap only if it can be done and the fights after it come out better
+      // for us than before (creatures killed, rough worth), Sorrow's Path's 2 damage to us and our creatures counted too.
+      case "swapBlockers":
+      case "swapBlocked": {
+        const ta = e.a.ref === "target" ? targets[e.a.index] : undefined;
+        const tb = e.b.ref === "target" ? targets[e.b.index] : undefined;
+        const a = ta?.kind === "object" ? s.objects[ta.id] : undefined;
+        const b = tb?.kind === "object" ? s.objects[tb.id] : undefined;
+        if (!a || !b || a.zone !== "battlefield" || b.zone !== "battlefield") {
+          v -= 10;
+          break;
+        }
+        v += swapWorth(s, pid, e.type, a, b);
+        break;
+      }
       // Round B256, Raiding Party: the opponents' Plains it would destroy (those their untapped white creatures can't spare)
       // against ours, for the Orc it costs.
       case "raidingParty": {
@@ -7489,6 +7505,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (!att.length) continue;
         leoninTarget = [{ kind: "object", id: att[0]! }];
       }
+      // Sorrow's Path, General Jarkeld (round B258): the two creatures whose swap does us the most good (swapWorth), if any.
+      let swapTargets: TargetChoice[] | undefined;
+      const swapFx = ab.body.effects.find((e) => e.type === "swapBlockers" || e.type === "swapBlocked");
+      if (swapFx?.type === "swapBlockers" || swapFx?.type === "swapBlocked") {
+        const best = bestSwap(s, pid, swapFx.type);
+        if (!best) continue;
+        swapTargets = best;
+      }
       // Brutal Hordechief (round 378): once a turn, on our turn before attackers are declared with the stack empty, while we
       // have a creature that could attack and an opponent an untapped creature it makes block.
       if (ab.body.effects.some((e) => e.type === "chooseBlocks")) {
@@ -7523,7 +7547,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       for (const x of xs) {
         // Krumar Initiate: "Pay X life" too; keep at least 10 life.
         if (ab.lifeCostX && (x ?? 0) > player(s, pid).life - 10) continue;
-        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : leoninTarget ?? (body.targets.length ? chooseTargets(s, pid, body, false, id, x) : []);
+        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : leoninTarget ?? swapTargets ?? (body.targets.length ? chooseTargets(s, pid, body, false, id, x) : []);
         if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
         // Zygon Infiltrator (round 396): only to become a copy of a creature at least as big as it is.
         const tappedCopy = body.effects.find((e) => e.type === "becomeCopy" && e.duration === "whileTargetTapped");
@@ -8109,7 +8133,8 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   }
   // Tidal Flats (round B214), Heroism (round B232): after blockers are declared (see chooseActivation).
   // Stalking Leonin (round 377): while a creature of the chosen player's is attacking us (see chooseActivation).
-  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent" || (e.type === "if" && e.cond.kind === "targetControlledByChosen"));
+  // Sorrow's Path (round B258): after blockers are declared (weighed in modeValue, swapWorth).
+  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent" || (e.type === "if" && e.cond.kind === "targetControlledByChosen") || (e.type === "swapBlockers" && s.step === "declareBlockers"));
   // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
   if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
     // Not Words of Wind (round 385), which costs every player a permanent, ours too; Mangara's Tome only while its pile
@@ -10022,3 +10047,65 @@ export function botReblock(s: GameState, pid: PlayerId, about: ObjectId | undefi
   if (pick) return pick.id;
   return may ? "none" : [...ats].sort((x, y) => worth(s, pid, x) - worth(s, pid, y))[0]!.id;
 }
+
+/** Round B258: the pair of creatures Sorrow's Path (two blockers of one opponent) or General Jarkeld (two blocked attackers) does us the most good swapping, if any does. */
+function bestSwap(s: GameState, pid: PlayerId, kind: "swapBlockers" | "swapBlocked"): TargetChoice[] | undefined {
+  const pool = s.battlefield.map((id) => obj(s, id)).filter((o) => objIsType(s, o, "Creature") && (kind === "swapBlockers" ? o.blocking !== undefined && controllerOf(s, o) !== pid && opponents(s, pid).includes(controllerOf(s, o)) : o.attacking !== undefined && !!o.blockedBy));
+  let best: { v: number; t: TargetChoice[] } | undefined;
+  for (let i = 0; i < pool.length; i++)
+    for (let j = i + 1; j < pool.length; j++) {
+      const [a, b] = [pool[i]!, pool[j]!];
+      if (kind === "swapBlockers" && controllerOf(s, a) !== controllerOf(s, b)) continue;
+      const v = swapWorth(s, pid, kind, a, b);
+      if (v > 0 && (!best || v > best.v)) best = { v, t: [{ kind: "object", id: a.id }, { kind: "object", id: b.id }] };
+    }
+  return best?.t;
+}
+
+/**
+ * Round B258: how much better the fights come out for `pid` after Sorrow's Path's (swapBlockers) or General Jarkeld's
+ * (swapBlocked) swap than before; -10 if it can't be done or isn't better. Rough: an attacker dies to its blockers' total
+ * power, and kills the blockers it can, smallest first; a creature is worth its power and toughness.
+ */
+function swapWorth(s: GameState, pid: PlayerId, kind: "swapBlockers" | "swapBlocked", a: GameObject, b: GameObject): number {
+  const can = kind === "swapBlockers" ? a.blocking !== undefined && b.blocking !== undefined && couldBlockAll(s, a, b) && couldBlockAll(s, b, a) : !!a.blockedBy && !!b.blockedBy && a.attacking !== undefined && b.attacking !== undefined && couldBeBlockedByAll(s, a, b) && couldBeBlockedByAll(s, b, a);
+  if (!can) return -10;
+  const live = (ids: ObjectId[] | undefined) => (ids ?? []).flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [s.objects[id]!] : []));
+  const worth = (o: GameObject) => Math.max(1, power(s, o) + toughness(s, o));
+  const sign = (o: GameObject) => (controllerOf(s, o) === pid ? -1 : 1);
+  // Each attacker in the fights, with its blockers before and after.
+  const fights = new Map<ObjectId, { at: GameObject; before: GameObject[]; after: GameObject[] }>();
+  const add = (at: GameObject) => {
+    if (!fights.has(at.id)) fights.set(at.id, { at, before: live(at.blockedBy), after: live(at.blockedBy) });
+  };
+  if (kind === "swapBlockers") {
+    for (const at of [...live(a.blocking), ...live(b.blocking)]) add(at);
+    for (const f of fights.values()) f.after = f.before.map((x) => (x.id === a.id ? b : x.id === b.id ? a : x)).filter((x, i, l) => l.indexOf(x) === i);
+  } else {
+    add(a);
+    add(b);
+    const [ba, bb] = [fights.get(a.id)!.before, fights.get(b.id)!.before];
+    fights.get(a.id)!.after = bb;
+    fights.get(b.id)!.after = ba;
+  }
+  const score = (which: "before" | "after") => {
+    let n = 0;
+    for (const f of fights.values()) {
+      const bl = f[which];
+      if (!bl.length) continue;
+      if (bl.reduce((m, x) => m + Math.max(0, power(s, x)), 0) >= lethalDamage(s, f.at)) n += sign(f.at) * worth(f.at);
+      let left = Math.max(0, power(s, f.at));
+      for (const x of [...bl].sort((p, q) => lethalDamage(s, p) - lethalDamage(s, q))) {
+        if (left < lethalDamage(s, x)) break;
+        left -= lethalDamage(s, x);
+        n += sign(x) * worth(x);
+      }
+    }
+    return n;
+  };
+  let gain = score("after") - score("before");
+  // Sorrow's Path: it deals 2 damage to us and each creature we control as it's tapped.
+  if (kind === "swapBlockers") for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature") && lethalDamage(s, obj(s, id)) <= 2) gain -= worth(obj(s, id));
+  return gain > 0 ? 2 + gain : -10;
+}
+

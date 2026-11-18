@@ -178,6 +178,10 @@ import {
   processCandidates,
   hiddenInExile,
   tapCostCandidates,
+  addedAbilityCosts,
+  addedSacrificeCandidates,
+  anyAddedSacrifice,
+  fitsEach,
   counterOnCandidates,
   exileSpellCandidates,
   untapViaMana,
@@ -412,6 +416,8 @@ type CastDraft = {
   x?: number;
   targets?: TargetChoice[];
   sacrifice?: string[];
+  /** Round B260: what's sacrificed for what Drought adds (CostChoices.addedSacrifice). */
+  addedSacrifice?: string[];
   discard?: string[];
   exileCards?: string[];
   /** A Borderpost's basic land returned to hand, Daze's Island. */
@@ -509,11 +515,16 @@ type OffspringPick = { draft: CastDraft; label: string; grants: { cost: string; 
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[]; /** "Kicker—Sacrifice two lands": the cost in words. */ text?: string };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[]; instead?: ManaType }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell" | /** Gift of Doom: the creature it's attached to as it's turned face up (round B255). */ "attachFaceUp";
+/** Round B260: "a land", "2 Swamps", "land and a Swamp": what Brutal Suppression's and Drought's added sacrifice takes. */
+const addedWhat = (c: AdditionalCost): string => (c.kind !== "sacrifice" ? "" : c.oneOfEach ? `a ${c.filter.text}` : c.n === 1 ? `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}` : `${c.n} ${c.filter.text}`);
+
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[]; instead?: ManaType; combo?: number; /** Springleaf Drum's pick, made before Brutal Suppression's or Drought's sacrifice. */ tap?: string[] }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
+  kind: "sacrifice" | /** Round B260: what Brutal Suppression and Drought add to a cost. */ "addedSacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell" | /** Gift of Doom: the creature it's attached to as it's turned face up (round B255). */ "attachFaceUp";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
+  /** Round B260: a land and a Swamp (Brutal Suppression and Drought together): one pick for each. */
+  each?: TargetSpec[];
   /** The Shoals: the card picked sets X, its mana value (CR 107.3a). */
   setsX?: true;
   /** Foil: one of the cards picked must be this. */
@@ -548,7 +559,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
 /** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
 type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[]; /** Gift of Doom (round B255): the creature it's attached to as it's turned face up, or "none". */ attach?: string };
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; addedSacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[]; instead?: ManaType };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -906,6 +917,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
     for (const c of activatedCosts(ab, d.x, s.objects[d.objectId], s, HUMAN)) {
+      // Round B260: what Brutal Suppression and Drought add, after its own costs.
+      if (c.kind === "sacrifice" && c.added) {
+        if (d.addedSacrifice !== undefined) continue;
+        const taken = [...(d.sacrifice ?? []), ...(d.tap ?? []), ...(d.returnToHand ?? []), ...(d.craft ?? [])];
+        const candidates = addedSacrificeCandidates(s, HUMAN, s.objects[d.objectId], c).filter((id) => !taken.includes(id));
+        return setCostPick({ activate: d, kind: "addedSacrifice", label: cardOf(s, d.objectId).name, what: `sacrifice ${addedWhat(c)}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.oneOfEach ? { each: c.oneOfEach } : {}) });
+      }
       if (c.kind === "forage") {
         // Forage (CR 701.61a): three cards from your graveyard or a Food, whichever you can and choose.
         if (d.sacrifice !== undefined || d.exileCards !== undefined) continue;
@@ -1015,7 +1033,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "discard" && c.differentNames ? " with different names" : c.kind === "discard" && c.sameName ? " with the same name" : ""}`;
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}), ...(c.kind === "discard" && c.differentNames ? { differentNames: true as const } : {}), ...(c.kind === "discard" && c.sameName ? { sameName: true as const } : {}) });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}), ...(d.exileSpell?.length ? { exileSpell: d.exileSpell } : {}), ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.addedSacrifice?.length ? { addedSacrifice: d.addedSacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}), ...(d.exileSpell?.length ? { exileSpell: d.exileSpell } : {}), ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -1052,6 +1070,21 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     dispatch(planTurnFaceUp(s, HUMAN, d.objectId, d.way, 0, costs, undefined, d.attach) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: d.objectId, ...(d.way ? { way: d.way } : {}), costs, ...(d.attach ? { attach: d.attach } : {}) }]);
   }
 
+  /**
+   * Round B260: a mana ability whose cost Brutal Suppression or Drought adds a sacrifice to: start that pick (true), or
+   * nothing to pick (false).
+   */
+  function manaSacrificePick(m: NonNullable<CostPick["mana"]>): boolean {
+    if (!s) return false;
+    const o = s.objects[m.objectId]!;
+    const ab = manaAbilitiesOn(s, o)[m.ability];
+    const c = ab ? addedAbilityCosts(s, HUMAN, o, ab.manaCost, ab.sacrificeSelf)[0] : undefined;
+    if (c?.kind !== "sacrifice") return false;
+    const candidates = addedSacrificeCandidates(s, HUMAN, o, c).filter((id) => !m.tap?.includes(id));
+    setCostPick({ mana: m, kind: "addedSacrifice", label: cardOf(s, m.objectId).name, what: `sacrifice ${addedWhat(c)}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.oneOfEach ? { each: c.oneOfEach } : {}) });
+    return true;
+  }
+
   /** Done picking what to sacrifice, discard or exile: carry on casting or activating. */
   function finishCostPick(pick: CostPick) {
     setCostPick(null);
@@ -1061,8 +1094,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pick.mana) {
-      // A mana ability that taps other permanents too (Springleaf Drum).
-      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen, pick.mana.extra, undefined, pick.mana.instead);
+      if (!s) return;
+      // A mana ability that taps other permanents too (Springleaf Drum); then what Brutal Suppression or Drought add.
+      const m = pick.kind === "tap" ? { ...pick.mana, tap: pick.chosen } : pick.mana;
+      const sacrifice = pick.kind === "addedSacrifice" ? pick.chosen : undefined;
+      if (!sacrifice && manaSacrificePick(m)) return;
+      const plan = planManaAbility(s, HUMAN, m.objectId, m.ability, m.mana, m.tap, m.extra, m.combo, m.instead, sacrifice);
       if (plan) dispatch(plan);
       return;
     }
@@ -1256,6 +1293,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.counters !== undefined) continue;
         return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${counterCostKinds(c)}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
       }
+      // Round B260: what Drought adds, after its own costs.
+      if (c.kind === "sacrifice" && c.added) {
+        if (d.addedSacrifice !== undefined) continue;
+        const taken = [...(d.sacrifice ?? []), ...(d.returnToHand ?? []), ...(d.bargain ?? []), ...(d.offering ?? []), ...(d.casualty ?? [])];
+        const candidates = addedSacrificeCandidates(s, HUMAN, undefined, c).filter((id) => !taken.includes(id));
+        return setCostPick({ draft: d, kind: "addedSacrifice", label: card.name, what: `sacrifice ${addedWhat(c)}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.oneOfEach ? { each: c.oneOfEach } : {}) });
+      }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       // Nethergoyf's escape: any number of other cards from your graveyard with four or more card types among them.
@@ -1368,6 +1412,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.creatureType ? { creatureType: d.creatureType } : {}),
       ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
+      ...(d.addedSacrifice?.length ? { addedSacrifice: d.addedSacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
       ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}),
@@ -1602,7 +1647,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       // A Room with a locked door to unlock (CR 709.5e) has a menu too.
-      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0 || !!abs[x.ability]!.toChosenPlayer) || [0, 1].some((door) => unlockCost(s, o, door) !== undefined)) return setMenu(o.id);
+      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0 || !!abs[x.ability]!.toChosenPlayer || !!addedPick(s, o, x.ability)) || [0, 1].some((door) => unlockCost(s, o, door) !== undefined)) return setMenu(o.id);
       const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo, mana[0].instead);
       if (plan) dispatch(plan);
     }
@@ -1914,6 +1959,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 // "{T}, Tap an untapped creature you control: Add ...": pick what to tap first.
                 const tapCost = manaAbilitiesOn(s, s.objects[menu]!)[x.ability]?.tapCost;
+                // Round B260: a sacrifice Brutal Suppression or Drought adds: picked on the battlefield.
+                if (!tapCost && manaSacrificePick({ objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}), ...(x.combo !== undefined ? { combo: x.combo } : {}) })) return;
                 if (tapCost) {
                   const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
                   return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
@@ -2252,10 +2299,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "attachFaceUp" || costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
+          {costPick && (costPick.kind === "attachFaceUp" || costPick.kind === "sacrifice" || costPick.kind === "addedSacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
             <CostPickBar
               pick={costPick}
-              valid={!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)}
+              valid={(!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.each || fitsEach(s, HUMAN, costPick.each, costPick.chosen))}
               costPickMv={(id) => characteristics(s, s.objects[id]!).manaValue}
               onDone={() => finishCostPick(costPick)}
               onSkip={costPick.kind === "attachFaceUp" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
@@ -2327,7 +2374,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSkip={() => dispatch([{ type: "collectEvidence", player: HUMAN, ids: [] }])}
             />
           )}
-          {costPick && costPick.kind !== "attachFaceUp" && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && costPick.kind !== "counterOn" && (
+          {costPick && costPick.kind !== "attachFaceUp" && costPick.kind !== "sacrifice" && costPick.kind !== "addedSacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && costPick.kind !== "counterOn" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -2952,7 +2999,7 @@ function CostPickBar({ pick, valid = true, costPickMv = () => 0, onDone, onSkip,
       </span>
       {pick.totalMv !== undefined && <span> total mana value {pick.chosen.reduce((n, id) => n + costPickMv(id), 0)} of {pick.totalMv}</span>}
       <button disabled={(pick.totalMv !== undefined ? !pick.chosen.length || pick.chosen.reduce((n, id) => n + costPickMv(id), 0) !== pick.totalMv : pick.chosen.length !== pick.n) || !valid} onClick={onDone}>
-        {pick.kind === "attachFaceUp" ? "Attach and turn face up" : pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "attachFaceUp" ? "Attach and turn face up" : pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : pick.mana ? "Sacrifice for mana" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>{pick.kind === "attachFaceUp" ? "Turn face up without attaching" : "Cast without"}</button>}
       <button className="ghost" onClick={onCancel}>
@@ -4986,7 +5033,14 @@ function ModeMenu({
  * also be tapped removing no counters, to start storing them (Bottomless Vault).
  */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0 || x.mills) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead) !== null);
+  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0 || x.mills) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo, x.instead, addedPick(s, o, x.ability)) !== null);
+}
+
+/** Round B260: some pick that pays the sacrifice Brutal Suppression or Drought adds to this mana ability (the player picks the real one), if it has one. */
+function addedPick(s: GameState, o: GameObject, ability: number): string[] | undefined {
+  const ab = manaAbilitiesOn(s, o)[ability];
+  const c = ab ? addedAbilityCosts(s, HUMAN, o, ab.manaCost, ab.sacrificeSelf)[0] : undefined;
+  return c?.kind === "sacrifice" ? (anyAddedSacrifice(s, HUMAN, o, c) ?? undefined) : undefined;
 }
 
 function AbilityMenu({

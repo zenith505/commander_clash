@@ -5272,13 +5272,13 @@ line blocks.
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
-   (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (sacrifices added to costs);
+   (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
-   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (spliced
+   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (done in round B260) (spliced
    cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
@@ -11138,6 +11138,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   mana is paid, a pick for each, then the blocks are declared). Browser tests for Benthic Explorers' untap pick and mana
   choice, Hollow Warrior's tap picks to attack and to block, and Divine Intervention's draw. +3, 31,706 of 31,936 with main
   through round 413 and B255-B258. The compiled text of every other card is unchanged.
+- Round B260 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 414-415): Minamo's Meddling
+  ("Counter target spell. That spell's controller reveals their hand, then discards each card with the same name as a card
+  spliced onto that spell."): the names of the cards revealed to splice onto a spell are kept on it as it's cast
+  (StackItem.spliced, CR 702.47a; a copy has none, it wasn't cast), seen as the Meddling resolves (resolving.spellSpliced),
+  and every card in the hand with one of those names, the spliced cards themselves among them, is discarded at once
+  (Effect discardSplicedNames), whether or not the spell was countered. Brutal Suppression ("Activated abilities of nontoken
+  Rebels cost an additional "Sacrifice a land" to activate.") and Drought ("Spells cost an additional "Sacrifice a Swamp" to
+  cast for each black mana symbol in their mana costs." and the same for activation costs): costs other permanents' static
+  abilities add (CompiledCard.addedCosts, added-costs.ts, CR 601.2f, 602.2b), part of the total cost and paid with it (CR
+  601.2h), so a player who can't pay can't cast or activate; mana abilities too (CR 605.1a); a Rebel is a permanent (CR
+  109.2), changelings included (CR 702.73a); hybrid and Phyrexian symbols with black count (rulings), {X} and generic don't;
+  paid however the spell is cast, even without its mana cost (CR 118.9d), none for a face-down spell (CR 708.2). The
+  sacrifices are their own pick (CostChoices.addedSacrifice, activateMana `sacrifice`), all different permanents, none of
+  the spell's or ability's own sacrifices, one for each when a land and Swamps are both asked for. Browser tests for the
+  pick when casting, activating and using a mana ability. +3, 31,709 of 31,936 with main through round 413 and B255-B259.
+  The compiled text of every other card is unchanged.
+- Out after round B260 (looked at, not done): the lists after round B259 stay out. Judgment calls and known gaps: a
+  spell's copy has no spliced cards, so Minamo's Meddling discards nothing for one; plans made without a pick (autopay,
+  the legal actions list) take the first permanents that fit, tapped ones first; bots never use a mana ability with an
+  added cost and sacrifice for one only when they'd keep at least four lands; Halo Fountain's untap through mana ignores
+  added costs.
 - Out after round B259 (looked at, not done): the lists after round B258 stay out. Judgment calls and known gaps: a
   counter removed by a replacement effect of an untap (Freyalise's Winds, Bewitching Leechcraft) has no remover recorded
   (only wind and +1/+1 counters, which no "you remove" card watches); a cost to block isn't one of the blocking
@@ -11310,7 +11331,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B228 (looked at, not done): Hollow Warrior (done in round B259) (attack and block costs that tap another creature that
   isn't attacking or blocking: attack costs that aren't mana only sacrifice or return, and no block cost asks for a pick), Reflecting Mirror (its {X} set by
   the target spell's mana value: definedX doesn't see an ability's targets yet), North Star ("for one spell this turn": the
-  player picks the spell the permission is used on), Brutal Suppression and Drought (a sacrifice added to other abilities'
+  player picks the spell the permission is used on), Brutal Suppression and Drought (done in round B260) (a sacrifice added to other abilities'
   costs). Known gap: with Rayami and another "exile it instead" effect (Rest in Peace), the creature's controller should
   choose which applies (CR 616.1), and so whether it gets a blood counter (rulings); the engine applies the first one it
   finds. Escaped Shapeshifter doesn't count "protection from everything" (CR 702.16j) as protection from a color.

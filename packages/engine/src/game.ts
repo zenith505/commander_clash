@@ -1,6 +1,7 @@
 import { isRealKicker, kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { addedAbilityCosts, addedSpellCosts, anyAddedSacrifice } from "./added-costs";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { createEmblem, liveEmblems } from "./emblems";
@@ -416,7 +417,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to, action.instead);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to, action.instead, action.sacrifice);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -6604,7 +6605,7 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
   return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType, sacrifice?: ObjectId[]) {
   const o = obj(s, id);
   // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
@@ -6612,7 +6613,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const i = index ?? pickManaAbility(s, p.id, o, mana);
   if (i === undefined) throw new RulesError(`${name} can't produce {${mana}} right now`);
   const ab = manaAbilitiesOn(s, o)[i]!;
-  const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
+  // Round B260: the sacrifices other permanents add (Brutal Suppression, Drought), as they are when it's activated.
+  const added = addedAbilityCosts(s, p.id, o, ab.manaCost, ab.sacrificeSelf)[0];
+  const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined), sacrifice ?? (added ? [] : undefined));
   if (problem) throw new RulesError(problem);
   // Piracy (round B238): mana from a land another player controls can be spent only to cast spells (CR 106.6), told as
   // it's activated, before its costs move it.
@@ -6686,6 +6689,13 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     addDelayed(s, "nextEndStep", p.id, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~" });
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
+  if (added && sacrifice?.length) {
+    for (const x of sacrifice) {
+      log(s, `${p.name} sacrifices ${nameOf(s, x)} for ${name}'s mana ability.`);
+      moveObject(s, x, "graveyard", { sacrificed: true, cost: true });
+    }
+    closeZoneBatch(s);
+  }
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
@@ -8803,6 +8813,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
   const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
   if (replicated.length) item.replicated = replicated;
+  // Round B260: the names of the cards spliced onto it (CR 702.47a), for Minamo's Meddling.
+  if (choices.splice?.length) item.spliced = choices.splice.map((c) => defOf(s, obj(s, c)).name);
   // Round 410: each instance of offspring a permanent gave it that was paid: the permanent it becomes has that instance's
   // enters trigger for the rest of the game, even once the giver is gone (CR 702.175a-b, 400.7b, 611.3d, rulings), as an
   // ability with the giver's timestamp (CR 613.7a). An unpaid instance's trigger would do nothing (its "if" is false).
@@ -9823,7 +9835,7 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice" | "faceDown"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -9855,7 +9867,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // 118.9), the mana value of what's cast (a split card's half, X as 0, CR 107.3b), for the card it lets be cast only.
   const payPend = s?.pending?.kind === "castFree" && s.pending.player === pid && s.pending.pay && s.pending.pay.kind !== "mana" && choices?.objectId === s.pending.objectId ? s.pending.pay : undefined;
   const payCosts: AdditionalCost[] = !payPend ? [] : payPend.kind === "discard" ? [{ kind: "discard", n: payPend.n }] : payPend.kind === "lifeMv" ? [{ kind: "payLife", n: manaValue(parseManaCost(d.manaCost)) }] : payPend.kind === "energyMv" ? [{ kind: "payEnergy", n: manaValue(parseManaCost(d.manaCost)) }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : []), ...(s && !choices?.faceDown ? addedSpellCosts(s, d.manaCost) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -9893,6 +9905,12 @@ export function clashingCosts(costs: AdditionalCost[]): boolean {
  */
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   if (s && pid !== undefined && src && freeCycling(s, pid, src, ab, x)) return [];
+  // Round B260: the sacrifices other permanents add (Brutal Suppression, Drought), after its own.
+  const added = s && pid !== undefined ? addedAbilityCosts(s, pid, src, ab.manaCost, ab.sacrificeSelf) : [];
+  return [...ownActivatedCosts(ab, x, src, s, pid), ...added];
+}
+
+function ownActivatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
@@ -9925,8 +9943,8 @@ export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
   c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random && !c.lastDrawn) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters" || c.kind === "putCounter";
-const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" | "counterOn" =>
-  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : c.kind === "putCounter" ? "counterOn" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
+const costPickKey = (c: AdditionalCost): "sacrifice" | "addedSacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" | "counterOn" =>
+  c.kind === "sacrifice" && c.added ? "addedSacrifice" : c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : c.kind === "putCounter" ? "counterOn" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
 
 /** What can get the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): ~ too. */
 export function counterOnCandidates(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>): ObjectId[] {
@@ -9959,9 +9977,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   const p = player(s, pid);
   const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal" | "exileFromHand") => choices?.[k];
   for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap", "reveal", "exileFromHand"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k) || (c.kind === "forage" && (k === "sacrifice" || k === "exileCards")))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
-  const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
+    if (given(k)?.length && !costs.some((c) => (c.kind === (k === "exileCards" ? "exileFromGraveyard" : k) && !(c.kind === "sacrifice" && c.added)) || (c.kind === "forage" && (k === "sacrifice" || k === "exileCards")))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
+  const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? []), ...(choices?.addedSacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
+  // Round B260: the sacrifices other permanents add (Brutal Suppression, Drought) take permanents no other cost of it takes.
+  if (choices?.addedSacrifice?.length) {
+    if (!costs.some((c) => c.kind === "sacrifice" && c.added)) return `${d.name} doesn't ask you to sacrifice anything more`;
+    const others = [...(choices.returnToHand ?? []), ...(choices.casualty !== undefined ? [choices.casualty] : []), ...(choices.casualtyMore ?? []), ...(choices.bargain !== undefined ? [choices.bargain] : []), ...(choices.offering !== undefined ? [choices.offering] : []), ...(choices.craft ?? [])];
+    if (choices.addedSacrifice.some((id) => others.includes(id))) return "one permanent can't pay two costs";
+  }
   if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
   if (choices?.craft?.length && !costs.some((c) => c.kind === "craft")) return `${d.name} doesn't ask you to exile materials`;
   if (choices?.counters?.length && !costs.some((c) => c.kind === "removeCounters")) return `${d.name} doesn't ask you to remove counters`;
@@ -10163,7 +10187,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
     const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
-    const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
+    const chosen = c.kind === "sacrifice" && c.added ? choices?.addedSacrifice : given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
       if (chosen?.length) return `${d.name}'s discard is at random`;
@@ -10663,6 +10687,13 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         // "Cards exiled with ~" (Mechtitan Core): the cards it became in exile (CR 400.7); a token is gone (CR 704.5d).
         if (o.zone === "exile") exiled?.push({ id, zc: o.zoneChanges ?? 0 });
       }
+    } else if (c.kind === "sacrifice" && c.added) {
+      // Round B260: what Brutal Suppression and Drought add (CR 601.2f, 602.2b): sacrificed as a cost, but not "the
+      // sacrificed creature" of the spell's or ability's own words, so not kept with them.
+      for (const id of choices.addedSacrifice ?? []) {
+        log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
+        moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+      }
     } else if (c.kind === "sacrifice") {
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
@@ -11053,8 +11084,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const tp = targets ? (targetProblem(s, body.targets, targets, pid, src, id) ?? flagbearerProblem(s, body.targets, targets, pid, src, id, manySpecs)) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
-  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o, s, pid), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
+  const allCosts = activatedCosts(ab, x, o, s, pid);
+  if (allCosts.length || costs?.sacrifice?.length || costs?.addedSacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
+    const cp = extraCostProblem(s, pid, o, allCosts, costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x, costs);
@@ -11495,7 +11527,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.crew !== undefined && !tapCreatures && costs?.crewLoyalty === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.tapPower ? "tap" : ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
-  if (ab && activatedCosts(ab, x, o, s, p.id).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  // Its costs beyond mana as they are when it's activated (CR 601.2f, 602.2b), before any of them is paid.
+  const extraCosts0 = ab ? activatedCosts(ab, x, o, s, p.id) : [];
+  if (ab && extraCosts0.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
   if (ab?.costs?.some((c) => c.kind === "exileSpell") && !costs?.exileSpell?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a spell you control to exile");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
@@ -11639,7 +11673,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costCardNames: string[] = [];
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const extraCosts = activatedCosts(ab, x, o, s, p.id);
+  const extraCosts = extraCosts0;
   const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   // Kylox's Voltstrider (round 401): the cards its collect evidence cost exiled are "exiled with it" (CR 607.2a), the
   // object it is now (CR 400.7).
@@ -16986,7 +17020,11 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
       const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
-      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) });
+      // Round B260: a pick for the sacrifices Brutal Suppression and Drought add.
+      const added = addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf)[0];
+      const sacrifice = added?.kind === "sacrifice" ? anyAddedSacrifice(s, pid, o, added) : undefined;
+      if (sacrifice === null || (sacrifice && tap?.some((t) => sacrifice.includes(t)))) return;
+      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(sacrifice ? { sacrifice } : {}), ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) });
     });
   }
   return out;

@@ -4,6 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaSpend, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, canSacrificeForCost, exiledLentTo, defOf, identityOf, lendersOf, objIsType, onceKeyBase } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
+import { addedAbilityCosts, addedSacrificeProblem } from "./added-costs";
 import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, manaActivationTax, obj, payableLife, player, sylexed, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, type ParsedCost } from "./mana";
@@ -676,7 +677,7 @@ export function abolisherBan(s: GameState, pid: PlayerId, o: GameObject): string
   return src ? `${characteristics(s, obj(s, src)).name}: opponents can't activate abilities of artifacts, creatures or enchantments during ${player(s, s.activePlayer).name}'s turn` : null;
 }
 
-export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false, tap?: ObjectId[]): string | null {
+export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false, tap?: ObjectId[], /** Round B260: what's sacrificed for the sacrifices Brutal Suppression and Drought add (activateMana `sacrifice`); without it, whether they could be. */ sacrifice?: ObjectId[]): string | null {
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
   if (!ab) return `${name} has no such mana ability`;
@@ -720,6 +721,10 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
     if (!tap) return can.length >= ab.tapCost.n ? null : `you need to tap ${ab.tapCost.n === 1 ? "an" : ab.tapCost.n} ${ab.tapCost.filter.text}`;
     if (tap.length !== ab.tapCost.n || new Set(tap).size !== tap.length || tap.some((id) => !can.includes(id))) return `choose ${ab.tapCost.n === 1 ? "an" : ab.tapCost.n} ${ab.tapCost.filter.text} to tap`;
   } else if (tap?.length) return "that ability doesn't tap other permanents";
+  // Round B260: Brutal Suppression's and Drought's sacrifices (CR 602.2b, 605.1a), none of them a permanent it taps.
+  const added = addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf)[0];
+  if (added?.kind === "sacrifice") return addedSacrificeProblem(s, pid, o, added, sacrifice, tap ?? []);
+  if (sacrifice?.length) return "that ability doesn't sacrifice other permanents";
   return null;
 }
 
@@ -756,7 +761,7 @@ export function pickManaAbility(s: GameState, pid: PlayerId, o: GameObject, mana
   const abs = manaAbilitiesOn(s, o);
   return abs
     .map((ab, i) => ({ ab, i }))
-    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && !manaCombos(s, o, ab))
+    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && !manaCombos(s, o, ab) && !addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf).length)
     .sort((a, b) => manaPenalty(a.ab) - manaPenalty(b.ab))[0]?.i;
 }
 
@@ -838,6 +843,8 @@ function activatedManaTypes(s: GameState, o: GameObject, ab: ActivatedAbility): 
 export function payableActivatedMana(s: GameState, pid: PlayerId, o: GameObject): { index: number; ab: ActivatedAbility; options: ManaOption[]; penalty: number }[] {
   return abilitiesOf(s, o).activated.flatMap((ab, index) => {
     if (!ab.mana || (ab.zone ?? "battlefield") !== "battlefield" || ab.costs?.length || ab.discardSelf || ab.exileSelf || ab.putCounters || ab.crew !== undefined || ab.station) return [];
+    // Round B260: a sacrifice Brutal Suppression or Drought adds is the player's to pick, so it's activated by hand.
+    if (addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf).length) return [];
     const m = activatedAsMana(ab);
     if (!m || parseManaCost(ab.manaCost).hasX) return [];
     const problem = abilityProblem(s, pid, o.id, index);

@@ -15,6 +15,7 @@ import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAb
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses, parseActivateCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
+import { addedCostLine } from "./laneb260-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -5869,6 +5870,8 @@ export function compile(d: CardDef): CompiledCard {
       out.landsCantEnter = true;
       continue;
     }
+    // Round B260: costs added to other spells and abilities (added-costs.ts, CR 601.2f, 602.2b).
+    if (!isSpell && addedCostLine(line, out)) continue;
     // Aggressive Mining: "You can't play lands.": its controller, the special action only; lands put onto the battlefield
     // by spells and abilities still arrive (rulings, CR 305.1, 101.2).
     if (line === "You can't play lands." && !isSpell) {

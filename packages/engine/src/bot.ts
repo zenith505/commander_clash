@@ -11,6 +11,7 @@ import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
 import { redistributions } from "./effects/run-round362";
+import { addedAbilityCosts, addedSacrificeCandidates } from "./added-costs";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { activatedQuality, manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -5445,6 +5446,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
     else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
+    } else if (c.kind === "sacrifice" && c.added) {
+      // Round B260: Drought's Swamps, apart from the spell's own sacrifices.
+      const picked = addedSacrificePick(s, pid, undefined, c, new Set([...targeted, ...(out.sacrifice ?? []), ...(out.returnToHand ?? [])]));
+      if (!picked) return null;
+      out.addedSacrifice = picked;
     } else if (c.kind === "sacrifice" && c.oneOfEach) {
       // "A Swamp and a Forest" (Jarad): for each in turn, the cheapest that fits it and as few of the others as can be
       // (a plain Swamp before an Overgrown Tomb), each a different permanent.
@@ -5874,6 +5880,29 @@ function landsToSpare(s: GameState, pid: PlayerId, costs: AdditionalCost[]): boo
   return !n || lands(s, pid) - n >= 5;
 }
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
+
+/**
+ * Round B260: what to sacrifice for what Brutal Suppression and Drought add to a cost: tapped lands first (their mana may be
+ * paying for it), then the least valuable, never the commander, something it targets or another cost of it takes, and only
+ * with four lands left after. Null when that can't be done.
+ */
+export function addedSacrificePick(s: GameState, pid: PlayerId, src: GameObject | undefined, c: Extract<AdditionalCost, { kind: "sacrifice" }>, exclude: Set<string | number>): ObjectId[] | null {
+  const pool = addedSacrificeCandidates(s, pid, src, c)
+    .map((x) => obj(s, x))
+    .filter((o) => !o.isCommander && !exclude.has(o.id))
+    .sort((a, b) => Number(b.tapped) - Number(a.tapped) || worth(s, pid, a) - worth(s, pid, b));
+  const landsGone = pool.filter((o) => objIsType(s, o, "Land")).slice(0, c.n).length;
+  if (lands(s, pid) - landsGone < 4) return null;
+  const specs = c.oneOfEach ?? Array.from({ length: c.n }, () => c.filter);
+  const picked: ObjectId[] = [];
+  for (const [i, f] of specs.entries()) {
+    const later = (x: GameObject) => specs.slice(i + 1).filter((g) => objectMatches(s, g, x, pid, false)).length;
+    const o = pool.filter((x) => !picked.includes(x.id) && objectMatches(s, f, x, pid, false)).sort((a, b) => later(a) - later(b))[0];
+    if (!o) return null;
+    picked.push(o.id);
+  }
+  return picked;
+}
 
 /** Explore revealed a nonland card: keep it on top if we could cast it soon, otherwise mill it. */
 /**
@@ -8291,10 +8320,25 @@ function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility
  * Undefined when it costs none of that; null when we'd rather not pay.
  */
 export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null | undefined {
-  if (!ab.costs?.length) return undefined;
+  // Round B260: what Brutal Suppression and Drought add, picked after its own costs.
+  const added = addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf);
+  if (!ab.costs?.length && !added.length) return undefined;
+  const out = ownAbilityCosts(s, pid, o, ab, targets, keep);
+  if (!out || !added.length) return out;
+  const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
+  for (const c of added) {
+    if (c.kind !== "sacrifice") return null;
+    const picked = addedSacrificePick(s, pid, o, c, new Set([...targeted, ...(keep ? [keep] : []), ...(out.sacrifice ?? []), ...(out.tap ?? []), ...(out.returnToHand ?? []), ...(out.craft ?? [])]));
+    if (!picked) return null;
+    out.addedSacrifice = picked;
+  }
+  return out;
+}
+
+function ownAbilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
-  for (const c0 of ab.costs) {
+  for (const c0 of ab.costs ?? []) {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
     // Ronin, Shadow Stalker: "an Equipment attached to ~", this permanent.

@@ -1372,6 +1372,12 @@ export interface StackItem {
    * each (its zone-change count then) and the times it was paid, for that instance's own copy trigger.
    */
   replicated?: { source: ObjectId; zc: number; times: number }[];
+  /**
+   * Round B260: the names of the cards spliced onto this spell as it was cast (CR 702.47a-b), for Minamo's Meddling's
+   * "each card with the same name as a card spliced onto that spell". Not copied: a copy isn't cast, and no card is
+   * spliced onto it (its spliced text comes with the copy, CR 707.10).
+   */
+  spliced?: string[];
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
   /** For a spell: cast during its controller's main phase (addendum, "if you cast this spell during your main phase"). */
@@ -1638,6 +1644,8 @@ export interface CostChoices {
   face?: number;
   /** Permanents to sacrifice, cards to discard, cards to exile from your graveyard. */
   sacrifice?: ObjectId[];
+  /** Round B260: the permanents sacrificed for the sacrifices other permanents add to its cost (AdditionalCost sacrifice `added`: Brutal Suppression, Drought), none of them one of `sacrifice`. */
+  addedSacrifice?: ObjectId[];
   discard?: ObjectId[];
   exileCards?: ObjectId[];
   /**
@@ -2980,6 +2988,8 @@ export interface Resolving {
   spellControllers?: (PlayerId | null)[];
   /** The cards of targeted spells, for "its mana value" after it's countered (CR 608.2h). */
   spellObjects?: (ObjectId | null)[];
+  /** Round B260: the names of the cards spliced onto each targeted spell (StackItem.spliced), for after it's countered (CR 608.2h). */
+  spellSpliced?: (string[] | null)[];
   /** The tokens its last "create" made, for "put a counter on it". */
   created?: ObjectId[];
   /** Thorin, Mountain-king: the Aura and Equipment its "attach" effects attached (moved) this resolution, for "when one or more Equipment become attached to that creature this way". */
@@ -3767,7 +3777,7 @@ export type Action =
   /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
   /** `extra`: the mana picked for the triggered mana abilities tapping it triggers ("one mana of any color", CR 605.4a). */
   /** `combo`: for "Add {W}{W}, {W}{U}, or {U}{U}", which of them (ManaOption.combo). */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** The color chosen for a replacement that lets the player tapping it choose (ManaOption.instead, round B224). */ instead?: ManaType; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; /** Round B260: the permanents sacrificed for the sacrifices Brutal Suppression and Drought add to its cost. */ sacrifice?: ObjectId[]; extra?: ManaType[]; combo?: number; /** The color chosen for a replacement that lets the player tapping it choose (ManaOption.instead, round B224). */ instead?: ManaType; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */

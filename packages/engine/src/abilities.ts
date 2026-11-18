@@ -5070,6 +5070,12 @@ export type Effect =
   /** Divine Intervention (round B259): "the game is a draw" (CR 104.4c): it ends at once with no winner (rulings; effects/run-laneb259.ts). */
   | { type: "gameIsDraw" }
   /**
+   * Minamo's Meddling (round B260): "That spell's controller reveals their hand, then discards each card with the same
+   * name as a card spliced onto that spell." after countering target spell `spell` (a target index): the names of the
+   * cards revealed to splice onto it as it was cast (StackItem.spliced, CR 702.47a), as resolution began (CR 608.2h).
+   */
+  | { type: "discardSplicedNames"; spell: number }
+  /**
    * General Jarkeld (round B258): "Choose two target blocked attacking creatures. If each of those creatures could be blocked
    * by all creatures that the other is blocked by, each creature that's blocking exactly one of those attacking creatures stops
    * blocking it and is blocking the other attacking creature." (CR 509.1b; rulings; effects/run-laneb258.ts).
@@ -8270,6 +8276,19 @@ export interface GraveCastRider {
  * `x` (on a spell's costs): "pay X life", "discard X cards", "sacrifice X lands": as many as the X announced as it's
  * cast (CR 107.3a, 601.2b); `n` is that X once `castExtraCosts` has it.
  */
+/**
+ * Round B260: "Activated abilities of nontoken Rebels cost an additional "Sacrifice a land" to activate." (Brutal
+ * Suppression; `source`, the permanents whose abilities it is), "Spells cost an additional "Sacrifice a Swamp" to cast for
+ * each black mana symbol in their mana costs." (Drought; `perBlack`, once for each black mana symbol, and the same for
+ * activation costs). `sacrifice`: what's sacrificed, one for each.
+ */
+export interface AddedCostRule {
+  what: "spells" | "abilities";
+  sacrifice: TargetSpec;
+  source?: TargetSpec;
+  perBlack?: true;
+}
+
 export type AdditionalCost =
   /**
    * Forage (CR 701.61a): exile three cards from your graveyard or sacrifice a Food, chosen as it's paid (CostChoices
@@ -8277,7 +8296,7 @@ export type AdditionalCost =
    */
   | { kind: "forage" }
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** With `x`: "Sacrifice up to three permanents" (Baba Lysaga, Night Witch): X is at most this. */ upTo?: number; /** "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): X announced as it's activated (CR 107.3a, 602.2b), then one with that mana value. */ mvX?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true; /** Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X": X announced as it's activated (CR 107.3a, 602.2b), then any number of them, at least one, whose mana values add up to X (`n` unused); `totalMv` is that X once announced (game.ts activatedCosts). */ totalMvX?: true; totalMv?: number }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** Round B260: a sacrifice another permanent's static ability adds (Brutal Suppression, Drought; added-costs.ts), picked apart from the spell's or ability's own (CostChoices.addedSacrifice). */ added?: true; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** With `x`: "Sacrifice up to three permanents" (Baba Lysaga, Night Witch): X is at most this. */ upTo?: number; /** "Sacrifice a creature you control with mana value X other than ~" (Sidisi, Regent of the Mire): X announced as it's activated (CR 107.3a, 602.2b), then one with that mana value. */ mvX?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[]; /** "Sacrifice three artifact tokens with different names" (Transmutation Font): no two with the same name. */ differentNames?: true; /** Fabrication Foundry (round 386): "Exile one or more other artifacts you control with total mana value X": X announced as it's activated (CR 107.3a, 602.2b), then any number of them, at least one, whose mana values add up to X (`n` unused); `totalMv` is that X once announced (game.ts activatedCosts). */ totalMvX?: true; totalMv?: number }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true; /** "Discard two nonland cards with the same name" (Sphinx of the Chimes): all of the `n` cards share a name (CR 201.2). */ sameName?: true; /** "Discard three cards with different names" (Ormos, Archive Keeper): no two with the same name. */ differentNames?: true; /** "Discard the last card you drew this turn" (Jandor's Ring): that card only, while it's still in your hand (rulings); nothing to choose. */ lastDrawn?: true }
   | { kind: "payLife"; n: number; x?: true; /** Phyrexian Purge: "costs 3 life more to cast for each target": `n` for each target chosen (CR 601.2c, 601.2f). */ perTarget?: true }
@@ -9474,6 +9493,11 @@ export interface CompiledCard {
    * spell that would be one is put into its owner's graveyard (CR 608.3e), and a land token isn't created (CR 111.5).
    */
   landsCantEnter?: true;
+  /**
+   * Round B260: sacrifices this permanent's static abilities add to the costs of other spells and abilities (Brutal
+   * Suppression, Drought; added-costs.ts, CR 601.2f, 602.2b).
+   */
+  addedCosts?: AddedCostRule[];
   /** "Players can't cast spells from graveyards or libraries." (Grafdigger's Cage), "... noncreature spells from graveyards or exile" (Soulless Jailer). */
   cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
   /** Ashes of the Abhorrent: "Players can't ... activate abilities of cards in graveyards." Triggered abilities still work (rulings). */

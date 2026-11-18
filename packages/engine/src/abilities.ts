@@ -783,6 +783,8 @@ export interface TargetSpec {
   notColors?: Color[];
   /** "A card that shares a color with a legendary creature you control" (Ringsight): a color of one of them as the search is made; none if they're colorless (rulings). */
   colorOfYourLegend?: true;
+  /** Kasmina, Enigma Sage (round B251): "a card that shares a color with this planeswalker": one of the colors of the ability's source as the search is made, or as it last existed (CR 608.2h); a colorless source shares none, so nothing fits (rulings). Bound in the search (effects/run-library.ts). */
+  sharesColorWithSource?: true;
   /** "A creature card that shares a creature type with the sacrificed creature" (Pyre of Heroes): searched for as it resolves, the creature as it last existed. */
   sharesCreatureTypeWithSacrificed?: true;
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
@@ -3570,6 +3572,11 @@ export type Effect =
    * 603.7): see GameState.exileReturnTurn.
    */
   | { type: "exileReturnThisTurn" }
+  /**
+   * Gather Specimens (round B250): "If a creature would enter the battlefield under an opponent's control this turn, it
+   * enters under your control instead." (CR 614.1c, 614.12): see GameState.gatherSpecimens and gather.ts.
+   */
+  | { type: "gatherSpecimens" }
   /** "If it would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a): while it's that permanent. */
   | { type: "exileIfLeaves"; what: ObjRef }
   /** "It can't be regenerated this turn" (CR 701.19c): its regeneration shields don't apply this turn. */
@@ -6115,7 +6122,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -9570,6 +9577,22 @@ export interface CompiledCard {
    * ~'s abilities." (CR 609.4b): every activated ability it has, mana abilities and borrowed ones among them (CR 602.1).
    */
   spendAnyColorOwnAbilities?: true;
+  /**
+   * Sharkey, Tyrant of the Shire (round B251): "Mana of any type can be spent to activate ~'s abilities." (CR 609.4b): its
+   * colored and {C} symbols paid with any mana, for every activated ability it has, borrowed ones among them (CR 602.1).
+   */
+  spendAnyTypeOwnAbilities?: true;
+  /**
+   * Kasmina, Enigma Sage (round B251): "Each other planeswalker you control has the loyalty abilities of ~.": its loyalty
+   * abilities (CR 606), as it has them now (CR 613.1f), are also abilities of each other planeswalker its controller
+   * controls; "this planeswalker" in them is the one they're activated from (rulings). See cards.ts withKasmina.
+   */
+  lendsLoyaltyToPlaneswalkers?: true;
+  /**
+   * Tamiyo, Collector of Tales (round B251): "Spells and abilities your opponents control can't cause you to discard
+   * cards": with `opponentsCantMakeYouSacrifice` (Sigarda, Host of Herons). See cards.ts opponentForbidsDiscard.
+   */
+  opponentsCantMakeYouDiscard?: true;
   /**
    * Quicksilver Elemental (round 400): "You may spend blue mana as though it were mana of any color to pay the activation
    * costs of ~'s abilities." (CR 609.4b): blue mana pays any colored symbol of every activated ability it has, mana and

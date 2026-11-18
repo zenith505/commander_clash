@@ -1,5 +1,5 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, discardShieldOf, isPermanentCard, isType, objIsType, opponentForbidsDiscard } from "../cards";
 import { controllerOf, ignoredBy, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
@@ -28,6 +28,32 @@ function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec
   const colors = [...new Set(Object.values(s.objects).filter((o) => o.zone === "battlefield" && controllerOf(s, o) === pid).map((o) => characteristics(s, o)).filter((c) => c.types.includes("Creature") && c.supertypes.includes("Legendary")).flatMap((c) => c.colors))];
   // No color to share: nothing fits.
   return colors.length ? { ...rest, colors } : { ...rest, colors: ["W"], notColors: ["W"] };
+}
+
+/**
+ * Tamiyo, Collector of Tales (round B251): the players of `who` that a spell or ability `by` controls can make discard;
+ * each of the others is said to be spared, once for each instruction.
+ */
+export function sparedFromDiscard(s: GameState, who: PlayerId[], by: PlayerId): PlayerId[] {
+  return who.filter((pid) => {
+    if (!opponentForbidsDiscard(s, pid, by)) return true;
+    logSpared(s, pid);
+    return false;
+  });
+}
+
+/** "Ken can't be made to discard (Tamiyo, Collector of Tales)." */
+export function logSpared(s: GameState, pid: PlayerId): void {
+  log(s, `${player(s, pid).name} can't be made to discard cards by another player's spells or abilities (${defOf(s, discardShieldOf(s, pid)!).name}).`);
+}
+
+/** Kasmina, Enigma Sage (round B251): a filter's "shares a color with this planeswalker" bound to the source's colors. */
+function sourceColors(s: GameState, spec: TargetSpec, ctx: ResolveCtx): TargetSpec {
+  const { sharesColorWithSource: _, ...rest } = spec;
+  const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+  const now = o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === (ctx.sourceZc ?? o.zoneChanges ?? 0) ? characteristics(s, o).colors : undefined;
+  const colors = now ?? ctx.lki?.colors ?? [];
+  return colors.length ? { ...rest, colors: [...colors] } : { ...rest, colors: ["W"], notColors: ["W"] };
 }
 
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
@@ -620,7 +646,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "discard": {
-      const who = players(s, e.who, ctx);
+      const allWho = players(s, e.who, ctx);
+      // Tamiyo, Collector of Tales (round B251): a player an opponent's spell or ability can't make discard isn't asked to
+      // choose and discards nothing (rulings); exiling from a hand isn't discarding (CR 701.9a).
+      const who = e.exile ? allWho : sparedFromDiscard(s, allWho, ctx.controller);
       // "Discards all cards with that name" (Cabal Therapy): the name chosen as it resolved.
       let filter = e.filter && bindChosen(e.filter, ctx.chosen);
       // Infernal Kirin: "cards with that spell's mana value": the number worked out as this resolves.
@@ -636,7 +665,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc0 = (s.resolving!.scratch ??= {});
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
       // discards the rest (n is per player then).
-      const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
+      const fewest = e.downToFewest ? (sc0.n ??= allWho.length ? Math.min(...allWho.map((pid) => player(s, pid).hand.length)) : 0) : 0;
       const keepN = e.keep !== undefined ? amountNow(s, e.keep, ctx) : 0;
       const nFor = e.downToFewest ? {} : e.keep !== undefined ? Object.fromEntries(who.map((pid) => [pid, Math.max(0, player(s, pid).hand.length - keepN)])) : amountFor(s, e.n, ctx, who);
       if (e.random && !e.hand) {
@@ -791,7 +820,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
         const ids = picked.filter((id) => p.hand.includes(id));
-        s.resolving!.tookFromHand = ids.length;
+        // Tamiyo, Collector of Tales (round B251): chosen, but not discarded.
+        const spared = !!ids.length && opponentForbidsDiscard(s, pid, ctx.controller);
+        s.resolving!.tookFromHand = spared ? 0 : ids.length;
+        if (spared) return void logSpared(s, pid);
         if (!ids.length) return;
         const tops = discardToTop(s, pid, ids, src, ctx);
         if (tops === "paused") return "paused";
@@ -837,6 +869,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (e.gainToughness && !sc.toughnessGained && ids.length) {
           sc.toughnessGained = true;
           gainLife(s, ctx.controller, Math.max(0, cardPT(s, obj(s, ids[0]!), "toughness")));
+        }
+        // Tamiyo, Collector of Tales (round B251): the card was chosen, but it isn't discarded, so "then draws" doesn't follow.
+        if (ids.length && opponentForbidsDiscard(s, pid, ctx.controller)) {
+          s.resolving!.tookFromHand = 0;
+          return void logSpared(s, pid);
         }
         const tops = discardToTop(s, pid, ids, src, ctx);
         if (tops === "paused") return "paused";
@@ -1434,7 +1471,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // (StackItem.castName; none face down, CR 708.2a, so nothing is found then).
       const causeName = filter1a?.sameNameAsCause && ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castName : undefined;
       const filter1 = filter1a?.sameNameAsCause && causeName !== undefined ? (({ sameNameAsCause: _, ...rest }) => ({ ...rest, named: causeName }))(filter1a) : filter1a;
-      const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
+      const filter2a = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
+      // Kasmina, Enigma Sage (round B251): "shares a color with this planeswalker": the source's colors now, or as it last
+      // existed (CR 608.2h); colorless, nothing fits (rulings).
+      const filter2 = filter2a?.sharesColorWithSource ? sourceColors(s, filter2a, ctx) : filter2a;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
       let filter3a = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
       // Curse of Misfortunes: "that doesn't have the same name as a Curse attached to enchanted player": the names of those
@@ -2431,6 +2471,8 @@ export function toBottom(s: GameState, pid: PlayerId, ids: ObjectId[], src: stri
 /** `cause`: the controller of the spell or ability that made them discard, if one did. */
 export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId, /** The X chosen for a cycling cost (Shark Typhoon). */ cycledX?: number, /** Library of Leng: those that go on top of the library instead, the first ending on top (see discardToTop). */ toTop: ObjectId[] = []) {
   if (!ids.length) return;
+  // Tamiyo, Collector of Tales (round B251): another player's spell or ability can't make `pid` discard (rulings).
+  if (cause !== undefined && opponentForbidsDiscard(s, pid, cause)) return void logSpared(s, pid);
   if (s.resolving) (s.resolving.discarded ??= {})[pid] = (s.resolving.discarded[pid] ?? 0) + ids.length;
   if (s.resolving) (s.resolving.discardedAll ??= []).push(...ids);
   const names = ids.map((id) => defOf(s, obj(s, id)).name);
@@ -2493,7 +2535,7 @@ export function lengName(s: GameState, pid: PlayerId): string | undefined {
  * first ending on top), a randomly discarded one too, once it's been picked (rulings). "paused" while they choose.
  */
 export function discardToTop(s: GameState, pid: PlayerId, ids: ObjectId[], src: string, ctx: ResolveCtx): ObjectId[] | "paused" {
-  if (!ids.length || !s.resolving || ctx.asCost) return [];
+  if (!ids.length || !s.resolving || ctx.asCost || opponentForbidsDiscard(s, pid, ctx.controller)) return [];
   const sc = (s.resolving.scratch ??= {});
   const done = sc.toTop?.[pid];
   if (done) return done;

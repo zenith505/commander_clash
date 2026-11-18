@@ -387,6 +387,26 @@ export function opponentForbidsSacrifice(s: GameState, o: GameObject): boolean {
 }
 
 /**
+ * Tamiyo, Collector of Tales (round B251): "Spells and abilities your opponents control can't cause you to discard cards":
+ * `by` (the controller of the spell or ability making `pid` discard, by default the one resolving) is another player (every
+ * other player is an opponent, CR 102.3) and `pid` controls a permanent with that ability. The discard, or the option to
+ * discard, just isn't there (rulings). A cost of `pid`'s own, or a game rule (cleanup's discard), has no such `by`.
+ */
+export function opponentForbidsDiscard(s: GameState, pid: PlayerId, by: PlayerId | undefined = s.resolving?.item.controller): boolean {
+  if (by === undefined || by === pid) return false;
+  return !!discardShieldOf(s, pid);
+}
+
+/** The permanent `pid` controls that says opponents can't make them discard (Tamiyo, Collector of Tales), if any. */
+export function discardShieldOf(s: GameState, pid: PlayerId): GameObject | undefined {
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (controllerOf(s, o) === pid && abilitiesOf(s, o).opponentsCantMakeYouDiscard) return o;
+  }
+  return undefined;
+}
+
+/**
  * Whether it can be sacrificed to pay a cost to cast a spell or activate an ability (mana abilities too): not while
  * Angel of Jubilation ("creatures") or Yasharn ("nonland permanents") says players can't (rulings).
  */
@@ -448,7 +468,45 @@ export function abilitiesOf(s: GameState, o: GameObject, unbound = false): Compi
   }
   const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
   if (lent.length) own = withLent(own, lent);
-  return own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
+  const all = own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
+  return o.zone === "battlefield" && !lendingLoyalty && c.types.includes("Planeswalker") ? withKasmina(s, o, c.controller, all) : all;
+}
+
+/** While working out a Kasmina's loyalty abilities to lend: its own, without what other Kasminas lend it (no loops). */
+let lendingLoyalty = false;
+const kasminaCache = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+
+/**
+ * Kasmina, Enigma Sage (round B251): "Each other planeswalker you control has the loyalty abilities of ~." Each other
+ * planeswalker with that ability its controller controls lends this one its loyalty abilities as it has them now (CR
+ * 613.1f, layer 6; not what other such planeswalkers lend it), in battlefield order, after its own; "this planeswalker"
+ * in them is this one (rulings). Still one loyalty ability of this permanent each turn (CR 606.3, rulings).
+ */
+function withKasmina(s: GameState, o: GameObject, you: PlayerId, own: CompiledCard): CompiledCard {
+  const lenders: CompiledCard[] = [];
+  lendingLoyalty = true;
+  try {
+    for (const id of s.battlefield) {
+      const k = s.objects[id]!;
+      if (k.id === o.id || !compileCard(defOf(s, k)).lendsLoyaltyToPlaneswalkers) continue;
+      const kc = characteristics(s, k);
+      if (!kc.hasPrintedAbilities || kc.controller !== you || !kc.types.includes("Planeswalker")) continue;
+      lenders.push(abilitiesOf(s, k));
+    }
+  } finally {
+    lendingLoyalty = false;
+  }
+  if (!lenders.length) return own;
+  const key = lenders.map(idOf).join(",");
+  let byKey = kasminaCache.get(own);
+  if (!byKey) kasminaCache.set(own, (byKey = new Map()));
+  let hit = byKey.get(key);
+  if (!hit) {
+    const loyal = (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX);
+    hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l) => l.activated.filter(loyal).map((a) => ({ ...a, borrowed: true as const })))] };
+    byKey.set(key, hit);
+  }
+  return hit;
 }
 
 const noFlankingCache = new WeakMap<CompiledCard, CompiledCard>();
@@ -630,7 +688,9 @@ function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledC
   if (!byKey) borrowed.set(own, (byKey = new Map()));
   let hit = byKey.get(key);
   if (!hit) {
-    const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
+    // Sharkey, Tyrant of the Shire (round B251): "except mana abilities", those compiled as activated abilities too (CR 605.1a).
+    const noMana = !!own.borrows!.noMana && !own.borrows!.loyalty;
+    const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX && !(noMana && a.mana);
     const base = found.objects.length;
     hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l, li) => l.activated.map((a, ai) => [a, ai] as const).filter(([a]) => usable(a)).map(([a, ai]) => ({ ...a, borrowed: true as const, ...(once && li >= base ? { onceKey: `${once[li - base]}#${ai}` } : {}) })))] };
     // Idris, Koh (round 399): "all activated and triggered abilities": the lenders' triggered abilities too.

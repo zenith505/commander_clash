@@ -1,7 +1,7 @@
 # Roadmap
 
-31,657 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,914 of
+31,661 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,915 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -204,7 +204,7 @@ line blocks.
    trigger), Inalla, Archmage Ritualist (an eminence copy with haste, exiled at end step), Threats Undetected (four
    creature cards with different powers, an opponent chooses two), Leader, Super-Genius (a connive replacement), This
    Is How It Ends (villainous choice after a shuffle), Azor's Gateway (done in round 337) (counting mana values among cards exiled with
-   it), Tamiyo, Collector of Tales, Anchor to Reality (done in round 270), Detective's
+   it), Tamiyo, Collector of Tales (done in round B251), Anchor to Reality (done in round 270), Detective's
    Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
    commander's mana value), Strata Scythe (done in round 275), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
@@ -303,7 +303,7 @@ line blocks.
    Out after round 181: Horrid Shadowspinner (done in round B105) (the number discarded is fixed as you choose to draw), Luminate Primordial (done in round 276),
    Old Man Willow (done in round B105) ("another creature or a token" to
    sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble! (done in round 324), Chocobo Camp (done in round 324),
-   Transcendence (done in round B105), Fumble (done in round B206), Goblin Assassin (done in round 276), Kasmina, Enigma Sage, Codie, Vociferous Codex (done in round 368), Jetfire (done in round 372), Hollow Marauder,
+   Transcendence (done in round B105), Fumble (done in round B206), Goblin Assassin (done in round 276), Kasmina, Enigma Sage (done in round B251), Codie, Vociferous Codex (done in round 368), Jetfire (done in round 372), Hollow Marauder,
    Gorex, the Tombshell (done in round 368), Council's Deliberation (done in round 276), Lumbering Megasloth (done in round 299), Braids's Frightful Return (done in round 276), Awakening of
    Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship (done in round 276), Stoic Farmer, See the Unwritten, Razorlash
    Transmogrant, Auntie Blyte, Nimble Trapfinder (done in round 324), Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
@@ -2563,7 +2563,7 @@ line blocks.
    to cast, where X is the number of players being attacked": a cost reduction for the turn by where a spell is cast from,
    then "exile the top X cards"); Bre of Clan Stoutarm (still out: whether "Otherwise" applies when you decline to cast,
    rulings silent); Surge to Victory (still out: the trigger it grants for the turn has to remember the exiled card);
-   Tamiyo, Collector of Tales ("Spells and abilities your opponents control can't cause you to discard cards or sacrifice
+   Tamiyo, Collector of Tales (done in round B251) ("Spells and abilities your opponents control can't cause you to discard cards or sacrifice
    permanents", every discard and sacrifice path); Share the Spoils (each player plays from cards exiled with it, "When
    they do, exile the top card of their library", and again whenever an opponent loses).
    Round 357 went on down `npm run popular`, most played first, to cards cast from where a permission or trigger puts them:
@@ -2755,7 +2755,7 @@ line blocks.
    exhaust ability left to use, cast Desperate Gambit for an unblocked attacker with power 3 or more, and use Forcefield
    against an unblocked attacker dealing 2 or more. +5, 31,315 of 31,936. The compiled text of every other card is
    unchanged.
-   Out after round 364 (looked at, not done): Tamiyo, Collector of Tales and Nephalia Academy (still out: who controls what
+   Out after round 364 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) and Nephalia Academy (still out: who controls what
    causes a discard or sacrifice, on every path); Stalking Leonin (still out: a secret choice); Celestial Reunion (still
    out: a type chosen and two creatures beheld as an optional cost); Rootpath Purifier ("land cards in your library are
    basic": searches read library cards' printed supertypes); Mysterious Stranger (still out: one target per graveyard);
@@ -2892,7 +2892,7 @@ line blocks.
    Canonist lets a creature spell cast under Biotransference count as an artifact spell. No new prompts. +4, 31,382 of
    31,936 with Lane B's B209-B211. The compiled text of every other card is unchanged.
    Out after round 369 (looked at, not done): Hatchery Sliver (done in round B248) (still out: a second replicate cost beside the spell's own
-   kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales, Nephalia Academy,
+   kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales (done in round B251), Nephalia Academy,
    Celestial Reunion and Stalking Leonin (still out, as in their earlier lists).
    Round 370 went on down `npm run popular`, most played first, to a free spell as big as the life gained this turn, spells
    from exile made cheaper by the players attacked, a look as deep as the creatures that convoked it and a search of
@@ -3088,7 +3088,7 @@ line blocks.
    attacker of the chosen player, and activate Garth in their first main phase for the card they can use (Shivan Dragon
    with six mana, Terror or Disenchant with a target, Regrowth with a card in the graveyard, Braingeyser with four mana,
    else Black Lotus).
-   Out after round 377 (looked at, not done): Tamiyo, Collector of Tales ("Spells and abilities your opponents control
+   Out after round 377 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) ("Spells and abilities your opponents control
    can't cause you to discard cards or sacrifice permanents." cuts across every discard and sacrifice path, and who controls
    the effect isn't passed to all of them); Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
    Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: the Garth copy's cast prompt says "from exile"
@@ -3115,7 +3115,7 @@ line blocks.
    Out after round 378 (looked at, not done): Master Warcraft (done in round 379) ("You choose which creatures attack this turn": another player
    picks the attackers, then the active player chooses what each one attacks and pays its costs, rulings; no such split of
    the attack declaration yet, nor its UI and bot); Melee (done in round 379) ("Whenever a creature attacks and isn't blocked this
-   combat, untap it and remove it from combat": a trigger on not being blocked, then removing it from combat); Tamiyo, Collector of Tales, Celestial Reunion, Fabrication Foundry,
+   combat, untap it and remove it from combat": a trigger on not being blocked, then removing it from combat); Tamiyo, Collector of Tales (done in round B251), Celestial Reunion, Fabrication Foundry,
    Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
    Round 379 went on down the "Out after round N" lists and `npm run popular`, most played first, to attackers chosen by
    another player, unblocked attackers removed from combat, an Aura for a creature, a planeswalker or a Clue and two
@@ -3141,7 +3141,7 @@ line blocks.
    allow; bots whose attackers another player chose attack the opponent with the least life, and never pay for them; bots
    cast Master Warcraft like Berserker's Frenzy (in their first main phase, to choose the blocks) and never cast Melee.
    Out after round 379 (looked at, not done): Capricopian ("Only the player ~ is attacking may activate this ability": an
-   ability another player activates, then "reselect which player ~ is attacking"); Tamiyo, Collector of Tales, Celestial
+   ability another player activates, then "reselect which player ~ is attacking"); Tamiyo, Collector of Tales (done in round B251), Celestial
    Reunion, Fabrication Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
    Polish: the log says "You chooses Hill Giant to attack." (the known "You chooses" wording).
    Round 380 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card given to the
@@ -3615,7 +3615,7 @@ line blocks.
    Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
    Killer, Celestial Dawn, Titania's Song, Bitter Feud, Breathstealer's Crypt, Swans of Bryn Argoll, Blood of the Martyr,
-   Shared Fate, Elemental Resonance, Rhystic Cave, Sharkey, Eye for an Eye, Spy Kit and the rest from rank 15,000 to 25,000
+   Shared Fate, Elemental Resonance, Rhystic Cave, Sharkey (done in round B251), Eye for an Eye, Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
    Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
    round 285: Koh, the Face Stealer's "Pay 1 life: Choose a creature card exiled with Koh." and "Koh has all activated and
@@ -4400,7 +4400,7 @@ line blocks.
    value" (Puca's Mischief: the mana values compared when targets are chosen and again as it resolves, CR 608.2b,
    rulings; a browser test); "Protection from permanents with corruption counters on them" (Geyadrone Dihada: a quality
    of the source, so spells aren't covered, CR 702.16a). +8, 30,791 of 31,936 with round 321 and B162.
-   Out after round 322 (looked at, not done): Tamiyo, Collector of Tales and Nephalia Academy (not every discard path
+   Out after round 322 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) and Nephalia Academy (not every discard path
    carries what caused it), Archelos, Lagoon Mystic (the order of replacement effects as permanents enter), Stalking
    Leonin (a secret choice of opponent, revealed as a cost), Breathkeeper Seraph (a return at "your next upkeep" granted by
    soulbond), Rebbec, Architect of Ascension (done in round 336). Bots: Coveted Falcon gives nothing away; Puca's Mischief only trades for a
@@ -9996,7 +9996,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   once, Auras among them attached as they enter), Lich's Mirror (losing the game replaced by shuffling your hand, graveyard
   and every permanent you own, even ones others control, into your library), Mana Cache (a mana ability any player may
   activate during their turn before the end step), Cultivator Drone (mana spendable only on colorless spells, abilities of
-  colorless permanents and costs with {C}, including costs paid as abilities resolve), Sharkey, Tyrant of the Shire (all
+  colorless permanents and costs with {C}, including costs paid as abilities resolve), Sharkey, Tyrant of the Shire (done in round B251) (all
   activated abilities of opponents' lands except mana abilities, gained and stopped, paid with mana of any type), Spy Kit
   (every nonlegendary creature card's name at once) and Liberated Livestock (an Aura card from your hand or graveyard
   attached to each token it creates, extra tokens included, rulings) stay out.
@@ -10749,6 +10749,49 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   isn't a commander, and the color is part of its color identity (validateCommanderDeck's `colors`, commanderIdentity for
   Command Tower and the like, `identityOf`). A browser test for the copy prompt. +5, 31,551 of 31,936. The compiled text of
   every other card is unchanged.
+- Round B250 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Gather Specimens ("If a
+  creature would enter the battlefield under an opponent's control this turn, it enters under your control instead."):
+  GameState `gatherSpecimens`, a control-changing replacement of how a creature enters (CR 614.1c, 614.12), tokens too, a
+  token's owner still its creator (rulings), applied before copy effects and the creature's own replacements (CR 616.1b,
+  rulings), each instance once per event (CR 614.5). With several that could apply (two players' Gather Specimens, or one
+  and the creature's own Xantcha replacement), the player it would enter under chooses which applies first, then the new
+  one among those left (rulings): the "controlFirst" prompt; bots pick the player with the least life. A creature put onto
+  the battlefield attacking under the wrong player's control is never attacking (CR 506.3c, Hero of Bladehold's tokens),
+  and a blocker under the active player's is never blocking (506.3d), only for a creature a Gather Specimens moved as it
+  entered (GameObject `gatheredAsEntered`). A browser test for the order prompt. +1, 31,647 of 31,936 (with main through Lane A round 402). The compiled text of
+  every other card is unchanged.
+- Round B251 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Sharkey, Tyrant of the
+  Shire ("Mana of any type can be spent to activate ~'s abilities.", CR 609.4b: CompiledCard `spendAnyTypeOwnAbilities`, its
+  colored and {C} symbols paid with any mana, every activated ability it has, borrowed ones among them; {S} still needs snow
+  mana, rulings); its "~ has all activated abilities of lands your opponents control except mana abilities" now leaves out
+  mana abilities compiled as activated ones too (Cabal Coffers'). Kasmina, Enigma Sage ("Each other planeswalker you control
+  has the loyalty abilities of ~.": CompiledCard `lendsLoyaltyToPlaneswalkers`, cards.ts withKasmina; each other planeswalker
+  its controller controls has its loyalty abilities as it has them now, CR 613.1f, still one loyalty ability of that
+  permanent each turn, CR 606.3, rulings), and its −8's "an instant or sorcery card that shares a color with this
+  planeswalker": the planeswalker it's activated from, by its colors as the search is made or as it last existed (CR
+  608.2h: Kasmina at 8 is gone before its −8 resolves), none for a colorless one (rulings; TargetSpec
+  `sharesColorWithSource`). Tamiyo, Collector of Tales ("Spells and abilities your opponents control can't cause you to
+  discard cards or sacrifice permanents.": the sacrifice half is Sigarda, Host of Herons'; CompiledCard
+  `opponentsCantMakeYouDiscard`, cards.ts opponentForbidsDiscard): a discard another player's spell or ability would make
+  them do doesn't happen and they aren't asked to choose (the "discard" effect, connive, Words of Waste, Library of Leng's
+  question, discardCards itself with its `cause`), an option it gives them to discard isn't offered (punishers, "unless"
+  costs and ward, "you may", Discard or sacrifice), a card chosen from their hand for them to discard stays there ("then
+  draws a card" doesn't follow) and another player's Chains of Mephistopheles has them mill instead (they don't discard a
+  card this way); game rules (cleanup) and their own spells and costs still make them discard (rulings). Its +1 is
+  Desperate Research's reveal said another way. Browser tests for Kasmina's lent +2 on Chandra, Sharkey's borrowed Sea Gate
+  Wreckage draw paid with Islands and a Plains, and Tamiyo's +1 naming a card. +3, 31,650 of 31,936. The compiled text of
+  every other card is unchanged.
+- Out after round B251 (looked at, not done): the lists after round B250 stay out. Known gaps: a villainous choice whose
+  option has a Tamiyo player discard is still offered to them (CR 701.55b: an option that can't be done is still a choice;
+  no ruling says which applies); bots don't aim discard spells away from a player with Tamiyo, nor weigh Kasmina's lent
+  abilities or Sharkey's borrowed ones beyond their usual worth.
+- Out after round B250 (looked at, not done): the lists after round B249 stay out, and Filigree Vector (two "any number of
+  target" slots in one ability), Lich's Mirror (each creature's own choice of graveyard or library as the game restarts),
+  Lodestone Bauble (a player chosen on activation and a delayed draw), Pulmonic Sliver, Breathstealer's Crypt, Land
+  Equilibrium, Elemental Resonance and Ashiok, Wicked Manipulator (none of whose lines parse yet). Kraven the Hunter is
+  Lane A round 404's (PR #656). Known gaps: bots cast Gather Specimens only in response to an opponent's creature spell; a
+  choice put off until after the order prompt (the life a player noted as it entered and the like) still reads the
+  controller it would have entered under first.
 - Out after round B249 (looked at, not done): the lists after round B248 stay out. Known gaps: two Mystic Reflections
   still apply in timestamp order rather than asking (only different kinds of copy effect are asked); the app's decks have
   no way to choose a color for a commander like The Prismatic Piper yet (no sample deck has one).
@@ -11358,7 +11401,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B87 (looked at, not done): Kodama of the Center Tree (done in round B213) (soulshift X: a target bounded by a changing
   number), Hide // Seek (the mana value of a card found by the search), Revival Experiment (one card of each permanent
   type, and a battle's protector on entering is unclear), Love on the Battlefield (a combat damage trigger granted until
-  end of turn), Sharkey, Tyrant of the Shire, Woodcaller Automaton (done in round B158), Dancing Sword (done in round B153), Elemental Resonance, Bat Colony (done in round B166).
+  end of turn), Sharkey, Tyrant of the Shire (done in round B251), Woodcaller Automaton (done in round B158), Dancing Sword (done in round B153), Elemental Resonance, Bat Colony (done in round B166).
 - Out after round B86 (looked at, not done): Goblin Maskmaker (done in round B198) (cost reduction for face-down spells), Bortuk
   Bonerattle (a destination chosen by mana value against domain), Nick Fury (put onto the battlefield tapped and
   attacking from the hand), Oath of Mages (done in round B143) (a target chosen by another player), Glyph of Life (done in round B130), Mob Mentality,

@@ -17442,6 +17442,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e3b8d70b-17aa-4a31-a4f9-319907d088c2",
+  "name": "Gather Specimens",
+  "manaCost": "{3}{U}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "If a creature would enter the battlefield under an opponent's control this turn, it enters under your control instead.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9f6d6e90-7462-46e5-bf2f-725b4badc394",
   "name": "Gathering Stone",
   "manaCost": "{4}",
@@ -23942,6 +23968,41 @@
   "set": "sld",
   "releasedAt": "2021-01-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "06425cb9-d157-4155-a727-78656df12458",
+  "name": "Kasmina, Enigma Sage",
+  "manaCost": "{1}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Kasmina",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Kasmina"
+  ],
+  "oracleText": "Each other planeswalker you control has the loyalty abilities of Kasmina.\n+2: Scry 1.\n−X: Create a 0/0 green and blue Fractal creature token. Put X +1/+1 counters on it.\n−8: Search your library for an instant or sorcery card that shares a color with this planeswalker, exile that card, then shuffle. You may cast that card without paying its mana cost.",
+  "loyalty": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -38127,6 +38188,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "91f34686-cb96-49c0-b4a7-49dd1fd076e2",
+  "name": "Sea Gate Wreckage",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}. ({C} represents colorless mana.)\n{2}{C}, {T}: Draw a card. Activate only if you have no cards in hand.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "ogw",
+  "releasedAt": "2016-01-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3ea060d8-449c-4a5e-8883-b45bd7707b5b",
   "name": "Season of Gathering",
   "manaCost": "{4}{G}{G}",
@@ -38882,6 +38968,41 @@
   "commanderLegal": "legal",
   "set": "iko",
   "releasedAt": "2020-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "93a476c0-c77e-43b0-8695-ada40368a002",
+  "name": "Sharkey, Tyrant of the Shire",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Avatar Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar",
+   "Rogue"
+  ],
+  "oracleText": "Activated abilities of lands your opponents control can't be activated unless they're mana abilities.\nSharkey has all activated abilities of lands your opponents control except mana abilities.\nMana of any type can be spent to activate Sharkey's abilities.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -43255,6 +43376,39 @@
   "commanderLegal": "legal",
   "set": "m3c",
   "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "75d56a0a-2f64-4e80-b83e-85942d3e6dd7",
+  "name": "Tamiyo, Collector of Tales",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Tamiyo",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Tamiyo"
+  ],
+  "oracleText": "Spells and abilities your opponents control can't cause you to discard cards or sacrifice permanents.\n+1: Choose a nonland card name, then reveal the top four cards of your library. Put all cards with the chosen name from among them into your hand and the rest into your graveyard.\n−3: Return target card from your graveyard to your hand.",
+  "loyalty": "5",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2019-12-16",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

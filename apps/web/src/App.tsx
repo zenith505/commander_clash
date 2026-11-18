@@ -1706,7 +1706,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <div className="targeting">
               <span>
                 {/* Blatant Thievery: one required target for each opponent, named. */}
-                <strong>{targeting.label}</strong>: choose {(nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player controls\b/, nextSpec.controlledBy === HUMAN ? "you control" : `${s.players[nextSpec.controlledBy]!.name} controls`).replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : (nextSpec?.text ?? "")).replace(/ of (?:their|defending player's|an opponent's) choice$/, "").replace(/~/g, targeting.mode === "activate" ? cardOf(s, targeting.objectId).name : "~")}{" "}
+                <strong>{targeting.label}</strong>: choose {(nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player controls\b/, nextSpec.controlledBy === HUMAN ? "you control" : `${s.players[nextSpec.controlledBy]!.name} controls`).replace(/\bthat player's\b/, nextSpec.controlledBy === HUMAN ? "your" : `${s.players[nextSpec.controlledBy]!.name}'s`).replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : (nextSpec?.text ?? "")).replace(/ of (?:their|defending player's|an opponent's) choice$/, "").replace(/~/g, targeting.mode === "activate" ? cardOf(s, targeting.objectId).name : "~")}{" "}
                 {inRun
                   ? `(optional, one for each ${targeting.specs.slice(targeting.chosen.length, runEnd).some((sp) => sp.controlledBy === HUMAN) ? "player" : "opponent"}: ${targeting.specs
                       .slice(targeting.chosen.length, runEnd)

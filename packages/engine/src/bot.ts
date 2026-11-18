@@ -3827,7 +3827,10 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       continue;
     }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
-    const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
+    // Guff Rewrites History (round 411): "for each player, choose target ... that player controls", a spell with a required
+    // slot for our own permanent that it hurts: one of ours must be chosen to cast it (the least useful, below).
+    const ownSlot = harm[i] && spec.controlledBy === pid && !spec.optional && printed.targets.some((t) => t.perPlayerAll);
+    const pool = preferred.length ? preferred : (forced || ownSlot) && !spec.optional ? all : [];
     if (!pool.length) {
       if (!spec.optional) return null;
       out.push({ kind: "none" });

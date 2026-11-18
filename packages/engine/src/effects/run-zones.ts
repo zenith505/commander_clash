@@ -1682,6 +1682,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of ids) moveObject(s, id, "exile");
         const gone = ids.filter((id) => obj(s, id).zone === "exile");
         if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
+        // Mysterious Stranger (round 411): "If two or more cards are exiled this way, choose one of them at random and copy
+        // it": the cards this exile moved there (an illegal target isn't exiled, CR 608.2b), and only one of them, chosen at
+        // random as it resolves; with fewer, no copy at all. The copy is cast as it resolves or never (rulings).
+        const atLeast = e.fromYard.randomOfAtLeast;
+        if (atLeast !== undefined) {
+          const one = gone.length >= atLeast ? gone[Math.floor(nextRandom(s) * gone.length)] : undefined;
+          if (one !== undefined) log(s, `${src}: ${defOf(s, obj(s, one)).name} is chosen at random to copy.`);
+          else log(s, `${src}: fewer than ${atLeast} cards were exiled this way, so none is copied.`);
+          gone.splice(0, gone.length, ...(one !== undefined ? [one] : []));
+        }
         // Uldaros Theorix: "spells with total mana value 6 or less from among the copies", what's left of it as each is cast.
         sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
       }

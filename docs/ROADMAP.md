@@ -1,7 +1,7 @@
 # Roadmap
 
-31,675 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,926 of
+31,677 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,928 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -43,7 +43,7 @@ line blocks.
    rulings); Thieving Varmint ("spells you don't own": the mana spending rule needs the spell's owner wherever mana is
    checked and paid); Balor ("whenever ~ attacks or dies", "choose one or more. Each mode must target a different
    player", "discards three cards at random"); New Blood (changing a creature type in a card's text, CR 612); Guff
-   Rewrites History (one target for each player, then each of them exiles until a nonland card and may cast it);
+   Rewrites History (done in round 411) (one target for each player, then each of them exiles until a nonland card and may cast it);
    Deeproot Pilgrimage (done in round 265); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
    last known power on a leaves trigger of its own); Tasha, the Witch Queen (page counters, "a spell you don't own"); Mirrormind Crown and Moonlit
    Meditation ("the first time you would create one or more tokens each turn, you may instead create copies": the same
@@ -2758,7 +2758,7 @@ line blocks.
    Out after round 364 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) and Nephalia Academy (still out: who controls what
    causes a discard or sacrifice, on every path); Stalking Leonin (still out: a secret choice); Celestial Reunion (still
    out: a type chosen and two creatures beheld as an optional cost); Rootpath Purifier ("land cards in your library are
-   basic": searches read library cards' printed supertypes); Mysterious Stranger (still out: one target per graveyard);
+   basic": searches read library cards' printed supertypes); Mysterious Stranger (done in round 411) (still out: one target per graveyard);
    Sala, Deck Boss (unranked, Lane B's range).
    Round 365 went on down the "Out after round N" lists and `npm run popular`, most played first, to attack triggers about
    who is attacked, a creature trap, a reflexive trigger on a prevention shield and phasing until a source leaves:
@@ -3910,6 +3910,30 @@ line blocks.
    their spare mana when paying offspring, not whether the token is worth it; with two evoke costs (its own and Ashling's),
    paying either one triggers only that one's sacrifice (CR 702.74a doesn't say which "its evoke cost" means; the permanent
    is sacrificed once either way).
+   Round 411 went back to the top of `npm run popular`, most played first, to two cards with a target for each player or
+   graveyard. Guff Rewrites History's "For each player, choose target nonenchantment, nonland permanent that player
+   controls. Those permanents' owners shuffle them into their libraries. Each player who controlled one of those
+   permanents exiles cards from the top of their library until they exile a nonland card, then puts the rest on the
+   bottom of their library in a random order. Each player may cast the nonland card they exiled without paying its mana
+   cost." (one required target for each player, the caster's first, TargetSpec perPlayerAll as Vaevictis Asmadi's: with
+   none for some player it can't be cast, CR 601.2c, a judgment call from Vaevictis's rulings since Guff has none; the
+   targets still legal shuffled away at once, a commander to the command zone, CR 903.9b; each player who controlled one
+   as it left exiles from their own library one card at a time, in turn order, and casts what they found as it resolves,
+   in the same order, CR 101.4, 608.2g, 118.9; an illegal target's controller doesn't exile, as with Vaevictis; Effect
+   guffRewrite, effects/run-round411.ts). Mysterious Stranger's "When ~ enters, for each graveyard with an instant or
+   sorcery card in it, exile target instant or sorcery card from that graveyard. If two or more cards are exiled this
+   way, choose one of them at random and copy it. You may cast the copy without paying its mana cost." (one required
+   target in each graveyard that has one, none for the others, as Sylvan Primordial's; castFromAmong fromYard
+   `randomOfAtLeast`: the cards this exiled, a copy of one chosen at random cast as it resolves or never, rulings, CR
+   707.12; with one exiled, no copy). The targeting panel names "your graveyard" or "Ben's graveyard" for "that player's
+   graveyard". Bots casting Guff pick their own least useful permanent and the opponents' best. Browser tests click
+   through Guff's four targets and free cast and the Stranger's two graveyard picks and copy cast. +2, 31,677 of 31,936
+   on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 411 (looked at, not done): Cryptic Spires ("as you create your deck, circle two of the colors": the
+   circled colors are copiable values, rulings, and whether they count toward a Commander deck's color identity isn't
+   settled); Nephalia Academy (an optional replacement at every discard an opponent's spell or ability causes, which
+   would need a pause inside every discard); Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility Storm
+   and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4596,7 +4620,7 @@ line blocks.
    ..." (Mogg Assassin: both chosen as it's activated, yours first, the second by the first one's controller without a
    question, rulings, CR 602.2b; TargetSpec.chooserOf; a browser test). +8, 30,730 of 31,936 with B157 and B158.
    Out after round 319 (looked at, not done): Rootweaver Druid (each opponent's search, one after another, for cards
-   put onto the battlefield under their control), Guff Rewrites History (each player casting during the resolution of
+   put onto the battlefield under their control), Guff Rewrites History (done in round 411) (each player casting during the resolution of
    another spell, no rulings to settle the order), Hellish Rebuke (done in round 339) (a granted trigger that refers back to the spell's
    caster), Extract Brain, and the cards of the round 318 list (still out, for the reasons in their earlier lists).
    Bots don't activate Mogg Assassin (the second target is any creature, which can be theirs); as its second chooser
@@ -5430,7 +5454,7 @@ line blocks.
    battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher (done in round 267; "You may cast the copy.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
    Legacy would follow, done in round 373); Ob Nixilis, the Adversary (done in round 352) (casualty X: the copy's starting loyalty from the chosen X);
-   Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
+   Mysterious Stranger (done in round 411) and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
    Out after round 251 (looked at, not done): Ill-Timed Explosion (done in round 273; "you may discard two cards. When you do": no ruling on
    whether you can do it with fewer than two cards in hand, as with Thrilling Discovery).
    Out after round 250 (looked at, not done): Owlbear Cub ("attacks a player who controls eight or more lands" and a

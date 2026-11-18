@@ -3403,6 +3403,8 @@ export interface Resolving {
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
     cascade?: { exiled: ObjectId[]; hit?: ObjectId; /** Discover: its value, for "whenever you discover" (Curator of Sun's Creation). */ n?: number; /** Averna: the lands from among them have been put onto the battlefield (or none chosen). */ landsDone?: true; /** The castFree prompt for `hit` has been asked. */ castAsked?: true }; // cards cascade exiled, and the one it may cast
+    /** Guff Rewrites History (round 411): each nonland card exiled and the player who may cast it, in turn order, and how many have been offered. */
+    guff?: { casts: { pid: PlayerId; id: ObjectId; zc: number }[]; i: number };
     untilNonland?: { hit?: ObjectId; caster: PlayerId; seen?: ObjectId[] }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     /** Wall of Shards' cumulative upkeep: the opponent chosen for each age counter so far (see Effect "cumulativeUpkeep" giveLife). */

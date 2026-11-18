@@ -2530,6 +2530,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d799e58a-0032-4df8-a77f-0d824ec15214",
+  "name": "Arni Metalbrow",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Berserker",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Berserker"
+  ],
+  "oracleText": "Whenever a creature you control attacks or enters attacking, you may pay {1}{R}. If you do, you may put a creature card with mana value less than that creature's mana value from your hand onto the battlefield tapped and attacking.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "76bdc626-f51b-420a-ac5c-5ab33772fabe",
   "name": "Arsenal Thresher",
   "manaCost": "{2}{W/B}{U}",
@@ -2650,6 +2683,43 @@
   "set": "who",
   "releasedAt": "2023-10-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "77a9e7cf-76e9-4323-8504-a5b831de00be",
+  "name": "Ashling, the Limitless",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elemental Sorcerer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Sorcerer"
+  ],
+  "oracleText": "Elemental permanent spells you cast from your hand gain evoke {4} as you cast them. (If you cast a spell for its evoke cost, it's sacrificed when it enters.)\nWhenever you sacrifice a nontoken Elemental, create a token that's a copy of it. The token gains haste until end of turn. At the beginning of your next end step, sacrifice it unless you pay {W}{U}{B}{R}{G}.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecc",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19966,6 +20036,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7ff7af5f-e4e3-40af-8882-756564bfa479",
+  "name": "Guff Rewrites History",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "For each player, choose target nonenchantment, nonland permanent that player controls. Those permanents' owners shuffle them into their libraries. Each player who controlled one of those permanents exiles cards from the top of their library until they exile a nonland card, then puts the rest on the bottom of their library in a random order. Each player may cast the nonland card they exiled without paying its mana cost.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f4b30f6c-09ac-407e-9c72-da64d212ce93",
   "name": "Guided Passage",
   "manaCost": "{G}{U}{R}",
@@ -23344,6 +23440,83 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "ca79cd3f-13ba-4d11-b885-48a504ae69aa",
+  "name": "Jadzi, Oracle of Arcavios // Journey to the Oracle",
+  "manaCost": "{6}{U}{U}",
+  "cmc": 8,
+  "typeLine": "Legendary Creature — Human Wizard // Sorcery",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Discard a card: Return Jadzi to its owner's hand.\nMagecraft — Whenever you cast or copy an instant or sorcery spell, reveal the top card of your library. If it's a nonland card, you may cast it by paying {1} rather than paying its mana cost. If it's a land card, put it onto the battlefield.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Magecraft"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Jadzi, Oracle of Arcavios",
+    "manaCost": "{6}{U}{U}",
+    "typeLine": "Legendary Creature — Human Wizard",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Wizard"
+    ],
+    "oracleText": "Discard a card: Return Jadzi to its owner's hand.\nMagecraft — Whenever you cast or copy an instant or sorcery spell, reveal the top card of your library. If it's a nonland card, you may cast it by paying {1} rather than paying its mana cost. If it's a land card, put it onto the battlefield.",
+    "power": "5",
+    "toughness": "5",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/b/0/b0a96416-9ee5-4202-a99f-e09db8794567.jpg?1783927246",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/b/0/b0a96416-9ee5-4202-a99f-e09db8794567.jpg?1783927246"
+   },
+   {
+    "name": "Journey to the Oracle",
+    "manaCost": "{2}{G}{G}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "You may put any number of land cards from your hand onto the battlefield. Then if you control eight or more lands, you may discard a card. If you do, return Journey to the Oracle to its owner's hand.",
+    "colors": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/b/0/b0a96416-9ee5-4202-a99f-e09db8794567.jpg?1783927246",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/b/0/b0a96416-9ee5-4202-a99f-e09db8794567.jpg?1783927246"
+   }
+  ]
  },
  {
   "oracleId": "169cf74a-07bf-4841-83f3-904df8a0a39b",
@@ -30696,6 +30869,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4cd2e1c2-5f14-4ac9-9c88-899af6ad9f80",
+  "name": "Mysterious Stranger",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "Flash\nWhen this creature enters, for each graveyard with an instant or sorcery card in it, exile target instant or sorcery card from that graveyard. If two or more cards are exiled this way, choose one of them at random and copy it. You may cast the copy without paying its mana cost.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0caf42f5-abff-48aa-9bbf-df6cba169ef3",
   "name": "Mystic Barrier",
   "manaCost": "{4}{W}",
@@ -34523,6 +34729,32 @@
   "set": "dsc",
   "releasedAt": "2024-09-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0d49187a-1c37-4c3a-afc2-fac2bbc6b29a",
+  "name": "Portent of Calamity",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top X cards of your library. For each card type, you may exile a card of that type from among them. Put the rest into your graveyard. You may cast a spell from among the exiled cards without paying its mana cost if you exiled four or more cards this way. Then put the rest of the exiled cards into your hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -52419,6 +52651,45 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8c16a3a-dd9d-410c-a5d5-06339a89970f",
+  "name": "Zinnia, Valley's Voice",
+  "manaCost": "{U}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Bird Bard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Bard"
+  ],
+  "oracleText": "Flying\nZinnia gets +X/+0, where X is the number of other creatures you control with base power 1.\nCreature spells you cast gain offspring {2} as you cast them. (You may pay an additional {2} as you cast a creature spell. If you do, when that creature enters, create a 1/1 token copy of it.)",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

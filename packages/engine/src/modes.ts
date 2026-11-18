@@ -307,7 +307,8 @@ function spreadRefs<T>(x: T, i: number, n: number): T {
     else if (o.about < i && typeof o.each === "number" && o.about + o.each > i) copy.each = o.each + n - 1;
   }
   // Display of Power's copySpell { target, many }: the slot's targets, all of them.
-  if (typeof o.target === "number" && o.many === true && Object.keys(o).every((k) => k === "target" || k === "many" || k === "n")) {
+  // Mysterious Stranger's (round 411) castFromAmong fromYard { target, many, randomOfAtLeast } too.
+  if (typeof o.target === "number" && o.many === true && Object.keys(o).every((k) => k === "target" || k === "many" || k === "n" || k === "randomOfAtLeast")) {
     if (o.target > i) copy.target = o.target + n - 1;
     else if (o.target === i) copy.n = n;
   }

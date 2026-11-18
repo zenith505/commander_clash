@@ -354,6 +354,8 @@ export interface GameObject {
   milledTurn?: number;
   /** Eye of Duskmantle (round 405): the turn its owner's surveil put this card into their graveyard (CR 701.25a), while it stays there. */
   surveilledTurn?: number;
+  /** Maralen, Fae Ascendant (round 406): the turn this permanent's "once each turn" free cast (CompiledCard.linkedFreeOnce) was used, as the object it was then (CR 400.7). */
+  linkedFreeOnceUsed?: { turn: number; zc: number };
   /** The turn it was last put into a graveyard from the battlefield ("put there from the battlefield this turn", Brought Back). */
   fromBattlefieldTurn?: number;
   damage: number;
@@ -592,6 +594,8 @@ export interface GameObject {
     anyColor?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
     exileAfter?: true;
+    /** Quintorius, Loremaster (round 406): "If that spell would be put into a graveyard, put it on the bottom of its owner's library instead": see bottomIfToGraveyard. */
+    bottomAfter?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
     castOnly?: true;
     /** "You may cast it if it's a creature spell" (Vivien, Champion of the Wilds): only as a creature spell (CR 601.3e). */
@@ -2283,7 +2287,7 @@ export interface GameState {
   /** How many times abilities that ask ("if this is the second time this ability has resolved this turn") resolved this turn, by source object and ability. */
   resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
-  linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  linkedExile?: Record<string, { id: ObjectId; zc: number; /** Maralen, Fae Ascendant (round 406): the turn it was exiled, for "cards exiled with ~ this turn". */ turn?: number }[]>;
   /** Soul Scourge, Laquatus's Champion: the player its enters ability targeted, by "sourceId@zc", for "that player" in its leaves ability (rulings). */
   linkedPlayer?: Record<string, PlayerId>;
   /** Soulgorger Orgg: the life its enters ability made its controller lose, by "sourceId@zc", for its leaves ability (CR 607.2e). */

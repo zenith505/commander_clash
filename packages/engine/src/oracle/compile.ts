@@ -142,6 +142,7 @@ import { round402Line } from "./round402";
 import { round403Line } from "./round403";
 import { round404Line } from "./round404";
 import { round405Line } from "./round405";
+import { round406Line } from "./round406";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1025,6 +1026,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Maralen, Fae Ascendant (round 406): once each turn, a free cast from among cards exiled with it this turn (oracle/round406.ts).
+    if (line.startsWith("Once each turn, you may cast a spell with mana value less than or equal to ") && round406Line(line, raw, out, isSpell)) continue;
     // Eye of Duskmantle (round 405): cards surveilled this turn (oracle/round405.ts).
     if (line.startsWith("You may play lands and cast spells from among cards in your graveyard you've surveilled") && round405Line(line, raw, out, isSpell)) continue;
     // Ranar the Ever-Watchful (round 404): free foretelling (oracle/round404.ts).
@@ -7962,6 +7965,18 @@ function linkExile(out: CompiledCard) {
     const others = all.some((e) => ["exile", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
     if (others || out.spell || tops.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(names a card exiled with it that it can't link to one exile ability)");
     else tops[0]!.linked = true;
+  }
+  // Maralen, Fae Ascendant (round 406): "cards exiled with ~ this turn" are those its one exile instruction (its enters
+  // trigger's "exile the top two cards of target opponent's library") exiled this turn (CR 607.2a).
+  if (out.linkedFreeOnce) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
+    const others = all.some((e) => ["exile", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || tops.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts from cards exiled with it that it can't link to one exile ability)");
+    else {
+      tops[0]!.linked = true;
+      tops[0]!.linkedTurn = true;
+    }
   }
   if (bodies.some((b) => b.targets.some((t) => t.linkedExile))) {
     const all = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");

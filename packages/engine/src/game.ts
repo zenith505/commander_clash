@@ -5821,7 +5821,7 @@ export const castFromExileForLife = (s: GameState, o: GameObject, pid: PlayerId)
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return mayPlayExiledOtherwise(s, o, pid) || linkedFreeGrant(s, o, pid) >= 0;
+  return mayPlayExiledOtherwise(s, o, pid) || linkedFreeAny(s, o, pid);
 }
 
 /** May `pid` play this exiled card now other than for Court of Locthwain's "without paying its mana cost"? */
@@ -5835,6 +5835,32 @@ export function linkedFreeGrant(s: GameState, o: GameObject, pid: PlayerId): num
   if (o.zone !== "exile" || !s.linkedFreeCasts?.length || isType(defOf(s, o), "Land")) return -1;
   return s.linkedFreeCasts.findIndex((g) => g.player === pid && g.turn === s.turn && (!g.filter || printedMatches(g.filter, defOf(s, o))) && (s.linkedExile?.[g.source] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0)));
 }
+
+/**
+ * Maralen, Fae Ascendant (round 406): a permanent `pid` controls whose "Once each turn, you may cast a spell with mana value
+ * less than or equal to the number of Elves and Faeries you control from among cards exiled with ~ this turn without paying
+ * its mana cost" (CompiledCard.linkedFreeOnce) lets them cast this exiled card now: one its exile ability exiled this turn
+ * (GameState.linkedExile `turn`, CR 607.2a), still that object (CR 400.7), the permission not used this turn by this object.
+ * A spell, not a land; its mana value at most the count as it's cast (`face`: the spell's own, CR 601.3e; otherwise any
+ * face it could be cast as, CR 601.3a), X as 0 (rulings).
+ */
+export function linkedFreeOnceSource(s: GameState, o: GameObject, pid: PlayerId, face?: CardDef): GameObject | undefined {
+  if (o.zone !== "exile" || !s.linkedExile || o.faceDown) return undefined;
+  for (const id of s.battlefield) {
+    const p = s.objects[id];
+    if (!p || controllerOf(s, p) !== pid) continue;
+    const once = compileCard(defOf(s, p)).linkedFreeOnce;
+    if (!once || (p.linkedFreeOnceUsed?.turn === s.turn && p.linkedFreeOnceUsed.zc === (p.zoneChanges ?? 0))) continue;
+    if (!(s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0) && l.turn === s.turn)) continue;
+    const max = evalAmount(s, once.maxMv, { controller: pid, sourceId: p.id });
+    const fits = (d: CardDef) => !isType(d, "Land") && defMv(d) <= max;
+    if (face ? fits(face) : fits(defOf(s, o)) || castableFaces(s, o).some((f) => asFace(s, o, f, () => fits(defOf(s, o))))) return p;
+  }
+  return undefined;
+}
+
+/** Court of Locthwain's grant or Maralen's permission (round 406): `pid` may cast this exiled card without paying its mana cost. */
+export const linkedFreeAny = (s: GameState, o: GameObject, pid: PlayerId): boolean => linkedFreeGrant(s, o, pid) >= 0 || !!linkedFreeOnceSource(s, o, pid);
 
 /**
  * Raphael, Most Attitude: the index in GameState.linkedPlays of a grant this turn that lets `pid` play this exiled card,
@@ -6958,7 +6984,7 @@ export function castProblem(
   if (!free && !via && o.zone === "exile" && o.mayPlay?.castFilter && ownExilePermission(s, o, pid) && !printedMatches(o.mayPlay.castFilter, d) && !linkedPlayPermission(s, o, pid))
     return /^card /.test(o.mayPlay.castFilter.text) ? `only a spell ${o.mayPlay.castFilter.text.replace(/^card /, "")} can be cast this way` : `only ${/^[aeiou]/i.test(o.mayPlay.castFilter.text) ? "an" : "a"} ${o.mayPlay.castFilter.text.replace(/ card$/, "")} spell can be cast this way`;
   // Court of Locthwain's card with no other permission: only without paying its mana cost.
-  if (!free && !via && o.zone === "exile" && choices?.alt !== "linkedFree" && !mayPlayExiledOtherwise(s, o, pid) && linkedFreeGrant(s, o, pid) >= 0) return `${d.name} can only be cast without paying its mana cost`;
+  if (!free && !via && o.zone === "exile" && choices?.alt !== "linkedFree" && !mayPlayExiledOtherwise(s, o, pid) && linkedFreeAny(s, o, pid)) return `${d.name} can only be cast without paying its mana cost`;
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
   // Aminatou's Augury: cast as one of its nonland card types no other card from the group was cast as (rulings).
   if (choices?.asType !== undefined && !byTypeChoices(s, o, pid).includes(choices.asType)) return `${d.name} can't be cast as ${/^[AEIOU]/.test(choices.asType) ? "an" : "a"} ${choices.asType.toLowerCase()} spell now`;
@@ -6983,7 +7009,8 @@ export function castProblem(
     if (choices.alt === "energyForSpell" && !payZeroSource(s, pid, o, "energy")) return `nothing lets you pay energy rather than ${d.name}'s mana cost now`;
     if (choices.alt === "genericMv" && !payZeroSource(s, pid, o, "generic")) return `nothing lets you pay generic mana rather than ${d.name}'s mana cost now`;
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
-    if (choices.alt === "linkedFree" && linkedFreeGrant(s, o, pid) < 0) return `${d.name} isn't a card you may cast this way`;
+    if (choices.alt === "linkedFree" && linkedFreeGrant(s, o, pid) < 0 && !linkedFreeOnceSource(s, o, pid, d)) return linkedFreeOnceSource(s, o, pid) ? `${d.name}'s mana value is too high to cast it this way` : `${d.name} isn't a card you may cast this way`;
+    if (choices.alt === "linkedFree" && x) return "X is 0 when you cast a spell without paying its mana cost";
     if (choices.alt === "topFree" && !topFreeGrant(s, o, pid)) return `${d.name} isn't a card you may cast this way`;
     if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid) && !yardCitadel(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
@@ -7013,7 +7040,7 @@ export function castProblem(
   if (isType(d, "Land")) return "lands are played, not cast";
   // Vivien, Champion of the Wilds: "you may cast it if it's a creature spell", the spell as it would be cast (its face,
   // CR 601.3e), unless something else lets it be cast from exile.
-  if (!free && !via && o.zone === "exile" && o.mayPlay?.creatureOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && linkedFreeGrant(s, o, pid) < 0) {
+  if (!free && !via && o.zone === "exile" && o.mayPlay?.creatureOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && !linkedFreeAny(s, o, pid)) {
     const cast = choices?.face !== undefined && d.faces?.length ? faceDef(d, choices.face) : d;
     if (!isType(cast, "Creature")) return `${cast.name} can be cast from exile only as a creature spell`;
   }
@@ -7794,7 +7821,8 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   // Omniscience: nothing at all, for a spell cast from the hand (checked in castProblem).
   if (alt === "omniscience") return s && pid !== undefined && controlsPayWUBRG(s, pid, "castFromHandFree") ? { kind: "omniscience", mana: "", text: "without paying its mana cost" } : undefined;
   // Court of Locthwain: nothing at all, for a card exiled with it (castProblem checks the card is one).
-  if (alt === "linkedFree") return s && pid !== undefined && s.linkedFreeCasts?.some((g) => g.player === pid && g.turn === s.turn) ? { kind: "linkedFree", mana: "", text: "without paying its mana cost" } : undefined;
+  // Maralen, Fae Ascendant (round 406): the same, from a permanent of the caster's with linkedFreeOnce.
+  if (alt === "linkedFree") return s && pid !== undefined && (s.linkedFreeCasts?.some((g) => g.player === pid && g.turn === s.turn) || s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && !!compileCard(defOf(s, s.objects[id]!)).linkedFreeOnce)) ? { kind: "linkedFree", mana: "", text: "without paying its mana cost" } : undefined;
   // Temporal Aperture: nothing at all, for the card it revealed (castProblem checks the card is that one).
   if (alt === "topFree") return s && pid !== undefined && s.topFreePlays?.some((g) => g.player === pid && topFreeLive(s, g)) ? { kind: "topFree", mana: "", text: "without paying its mana cost" } : undefined;
   // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
@@ -8060,7 +8088,7 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -8353,7 +8381,16 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (choices.alt !== "linkedFree") useLinkedSpellOnce(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
   // Court of Locthwain: one spell for each time its ability resolved.
-  if (choices.alt === "linkedFree") s.linkedFreeCasts!.splice(linkedFreeGrant(s, o, p.id), 1);
+  // Court of Locthwain's grant first, else Maralen's once this turn (round 406).
+  if (choices.alt === "linkedFree") {
+    const grant = linkedFreeGrant(s, o, p.id);
+    const once = grant < 0 ? linkedFreeOnceSource(s, o, p.id, d) : undefined;
+    if (grant >= 0) s.linkedFreeCasts!.splice(grant, 1);
+    else if (once) {
+      once.linkedFreeOnceUsed = { turn: s.turn, zc: once.zoneChanges ?? 0 };
+      log(s, `${p.name} casts ${d.name} without paying its mana cost (${defOf(s, once).name}, once this turn).`);
+    }
+  }
   // A once-a-turn permission to cast from the top is used up (Johann).
   let topCosts: AdditionalCost[] = [];
   if (castFrom === "library") {
@@ -8402,6 +8439,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // Cast with a permission that says "if that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil).
   const exileAfter = castFrom === "exile" && !!o.mayPlay?.exileAfter && ownExilePermission(s, o, p.id);
+  // Quintorius, Loremaster (round 406): "If that spell would be put into a graveyard, put it on the bottom of its owner's library instead".
+  const bottomAfter = castFrom === "exile" && !!o.mayPlay?.bottomAfter && ownExilePermission(s, o, p.id);
   // The Ruinous Powers: "When you cast a spell this way, ..." (CR 603.2): cast with that permission.
   const castTrigger = castFrom === "exile" && ownExilePermission(s, o, p.id) ? o.mayPlay?.castTrigger : undefined;
   const from = zoneList(s, o)!;
@@ -8426,6 +8465,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
   if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
   if (via?.exileIfToGraveyard || exileAfter) o.exileIfToGraveyard = true;
+  if (bottomAfter) o.bottomIfToGraveyard = true;
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;

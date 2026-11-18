@@ -25672,6 +25672,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8027a610-613e-4640-9840-c8778694f312",
+  "name": "Lazav, Dimir Mastermind",
+  "manaCost": "{U}{U}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Shapeshifter",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "Hexproof\nWhenever a creature card is put into an opponent's graveyard from anywhere, you may have Lazav become a copy of that card, except its name is Lazav, Dimir Mastermind, it's legendary in addition to its other types, and it has hexproof and this ability.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Hexproof"
+  ],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4ec0b64d-c793-47a6-9c26-9ad4d9e9c182",
   "name": "Lazav, Wearer of Faces",
   "manaCost": "{U}{B}",
@@ -27584,6 +27620,46 @@
   "commanderLegal": "legal",
   "set": "c16",
   "releasedAt": "2016-11-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "114e1d2c-cefc-4e2a-922e-3b2ceed1871d",
+  "name": "Maralen, Fae Ascendant",
+  "manaCost": "{2}{B}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elf Faerie Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Faerie",
+   "Noble"
+  ],
+  "oracleText": "Flying\nWhenever Maralen or another Elf or Faerie you control enters, exile the top two cards of target opponent's library.\nOnce each turn, you may cast a spell with mana value less than or equal to the number of Elves and Faeries you control from among cards exiled with Maralen this turn without paying its mana cost.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -34997,6 +35073,43 @@
   "set": "fdn",
   "releasedAt": "2024-11-15",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c3d38129-b955-4fb5-8486-095f918935b9",
+  "name": "Quintorius, Loremaster",
+  "manaCost": "{3}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elephant Cleric",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elephant",
+   "Cleric"
+  ],
+  "oracleText": "Vigilance\nAt the beginning of your end step, exile target noncreature, nonland card from your graveyard. Create a 3/2 red and white Spirit creature token.\n{1}{R}{W}, {T}, Sacrifice a Spirit: Choose target card exiled with Quintorius. You may cast that card this turn without paying its mana cost. If that spell would be put into a graveyard, put it on the bottom of its owner's library instead.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

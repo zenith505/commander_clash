@@ -1567,7 +1567,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "continuous" && e.duration === "whileControlled" && !e.whileOnBattlefield && !(ctx.sourceId && whileControlledHolds(s, { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, controller: ctx.controller }))) return false;
     // "You may have it assign no combat damage this turn" (Cloak of Confusion): only a creature still on the battlefield.
     if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
-    if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
+    // Lazav, Dimir Mastermind (round 406): "that card" is copied as it last existed in the graveyard, wherever it is now (rulings).
+    if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !(e.of.ref === "eventGroup" && e.of.printed ? (ctx.event?.group ?? []).some((g) => !!s.objects[g.id]) : objects(s, e.of, ctx).length))) return false;
     if (e.type === "attach" && e.what.ref === "target" && !e.source && ((me) => !me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !characteristics(s, me).subtypes.includes("Equipment") || !objects(s, e.what, ctx).some((h) => h.zone === "battlefield" && h.id !== me.id))(ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) return false;
     // Magnanimous Magistrate: "you may remove that many reprieve counters": a number counted as it resolves.
     if (e.type === "removeCounters" && typeof e.n !== "string" && ((n) => !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= n))(amountNow(s, e.n, ctx))) return false;

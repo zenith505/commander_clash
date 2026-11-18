@@ -111,7 +111,7 @@ import {
   altCostsFor,
   isEmerge,
   payZeroSource,
-  linkedFreeGrant,
+  linkedFreeAny,
   commanderTax,
   legendBotKeep,
   loseReplacements,
@@ -4347,8 +4347,8 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     const plan = castPlan(s, pid, id, false, undefined, "topFree");
     if (plan) return plan;
   }
-  // Court of Locthwain: a card exiled with it, for nothing.
-  if (linkedFreeGrant(s, o, pid) >= 0) {
+  // Court of Locthwain: a card exiled with it, for nothing; Maralen, Fae Ascendant (round 406): one exiled with it this turn.
+  if (linkedFreeAny(s, o, pid)) {
     const plan = castPlan(s, pid, id, false, undefined, "linkedFree");
     if (plan) return plan;
   }
@@ -6192,6 +6192,13 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
     return d.supertypes.includes("Legendary") ? -1 : defWorth(d) - defWorth(defOf(s, host));
   }
   if (e.what.ref !== "self") return 0;
+  // Lazav, Dimir Mastermind (round 406): the creature card put into an opponent's graveyard, as printed; it keeps its own
+  // name, so the legend rule doesn't come into it.
+  if (e.of.ref === "eventGroup" && e.of.printed) {
+    const g = item.event?.group?.[0];
+    const card = g ? s.objects[g.id] : undefined;
+    return card && !card.isToken ? defWorth(restingDef(s.cards[card.cardId]!)) - defWorth(defOf(s, me)) : 0;
+  }
   const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
   const sub = item.subject && s.objects[item.subject.id];
   const d =

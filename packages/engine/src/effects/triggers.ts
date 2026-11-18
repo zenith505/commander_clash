@@ -166,6 +166,11 @@ export type TriggerSourceEvent =
   | { type: "blocksDeclared" }
   /** Attacking creatures an effect made blocked, by no creature (Effect becomeBlocked, CR 509.1h). */
   | { type: "becameBlocked"; ids: ObjectId[] }
+  /**
+   * An effect made `blocker` block these attackers (False Orders, Balduvian Warlord, round B256; CR 509.3a-d): `newlyBlocked`
+   * were unblocked creatures until then, `newBlocker` says it wasn't a blocking creature until then.
+   */
+  | { type: "blockedByEffect"; blocker: ObjectId; attackers: ObjectId[]; newlyBlocked: ObjectId[]; newBlocker: boolean }
   /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
   | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -1277,6 +1282,65 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(w, you, (e) => e === "yourCreaturesBecomeBlocked");
       }
     }
+  } else if (ev.type === "blockedByEffect") {
+    // An effect caused a creature to block (CR 509.3a-d): "blocks" triggers only if it wasn't a blocking creature then,
+    // "blocks a creature" once for each attacker it now blocks, "becomes blocked" only for an attacker that was unblocked
+    // then, "becomes blocked by a creature" for each attacker it now blocks. "Blocked by two or more creatures" triggers if
+    // this block is the one that makes it so (CR 509.3e). Nothing for "attacks and isn't blocked" (blockers are declared
+    // already, CR 509.1h).
+    const bl0 = s.objects[ev.blocker];
+    if (bl0 && bl0.zone === "battlefield") {
+    const bl = bl0;
+    const blYou = controllerOf(s, bl);
+    const watchers = s.battlefield.map((id) => obj(s, id));
+    const ats = ev.attackers.map((id) => s.objects[id]).filter((a): a is GameObject => !!a && a.zone === "battlefield");
+    const crossed = (t: TriggeredAbility, a: GameObject) => !t.blockedByAtLeast || ((a.blockedBy?.length ?? 0) >= t.blockedByAtLeast && (a.blockedBy?.length ?? 0) - 1 < t.blockedByAtLeast);
+    const fits = (t: TriggeredAbility, subject: GameObject, you: PlayerId) => (!t.subjectFilter || objectMatches(s, t.subjectFilter, subject, you, false)) && crossed(t, subject);
+    if (ev.newBlocker) {
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocks" && !(t.subjectNotSelf && w.id === bl.id) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, controllerOf(s, w), false)), undefined, undefined, bl);
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "creatureBlocks" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, ctrl, false)), triggers, undefined, bl));
+      for (const w of watchers) add(w, controllerOf(s, w), (e) => e === "creaturesBlock");
+      const anyBlocked = (t: TriggeredAbility) => (!t.blockFilter || ats.some((a) => objectMatches(s, t.blockFilter!, a, blYou, false))) && (!t.blocksAtLeast || (bl.blocking?.length ?? 0) >= t.blocksAtLeast);
+      add(bl, blYou, (e, t) => (e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks") && anyBlocked(t));
+      addHosted(bl, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
+      if (ats.length) addHosted(bl, (e) => e === "selfBlocksOrBlockedByMany", undefined, bl, { group: ats.map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
+    }
+    for (const at of ats) {
+      const atYou = controllerOf(s, at);
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, controllerOf(s, w), false)) && !!t.blockFilter && objectMatches(s, t.blockFilter, at, controllerOf(s, w), false), undefined, undefined, bl);
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "blockerLess" && power(s, bl) < power(s, at), undefined, undefined, bl);
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && t.blockPower === "attackerLess" && power(s, at) < power(s, bl), undefined, undefined, at);
+      add(bl, blYou, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, blYou, false)), undefined, undefined, at);
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, ctrl, false)), triggers, undefined, at), bl);
+      addHosted(bl, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, w, false)), undefined, at, { group: [bl, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
+      addHosted(bl, (e, t, w) => e === "selfBlocksCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, at, w, false)), undefined, at);
+      // The attacker: "becomes blocked by a creature" for this blocker (CR 509.3d).
+      add(at, atYou, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, atYou, false)), undefined, undefined, bl);
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, ctrl, false)), triggers, undefined, bl), at);
+      addHosted(at, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, bl, w, false)), undefined, bl, { player: at.attacking, group: [at, bl].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
+      addHosted(at, (e) => e === "selfBlockedByCreature", undefined, bl, { player: at.attacking });
+      if (isRingBearer(s, at)) ringTrigger(s, atYou, 1, bl);
+      // "Becomes blocked" (CR 509.3c): only if it was unblocked until now; a count of blockers if this one makes it.
+      const fresh = ev.newlyBlocked.includes(at.id);
+      const anyBlocker = (t: TriggeredAbility) => (!t.blockFilter || objectMatches(s, t.blockFilter, bl, atYou, false)) && (t.blockedByAtLeast ? crossed(t, at) : fresh);
+      for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBecomesBlocked" && (t.blockedByAtLeast ? true : fresh) && !(t.subjectNotSelf && w.id === at.id) && fits(t, at, controllerOf(s, w)) && (!t.blockFilter || objectMatches(s, t.blockFilter, bl, controllerOf(s, w), false)), undefined, undefined, at, undefined, undefined, undefined, { player: at.attacking });
+      add(at, atYou, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && anyBlocker(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: at.attacking });
+      add(at, atYou, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf" && anyBlocker(t), undefined, undefined, at, undefined, undefined, undefined, { player: at.attacking });
+      if (fresh) {
+        addHosted(at, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, at, { player: at.attacking });
+        addHosted(at, (e) => e === "selfBlocksOrBlockedByMany", undefined, at, { player: at.attacking, group: [{ id: bl.id, zc: bl.zoneChanges ?? 0 }] });
+        for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === at.id && d.subject.zc === (at.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: at.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
+      }
+    }
+    // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked now.
+    for (const w of watchers) {
+      const you = controllerOf(s, w);
+      if (ats.some((a) => ev.newlyBlocked.includes(a.id) && controllerOf(s, a) === you)) {
+        add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
+        add(w, you, (e) => e === "yourCreaturesBecomeBlocked");
+      }
+    }
+    }
   } else if (ev.type === "fought") {
     // Neyith of the Dire Hunt: once for the fight, however many of the creatures are its controller's (rulings).
     for (const id of s.battlefield) {
@@ -1363,7 +1427,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         printedMatches(t.cast.orPlaysLand, defOf(s, land)) &&
         (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
         (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types)) &&
-        (!t.cast.fromLinked || (ev.from === "exile" && playedFromLinked(s, o, land, false)));
+        (!t.cast.fromLinked || (ev.from === "exile" && playedFromLinked(s, o, land, false))) &&
+        // Search the City (round B256): a land with the name of a card exiled with it.
+        (!t.cast.nameExiledWithSelf || (!land.faceDown && exiledWithNamed(s, o, characteristics(s, land).name)));
       add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "finalChapterResolved") {

@@ -1,5 +1,6 @@
 // Lane B round B240's lines, read by compileCard before its triggers and activated abilities (after round B239's), and its
 // sentences (at the end of round B203's chain).
+import { roundB256Sentence } from "./laneb256";
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { roundB243Sentence } from "./laneb243";
@@ -64,5 +65,6 @@ export function roundB240Sentence(s: string, sentences: string[], si: number, ct
     return { effect: { type: "graveyardTurn", cast: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant and sorcery card" }, exileCast: true, topOnly: true }, next: si + 2 };
   }
   // Round B243's sentences (oracle/laneb243.ts).
-  return roundB243Sentence(s, sentences, si, ctx);
+  // Then round B256's (oracle/laneb256.ts).
+  return roundB243Sentence(s, sentences, si, ctx) ?? roundB256Sentence(s, sentences, si, ctx, effects);
 }

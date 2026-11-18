@@ -2566,7 +2566,9 @@ export interface GameState {
    * step, in order, made once the damage is dealt (dealCombatDamage); a draw replacement can stop them to ask (dredge), and
    * the rest follow its answer (draw `after` "damageDraws").
    */
-  damageDraws?: { player: PlayerId; n: number; card: string }[];
+  damageDraws?: { player: PlayerId; n: number; card: string; /** Lich (round B253): the draws replace a life gain; the Liches that have replaced a gain in this chain of events so far (CR 614.5). */ lich?: ObjectId[] }[];
+  /** Round B253: while a Lich's draws (`damageDraws` `lich`) are being made, through a draw replacement's question: a gain one of them turns into isn't replaced by those Liches again (CR 614.5, rulings on Nefarious Lich). */
+  gainDrawLineage?: { player: PlayerId; used: ObjectId[] };
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;

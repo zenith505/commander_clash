@@ -3294,7 +3294,7 @@ line blocks.
    Out after round 384 (looked at, not done): Whims of the Fates (still out: each player separates all their permanents
    into three piles, a choice the browser has no prompt for yet); Stardew Valley ("another player of your choice may gain
    control of that permanent"); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Hero of
-   Bretagard, Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil, Nefarious Lich and the rest above rank 15,000 (still
+   Bretagard, Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil, Nefarious Lich (done in round B253) and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Polish: the Trap's log reads "You reveals" and "You guesses" (the "You plays" grammar of the log).
    Round 385 went on down `npm run popular` and the "Out after round N" lists, most played first, to three more shields
@@ -3321,7 +3321,7 @@ line blocks.
    riot": mana from a loyalty ability, not a mana ability, CR 605.1a, and whether riot a spell gains applies as the
    permanent enters, CR 614.12, isn't settled by its rulings); Blood Scrivener and Breathstealer's Crypt (still out: a
    draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil,
-   Nefarious Lich and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
+   Nefarious Lich (done in round B253) and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 386 went on down `npm run popular` and the "Out after round N" lists, most played first, to the pieces rounds 241
    to 385 had left them waiting for: Parallel Thoughts' "When ~ enters, search your library for seven cards, exile them in a
    face-down pile, and shuffle that pile. Then shuffle your library." (as Mangara's Tome's, seven cards) and "If you would
@@ -10716,6 +10716,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   exile, or a spell cast from exile as it resolves (a copy wasn't cast), that would be a creature there (CR 614.12). A
   browser test for Elemental Resonance's hybrid mana choice. +3, 31,653 of 31,936. The compiled text of every other card is
   unchanged.
+- Round B253 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Lich ("As ~ enters, you
+  lose life equal to your life total.": the player it enters under, as it enters, CR 614.12, rulings; nothing with 0 or less
+  life, CR 107.1b; CompiledCard `entersLoseLifeTotal`), and Lich's and Nefarious Lich's "If you would gain life, draw that many
+  cards instead." (CR 119.10, 614.1a: CompiledCard `gainLifeDrawsInstead`, game.ts gainLife): no life is gained, so nothing
+  triggers on a gain; nothing to replace when life can't be gained (rulings on Leyline of Punishment and Platinum Emperion);
+  one card for each life however many Liches there are (rulings); "plus 1" and "twice that much" apply first and the draws
+  before anything that turns the gain into nothing or a loss (the player's order, CR 616.1, chosen for them: the most
+  cards); a gain that one of a Lich's draws turns into (Words of Worship) isn't replaced by that Lich again, but can be by
+  another (CR 614.5, rulings on Nefarious Lich; GameState.gainDrawLineage). The draws go through GameState.damageDraws: after
+  the instruction, after the combat damage (lifelink), or, for a gain anywhere else, before state-based actions. Lich's
+  "Whenever you're dealt damage, sacrifice that many nontoken permanents. If you can't, you lose the game.": sacrificed at
+  once (rulings); with fewer it could sacrifice, none is and its controller loses (Condition `canSacrificeMany`, the way the
+  rulings on Egon, God of Death read "If you can't"). Nefarious Lich ("If damage would be dealt to you, exile that many cards
+  from your graveyard instead. If you can't, you lose the game.") and Dralnu, Lich Lord ("If damage would be dealt to ~,
+  sacrifice that many permanents instead."): DamageMod ops `exileYard` and `sacrifice`, replacements, not prevention (CR
+  614.1a; damage that can't be prevented is replaced too, CR 615.12), ordered with the other replacement and prevention
+  effects (CR 616.1). The cards or permanents are chosen one at a time as the damage's plan is worked out (damage-picks.ts,
+  "damageShield" questions, so a resolution or the combat damage step stops to ask; inside a mana ability, such as a
+  painland's damage, the way a bot would: lands and cheap cards first), then exiled or sacrificed as the rest of the damage is
+  dealt: a sacrificed creature's own damage is still dealt and its abilities that would trigger on it don't (rulings on
+  Dralnu); Dralnu may be one of them, and with more damage than permanents all of them are (rulings); with fewer cards in the
+  graveyard than the damage, none is exiled and the player loses. Browser tests for Dralnu's and Nefarious Lich's choices
+  and Lich's sacrifice. +3, 31,656 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B253 (looked at, not done): the lists after round B252 stay out. Judgment calls and known gaps: "If you
+  can't" is read as all or nothing for Lich's sacrifice and Nefarious Lich's exile, as Egon, God of Death's rulings read it
+  (no ruling on either card says so); the order of a gain's replacements is chosen for a Lich's controller (the most cards,
+  CR 616.1), not asked; bots cast Lich and Nefarious Lich by their usual worth, without weighing the risk, and don't aim
+  damage away from Dralnu or a Nefarious Lich player.
 - Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (Y counted from the
   toughness so far in layer 7c: other 7c effects apply first, as it depends on them, CR 613.8, but counters apply in
   timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (as before: one
@@ -10740,7 +10768,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B248 (looked at, not done): the lists after round B247 stay out, and Zinnia, Valley's Voice and Ashling, the
   Limitless (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
   its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
-- Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich and Swans of
+- Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich (done in round B253) and Swans of
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done
   after it merges), Divine Intervention (still out: who removed its last counter isn't recorded), Allure of the Unknown
   (still out: another player casting one of the cards in the middle of the resolution), Medomai's Prophecy (still out: its
@@ -10893,9 +10921,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   may still replace but not Enduring Renewal itself, CR 614.5, which the draw replacements don't track yet; and "Play with
   your hand revealed"), The Spot, Living Portal (done in round 397) (its dies trigger returns the cards its enters trigger exiled, linked to the
   permanent it was, CR 607.2a, 400.7) stay out.
-- Out after round B217 (looked at, not done): Lich and Nefarious Lich (life gained becomes cards drawn, and those draws
+- Out after round B217 (looked at, not done): Lich and Nefarious Lich (done in round B253) (life gained becomes cards drawn, and those draws
   can happen in the middle of lifelink damage, where a draw replacement can't pause yet, see Swans of Bryn Argoll (done in round B252); Nefarious
-  Lich's and Dralnu, Lich Lord's choices of what to exile or sacrifice for each damage are in the middle of damage too),
+  Lich's and Dralnu, Lich Lord's (done in round B253) choices of what to exile or sacrifice for each damage are in the middle of damage too),
   Battlefield Thaumaturge (still out: whether a creature targeted twice counts twice), Charmed Pendant (done in round B239) (a mana ability whose
   colors come from the card its cost mills, a hybrid symbol giving either color: the mana can't be known before paying, so
   autopay can't plan it), Cemetery Desecrator (a reflexive modal trigger after exiling a card from any graveyard, X its mana
@@ -10956,7 +10984,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   mana equal to enchanted permanent's mana cost": what a {2/W} symbol adds isn't settled by its rulings), Medomai's Prophecy
   ("when you cast a spell with the chosen name for the first time this turn": a spell of that name cast earlier that turn,
   before chapter III, isn't settled by its rulings), Spectral Searchlight (another player choosing a color in the middle of a
-  mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (sacrifices chosen in the
+  mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (done in round B253) (sacrifices chosen in the
   middle of dealing damage), Words of Waste (done in round 383) and Fade Away (done in round B212) (see round 340's list) stay out.
 - Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration (done in round B219) ("add the total mana value of those cards" to a d20 roll: whether a target

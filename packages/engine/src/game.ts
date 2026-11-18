@@ -1450,6 +1450,12 @@ export function moveObject(
   o.castFromExile = to === "battlefield" && castFromExile ? true : undefined;
   // Sigarda's Splendor: "As ~ enters, note your life total" (a new object notes anew, CR 400.7); one that left keeps it.
   if (to === "battlefield") o.notedLife = compileCard(defOf(s, o)).notesLifeOnEnter ? player(s, o.controller).life : undefined;
+  // Lich (round B253): "As ~ enters, you lose life equal to your life total" (CR 614.12): the player it enters under, as it
+  // enters (rulings); none with 0 or less life (CR 107.1b).
+  if (to === "battlefield" && compileCard(defOf(s, o)).entersLoseLifeTotal && player(s, o.controller).life > 0) {
+    log(s, `${player(s, o.controller).name} loses life equal to their life total (${defOf(s, o).name}).`);
+    loseLife(s, o.controller, player(s, o.controller).life);
+  }
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
@@ -2409,6 +2415,21 @@ export function gainLife(s: GameState, pid: PlayerId, n: number, cause?: GainCau
     log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
     return;
   }
+  // Lich, Nefarious Lich (round B253): "If you would gain life, draw that many cards instead" (CR 119.10, 614.1a). Only one of
+  // a player's Liches replaces the gain (rulings), and not one that already replaced the gain this one comes from (CR 614.5,
+  // rulings on Nefarious Lich: a draw it made that another effect turned back into a gain). With other replacements of the
+  // gain the player chooses the order (CR 616.1), chosen for them here: "plus" and "twice that much" first, then the draws,
+  // before anything that would turn the gain into nothing or a loss. The draws are made right after this event
+  // (GameState.damageDraws: after the instruction, the combat damage, or before state-based actions), where a draw
+  // replacement can stop to ask.
+  const lineage = s.gainDrawLineage?.player === pid ? s.gainDrawLineage.used : [];
+  const lich = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).gainLifeDrawsInstead && !lineage.includes(id));
+  if (lich) {
+    const m = gainBoosted(s, pid, n);
+    log(s, `${player(s, pid).name} would gain ${m} life; they draw ${m === 1 ? "a card" : `${m} cards`} instead (${nameOf(s, lich)}).`);
+    (s.damageDraws ??= []).push({ player: pid, n: m, card: nameOf(s, lich), lich: [...lineage, lich] });
+    return;
+  }
   // "That player gains no life instead" (Sulfuric Vortex, CR 614.1a): whatever order the player applies it in with the
   // others below, no life is gained (CR 616.1). Unlike "can't gain life", it doesn't stop costs or exchanges.
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).gainsNoLife)) {
@@ -2457,6 +2478,16 @@ export function gainLife(s: GameState, pid: PlayerId, n: number, cause?: GainCau
   // lifelink (rulings); a mana ability resolving inside it is its own item, not the spell.
   const spell = s.resolving?.item.kind === "spell" ? s.resolving.item : undefined;
   fireEvent(s, { type: "lifeGained", player: pid, amount: n, first, ...(spell ? { spell } : {}) });
+}
+
+/** A gain of `n` life after "you gain that much life plus 1 instead" and "twice that much life instead" (CR 614.1a), with no log (round B253's Lich). */
+function gainBoosted(s: GameState, pid: PlayerId, n: number): number {
+  const plus = s.battlefield.reduce((a, id) => a + (controllerOf(s, obj(s, id)) === pid ? (abilitiesOf(s, obj(s, id)).lifeGainPlus ?? 0) : 0), 0);
+  const doublers = s.battlefield.filter((id) => {
+    const ab = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    return !!ab?.doubleLifeGain && (!ab.doubleLifeGainIf || staticConditionNow(s, ab.doubleLifeGainIf, id, pid));
+  }).length;
+  return (n + plus) * 2 ** doublers;
 }
 
 /** `pid` pays or loses `n` energy counters (CR 107.14, 122.1), counted for the turn (Blaster Hulk). */
@@ -3784,12 +3815,16 @@ function drawsDone(s: GameState, after: DrawAfter | undefined) {
  * combat damage is dealt. True when a draw replacement stopped them to ask (dredge); its answer makes the rest.
  */
 export function damageDrawsMade(s: GameState): boolean {
+  // Round B253: a Lich's draws that stopped to ask are made by now.
+  s.gainDrawLineage = undefined;
   while (s.damageDraws?.length) {
     const d = s.damageDraws.shift()!;
     if (!s.damageDraws.length) s.damageDraws = undefined;
     if (player(s, d.player).lost || d.n <= 0) continue;
     log(s, `${player(s, d.player).name} draws ${d.n === 1 ? "a card" : `${d.n} cards`} (${d.card}).`);
+    if (d.lich) s.gainDrawLineage = { player: d.player, used: d.lich };
     if (!draw(s, d.player, d.n, "damageDraws")) return true;
+    s.gainDrawLineage = undefined;
   }
   return false;
 }
@@ -15835,6 +15870,9 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   // Grimoire Thief: its controller now may look at the cards exiled with it too (rulings).
   if (s.exileLookWatch) watchExileLookers(s);
   if (!s.pending && askEntersChoice(s)) return;
+  // Round B253: draws a Lich made of a life gain outside a resolution and outside damage (a cost, a choice's answer, a loss
+  // replaced), made before anything else happens; a draw replacement may stop them to ask.
+  if (!s.pending && !s.damageBatch && s.damageDraws?.length && damageDrawsMade(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     closeZoneBatch(s); // the action before, or the last pass, was one event for "one or more" triggers (CR 603.2c)

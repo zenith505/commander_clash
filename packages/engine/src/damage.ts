@@ -22,6 +22,7 @@ import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, Playe
 import type { AbilityBody, DamageMod, TargetSpec } from "./abilities";
 import { defMv, hasName } from "./faces";
 import { shuffleLibrary } from "./rng";
+import { makeReplacementPicks, replacementPicks, type ReplacementPicks } from "./damage-picks";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -545,7 +546,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true; /** Crumbling Sanctuary: `player` exiles that many from the top of their library instead. */ exileTop?: true }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true; /** Crumbling Sanctuary: `player` exiles that many from the top of their library instead. */ exileTop?: true; /** Dralnu, Lich Lord (round B253): this player sacrifices that many permanents instead. */ sacrifice?: PlayerId; /** Nefarious Lich (round B253): `player` exiles that many cards from their graveyard instead, or loses the game. */ exileYard?: true }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -573,6 +574,8 @@ interface ShieldPlan {
   shuffled?: { id: ObjectId; zc: number; card: string; by: PlayerId }[];
   /** Channel Harm: the rules (by id) whose controller chose not to have them deal the damage they prevented (DamageRule.dealToMay). */
   declined?: string[];
+  /** Round B253 (damage-picks.ts): Dralnu's permanents sacrificed and Nefarious Lich's graveyard cards exiled instead of the damage, chosen as the plan is made, and the players who couldn't exile enough. */
+  replaced?: ReplacementPicks;
 }
 
 /** One of the shields around a permanent or player, as the planner sees it. */
@@ -903,6 +906,8 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "mill" && d.exileTop ? "Exile that many cards from the top of the library instead"
     : d.op === "mill" ? "Mill that many cards instead"
     : d.op === "destroy" ? "Destroy it instead"
+    : d.op === "sacrifice" ? "Sacrifice that many permanents instead"
+    : d.op === "exileYard" ? "Exile that many cards from your graveyard instead"
     : "Prevent it";
   return `${what} (${m.card})`;
 }
@@ -1200,7 +1205,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && (m.mod.onDamaged ? "object" in to : m.holder) ? { counters: { id: m.mod.onDamaged && "object" in to ? to.object : m.holder!.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && (m.mod.onDamaged ? "object" in to : m.holder) ? { counters: { id: m.mod.onDamaged && "object" in to ? to.object : m.holder!.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}), ...(m.mod.op === "sacrifice" ? { sacrifice: m.mod.you } : {}), ...(m.mod.op === "exileYard" && "player" in to ? { exileYard: true as const } : {}) });
       }
     };
     // Battletide Alchemist: "you may prevent X of that damage": its controller chooses for each source's damage to each
@@ -1332,6 +1337,10 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
             else if (o.mod.mod.op === "counters") swapped += (before - at.reduce((a, n) => a + n, 0)) * (o.mod.mod.counter === "-1/-1" ? 1.5 : o.mod.mod.counter === "+1/+1" ? -0.5 : 0.5);
             // Kill-Suit Cultist: the creature destroyed is worse for its controller than any damage to it.
             if (o.mod.mod.op === "destroy" && before > at.reduce((a, n) => a + n, 0) && "object" in to) swapped += controllerOf(s, obj(s, to.object)) === who ? 100 : -100;
+            // Round B253: a permanent sacrificed is worse than a point of damage to Dralnu; a card exiled from the graveyard
+            // costs less than a point of life, unless there aren't enough of them (the player loses).
+            if (o.mod.mod.op === "sacrifice") swapped += (before - at.reduce((a, n) => a + n, 0)) * 3;
+            if (o.mod.mod.op === "exileYard" && "player" in to) swapped += ((r) => (r > player(s, to.player).graveyard.length ? 1000 : r / 2))(before - at.reduce((a, n) => a + n, 0));
           } else taken.push(allocate(o.shield, at, () => 0)!);
         }
         const used = taken.reduce((a, t) => a + t.reduce((x, y) => x + y, 0), 0);
@@ -1406,6 +1415,9 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     if (i === null) return { ask, ops, final, used: next };
     if (order[i] === 1) declined.push(id);
   }
+  // Round B253: Dralnu's permanents and Nefarious Lich's cards, chosen by their players as the damage is replaced.
+  const replaced = replacementPicks(s, ops, choose);
+  if (replaced === null) return { ask, ops, final, used: next };
   // One amount per source and permanent or player: damage redirected back to where it came from adds up.
   const out = new Map<string, DamageEvent>();
   for (const e of final) {
@@ -1414,7 +1426,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     if (m) m.n += e.n;
     else out.set(k, { src: e.src, to: e.to, n: e.n, ...(e.combat ? { combat: true } : {}) });
   }
-  return { ops, final: [...out.values()], used: next, rules: allRules, ...(declined.length ? { declined } : {}) };
+  return { ops, final: [...out.values()], used: next, rules: allRules, ...(declined.length ? { declined } : {}), ...(replaced ? { replaced } : {}) };
 }
 
 /**
@@ -1593,6 +1605,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         swapLater.push({ ...op.counters, n: op.from - op.n });
         log(s, `${op.card}: ${op.from} damage from ${op.srcName}${op.mill ? ` to ${op.toName}` : ""} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}${op.mill ? " and a mill" : ""}.`);
       } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by ${op.exileTop ? "exiling cards from the top of the library" : "a mill"}.`);
+      else if (op.sacrifice !== undefined) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; ${player(s, op.sacrifice).name} sacrifices that many permanents instead.`);
+      else if (op.exileYard) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; they exile that many cards from their graveyard instead.`);
       else if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
       if (op.mill && op.player !== undefined && !player(s, op.player).lost && op.from - op.n > 0) {
@@ -1846,6 +1860,8 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
     if (o?.zone === "battlefield") destroyPermanent(s, o, `${characteristics(s, o).name} is destroyed.`);
   }
   if (plan.destroyed?.length) invalidateCharacteristics(s);
+  // Round B253: Dralnu's sacrifices and Nefarious Lich's exiles, as the rest of the damage is dealt (CR 614.1a).
+  if (plan.replaced) makeReplacementPicks(s, plan.replaced);
   // Weeping Angel: "that creature's owner shuffles it into their library", immediately after the damage event (CR 615.5),
   // only while it's still that permanent (CR 400.7). A token goes there and ceases to exist (CR 111.7).
   for (const sh of plan.shuffled ?? []) {

@@ -12430,6 +12430,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "35ab189a-adc8-48d6-82d2-53eb56a4d5e4",
+  "name": "Dralnu, Lich Lord",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Zombie Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wizard"
+  ],
+  "oracleText": "If damage would be dealt to Dralnu, sacrifice that many permanents instead.\n{T}: Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost. (You may cast that card from your graveyard for its flashback cost. Then exile it.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "81338d64-8fc3-41ac-afc8-e2a79df1159b",
   "name": "Dream Cache",
   "manaCost": "{2}{U}",
@@ -25978,6 +26013,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5b7515f2-7a5a-4e2a-9784-6cbacd768172",
+  "name": "Lich",
+  "manaCost": "{B}{B}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, you lose life equal to your life total.\nYou don't lose the game for having 0 or less life.\nIf you would gain life, draw that many cards instead.\nWhenever you're dealt damage, sacrifice that many nontoken permanents. If you can't, you lose the game.\nWhen this enchantment is put into a graveyard from the battlefield, you lose the game.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "785c306c-471c-4699-8ab2-43c253d569cf",
   "name": "Lich's Mastery",
   "manaCost": "{3}{B}{B}{B}",
@@ -30502,6 +30563,32 @@
   "commanderLegal": "legal",
   "set": "clb",
   "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d79e8ec4-b44b-4598-991c-7781dab55868",
+  "name": "Nefarious Lich",
+  "manaCost": "{B}{B}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If damage would be dealt to you, exile that many cards from your graveyard instead. If you can't, you lose the game.\nIf you would gain life, draw that many cards instead.\nWhen this enchantment leaves the battlefield, you lose the game.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

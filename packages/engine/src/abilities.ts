@@ -2003,7 +2003,7 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill" | /** Dralnu, Lich Lord (round B253): none of it is dealt; the holder's controller sacrifices that many permanents (all of them, with fewer, rulings). */ "sacrifice" | /** Nefarious Lich (round B253): none of it is dealt; the player exiles that many cards from their graveyard, or with fewer there, none and loses the game (rulings on Egon, God of Death). */ "exileYard";
   /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
   counter?: CounterKind;
   /** With op "counters": "put that many -1/-1 counters on that creature instead" (Soul-Scar Mage): on the permanent the damage would be dealt to, not the holder. */
@@ -6312,6 +6312,8 @@ export type SpellCondition =
   | { kind: "powerBecame"; n: number }
   /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
+  /** Lich (round B253): "sacrifice that many nontoken permanents. If you can't": you control at least `n` permanents like `filter` that can be sacrificed (rulings on Egon, God of Death: otherwise none is). */
+  | { kind: "canSacrificeMany"; filter: TargetSpec; n: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** Stalking Leonin (round 377): "if it's controlled by the chosen player": that target, still legal, is controlled by the player chosen for the source (its last known one if it's gone, CR 608.2h). */
@@ -8882,6 +8884,10 @@ export interface CompiledCard {
   preventToSelfExileTop?: { combat?: "only" | "non" };
   /** Swans of Bryn Argoll (round B252): "If a source would deal damage to ~, prevent that damage. The source's controller draws cards equal to the damage prevented this way." (CR 615.5) */
   preventToSelfDrawsSource?: true;
+  /** Lich (round B253): "As ~ enters, you lose life equal to your life total." (CR 614.12, 107.1b), under the player it enters under (rulings). */
+  entersLoseLifeTotal?: true;
+  /** Lich and Nefarious Lich (round B253): "If you would gain life, draw that many cards instead." (CR 119.10, 614.1a, 614.5; game.ts gainLife). */
+  gainLifeDrawsInstead?: true;
   /**
    * Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it
    * into their library" (CR 615.5): see staticRules in damage.ts.

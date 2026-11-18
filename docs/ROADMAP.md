@@ -1,7 +1,7 @@
 # Roadmap
 
-31,690 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,932 of
+31,693 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,934 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3982,6 +3982,37 @@ line blocks.
    whether the spell's current target is among those it can be reselected to, as Grip of Chaos's rulings say for its own
    reselection; still out); the lists after round 412 stay out. Known gap: a spell owned by a player who leaves the game
    while another player controls it stays on the stack (CR 800.4a says it leaves the game), as before.
+   Round 414 went on down `npm run popular`, most played first, past cards left out before to three cards that give
+   control or targets away. Elrond of the White Council's "Secret council — When ~ enters, each player secretly votes for
+   fellowship or aid, then those votes are revealed. For each fellowship vote, the voter chooses a creature they control.
+   You gain control of each creature chosen this way, and they gain "This creature can't attack its owner." Then for each
+   aid vote, put a +1/+1 counter on each creature you control." (the secret vote as Círdan's, extra votes included, CR
+   701.38; then, starting with the player whose turn it is, each fellowship voter chooses a creature they control for each
+   such vote, the same one again allowed, rulings; Effect controlFromEach `voterChooses`; control for good and the granted
+   static at once; then the counters on each creature you control, the gained ones too: all of one creature's at once, as
+   Lieutenants of the Guard's "for each strength vote", a judgment call: with Hardened Scales that's one more, not one
+   more for each vote). Boltbender's "When ~ is turned face up, you may choose new targets for any number of other spells
+   and/or abilities." (Effect newTargetsAny: each other spell and ability on the stack with targets, from the top down,
+   its targets kept or changed to legal ones for its controller, CR 115.7d; a division of damage stays, rulings; not
+   targeted). Confusion in the Ranks' "Whenever an artifact, creature, or enchantment enters, its controller chooses
+   target permanent another player controls that shares a card type with it. Exchange control of those permanents."
+   (any player's, itself too; the entering permanent's controller chooses the target as the trigger goes on the stack,
+   CR 603.3d, TargetSpec.chosenBy "subjectController" with `opponentOfSubjectController`, every other player being an
+   opponent with no teams, CR 102.3; `sharesCardTypeWithSubject` binds the card types it has then, so an artifact land can
+   take a land, rulings; not optional, and with no legal target it's removed; Effect exchangeWithSubject exchanges only if
+   both are still on the battlefield and still share a card type, rulings, CR 701.12). Bots: Elrond's controller votes
+   aid, an opponent votes fellowship only when it has no creature to give (else the one it values least); Boltbender's
+   new targets as for any "choose new targets" (harmful ones off theirs); Confusion's chooser takes the most valuable
+   permanent it can. The app's permanent picker now starts fresh when the same pick is asked again with a new prompt
+   (Elrond's second fellowship vote). Browser tests click through Elrond's two fellowship votes (Brago's Representative)
+   and both picks, Boltbender turned face up against Ana's Murder and Murder's new target, and the target you choose for
+   Ana's Confusion when your Grizzly Bears enters. +3, 31,693 of 31,936 on this stacked branch. The compiled text of every
+   other card is unchanged.
+   Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
+   the cost picks the Equipment whose mana value it divides, no ruling); Kefnet, Taskmaster, Niko, Mirror of the
+   Forebears, Wayta, Draugr Necromancer, Apple of Eden, Missy and the rest of `npm run popular` above rank 15,000 (still
+   out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
+   it face up; a bot voting with Elrond counts only creatures, not what the new controller can do with them.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

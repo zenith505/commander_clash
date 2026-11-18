@@ -5279,6 +5279,39 @@
   "gameChanger": true
  },
  {
+  "oracleId": "055e1799-8188-48f4-854e-d3e28363084f",
+  "name": "Boltbender",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Goblin Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Wizard"
+  ],
+  "oracleText": "Disguise {1}{R} (You may cast this card face down for {3} as a 2/2 creature with ward {2}. Turn it face up any time for its disguise cost.)\nWhen this creature is turned face up, you may choose new targets for any number of other spells and/or abilities.",
+  "power": "4",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Disguise"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "16e555f2-5aa8-4100-a036-eed48db0e84a",
   "name": "Bone Saw",
   "manaCost": "{0}",
@@ -5710,6 +5743,37 @@
   "set": "khc",
   "releasedAt": "2021-02-05",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8877b896-8458-4828-9ff6-9e0ecc180cf7",
+  "name": "Brago's Representative",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Advisor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "While voting, you get an additional vote. (The votes can be for different choices or for the same choice.)",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cns",
+  "releasedAt": "2014-06-06",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8920,6 +8984,32 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e477abb9-9b99-48a8-8c09-07b120b72540",
+  "name": "Confusion in the Ranks",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever an artifact, creature, or enchantment enters, its controller chooses target permanent another player controls that shares a card type with it. Exchange control of those permanents.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13439,6 +13529,43 @@
   "set": "m10",
   "releasedAt": "2009-07-17",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5ae4a172-b846-4ec2-8178-a8b762134bfe",
+  "name": "Elrond of the White Council",
+  "manaCost": "{3}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elf Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Noble"
+  ],
+  "oracleText": "Secret council — When Elrond enters, each player secretly votes for fellowship or aid, then those votes are revealed. For each fellowship vote, the voter chooses a creature they control. You gain control of each creature chosen this way, and they gain \"This creature can't attack its owner.\" Then for each aid vote, put a +1/+1 counter on each creature you control.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Secret council"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltc",
+  "releasedAt": "2023-06-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

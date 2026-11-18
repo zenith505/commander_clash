@@ -3415,7 +3415,16 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   if (body.targets.some((x) => x.opponentOfSubjectController)) {
     const subj = t.subject && s.objects[t.subject.id];
     const chooser = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? controllerOf(s, subj) : (s.lastKnown?.[t.subject?.id ?? ""]?.controller ?? t.controller);
-    return { ...body, targets: body.targets.map((x) => (x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
+    // Confusion in the Ranks (round 414): "that shares a card type with it": a card type of the subject as it is, or last
+    // was, on the battlefield (CR 608.2h); none known, nothing matches.
+    const here = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc;
+    const kin = (x: TargetSpec): TargetSpec => {
+      if (!x.sharesCardTypeWithSubject) return x;
+      const { sharesCardTypeWithSubject: _, ...rest } = x;
+      const types = here ? characteristics(s, subj!).types : (s.lastKnown?.[t.subject?.id ?? ""]?.source?.types ?? []);
+      return { ...rest, types: types.length ? [...types] : ["(none)"] };
+    };
+    return { ...body, targets: body.targets.map((x) => kin(x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
   }
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;

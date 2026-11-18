@@ -1099,6 +1099,20 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const chooser = e.bySpellController ? s.stack.find((x) => x.id === t.id)?.controller : undefined;
       return newTargets(s, ctx, t.id, src, e.allOrNone, e.changeAny, chooser);
     }
+    case "newTargetsAny": {
+      // Boltbender (round 414): each other spell and ability on the stack, from the top down, its controller here keeping
+      // or changing each of its targets (CR 115.7d); one without targets, or with nothing else to change to, isn't asked
+      // about. Not targeted, so nothing is "targeted" by it.
+      const sc = (s.resolving!.scratch ??= {});
+      const queue = (sc.retargetQueue ??= [...s.stack].reverse().filter((x) => x.id !== s.resolving?.item.id).map((x) => x.id));
+      while (queue.length) {
+        if (newTargets(s, ctx, queue[0]!, src) === "paused") return "paused";
+        sc.retargets = undefined;
+        queue.shift();
+      }
+      sc.retargetQueue = undefined;
+      return;
+    }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
       // since it isn't one it can counter (CR 608.2: it's resolving).

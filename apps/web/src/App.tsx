@@ -685,7 +685,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
     else if (pending?.kind === "newTargets") setTargeting({ mode: "retarget", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source}: new targets for ${pending.spell}${pending.allOrNone ? " (change all of them, or keep them)" : ""}` });
     else setTargeting((t) => (answering(t) ? null : t));
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}` : ""]);
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
   // Who defends a permanent that can be attacked: a planeswalker's controller, a battle's protector (CR 506.2, 310.9b).

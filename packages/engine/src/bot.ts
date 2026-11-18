@@ -1033,6 +1033,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Infernal Denizen (round B238): the best of the creatures we may gain control of (pick, then a control effect for us).
     if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.options.length && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "continuous" && e.what.ref === "created" && e.giveTo?.ref === "chosenPlayer" && e.whileOnBattlefield && e.mods.some((m) => m.kind === "control")))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
+    // Elrond of the White Council (round 414): our creature for our fellowship vote, the one we value least (it's ours
+    // anyway when Elrond is ours).
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && (s.resolving?.body.effects[s.resolving.next] as { voterChooses?: true } | undefined)?.voterChooses)
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     // Order of Succession: the best of the creatures we gain control of.
     // Inniaz, the Gale Force (round B247): we choose for every player. For us, the best one; out of ours, for the player to
     // our left, the least one; between two other players, the one the player getting it values least.
@@ -3317,11 +3321,26 @@ function bestChooser(s: GameState, pid: PlayerId, options: string[], d: Deferred
 }
 
 /**
+ * Confusion in the Ranks (round 414, Effect exchangeWithSubject): the permanent that entered is exchanged for the target
+ * whichever one is chosen, so the one most valuable to us among the legal ones (legal for `controller`, the trigger's).
+ */
+function exchangeWithSubjectPick(s: GameState, pid: PlayerId, body: AbilityBody, sourceId: ObjectId | undefined, controller = pid): TargetChoice[] | null {
+  const e = body.effects.find((x) => x.type === "exchangeWithSubject");
+  if (e?.type !== "exchangeWithSubject" || body.targets.length !== 1) return null;
+  const all = legalTargets(s, body.targets[e.index]!, controller, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
+  const best = [...all].sort((a, b) => worth(s, pid, b) - worth(s, pid, a))[0];
+  return [best ? { kind: "object", id: best.id } : { kind: "none" }];
+}
+
+/**
  * The target of `controller`'s triggered ability that we choose for them ("target creature of their choice", TargetSpec
  * chosenBy): legal for the controller (rulings), and the best for us, our most valuable if what it does helps, else
  * theirs (an opponent's), our least valuable only when there's nothing else.
  */
 function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body: AbilityBody, sourceId: ObjectId, slot = 0, chosen: TargetChoice[] = []): TargetChoice[] {
+  // Confusion in the Ranks (round 414): ours that entered is exchanged for the target, so the most valuable one.
+  const withSubject = exchangeWithSubjectPick(s, pid, body, sourceId, controller);
+  if (withSubject) return withSubject;
   const spec = body.targets[slot]!;
   const all = legalTargets(s, spec, controller, undefined, botSource(s, sourceId), sourceId).filter((t) => canChooseTarget(s, body.targets, chosen.slice(0, slot), slot, t, controller, botSource(s, sourceId), sourceId));
   // "Target creature of an opponent's choice they control" (Evangelize, Echo Chamber, Preacher): what it does is for its
@@ -3614,6 +3633,9 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (forced) return pick ? [pick] : all[0] ? [all[0]] : null;
     return pick && gain(pick.id) > 2 ? [pick] : null;
   }
+  // Confusion in the Ranks (round 414): the permanent that entered goes either way, so the most valuable one we can take.
+  const withSubject = exchangeWithSubjectPick(s, pid, body, sourceId);
+  if (withSubject) return withSubject;
   // Exchanging control (Switcheroo, Avarice Totem): our least useful permanent for an opponent's most useful one, worth it
   // only when theirs is worth clearly more; an exchange between two of their permanents does us no good.
   const swap = body.effects.flatMap((e) => (e.type === "may" ? e.effects : [e])).find((e): e is Extract<Effect, { type: "exchangeControl" }> => e.type === "exchangeControl");

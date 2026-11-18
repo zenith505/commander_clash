@@ -1164,6 +1164,12 @@ export interface TargetSpec {
   sharesColorWithManaSpent?: true;
   /** "A permanent ... that shares a card type with it" (Martyr's Bond): with the trigger's subject, as it last existed; bound as the pick resolves. */
   sharesTypeWithSubject?: true;
+  /**
+   * Confusion in the Ranks (round 414): "target permanent ... that shares a card type with it": a card type of the
+   * trigger's subject (the permanent that entered), as it is, or last was, on the battlefield when the trigger is put on
+   * the stack, bound then as the target's `types` (effects/triggers.ts).
+   */
+  sharesCardTypeWithSubject?: true;
   /** "A creature of their choice that's blocking it" (Labyrinth Raptor): blocking the trigger's subject as the pick resolves (CR 509.1h); none once the subject has left combat or the battlefield (CR 506.4). Only a "pick" checks it. */
   blockingSubject?: true;
   /**
@@ -4486,7 +4492,18 @@ export type Effect =
    * `votedFor`: "For each money vote, choose a permanent owned by the voter and gain control of it" (Expropriate): one
    * permanent that voter owns for each such vote, for good.
    */
-  | { type: "controlFromEach"; chose?: string; votedFor?: string; duration: "endOfTurn" | "game" }
+  | {
+      type: "controlFromEach";
+      chose?: string;
+      votedFor?: string;
+      /**
+       * With `votedFor`, Elrond of the White Council (round 414): "For each fellowship vote, the voter chooses a creature
+       * they control": the voter chooses, a creature they control, once for each such vote (the same one again allowed),
+       * voters in APNAP order (rulings).
+       */
+      voterChooses?: true;
+      duration: "endOfTurn" | "game";
+    }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   /** Parley: "Each player reveals the top card of their library." (ResolvingState.parley counts them.) */
@@ -5891,6 +5908,17 @@ export type Effect =
    * player's control, nothing happens (CR 701.12b). Sets "if you do" (ResolvingState.did). See effects/run-round413.ts.
    */
   | { type: "exchangeSpellControl"; spell: number; cause?: true; perm: ObjRef }
+  /**
+   * Boltbender (round 414): "you may choose new targets for any number of other spells and/or abilities": each other spell
+   * and ability on the stack with targets, from the top down, its targets chosen again or kept (CR 115.7d), not targeted.
+   */
+  | { type: "newTargetsAny" }
+  /**
+   * Confusion in the Ranks (round 414): "Exchange control of those permanents": the trigger's subject (the permanent that
+   * entered, still the same object on the battlefield) and target `index`, only if they still share a card type as this
+   * resolves (rulings), each player gaining control of the other's indefinitely (CR 701.12a-b).
+   */
+  | { type: "exchangeWithSubject"; index: number }
   /** Midnight Crusader Shuttle: "If you gain control of a creature this way, tap it, and it's attacking that player": only
    * while you control it now, and during combat; it's attacking without having been declared an attacker (CR 506.3,
    * rulings). */

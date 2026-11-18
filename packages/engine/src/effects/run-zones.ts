@@ -1784,9 +1784,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Yennett: none cast, so you draw (the card revealed, still on top: rulings).
         if (e.noneCastDraw && !st.cast) draw(s, you.id, e.noneCastDraw);
         if (!e.rest) return;
-        const toHand = e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
+        // Glorious Purpose (round 405): all of them into the hand.
+        const toHand = e.rest.dest === "hand" ? left.filter((id) => s.objects[id]?.zone === "exile") : e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
         for (const id of toHand) moveObject(s, id, "hand");
         if (toHand.length) log(s, `${you.name} puts ${toHand.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their hand.`);
+        if (e.rest.dest === "hand") return;
         const others = left.filter((id) => !toHand.includes(id));
         if (e.rest.dest === "graveyard") {
           // Each card to its owner's graveyard (CR 404.2): the target opponent's own, for Talent of the Telepath.

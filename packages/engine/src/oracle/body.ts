@@ -9530,7 +9530,11 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
       // cards exiled this way that weren't cast into your graveyard" (Epic Experiment), "Put the exiled cards not cast
       // this way on the bottom of your library in a random order" (Collected Conjuring). Your own library only.
       const restText = sentences[si + 2]?.replace(/\.$/, "").replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase()) ?? "";
-      const rest: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } | undefined =
+      const rest: { dest: "graveyard" | "bottomRandom" | "hand"; toHand?: boolean } | undefined =
+        // Glorious Purpose (round 405): "Put the rest into your hand.": every exiled card not cast, lands too.
+        !kinds && !one && who.ref === "you" && /^Put the rest into your hand$/.test(restText)
+          ? { dest: "hand" }
+          :
         kinds && new RegExp(`^Put the exiled ${kinds.replace(" or ", " and ")} cards that weren't cast this way into your hand and the rest on the bottom of your library in a random order$`).test(restText)
           ? { dest: "bottomRandom", toHand: true }
           : /^Put all cards exiled this way that weren't cast into your graveyard$/.test(restText)

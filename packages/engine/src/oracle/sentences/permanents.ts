@@ -762,6 +762,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Hallowed Moonlight: "Until end of turn, if a creature would enter and it wasn't cast, exile it instead": the same, for
   // tokens too (rulings).
   if (/^(?:Until end of turn, if a creature would enter and it wasn't cast, exile it instead|If a creature would enter and it wasn't cast, exile it instead until end of turn)$/.test(s)) return [{ type: "exileUncastThisTurn", tokens: true }];
+  // Don't Blink (round B252): a replacement of how creatures enter for the rest of the turn (CR 614.1a), from exile or as a
+  // spell cast from exile resolves (GameState.dontBlinkTurn, moveObject).
+  if (/^(?:Until end of turn, if one or more creatures would enter from exile or after being cast from exile, their owners shuffle them into their libraries instead|If one or more creatures would enter from exile or after being cast from exile, their owners shuffle them into their libraries instead until end of turn)$/.test(s)) return [{ type: "shuffleFromExileThisTurn" }];
   // Malicious Eclipse: "If a creature an opponent controls would die this turn, exile it instead": only those an opponent of
   // the spell's controller controls as they would die (CR 614.1a).
   if (/^If a creature an opponent controls would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn", opponentsOfYou: true }];

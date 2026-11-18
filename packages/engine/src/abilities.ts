@@ -2003,7 +2003,7 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill" | /** Dralnu, Lich Lord (round B253): none of it is dealt; the holder's controller sacrifices that many permanents (all of them, with fewer, rulings). */ "sacrifice" | /** Nefarious Lich (round B253): none of it is dealt; the player exiles that many cards from their graveyard, or with fewer there, none and loses the game (rulings on Egon, God of Death). */ "exileYard";
   /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
   counter?: CounterKind;
   /** With op "counters": "put that many -1/-1 counters on that creature instead" (Soul-Scar Mage): on the permanent the damage would be dealt to, not the holder. */
@@ -3560,6 +3560,8 @@ export type Effect =
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
   /** Mistcaller: "Until end of turn, if a nontoken creature would enter and it wasn't cast, exile it instead" (GameState.exileUncastTurn). */
+  /** Don't Blink (round B252): "Until end of turn, if one or more creatures would enter from exile or after being cast from exile, their owners shuffle them into their libraries instead." (GameState.dontBlinkTurn) */
+  | { type: "shuffleFromExileThisTurn" }
   | { type: "exileUncastThisTurn"; /** Hallowed Moonlight: "if a creature would enter": tokens too (GameState.exileUncastAnyTurn). */ tokens?: true }
   | { type: "exileDyingThisTurn"; /** Malicious Eclipse: only creatures the controller's opponents control. */ opponentsOfYou?: true }
   /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
@@ -5011,11 +5013,19 @@ export type Effect =
       riot?: true;
       /** Squandered Resources: "Add one mana of any type the sacrificed land could produce": a type its cost's sacrificed land could make as it last existed (LastKnown.couldProduce, CR 106.7), chosen as it resolves; none if none (rulings). */
       sacrificedType?: true;
+      /**
+       * Elemental Resonance (round B252): "add mana equal to enchanted permanent's mana cost": a mana of each colored symbol's
+       * color, {C} for each generic one, one of the colors of each hybrid symbol chosen as it resolves, nothing for {X}
+       * (rulings, CR 107.4).
+       */
+      costOf?: "attached";
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec; /** Eunuchs' Intrigues: "Other creatures they control": controlled by this player, as it resolves, except the creature that player just chose (ObjRef "created"). */ ofPlayer?: PlayerRef; exceptChosen?: true; /** Mark for Death: "Other creatures that player controls can't block this turn": not this target, while it's the same object (CR 400.7). */ exceptTarget?: number }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
+  /** Peace Talks (round B254): "This turn and next turn, creatures can't attack, and players and permanents can't be the targets of spells or activated abilities." (GameState.peaceTalksTurns). */
+  | { type: "peaceTalks" }
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number; /** Overencumbered: "creatures can't attack this combat": only in the combat phase it's made in (GameState.combatsThisTurn). */ combat?: true }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }
@@ -6338,6 +6348,8 @@ export type SpellCondition =
   | { kind: "powerBecame"; n: number }
   /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
+  /** Lich (round B253): "sacrifice that many nontoken permanents. If you can't": you control at least `n` permanents like `filter` that can be sacrificed (rulings on Egon, God of Death: otherwise none is). */
+  | { kind: "canSacrificeMany"; filter: TargetSpec; n: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** Stalking Leonin (round 377): "if it's controlled by the chosen player": that target, still legal, is controlled by the player chosen for the source (its last known one if it's gone, CR 608.2h). */
@@ -7919,6 +7931,11 @@ export interface ManaAbility {
   millCost?: true;
   /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
   instantOnly?: true;
+  /**
+   * Rhystic Cave (round B254): "Add one mana of that color unless any player pays {1}": each other player in turn order may
+   * pay this cost as it resolves (GameState.manaUnless). Never used by automatic payment.
+   */
+  unlessAnyPays?: string;
   /** "Activate only as a sorcery" (Grinning Ignus): only when its controller could cast a sorcery (CR 307.1), so never while paying. */
   sorceryOnly?: true;
   /** "Return ~ to its owner's hand" as part of the cost (Grinning Ignus): never used by automatic payment. */
@@ -8074,6 +8091,11 @@ export interface ManaSpend {
   faceUp?: FaceDownKind[];
   /** "Only to pay cumulative upkeep costs" (Adarkar Unicorn): ManaUse.cumulativeUpkeep. */
   cumulativeUpkeep?: true;
+  /**
+   * Cultivator Drone (round B254): "Spend this mana only to cast a colorless spell, activate an ability of a colorless
+   * permanent, or pay a cost that contains {C}": all three, with the other fields unset (spend.ts spendAllows).
+   */
+  costsWithC?: true;
   /** "Only to activate power-up abilities" (Quinjet Technician): ManaUse.powerUp. */
   powerUpAbilities?: true;
   /** "Only to foretell cards or cast spells that have foretell" (Niko Defies Destiny): ManaUse.foretell, or a spell with foretell. */
@@ -8920,6 +8942,12 @@ export interface CompiledCard {
   spellDamageToYouToController?: TargetSpec;
   /** Gloom Surgeon: "If combat damage would be dealt to ~, prevent that damage and exile that many cards from the top of your library" (CR 615.5). */
   preventToSelfExileTop?: { combat?: "only" | "non" };
+  /** Swans of Bryn Argoll (round B252): "If a source would deal damage to ~, prevent that damage. The source's controller draws cards equal to the damage prevented this way." (CR 615.5) */
+  preventToSelfDrawsSource?: true;
+  /** Lich (round B253): "As ~ enters, you lose life equal to your life total." (CR 614.12, 107.1b), under the player it enters under (rulings). */
+  entersLoseLifeTotal?: true;
+  /** Lich and Nefarious Lich (round B253): "If you would gain life, draw that many cards instead." (CR 119.10, 614.1a, 614.5; game.ts gainLife). */
+  gainLifeDrawsInstead?: true;
   /**
    * Weeping Angel: "If ~ would deal combat damage to a creature, prevent that damage and that creature's owner shuffles it
    * into their library" (CR 615.5): see staticRules in damage.ts.

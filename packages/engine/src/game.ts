@@ -14,7 +14,7 @@ import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDama
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
+import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -990,6 +990,16 @@ export function moveObject(
     gatherUsed = step.used;
     if (step.choice) gatherChoice = { options: step.choice, used: step.used };
   }
+  // Don't Blink (round B252): "Until end of turn, if one or more creatures would enter from exile or after being cast from
+  // exile, their owners shuffle them into their libraries instead" (CR 614.1a): a card from exile, or a spell cast from
+  // exile as it resolves (a copy wasn't cast, CR 707.10), that would be a creature there (CR 614.12). Its owner shuffles
+  // (below), as a commander may go to the command zone instead (CR 903.9a).
+  let dontBlink = false;
+  if (to === "battlefield" && s.dontBlinkTurn === s.turn && (fromZone === "exile" || (fromZone === "stack" && !o.spellCopy && o.castFrom === "exile")) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
+    log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} is shuffled into its owner's library instead of entering (Don't Blink).`);
+    to = "library";
+    dontBlink = true;
+  }
   // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
   // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
   // token, wasn't cast (rulings).
@@ -1447,6 +1457,12 @@ export function moveObject(
   o.castFromExile = to === "battlefield" && castFromExile ? true : undefined;
   // Sigarda's Splendor: "As ~ enters, note your life total" (a new object notes anew, CR 400.7); one that left keeps it.
   if (to === "battlefield") o.notedLife = compileCard(defOf(s, o)).notesLifeOnEnter ? player(s, o.controller).life : undefined;
+  // Lich (round B253): "As ~ enters, you lose life equal to your life total" (CR 614.12): the player it enters under, as it
+  // enters (rulings); none with 0 or less life (CR 107.1b).
+  if (to === "battlefield" && compileCard(defOf(s, o)).entersLoseLifeTotal && player(s, o.controller).life > 0) {
+    log(s, `${player(s, o.controller).name} loses life equal to their life total (${defOf(s, o).name}).`);
+    loseLife(s, o.controller, player(s, o.controller).life);
+  }
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
@@ -1640,6 +1656,7 @@ export function moveObject(
   // Darksteel Colossus: its own replacement ability shuffled it in, controlled by whoever controlled it (by its owner
   // from another zone, CR 113.8).
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner), fromZone === "battlefield" ? lastController : o.owner);
+  if (dontBlink && o.zone === "library") shuffleLibrary(s, player(s, o.owner), o.owner);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name, undefined, lastController);
   if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
   // Cosmic Intervention: each card exiled this way gets its own delayed trigger (rulings); a token ceases to exist and
@@ -2442,6 +2459,21 @@ export function gainLife(s: GameState, pid: PlayerId, n: number, cause?: GainCau
     log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
     return;
   }
+  // Lich, Nefarious Lich (round B253): "If you would gain life, draw that many cards instead" (CR 119.10, 614.1a). Only one of
+  // a player's Liches replaces the gain (rulings), and not one that already replaced the gain this one comes from (CR 614.5,
+  // rulings on Nefarious Lich: a draw it made that another effect turned back into a gain). With other replacements of the
+  // gain the player chooses the order (CR 616.1), chosen for them here: "plus" and "twice that much" first, then the draws,
+  // before anything that would turn the gain into nothing or a loss. The draws are made right after this event
+  // (GameState.damageDraws: after the instruction, the combat damage, or before state-based actions), where a draw
+  // replacement can stop to ask.
+  const lineage = s.gainDrawLineage?.player === pid ? s.gainDrawLineage.used : [];
+  const lich = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).gainLifeDrawsInstead && !lineage.includes(id));
+  if (lich) {
+    const m = gainBoosted(s, pid, n);
+    log(s, `${player(s, pid).name} would gain ${m} life; they draw ${m === 1 ? "a card" : `${m} cards`} instead (${nameOf(s, lich)}).`);
+    (s.damageDraws ??= []).push({ player: pid, n: m, card: nameOf(s, lich), lich: [...lineage, lich] });
+    return;
+  }
   // "That player gains no life instead" (Sulfuric Vortex, CR 614.1a): whatever order the player applies it in with the
   // others below, no life is gained (CR 616.1). Unlike "can't gain life", it doesn't stop costs or exchanges.
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).gainsNoLife)) {
@@ -2490,6 +2522,16 @@ export function gainLife(s: GameState, pid: PlayerId, n: number, cause?: GainCau
   // lifelink (rulings); a mana ability resolving inside it is its own item, not the spell.
   const spell = s.resolving?.item.kind === "spell" ? s.resolving.item : undefined;
   fireEvent(s, { type: "lifeGained", player: pid, amount: n, first, ...(spell ? { spell } : {}) });
+}
+
+/** A gain of `n` life after "you gain that much life plus 1 instead" and "twice that much life instead" (CR 614.1a), with no log (round B253's Lich). */
+function gainBoosted(s: GameState, pid: PlayerId, n: number): number {
+  const plus = s.battlefield.reduce((a, id) => a + (controllerOf(s, obj(s, id)) === pid ? (abilitiesOf(s, obj(s, id)).lifeGainPlus ?? 0) : 0), 0);
+  const doublers = s.battlefield.filter((id) => {
+    const ab = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    return !!ab?.doubleLifeGain && (!ab.doubleLifeGainIf || staticConditionNow(s, ab.doubleLifeGainIf, id, pid));
+  }).length;
+  return (n + plus) * 2 ** doublers;
 }
 
 /** `pid` pays or loses `n` energy counters (CR 107.14, 122.1), counted for the turn (Blaster Hulk). */
@@ -3806,7 +3848,10 @@ function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", sou
 /** Draws a replacement's question stopped are all made: carry on with what was drawing (`after`, or the resolving spell or ability). */
 function drawsDone(s: GameState, after: DrawAfter | undefined) {
   if (after === "drawStep") drawStepDrawn(s);
-  else if (after === "damageDraws") damageDrawsMade(s);
+  // Inside a resolution (Swans of Bryn Argoll, round B252), the rest of it follows the draws.
+  else if (after === "damageDraws") {
+    if (!damageDrawsMade(s) && s.resolving && !s.pending) continueResolution(s);
+  }
   else if (s.resolving) continueResolution(s);
 }
 
@@ -3815,12 +3860,16 @@ function drawsDone(s: GameState, after: DrawAfter | undefined) {
  * combat damage is dealt. True when a draw replacement stopped them to ask (dredge); its answer makes the rest.
  */
 export function damageDrawsMade(s: GameState): boolean {
+  // Round B253: a Lich's draws that stopped to ask are made by now.
+  s.gainDrawLineage = undefined;
   while (s.damageDraws?.length) {
     const d = s.damageDraws.shift()!;
     if (!s.damageDraws.length) s.damageDraws = undefined;
     if (player(s, d.player).lost || d.n <= 0) continue;
     log(s, `${player(s, d.player).name} draws ${d.n === 1 ? "a card" : `${d.n} cards`} (${d.card}).`);
+    if (d.lich) s.gainDrawLineage = { player: d.player, used: d.lich };
     if (!draw(s, d.player, d.n, "damageDraws")) return true;
+    s.gainDrawLineage = undefined;
   }
   return false;
 }
@@ -6526,12 +6575,15 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : manaAbilityCostOf(s, p.id, o, ab);
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o, ...(ab.blueAsAny ? { blueAny: true as const } : {}) }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
+  // Rhystic Cave (round B254): "unless any player pays {1}": the other players are asked below, once its cost is paid; it's
+  // tapped for mana only if none of them pays (rulings), when its mana is added (manaUnlessDone).
+  const unless = ab.unlessAnyPays && adds.length ? ab.unlessAnyPays : undefined;
   batchTaps(s, () => {
     if (ab.tap) tapPermanent(s, o);
     if (ab.untapSelf) untapPermanent(s, o); // {Q} (CR 107.6): untapped, not tapped for mana (rulings on Pili-Pala)
     // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
     // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
-    if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+    if (ab.tap && adds.length && !unless) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
     for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   }, true);
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
@@ -6599,13 +6651,14 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     } else adds = milledCombos[0]!;
     if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
   }
+  else if (unless) s.manaUnless = { player: p.id, id: o.id, zc: o.zoneChanges ?? 0, adds, from, picked, queue: turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost), cost: unless, source: name };
   else if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
-  if (o.zone === "battlefield") fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
+  if (o.zone === "battlefield" && !unless) fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
-  addTriggeredMana(s, p.id, picked);
+  if (!unless) addTriggeredMana(s, p.id, picked);
   // Winter's Night: the land tapped for mana doesn't untap during its controller's next untap step.
-  if (picked.skipUntap && o.zone === "battlefield") o.skipNextUntap = true;
+  if (picked.skipUntap && o.zone === "battlefield" && !unless) o.skipNextUntap = true;
   // Yuna, Grand Summoner: "When you next cast a creature spell this turn, ..." (a delayed trigger, CR 603.7a).
   if (ab.nextCast) {
     const e = ab.nextCast;
@@ -6630,6 +6683,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
   // Wizard's Rockets: {X} in its activation cost (Magus Lucea Kane's delayed trigger is used up by it, with nothing to copy).
   fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}) });
+  if (unless) askManaUnless(s);
   if (theyChoose && adds.length && !player(s, getter).lost) {
     s.manaColorFor = { player: getter, n: adds.length, from, source: name };
     s.pending = { kind: "chooseOption", player: getter, source: name, what: "manaColorFor", options: COLORS.map((c) => COLOR_NAMES[c]), prompt: `${p.name} tapped ${name}: choose the color of the ${adds.length === 1 ? "mana" : `${adds.length} mana`} you add` };
@@ -6639,6 +6693,62 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     s.pendantMana = { player: p.id, combos: milledCombos, from, source: name, id: o.id };
     s.pending = { kind: "chooseOption", player: p.id, source: name, what: "pendantMana", options: milledCombos.map((c) => c.join("")), labels: milledCombos.map((c) => `Add ${c.map((m) => `{${m}}`).join("")}`), prompt: `${name}: choose the mana its milled card's hybrid symbols add` };
   }
+}
+
+/**
+ * Rhystic Cave (round B254, GameState.manaUnless): ask the next player in turn order whether they pay to stop its mana (a
+ * payUnless question outside any resolution, CR 605.3b); with no one left to ask, its mana is added.
+ */
+function askManaUnless(s: GameState): void {
+  const m = s.manaUnless;
+  if (!m) return;
+  m.queue = m.queue.filter((q) => !player(s, q).lost);
+  const next = m.queue[0];
+  if (next === undefined) return manaUnlessDone(s, false);
+  const mana = m.adds.map((x) => `{${x}}`).join("");
+  s.pending = { kind: "payUnless", player: next, cost: m.cost, source: m.source, what: m.source, otherwise: `${player(s, m.player).name} adds ${mana}`, manaUnless: true };
+}
+
+/** A player's answer to Rhystic Cave's question: paying stops its mana (none is added, nothing is tapped for mana). */
+function manaUnlessAnswer(s: GameState, p: Player, pay: boolean): void {
+  const m = s.manaUnless;
+  const pend = s.pending;
+  if (!m || pend?.kind !== "payUnless" || !pend.manaUnless || pend.player !== p.id) throw new RulesError("nothing to pay for");
+  if (pay) {
+    const paid = spendFromPool(s, p.id, parseManaCost(m.cost), "other", 0, payableLife(s, p.id));
+    if (!paid) throw new RulesError(`not enough mana in your pool to pay ${m.cost}`);
+    payLife(s, p.id, paid.lifePaid);
+    log(s, `${p.name} pays ${m.cost} for ${m.source}.`);
+    s.pending = null;
+    return manaUnlessDone(s, true);
+  }
+  log(s, `${p.name} doesn't pay ${m.cost} for ${m.source}.`);
+  m.queue = m.queue.filter((q) => q !== p.id);
+  s.pending = null;
+  askManaUnless(s);
+}
+
+/**
+ * Rhystic Cave's ability finishes resolving: if no one paid, its mana is added and it was tapped for mana (CR 106.12,
+ * rulings), with the triggered mana abilities that tapping triggers (CR 605.4a); if someone paid, it adds nothing.
+ */
+function manaUnlessDone(s: GameState, paid: boolean): void {
+  const m = s.manaUnless!;
+  s.manaUnless = undefined;
+  const o = s.objects[m.id];
+  const here = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === m.zc;
+  if (paid) {
+    log(s, `${m.source} adds no mana.`);
+    if (here) fireEvent(s, { type: "manaAbilityResolved", id: m.id, amount: 0 });
+    return;
+  }
+  if (player(s, m.player).lost) return;
+  if (here) fireEvent(s, { type: "tappedForMana", id: m.id, player: m.player });
+  addMana(s, m.player, m.adds, { from: m.from });
+  log(s, `${player(s, m.player).name} adds ${m.adds.map((x) => `{${x}}`).join("")} (${m.source}).`);
+  if (here) fireEvent(s, { type: "manaAbilityResolved", id: m.id, amount: m.adds.length });
+  addTriggeredMana(s, m.player, m.picked);
+  if (m.picked.skipUntap && here) o!.skipNextUntap = true;
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -6820,7 +6930,7 @@ function askChoosers(s: GameState, p: Player, act: DeferredAct["act"], restore?:
   }
   if (chooser === undefined) {
     // Only an opponent with something to choose: choosing another would make it illegal to cast (CR 601.2c).
-    const src = cast ? undefined : sourceQuality(s, o.id);
+    const src = cast ? undefined : activatedQuality(s, o.id);
     const able = opponents(s, p.id).filter((q) => !player(s, q).lost && legalTargets(s, bindChoosers(specs, [...choosers, q])[slot]!, p.id, undefined, src, o.id).length);
     if (!able.length) throw new RulesError(`nothing can be chosen for ${what}`);
     if (able.length > 1) {
@@ -8422,7 +8532,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
-  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices, o, x)).pool);
+  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices, o, x), cost.cost).pool);
   const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices, o, x) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, sylexed(s, payableLife(s, p.id)), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
@@ -10826,7 +10936,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
-    const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id), false, id);
+    const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, activatedQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, activatedQuality(s, id), false, id);
     if (mp) return mp;
   }
   // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
@@ -10841,7 +10951,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
       if (p) continue;
       // Without targets chosen, the check above lets any X target; here the target must have mana value n too.
       const b = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: n }, false);
-      if (targets || !b.targets.length || hasLegalTargetsFor(s, b.targets, pid, sourceQuality(s, id), id)) return null;
+      if (targets || !b.targets.length || hasLegalTargetsFor(s, b.targets, pid, activatedQuality(s, id), id)) return null;
     }
     return short ?? abilityProblem(s, pid, id, index, targets, modes, tapCreatures, 0, costs);
   }
@@ -10857,12 +10967,13 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (body.targets.length === 1 && body.targets[0]!.random && !targets?.length) targets = undefined;
   // "Target creature of an opponent's choice they control" (Magus of the Arena): as for spells (castProblem).
   if (chooserSlots(body.targets).length) {
-    const cp = chooserProblem(s, pid, body.targets, targets, costs, sourceQuality(s, id), id);
+    const cp = chooserProblem(s, pid, body.targets, targets, costs, activatedQuality(s, id), id);
     if (typeof cp === "string") return cp;
     [body, targets] = [{ ...body, targets: cp.specs }, cp.targets];
   }
   if (body.targets.length) {
-    const src = sourceQuality(s, id);
+    // Peace Talks (round B254): an activated ability's targets.
+    const src = activatedQuality(s, id);
     const tp = targets ? (targetProblem(s, body.targets, targets, pid, src, id) ?? flagbearerProblem(s, body.targets, targets, pid, src, id, manySpecs)) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
@@ -11315,7 +11426,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Goblin Test Pilot: "any target chosen at random", as part of activating it, each legal target with an equal chance
   // (rulings); players can respond knowing it.
   if (body?.targets.length === 1 && body.targets[0]!.random) {
-    const legal = legalTargets(s, body.targets[0]!, p.id, undefined, sourceQuality(s, id), id);
+    const legal = legalTargets(s, body.targets[0]!, p.id, undefined, activatedQuality(s, id), id);
     if (!legal.length) throw new RulesError(`${d.name}'s ability has no legal targets`);
     const pick = legal[Math.floor(nextRandom(s) * legal.length)]!;
     log(s, `${d.name}'s ability targets ${pick.kind === "player" ? player(s, pick.id).name : nameOf(s, pick.id)}, chosen at random.`);
@@ -11652,7 +11763,7 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
 /** What a spell or ability on the stack is, for its targets: the spell's own characteristics, or its source's (CR 113.7a). */
 export function stackItemQuality(s: GameState, item: StackItem): SourceQuality | undefined {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
-  return o ? spellQuality(s, cardIdOf(o), item) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  return o ? spellQuality(s, cardIdOf(o), item) : itemQuality(s, item);
 }
 
 /**
@@ -13925,6 +14036,11 @@ function chooseEvidence(s: GameState, p: Player, ids: ObjectId[]) {
 /** "Counter it unless its controller pays": pay from the mana pool, or don't (CR 702.21a, 118.12). */
 function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
   const pend = s.pending;
+  // Rhystic Cave (round B254): a mana ability's question, outside any resolution.
+  if (pend?.kind === "payUnless" && pend.manaUnless) {
+    if (tap?.length) throw new RulesError("this cost can't be paid by tapping");
+    return manaUnlessAnswer(s, p, pay);
+  }
   const r = s.resolving;
   if (pend?.kind !== "payUnless" || pend.player !== p.id || !r) throw new RulesError("nothing to pay for");
   // Waterbend (CR 701.67a): each untapped artifact or creature they control pays {1} of its generic mana, no more than
@@ -14104,6 +14220,8 @@ function pilesForbid(s: GameState, o: GameObject, kind: "attack" | "block"): boo
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   if (arbiterStopsAttacks(s, pid)) return [];
+  // Peace Talks (round B254): "this turn and next turn, creatures can't attack" (CR 508.1c).
+  if (peaceTalksNow(s)) return [];
   return creaturesOf(s, pid).filter(
     (o) =>
       !o.tapped &&
@@ -15898,7 +16016,7 @@ function finishCombatDamage(s: GameState): boolean {
   // Each source's lifelink is one life-gain event however many things it damaged (CR 119.10).
   const lifelink = new Map<string, { n: number }>();
   const key = (e: DamageEvent) => e.src.id!;
-  const done = dealPlanned(s, plan, { lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
+  const done = dealPlanned(s, plan, { combatStep: true, lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
   const dealt = new Map<ObjectId, number>();
   // Arashin War Beast: the sources that dealt some of it to a creature that's blocking (CR 509.1g, 506.4).
   const toBlocker = new Set<ObjectId>();
@@ -16034,6 +16152,9 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   // Grimoire Thief: its controller now may look at the cards exiled with it too (rulings).
   if (s.exileLookWatch) watchExileLookers(s);
   if (!s.pending && askEntersChoice(s)) return;
+  // Round B253: draws a Lich made of a life gain outside a resolution and outside damage (a cost, a choice's answer, a loss
+  // replaced), made before anything else happens; a draw replacement may stop them to ask.
+  if (!s.pending && !s.damageBatch && s.damageDraws?.length && damageDrawsMade(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     closeZoneBatch(s); // the action before, or the last pass, was one event for "one or more" triggers (CR 603.2c)

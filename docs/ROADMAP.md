@@ -1,6 +1,6 @@
 # Roadmap
 
-31,696 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,699 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,929 of
 9,979 (99%).
 
@@ -2354,7 +2354,7 @@ line blocks.
    Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River,
-   Defensive Formation, Sorrow's Path, Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
+   Defensive Formation, Sorrow's Path (done in round B258), Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
    don't control for mana); Aetherplasm (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome (done in round 385) and Aladdin's Lamp (done in round 385) (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (done in round B223) (permanents can't phase in);
@@ -5218,14 +5218,14 @@ line blocks.
    +10, 30,190 of 31,936 with B123 and B124. After it, every unsupported name has been looked at by some round.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
-   Orders (done in round B256), Balduvian Warlord (done in round B256), General Jarkeld (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
+   Orders (done in round B256), Balduvian Warlord (done in round B256), General Jarkeld (done in round B258) (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (noted
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (sacrifices added to costs);
-   Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (lands can't enter the
+   Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
@@ -11046,6 +11046,38 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Eye waits for the next time). Browser tests for the Shell's exile and free cast, the Whistle's pay question both ways and
   Eye for an Eye's source pick and order question. +3, 31,696 of 31,936 with main through round 411 and B255-B256. The
   compiled text of every other card is unchanged.
+- Round B258 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 412-413): Sorrow's Path ("{T}:
+  Choose two target blocking creatures controlled by the same opponent. If each of those creatures could block all creatures
+  that the other is blocking, remove both of them from combat. Each one then blocks all creatures the other was blocking.":
+  Effect `swapBlockers`, effects/run-laneb258.ts): both targets one opponent's as they're chosen and as it resolves; whether
+  each could block the other's attackers is worked out as it resolves (rulings), with evasion, protection, the other blocking
+  restrictions, how many creatures it can block and whether it's tapped, never the costs to block (blockProblem, maxBlocks;
+  only attackers attacking that player or their planeswalkers or battles, CR 802.4a); with what one was blocking gone it could
+  (rulings). Both are removed from combat (CR 506.4) and each blocks what the other blocked through B256's block by an effect,
+  so "blocks" and "becomes blocked by a creature" trigger again and "becomes blocked" doesn't (rulings; blockedByEffect `swap`
+  keeps "blocked by N or more" from triggering: the count doesn't change). Its "becomes tapped" trigger was already supported.
+  General Jarkeld ("{T}: Choose two target blocked attacking creatures. If each of those creatures could be blocked by all
+  creatures that the other is blocked by, each creature that's blocking exactly one of those attacking creatures stops
+  blocking it and is blocking the other attacking creature. Activate only during the declare blockers step.": Effect
+  `swapBlocked`): each attacker checked against the other's blockers as a group (menace, "can't be blocked except by three
+  or more", "by more than one creature", CR 509.1b) and one by one (as Sorrow's Path's); the switch makes no new block, so
+  nothing triggers (rulings), but it's a block of this combat for "blocked by only that creature this combat" (TurnLog.blocks).
+  Worms of the Earth ("Lands can't enter the battlefield.": CompiledCard `landsCantEnter`, game.ts moveObject): judged as it
+  would exist there (the face up, face down, types given as it enters; Ashaya's rulings: a creature spell entering as a land);
+  a card stays where it is and the effect does the rest (rulings), a permanent spell goes to its owner's graveyard (CR
+  608.3e), a land token isn't created (CR 111.5, createToken and token copies), a permanent phasing in isn't entering; its
+  upkeep trigger ("any player may sacrifice two lands of their choice or have ~ deal 5 damage to that player. If a player
+  does either, destroy ~.") is a punisher in turn order from the active player, every player asked, the damage counting even
+  if it's prevented (Vexing Devil's rulings), the sacrifice only with two lands. Browser tests for both swaps' two-target
+  activations and Worms of the Earth's upkeep question. +3, 31,699 of 31,936 with main through round 411 and B255-B257. The
+  compiled text of every other card is unchanged.
+- Out after round B258 (looked at, not done): the lists after round B257 stay out. Judgment calls and known gaps: General
+  Jarkeld's "could be blocked by all creatures that the other is blocked by" is read as the group of blockers (no ruling says
+  how menace applies); for both swaps, only attackers attacking the blockers' controller count as ones they could block (CR
+  802.4a, as round B256); a permanent entering as a copy (Clone) isn't offered a land to copy while Worms of the Earth is out
+  (CR 608.3e would have it go to the graveyard, but the copy is chosen once it's on the battlefield here); bots use Sorrow's
+  Path and General Jarkeld only when the fights after the swap come out better for them (Sorrow's Path's 2 damage counted),
+  and answer Worms of the Earth's question as any punisher.
 - Out after round B257 (looked at, not done): the lists after round B256 stay out, and Guardian Beast (still out: "can't be
   enchanted" that "doesn't remove Auras already attached" while it toggles with the Beast's tapped state, and "other players
   can't gain control of them", which its rulings don't settle beyond sacrifices). Known gaps: bots never activate Arcum's
@@ -11053,7 +11085,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   them), and pay the Whistle's {X} only when the punisher weighing says so; bots cast Eye for an Eye as they cast a prevention
   shield when damage comes (it deals that much back instead of preventing it) and take it first in the order questions
   unless the source is their own.
-- Out after round B256 (looked at, not done): the lists after round B255 stay out, and General Jarkeld (two blockers
+- Out after round B256 (looked at, not done): the lists after round B255 stay out, and General Jarkeld (done in round B258) (two blockers
   swapped between attackers, each needing a legal block). Judgment calls and known gaps: an effect's block isn't checked
   against blocking restrictions or costs and a tapped creature can block this way (no ruling on either card covers it; CR
   509.1b-d only govern declared blocks); the attackers offered are only those attacking the creature's controller (no rule
@@ -11211,7 +11243,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B226 (looked at, not done): Snowfall (its "may add" in a triggered mana ability, a choice that matters
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
   would have to keep apart), Jasmine Boreal of the Seven (a creature spell with no abilities, counting abilities other
-  permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth ("Lands can't
+  permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth (done in round B258) ("Lands can't
   enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper (done in round B249),
   Faceless One (done in round B249) and Clara Oswald (done in round B249) (a color chosen before the game that changes the commander's color identity for deck
   building, CR 903.4b), Ranar the Ever-Watchful (its exile trigger, still out; its free first foretell would use Cosmos
@@ -11280,7 +11312,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and a life loss replacing one draw) stay out for the reasons in the earlier lists.
 - Out after round B211 (looked at, not done): Caller of the Hunt (done in round B245) (a creature type chosen as an additional cost to cast it,
   kept by the spell and then the permanent for its power and toughness; no cast-time choice of that kind yet), Mangara's
-  Equity (damage to "you or a white creature you control" grouped per event), Worms of the Earth ("Lands can't enter the
+  Equity (damage to "you or a white creature you control" grouped per event), Worms of the Earth (done in round B258) ("Lands can't enter the
   battlefield" for every way a land is put onto it) stay out.
 - Out after round B210 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with no
   target, a new choice in activation), Light Up the Night (done in round B213) (a flashback cost removing X loyalty counters from among your

@@ -3,12 +3,13 @@
 import type { Effect } from "../abilities";
 import { addTarget, parseBody, type Ctx } from "./body";
 import { parseTargetPhrase } from "./targets";
+import { roundB258Sentence } from "./laneb258";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
 const plain = (s: string | undefined) => (s ?? "").replace(/\.$/, "");
 
-export function roundB257Sentence(s: string, _sentences: string[], si: number, ctx: Ctx): Found {
+export function roundB257Sentence(s: string, sentences: string[], si: number, ctx: Ctx): Found {
   // Shell of the Last Kappa: "Exile target instant or sorcery spell that targets you": a spell with you among its targets
   // (rulings), as Psychic Rebuttal's counter; it leaves the stack without being countered, so even one that can't be
   // countered goes (rulings, CR 701.6a). The card (a copy ceases to exist, CR 707.10a) is linked to the Shell for its other
@@ -29,5 +30,5 @@ export function roundB257Sentence(s: string, _sentences: string[], si: number, c
     if (e?.type !== "damageRule" || !e.rule.nextTime || !e.rule.by?.choose || e.rule.to?.players !== "you" || e.rule.dealBack || e.rule.redirect) return "fail";
     return { effect: { ...e, rule: { ...e.rule, echoToSourceController: true } }, next: si + 1 };
   }
-  return null;
+  return roundB258Sentence(s, sentences, si, ctx);
 }

@@ -5858,6 +5858,11 @@ export function compile(d: CardDef): CompiledCard {
       out.playersCantPlayLands = true;
       continue;
     }
+    // Worms of the Earth (round B258): "Lands can't enter the battlefield." (game.ts moveObject, CR 111.5, 608.3e; rulings).
+    if (line === "Lands can't enter the battlefield." && !isSpell) {
+      out.landsCantEnter = true;
+      continue;
+    }
     // Aggressive Mining: "You can't play lands.": its controller, the special action only; lands put onto the battlefield
     // by spells and abilities still arrive (rulings, CR 305.1, 101.2).
     if (line === "You can't play lands." && !isSpell) {

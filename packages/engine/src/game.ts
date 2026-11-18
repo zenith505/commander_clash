@@ -853,6 +853,12 @@ function combatAlone(s: GameState, o: GameObject): "attacking" | "blocking" | un
   return undefined;
 }
 
+/** Worms of the Earth (round B258): the name of a permanent with "Lands can't enter the battlefield", if there is one. */
+export function landsCantEnterBy(s: GameState): string | undefined {
+  for (const b of s.battlefield) if (abilitiesOf(s, obj(s, b)).landsCantEnter) return characteristics(s, obj(s, b)).name;
+  return undefined;
+}
+
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
 /** The name of a permanent whose ability stops this card entering the battlefield from its graveyard or library. */
 export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard" | "library", faceDown = false): string | undefined {
@@ -1030,6 +1036,29 @@ export function moveObject(
       return;
     }
     to = "exile";
+  }
+  // Worms of the Earth (round B258): "Lands can't enter the battlefield", judged as it would exist there (the face it would
+  // have up, face down, the types an effect gives it as it enters): a card stays where it is (rulings: the effect putting it
+  // there does the rest of what it says), a permanent spell is put into its owner's graveyard instead (CR 608.3e), and a
+  // land token isn't created (CR 111.5). A permanent phasing in doesn't enter (CR 702.26d). After the replacements above
+  // that send it elsewhere: then it doesn't try to enter.
+  if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged") {
+    const worms = landsCantEnterBy(s);
+    const mods = worms ? [...(opts.entersAs ?? []), ...(opts.becomes ? [{ kind: "setTypes" as const, types: opts.becomes.types, subtypes: opts.becomes.subtypes }] : [])] : [];
+    if (worms && asFace(s, o, fromZone === "stack" ? o.face : opts.face, () => entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, mods.length ? mods : undefined, "Land"))) {
+      const name = opts.faceDown ? "The face-down card" : defOf(s, o).name;
+      if (o.isToken && fromZone !== "stack") {
+        log(s, `The ${name.replace(/ Token$/, "")} token isn't created: lands can't enter the battlefield (${worms}).`);
+        delete s.objects[id];
+        return;
+      }
+      if (fromZone !== "stack") {
+        log(s, `${name} can't enter the battlefield (${worms}).`);
+        return;
+      }
+      log(s, `${name} can't enter the battlefield (${worms}), so it's put into ${player(s, o.owner).name}'s graveyard.`);
+      to = "graveyard";
+    }
   }
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
@@ -1896,7 +1925,10 @@ export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec):
   if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
   // Mockingbird's "with mana value less than or equal to the amount of mana spent to cast ~": the spell it was.
   const bound = filter.bound ? bindBound(s, filter, { controller: controllerOf(s, o), sourceId: o.id, manaSpent: o.manaSpent ?? 0 }) : filter;
-  return s.battlefield.filter((id) => id !== o.id && objectMatches(s, bound, obj(s, id), controllerOf(s, o), false));
+  // Worms of the Earth (round B258): entering as a copy of a land, it couldn't enter at all (CR 608.3e's example: Clone and
+  // Dryad Arbor go to the graveyard). Known gap: such a choice isn't offered, as the copy is chosen once it's on the battlefield.
+  const worms = landsCantEnterBy(s);
+  return s.battlefield.filter((id) => id !== o.id && objectMatches(s, bound, obj(s, id), controllerOf(s, o), false) && !(worms && copiableDef(s, obj(s, id)).types.includes("Land")));
 }
 
 /** What Deadpool can exchange its text box with as it enters: another creature on the battlefield (not one entering with it). */
@@ -2409,8 +2441,8 @@ export function entersRulesOf(s: GameState, pid: PlayerId, id: ObjectId): Compil
 
 /** Would this card be a creature on the battlefield under `pid`, face down as `faceDown` says, with the effect it enters
  * with (`entersAs`: "it's a 3/3 Robot artifact creature", CR 614.12)? */
-function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?: FaceDownKind, entersAs?: Modification[]): boolean {
-  if (o.zone === "battlefield") return objIsType(s, o, "Creature");
+function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?: FaceDownKind, entersAs?: Modification[], type = "Creature"): boolean {
+  if (o.zone === "battlefield") return objIsType(s, o, type);
   const was = { zone: o.zone, controller: o.controller, timestamp: o.timestamp, faceDown: o.faceDown };
   o.zone = "battlefield";
   o.controller = pid;
@@ -2420,7 +2452,7 @@ function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?:
   if (entersAs) s.effects.push({ id: "entersAs", timestamp: s.nextTimestamp, controller: pid, sourceName: "", duration: "game", affected: [o.id], mods: entersAs });
   invalidateCharacteristics(s);
   try {
-    return objIsType(s, o, "Creature");
+    return objIsType(s, o, type);
   } finally {
     if (entersAs) s.effects.pop();
     s.battlefield.shift();

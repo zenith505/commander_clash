@@ -39,6 +39,7 @@ import { runMoveCurseEffect, runReturnOneOfThemEffect, runStealTokensEffect } fr
 import { runExileUntilNonlandLinkedEffect, runRevealTopsShareTypeEffect } from "./run-round395";
 import { runGuffRewriteEffect } from "./run-round411";
 import { runExchangeSpellControlEffect } from "./run-round413";
+import { runExchangeWithSubjectEffect } from "./run-round414";
 import { runBecomeCopyOfLinkedEffect } from "./run-round396";
 import { runBecomeCopyOfAmongEffect } from "./run-round405";
 import { runBecomeCopyOfLinkedXEffect, runEachOpponentTakesEffect } from "./run-round408";
@@ -1841,6 +1842,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "bounceEachUnless":
     case "changeTarget":
     case "newTargets":
+    case "newTargetsAny":
     case "controlSpell":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
@@ -2012,6 +2014,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runGuffRewriteEffect(s, e, ctx, src);
     case "exchangeSpellControl":
       return runExchangeSpellControlEffect(s, e, ctx, src);
+    case "exchangeWithSubject":
+      return runExchangeWithSubjectEffect(s, e, ctx, src);
     case "attackingNow":
       return runAttackingNowEffect(s, e, ctx);
     case "returnSacrificedCards":

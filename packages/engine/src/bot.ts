@@ -1,4 +1,4 @@
-import { bindBound, cardPT, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
+import { bindBound, cardPT, isLegalTarget, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
 import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
@@ -179,6 +179,8 @@ import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
 import { pileCards } from "./effects/run-round386";
+import { eachOtherTargets } from "./effects/run-spells";
+import { onlyPermanentOrPlayer } from "./effects/targeting";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -1059,6 +1061,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Infernal Denizen (round B238): the best of the creatures we may gain control of (pick, then a control effect for us).
     if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.min === 0 && pend.options.length && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "continuous" && e.what.ref === "created" && e.giveTo?.ref === "chosenPlayer" && e.whileOnBattlefield && e.mods.some((m) => m.kind === "control")))
       return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
+    // Elrond of the White Council (round 414): our creature for our fellowship vote, the one we value least (it's ours
+    // anyway when Elrond is ours).
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && (s.resolving?.body.effects[s.resolving.next] as { voterChooses?: true } | undefined)?.voterChooses)
+      return [{ type: "pickPermanents", player: pid, ids: [[...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!] }];
     // Order of Succession: the best of the creatures we gain control of.
     // Inniaz, the Gale Force (round B247): we choose for every player. For us, the best one; out of ours, for the player to
     // our left, the least one; between two other players, the one the player getting it values least.
@@ -2029,6 +2035,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: perms[0] ?? pend.options.find((o) => o !== "none") ?? pend.options[0]! }];
     }
     // Zada's copies: the order hardly matters to a bot, so battlefield order.
+    // Exterminator Magmarch (round 415): the one copy at the most valuable of those permanents.
+    if (pend.kind === "chooseOption" && pend.what === "copyOrder" && s.resolving?.scratch?.copies?.pickOne && pend.options.every((o) => !/^p\d+$/.test(o) && s.objects[o]?.zone === "battlefield" && controllerOf(s, obj(s, o)) !== pid))
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => permanentWorth(s, pid, b) - permanentWorth(s, pid, a))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "copyOrder") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Sword-Point Diplomacy: the cheapest revealed card first (its opponents pay life for the costly ones later).
     // Chaotic Transformation: the order of its own exiled permanents doesn't matter much; the first.
@@ -2411,6 +2420,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (deflect) return deflect;
   const echo = chooseCopyWithTaps(s, pid);
   if (echo) return echo;
+  const radiate = chooseRadiate(s, pid);
+  if (radiate) return radiate;
   // Respond to an opponent's spell with a counterspell if we have one: from hand, or an ability
   // like Spiketail Hatchling's. "Unless its controller pays" only if they can't pay.
   const top = s.stack[s.stack.length - 1];
@@ -3365,11 +3376,26 @@ function bestChooser(s: GameState, pid: PlayerId, options: string[], d: Deferred
 }
 
 /**
+ * Confusion in the Ranks (round 414, Effect exchangeWithSubject): the permanent that entered is exchanged for the target
+ * whichever one is chosen, so the one most valuable to us among the legal ones (legal for `controller`, the trigger's).
+ */
+function exchangeWithSubjectPick(s: GameState, pid: PlayerId, body: AbilityBody, sourceId: ObjectId | undefined, controller = pid): TargetChoice[] | null {
+  const e = body.effects.find((x) => x.type === "exchangeWithSubject");
+  if (e?.type !== "exchangeWithSubject" || body.targets.length !== 1) return null;
+  const all = legalTargets(s, body.targets[e.index]!, controller, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
+  const best = [...all].sort((a, b) => worth(s, pid, b) - worth(s, pid, a))[0];
+  return [best ? { kind: "object", id: best.id } : { kind: "none" }];
+}
+
+/**
  * The target of `controller`'s triggered ability that we choose for them ("target creature of their choice", TargetSpec
  * chosenBy): legal for the controller (rulings), and the best for us, our most valuable if what it does helps, else
  * theirs (an opponent's), our least valuable only when there's nothing else.
  */
 function targetForOther(s: GameState, pid: PlayerId, controller: PlayerId, body: AbilityBody, sourceId: ObjectId, slot = 0, chosen: TargetChoice[] = []): TargetChoice[] {
+  // Confusion in the Ranks (round 414): ours that entered is exchanged for the target, so the most valuable one.
+  const withSubject = exchangeWithSubjectPick(s, pid, body, sourceId, controller);
+  if (withSubject) return withSubject;
   const spec = body.targets[slot]!;
   const all = legalTargets(s, spec, controller, undefined, botSource(s, sourceId), sourceId).filter((t) => canChooseTarget(s, body.targets, chosen.slice(0, slot), slot, t, controller, botSource(s, sourceId), sourceId));
   // "Target creature of an opponent's choice they control" (Evangelize, Echo Chamber, Preacher): what it does is for its
@@ -3475,6 +3501,15 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const rest = pickTargets(s, pid, { ...printed, targets: printed.targets.map((t) => (t.chosenBy === "opponent" ? (({ chosenBy: _, ...r }) => ({ ...r, skip: true as const }))(t) : t)) }, forced, sourceId, x);
     if (!rest && chosenBy.length < printed.targets.length) return null;
     return printed.targets.map((t, i): TargetChoice => (t.chosenBy === "opponent" ? { kind: "none" } : (rest?.[i] ?? { kind: "none" })));
+  }
+  // Radiate, Radiant Performer (round 415): the spell or ability on the stack whose copies do us the most good, none if
+  // no copy would (unless the target is required).
+  const radiate = printed.targets.length === 1 && printed.targets[0]!.targetsOnlyPermanentOrPlayer ? printed.effects.find((e) => e.type === "copySpell" && e.n === "eachOther" && e.eachOther?.orPlayers) : undefined;
+  if (radiate?.type === "copySpell" && radiate.eachOther) {
+    const eo = radiate.eachOther;
+    const options = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "stack" ? [{ t, gain: copyEachGain(s, pid, s.stack.find((x) => x.id === t.id), eo) }] : [])).sort((a, b) => b.gain - a.gain);
+    const pick = options[0];
+    return pick && (forced || pick.gain >= RADIATE_GAIN) ? [pick.t] : null;
   }
   // Stardew Valley (round 393): "Choose target permanent you control. Draw a card, then another player of your choice may
   // gain control of that permanent": only a noncreature token of ours (a Food, a Treasure), the least worth, for the card.
@@ -3662,6 +3697,9 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (forced) return pick ? [pick] : all[0] ? [all[0]] : null;
     return pick && gain(pick.id) > 2 ? [pick] : null;
   }
+  // Confusion in the Ranks (round 414): the permanent that entered goes either way, so the most valuable one we can take.
+  const withSubject = exchangeWithSubjectPick(s, pid, body, sourceId);
+  if (withSubject) return withSubject;
   // Exchanging control (Switcheroo, Avarice Totem): our least useful permanent for an opponent's most useful one, worth it
   // only when theirs is worth clearly more; an exchange between two of their permanents does us no good.
   const swap = body.effects.flatMap((e) => (e.type === "may" ? e.effects : [e])).find((e): e is Extract<Effect, { type: "exchangeControl" }> => e.type === "exchangeControl");
@@ -4174,6 +4212,53 @@ function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecisio
   if (changed && pend.allOrNone && next.some((t, j) => t.kind !== "none" && sameTarget(pend.current[j], t))) return undefined;
   return changed ? next : undefined;
 }
+
+/** Radiate, Radiant Performer (round 415): copies worth at least this much more to us than to the others (copyEachGain). */
+const RADIATE_GAIN = 6;
+
+/**
+ * Radiate, Radiant Performer, Agrus Kos (round 415): what the copies of a spell or ability on the stack that a "copy it
+ * for each other ... it could target" effect (copySpell eachOther `eo`) would make for us are worth to us: each aimed at
+ * an opponent or theirs counts for it if what it does is harmful, against it if it's helpful, and ours the other way
+ * round (a creature by its power and toughness, another permanent by its mana value, a player as 3).
+ */
+function copyEachGain(s: GameState, pid: PlayerId, item: StackItem | undefined, eo: NonNullable<Extract<Effect, { type: "copySpell" }>["eachOther"]>): number {
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  const body = item?.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+  const slot = (item?.targets ?? []).findIndex((t) => t.kind !== "none");
+  if (!item || !body || slot < 0) return -Infinity;
+  const harm = !!harmfulTargets(body)[slot];
+  let gain = 0;
+  for (const id of eachOtherTargets(s, item, eo, { controller: pid })) {
+    const t: ChosenTarget = /^p\d+$/.test(id) ? { kind: "player", id: Number(id.slice(1)) as PlayerId } : { kind: "object", id };
+    const it = t.kind === "object" ? obj(s, t.id) : undefined;
+    const w = !it ? 3 : objIsType(s, it, "Creature") ? Math.max(1, power(s, it) * 2 + toughness(s, it) + (it.isCommander ? 10 : 0)) : 2 + defMv(defOf(s, it));
+    gain += (isMine(s, pid, t) === harm ? -1 : 1) * w;
+  }
+  return gain;
+}
+
+/**
+ * Radiate, Radiant Performer (round 415): cast in response to the spell or ability on top of the stack when its copies
+ * would do us clearly more good than the others (copyEachGain); Radiant Performer only from our hand, for its trigger.
+ */
+function chooseRadiate(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || !onlyPermanentOrPlayer(s, top.targets ?? [])) return null;
+  for (const id of player(s, pid).hand) {
+    const c = compileCard(defOf(s, obj(s, id)));
+    const body = c.spell?.effects.some((e) => e.type === "copySpell" && e.eachOther?.orPlayers) ? c.spell : c.triggers.find((t) => t.event === "selfEnters" && t.body.effects.some((e) => e.type === "copySpell" && e.eachOther?.orPlayers))?.body;
+    const e = body?.effects.find((x) => x.type === "copySpell" && x.eachOther?.orPlayers);
+    if (!body || e?.type !== "copySpell" || !e.eachOther || !spellMatchesOrAbility(s, body.targets[0]!, top, pid)) continue;
+    if (copyEachGain(s, pid, top, e.eachOther) < RADIATE_GAIN) continue;
+    const plan = planCast(s, pid, id, c.spell ? [{ kind: "stack", id: top.id }] : undefined, undefined, "auto");
+    if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
+}
+
+/** Could `spec` (a spell target, perhaps of abilities too) name this item on the stack, for `pid`? */
+const spellMatchesOrAbility = (s: GameState, spec: TargetSpec, item: StackItem, pid: PlayerId): boolean => isLegalTarget(s, spec, { kind: "stack", id: item.id }, pid);
 
 /**
  * Sudden Substitution (round 413): "Exchange control of target noncreature spell and target creature": an opponent's
@@ -5970,6 +6055,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const o = t?.kind === "object" ? s.objects[t.id] : undefined;
     return !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;
   }
+  // Agrus Kos, Eternal Soldier (round 415): "you may pay {1}{R/W}. If you do, copy that ability for each other creature you
+  // control that ability could target": only when the copies do us more good than harm (copyEachGain).
+  const agrus = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0].eachOther?.copier ? e.effects[0] : undefined;
+  if (r && agrus?.type === "copySpell" && agrus.eachOther) return copyEachGain(s, pid, s.stack.find((x) => x.id === r.item.cause), agrus.eachOther) > 0;
   // Perplexing Chimera (round 413): "you may exchange control of ~ and that spell": an opponent's spell worth more than
   // the Chimera (mana value 4 or more), or one aimed at us or ours (its new targets go to theirs).
   if (r && e?.type === "may" && e.effects[0]?.type === "exchangeSpellControl" && e.effects[0].cause) {

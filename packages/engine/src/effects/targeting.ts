@@ -83,6 +83,18 @@ export function sharingAColor(s: GameState, t: GameObject, group: NonNullable<Ex
     .filter((o) => o.id !== t.id && characteristics(s, o).colors.some((c) => colors.includes(c)) && objectMatches(s, group.filter, o, controller, false));
 }
 
+/**
+ * Killer (round B255): the other permanents matching `group.filter` that share a creature type with `t` now (CR 205.3,
+ * changelings having all of them, CR 702.73a); a creature with no creature types shares none.
+ */
+export function sharingACreatureType(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sharesType"]>, controller: PlayerId): GameObject[] {
+  if (t.zone !== "battlefield") return [];
+  const types = creatureTypesOf(s, t);
+  return s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => o.id !== t.id && objectMatches(s, group.filter, o, controller, false) && shareCreatureType(types, creatureTypesOf(s, o)));
+}
+
 /** Is `o` attacking `pid` or a planeswalker `pid` controls now (CR 506.3)? Not a battle. */
 /** Roar of Resistance: attacking an opponent of `pid`, or a planeswalker one of them controls (not a battle, CR 506.3). */
 function attacksOpponentOrTheirPlaneswalker(s: GameState, o: GameObject, pid: PlayerId): boolean {

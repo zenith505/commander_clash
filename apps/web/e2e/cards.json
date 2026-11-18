@@ -17904,6 +17904,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2dd1450e-902e-480a-9c42-1c47549d2eeb",
+  "name": "Gift of Doom",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has deathtouch and indestructible.\nMorph—Sacrifice another creature. (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nAs this Aura is turned face up, you may attach it to a creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Morph",
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9a02a9a7-39d9-4763-85d3-747a0540b60b",
   "name": "Gilded Lotus",
   "manaCost": "{5}",
@@ -49748,6 +49779,32 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7d359434-eb1b-478e-a745-10e2c564d89f",
+  "name": "Whims of the Fates",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Starting with you, each player separates all permanents they control into three piles. Then each player chooses one of their piles at random and sacrifices those permanents. (Piles can be empty.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bng",
+  "releasedAt": "2014-02-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

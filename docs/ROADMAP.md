@@ -1,7 +1,7 @@
 # Roadmap
 
-31,656 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,912 of
+31,662 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,913 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -10756,6 +10756,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activated, and on the stack an ability that wasn't triggered, a copy of one too, CR 707.10), so triggered abilities still
   target; spells on the stack and cards in other zones can still be targeted. Browser tests for Rhystic Cave's menu button and
   its Pay and Don't pay question. +3, 31,659 of 31,936. The compiled text of every other card is unchanged.
+- Round B255 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Coward // Killer. A
+  card's face named for a creature type (CR 205.3m) is no longer read as the card in "becomes a Coward in addition to its
+  other types" (compile.ts normalizeSelf); Coward makes its target unable to block this turn and a Coward in addition to its
+  other types until end of turn, then time travels. Killer's "target creature and each other creature that shares a creature
+  type with it" (ObjRef target `sharesType`, like Radiance's colors): every other creature with one of the target's creature
+  types as it resolves, a changeling with all of them (CR 702.73a), a face-down creature with none (CR 708.2a), and none if
+  the target is illegal (rulings). Whims of the Fates ("Starting with you, each player separates all permanents they control
+  into three piles. Then each player chooses one of their piles at random and sacrifices those permanents.": Effect
+  `whimsPiles`, effects/run-laneb255.ts): in turn order from the caster, each player picks a first pile from every permanent
+  they control, then a second from the rest, the rest being the third (piles can be empty, CR 700.3); a player with no
+  permanents isn't asked; then one pile of each is chosen at random (each equally likely, no die rolled: rulings) and all of
+  the chosen piles are sacrificed at once. Gift of Doom ("Morph—Sacrifice another creature.": a sacrifice cost other than the
+  face-down permanent; "As this Aura is turned face up, you may attach it to a creature.": CompiledCard `faceUpAttach`): the
+  creature is chosen with the special action (Action turnFaceUp `attach`, CR 702.37e, rulings: no one acts in between), or,
+  turned face up by an effect, as the effect does it (a "faceUpAttach" question); any creature it could enchant face up, not
+  targeted (hexproof doesn't stop it, protection from black does: game.ts faceUpAttachOptions works it out on a copy of the
+  game with it face up), never the creature sacrificed for it; not attached, it's put into its owner's graveyard (CR 704.5m).
+  Browser tests for Whims of the Fates' three piles and Gift of Doom's attach choice, both ways. +3, 31,662 of 31,936. The
+  compiled text of every other card is unchanged.
+- Out after round B255 (looked at, not done): the lists after round B254 stay out. Known gaps: bots aim Killer by its target
+  alone, not the creatures sharing its types; bots cast Whims of the Fates only when their own board is well behind the
+  opponents' average, and split theirs into three even piles (any split loses a third on average, rulings); bots turn Gift of
+  Doom face up only with a creature of theirs to attach it to.
 - Out after round B254 (looked at, not done): the lists after round B253 stay out. Judgment calls and known gaps: Rhystic
   Cave doesn't ask its own controller (who would never pay to stop their own mana, though "any player" includes them); bots
   never pay to stop another player's Rhystic Cave and never tap their own (automatic payment can't use it); new targets chosen

@@ -95,6 +95,7 @@ import { roundB249Line } from "./laneb249";
 import { roundB251Line, roundB251Loyalty } from "./laneb251";
 import { roundB252Line } from "./laneb252";
 import { roundB253Line } from "./laneb253";
+import { roundB255Line } from "./laneb255-lines";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -534,7 +535,8 @@ export function normalizeSelf(d: CardDef): string {
     const verb = /^[A-Z][a-z]+$/.test(full) ? "(?! target\\b)" : "";
     // Aurochs: "for each other attacking Aurochs" is the creature type that is also its name (CR 205.3m), not the card.
     // Assembly-Worker: "Target Assembly-Worker creature" is the type too (rulings: any creature of that type).
-    const typed = CREATURE_TYPES.has(full) ? "(?<!attacking )" : "";
+    // Coward // Killer: "becomes a Coward in addition to its other types" is the creature type its face is named (CR 205.3m).
+    const typed = CREATURE_TYPES.has(full) ? "(?<!attacking )(?<!becomes an? )" : "";
     const typedAfter = CREATURE_TYPES.has(full) ? "(?! creatures?\\b)" : "";
     t = t.replace(new RegExp(typed + esc(full) + verb + typedAfter, "g"), "~");
   }
@@ -2322,6 +2324,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB252Line(line, out, isSpell)) continue;
     // Lich, Nefarious Lich, Dralnu, Lich Lord (round B253).
     if (roundB253Line(line, out, isSpell)) continue;
+    // Gift of Doom (round B255).
+    if (roundB255Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

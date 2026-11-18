@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, opponentForbidsDiscard, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
+import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, faceUpAttaches, faceUpAttachOptions, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
@@ -348,6 +348,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: name, what: "faceUpForm", about: o.id, options: options.map((_, i) => String(i)), labels: options.map((f) => f.text), prompt: `choose what ${name} becomes as it's turned face up` };
           return "paused";
         }
+      // Gift of Doom (round B255): the creature it's attached to as it's turned face up, chosen by its controller, asked the
+      // same way (rulings: nothing happens in between).
+      const attaching = e.revealOnly || !s.resolving ? undefined : (s.resolving.scratch?.faceUpAttach ?? {});
+      if (attaching)
+        for (const o of objects(s, e.what, ctx)) {
+          if (o.zone !== "battlefield" || characteristics(s, o).cantTurnFaceUp || (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) || !faceUpAttaches(s, o) || attaching[o.id] !== undefined) continue;
+          const name = defOf(s, { ...o, faceDown: undefined }).name;
+          const hosts = faceUpAttachOptions(s, o);
+          s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: name, what: "faceUpAttach", about: o.id, options: [...hosts, "none"], labels: [...hosts.map((id) => `Attach it to ${defOf(s, obj(s, id)).name}`), "Don't attach it (it's put into its owner's graveyard)"], prompt: `choose a creature to attach ${name} to as it's turned face up` };
+          return "paused";
+        }
       for (const o of objects(s, e.what, ctx)) {
         // Hauntwoods Shrieker: reveal it (CR 701.20a), then turn it face up only if the card is a creature card as printed
         // (rulings: effects on the permanent don't count; a double-faced card's front face).
@@ -356,7 +367,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           continue;
         }
         if (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) continue;
-        turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id]);
+        turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id], attaching?.[o.id]);
       }
       return;
     }

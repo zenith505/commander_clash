@@ -20,7 +20,7 @@ import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protect
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
-import { canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
+import { attachTo, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
@@ -510,7 +510,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "turnFaceUp":
       requireNoPending(s);
-      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs, action.form);
+      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs, action.form, action.attach);
       break;
     case "suspend":
       requireNoPending(s);
@@ -12660,6 +12660,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "faceUpAttach") {
+    // Gift of Doom turned face up by an effect: the creature it's attached to as it's turned face up, then the effect goes on.
+    if (!pend.about || !r || !pend.options.includes(choice)) throw new RulesError("choose a creature to attach it to, or none");
+    ((r.scratch ??= {}).faceUpAttach ??= {})[pend.about] = choice;
+    log(s, choice === "none" ? `${p.name} chooses not to attach ${pend.source} to a creature.` : `${p.name} chooses to attach ${pend.source} to ${nameOf(s, choice)}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "faceUpForm") {
     // Aquamorph Entity turned face up by an effect: the form it's turned face up as, then the effect goes on.
     if (!pend.about || !r) throw new RulesError("nothing to choose");
@@ -17160,13 +17168,16 @@ export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s
 /** A morph or disguise cost with its {X} as the X chosen (CR 107.3d): "{X}{3}{W}" with X 2 is "{2}{3}{W}". */
 export const faceUpManaCost = (cost: string, x = 0) => cost.replace(/\{X\}/g, x ? `{${x}}` : "") || "{0}";
 
-function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number) {
+function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number, attach?: ObjectId | "none") {
   const problem = turnFaceUpProblem(s, p.id, id, way, x, costs);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   // Aquamorph Entity: what it becomes is chosen as it's turned face up (CR 614.1e), so with the special action.
   const forms = faceUpFormsOf(s, o);
   if (forms && (form === undefined || !forms[form])) throw new RulesError(`choose what ${defOf(s, { ...o, faceDown: undefined }).name} becomes as it's turned face up`);
+  // Gift of Doom: the creature it's attached to, chosen with the special action (rulings: nothing happens in between); not
+  // one sacrificed to pay for it.
+  if (faceUpAttaches(s, o) && (attach === undefined || (attach !== "none" && !faceUpAttachOptions(s, o, costs?.sacrifice).includes(attach)))) throw new RulesError(`choose a creature to attach ${defOf(s, { ...o, faceDown: undefined }).name} to as it's turned face up, or none`);
   const fd = faceUpWays(s, o)[way]!;
   // What pays it is chosen as it's paid (as for abilities, activateAbility): no skipping a cost by not saying.
   if (fd.costs?.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError("choose what to pay its morph cost with");
@@ -17175,8 +17186,27 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
   // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
   if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), { ability: o, faceUp: fd.kind });
-  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id, forms ? form : undefined);
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id, forms ? form : undefined, attach);
   s.passedInSuccession = [];
+}
+
+/** Gift of Doom (CompiledCard.faceUpAttach): a face-down permanent that may be attached to a creature as it's turned face up. */
+export function faceUpAttaches(s: GameState, o: GameObject): boolean {
+  return !!o.faceDown && !!compileCard(defOf(s, { ...o, faceDown: undefined })).faceUpAttach;
+}
+
+/**
+ * Gift of Doom: the creatures it could be attached to as it's turned face up, worked out on a copy of the game where it's
+ * face up already, so its own color and "Enchant creature" count (protection from black rules one out, hexproof doesn't:
+ * rulings); not itself, which is no longer a creature then, nor any of `without` (sacrificed to pay its morph cost).
+ */
+export function faceUpAttachOptions(s: GameState, o: GameObject, without: readonly ObjectId[] = []): ObjectId[] {
+  if (!faceUpAttaches(s, o)) return [];
+  const u = cloneState(s);
+  const up = u.objects[o.id]!;
+  up.faceDown = undefined;
+  invalidateCharacteristics(u);
+  return auraHostOptions(u, up, controllerOf(u, up)).flatMap((h) => ("attachTo" in h && h.attachTo !== o.id && !without.includes(h.attachTo) && objIsType(u, u.objects[h.attachTo]!, "Creature") ? [h.attachTo] : []));
 }
 
 /**
@@ -17193,7 +17223,7 @@ export function faceUpFormsOf(s: GameState, o: GameObject): CompiledCard["enters
  * Turns a face-down permanent face up. Its copiable values go back to the card's, or what a copy effect made it (CR
  * 708.8, 707.3); it's the same permanent, so nothing "enters". `megamorph`: its megamorph cost was paid (CR 702.37b).
  */
-function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number) {
+function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number, attach?: ObjectId | "none") {
   const forms = faceUpFormsOf(s, o);
   o.faceDown = undefined;
   o.turnedFaceUpTurn = s.turn;
@@ -17208,6 +17238,13 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
   invalidateCharacteristics(s);
   const d = defOf(s, o);
   log(s, chosenForm ? `${text} It becomes ${chosenForm.text}.` : text);
+  // Gift of Doom: attached as it's turned face up (CR 702.37e), to a creature it can enchant now, before anything else. Not
+  // attached, the Aura is put into its owner's graveyard by state-based actions (CR 704.5m; rulings).
+  if (compileCard(d).faceUpAttach) {
+    const host = attach && attach !== "none" ? s.objects[attach] : undefined;
+    if (host && host.zone === "battlefield" && auraHostOptions(s, o, controllerOf(s, o)).some((h) => "attachTo" in h && h.attachTo === host.id)) attachTo(s, o, host);
+    else log(s, `${d.name} isn't attached to a creature.`);
+  }
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
   if (megamorph) putCounters(s, o, "+1/+1", 1);
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
@@ -17222,7 +17259,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
  * (Unable to Scream); a manifested or cloaked instant or sorcery card is revealed and stays face down, and nothing
  * triggers (CR 701.40g, 701.58g). Whether it turned face up.
  */
-export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId, form?: number): boolean {
+export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId, form?: number, attach?: ObjectId | "none"): boolean {
   if (o.zone !== "battlefield" || !o.faceDown) return false;
   if (characteristics(s, o).cantTurnFaceUp) {
     log(s, `${src}: that face-down permanent can't be turned face up.`);
@@ -17234,7 +17271,7 @@ export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?
     log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
     return false;
   }
-  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by, form);
+  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by, form, attach);
   return true;
 }
 

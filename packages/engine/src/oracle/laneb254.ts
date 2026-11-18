@@ -2,6 +2,7 @@
 // Talks. Cultivator Drone's and Rhystic Cave's mana abilities are read in oracle/mana-abilities.ts.
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { roundB255Sentence } from "./laneb255";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -13,5 +14,6 @@ export function roundB254Sentence(s: string, _sentences: string[], si: number, c
   // abilities only, so a triggered ability can still target (rulings: activated abilities have a colon, CR 113.3b-c).
   if (ctx.spell && plain(s) === "This turn and next turn, creatures can't attack, and players and permanents can't be the targets of spells or activated abilities")
     return { effect: { type: "peaceTalks" }, next: si + 1 };
-  return null;
+  // Round B255's sentences (oracle/laneb255.ts).
+  return roundB255Sentence(s, _sentences, si, ctx);
 }

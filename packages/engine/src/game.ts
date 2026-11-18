@@ -16716,6 +16716,21 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   p.lossReason = reason;
   log(s, `${p.name} loses the game (${reason}).`);
   // CR 800.4a: everything they own leaves the game, and effects giving them control of things end.
+  // A spell another player's effect gave them (Commandeer, Perplexing Chimera, Sudden Substitution): that effect ends,
+  // so the spell's controller is the player before (rulings on Sudden Substitution).
+  for (const item of s.stack) {
+    if (!item.controlledBefore?.length) continue;
+    const [caster, ...gained] = [...item.controlledBefore, item.controller];
+    const kept = [caster!, ...gained.filter((c) => c !== pid)];
+    const now = kept[kept.length - 1]!;
+    item.controlledBefore = kept.length > 1 ? kept.slice(0, -1) : undefined;
+    if (!item.controlledBefore) item.controlTaken = undefined;
+    if (now === item.controller) continue;
+    item.controller = now;
+    const o = item.objectId ? s.objects[item.objectId] : undefined;
+    if (o) o.controller = now;
+    if (now !== pid) log(s, `${player(s, now).name} controls ${item.description} again.`);
+  }
   s.stack = s.stack.filter((item) => item.controller !== pid);
   for (const e of s.effects) if (e.controller === pid) e.mods = e.mods.filter((m) => m.kind !== "control");
   // ... and of players (CR 723): Emrakul's extra turn still comes.

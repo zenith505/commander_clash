@@ -5233,6 +5233,8 @@ export type Effect =
       allOrNone?: true;
       /** Sideswipe: "You may change any targets of target Arcane spell" (CR 115.7c): any number of them, each to another legal one, never to none. */
       changeAny?: true;
+      /** Sudden Substitution (round 413): "Then the spell's controller may choose new targets for it": its controller as this resolves decides, not this ability's. */
+      bySpellController?: true;
     }
   /**
    * "Gain control of target spell" (Commandeer): its controller becomes this ability's controller; a permanent spell
@@ -5881,6 +5883,14 @@ export type Effect =
    * without paying its mana cost." See effects/run-round411.ts.
    */
   | { type: "guffRewrite"; what: ObjRef }
+  /**
+   * Perplexing Chimera, Sudden Substitution (round 413): "exchange control of ~ and that spell", "exchange control of target
+   * noncreature spell and target creature" (CR 701.12a): the spell (a target, or with `cause` the spell whose casting
+   * triggered this) and the permanent swap controllers, each still on the stack or the battlefield and still that object;
+   * neither changes zones, and the exchange lasts indefinitely (rulings). With either gone or illegal, or both under one
+   * player's control, nothing happens (CR 701.12b). Sets "if you do" (ResolvingState.did). See effects/run-round413.ts.
+   */
+  | { type: "exchangeSpellControl"; spell: number; cause?: true; perm: ObjRef }
   /** Midnight Crusader Shuttle: "If you gain control of a creature this way, tap it, and it's attacking that player": only
    * while you control it now, and during combat; it's attacking without having been declared an attacker (CR 506.3,
    * rulings). */

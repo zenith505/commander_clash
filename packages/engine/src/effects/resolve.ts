@@ -38,6 +38,7 @@ import { runPlayTopOrHandEffect, runPowerToPlayersEffect } from "./run-round392"
 import { runMoveCurseEffect, runReturnOneOfThemEffect, runStealTokensEffect } from "./run-round394";
 import { runExileUntilNonlandLinkedEffect, runRevealTopsShareTypeEffect } from "./run-round395";
 import { runGuffRewriteEffect } from "./run-round411";
+import { runExchangeSpellControlEffect } from "./run-round413";
 import { runBecomeCopyOfLinkedEffect } from "./run-round396";
 import { runBecomeCopyOfAmongEffect } from "./run-round405";
 import { runBecomeCopyOfLinkedXEffect, runEachOpponentTakesEffect } from "./run-round408";
@@ -2000,6 +2001,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSacrificeTargetsRevealEffect(s, e, ctx);
     case "guffRewrite":
       return runGuffRewriteEffect(s, e, ctx, src);
+    case "exchangeSpellControl":
+      return runExchangeSpellControlEffect(s, e, ctx, src);
     case "attackingNow":
       return runAttackingNowEffect(s, e, ctx);
     case "returnSacrificedCards":

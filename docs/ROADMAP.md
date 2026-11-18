@@ -1,7 +1,7 @@
 # Roadmap
 
-31,688 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,930 of
+31,690 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,932 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -123,7 +123,7 @@ line blocks.
    from its exiled cards on their own turn, with mana of any type, and "whenever an opponent loses the game"), Sanctum
    of All (Shrine triggers that trigger an additional time), Master Warcraft (you declare everyone's attackers and
    blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
-   separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (exchanging control of a
+   separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (done in round 413) (exchanging control of a
    permanent and a spell), Karn, Living Legacy (done in round 330) ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
    that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (done in round 410) (spells that gain evoke as
    they're cast), Omnath, Locus of All (done in round 277) ("three mana in any combination of its colors" from a trigger), Crypt Rats
@@ -2487,7 +2487,7 @@ line blocks.
    mana it adds, in the middle of a mana ability); Quicksilver Elemental (done in round 400) ("gains all activated abilities of target
    creature until end of turn" and "You may spend blue mana as though it were mana of any color to pay the activation
    costs of ~'s abilities": abilities gained from a permanent for a while, and a mana rule for one source's abilities);
-   Sudden Substitution (control of a spell exchanged with a creature's, then new targets chosen by the spell's new
+   Sudden Substitution (done in round 413) (control of a spell exchanged with a creature's, then new targets chosen by the spell's new
    controller).
    Round 354 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of dying or
    exiled creatures and searches for other players: Vincent's Limit Break's tiers that are only a base power and toughness
@@ -2820,7 +2820,7 @@ line blocks.
    that many cards": draws inside a combat damage event, which can stop for dredge and similar choices with nothing to
    resume them); Spectral Searchlight (still out: another player choosing a color inside a mana ability); Filigree Vector
    (still out: two "any number of target" groups); Pulmonic Sliver (an optional replacement for a permanent going to a
-   graveyard, a choice in the middle of any zone change); Sudden Substitution and the rest above rank 6,900 (still out).
+   graveyard, a choice in the middle of any zone change); Sudden Substitution (done in round 413) and the rest above rank 6,900 (still out).
    Round 367 went on down `npm run popular` and the "Out after round N" lists, most played first, to "could produce" counts,
    a tapped land tapping the rest, a cumulative upkeep paid in stolen lands, a quest that copies spells and a Saga's Aura
    or Equipment from hand or graveyard: Obsidian Charmaw's "This spell costs {1} less to cast for each land your opponents
@@ -3959,6 +3959,29 @@ line blocks.
    card from another player's hand cast with Sen Triplets keeps its own alternative costs (evoke, dash) but not ones given
    only to spells from your hand (Omniscience, granted evoke), and suspend, foretell and plot (from your hand) aren't
    offered for it.
+   Round 413 went on down `npm run popular`, most played first, past cards left out before to two cards that exchange
+   control of a spell and a permanent. Perplexing Chimera's "Whenever an opponent casts a spell, you may exchange control
+   of ~ and that spell. If you do, you may choose new targets for the spell." (any spell, with targets or not, rulings;
+   decided as it resolves; Effect exchangeSpellControl `cause`: the Chimera and the spell, each still where it was and the
+   same object, swap controllers between their two controllers, CR 701.12a, no exchange once either has left or with both
+   under one player's control, CR 701.12b, rulings; neither changes zones, and a permanent spell becomes a permanent under
+   its new controller's control, CR 110.2b; then, only if they were exchanged, the trigger's controller may choose new
+   targets, CR 115.7d, legal ones for the spell's new controller, rulings). Sudden Substitution's "Exchange control of
+   target noncreature spell and target creature. Then the spell's controller may choose new targets for it." (the same
+   exchange between two targets, each still legal; then whoever controls the spell, after the exchange or as it was without
+   one, may choose new targets, rulings; Effect newTargets `bySpellController`). A spell taken by an effect remembers who
+   controlled it before (StackItem.controlledBefore, Commandeer's too): when the player who gained it leaves the game,
+   that effect ends and the one before controls it again (CR 800.4a, rulings on Sudden Substitution), rather than the
+   spell leaving the stack with them. Bots take a spell with the Chimera when its mana value is 4 or more or it's aimed at
+   them or theirs, then aim it at the caster's best; they answer an opponent's noncreature spell of mana value 3 or more
+   with Sudden Substitution, giving their least useful creature (a token or one cheaper than the spell, never their
+   commander). Browser tests click through the Chimera's Yes and Murder's new target, and Sudden Substitution's two
+   targets (Ana's Murder on the stack, your Grizzly Bears) and Murder's new target. +2, 31,690 of 31,936 on this stacked
+   branch. The compiled text of every other card is unchanged.
+   Out after round 413 (looked at, not done): Chef's Kiss ("reselect the targets at random": no rule or ruling says
+   whether the spell's current target is among those it can be reselected to, as Grip of Chaos's rulings say for its own
+   reselection; still out); the lists after round 412 stay out. Known gap: a spell owned by a player who leaves the game
+   while another player controls it stays on the stack (CR 800.4a says it leaves the game), as before.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5574,7 +5597,7 @@ line blocks.
    mana).
    Out after round 234 (looked at, not done): Monument to Perfection (Lane B round B71 has it); Rowan Kenrith (done in round 391) (its +2's
    "each creature target player controls attacks you during that player's next turn if able" and the emblem copying
-   activated abilities); Brutal Hordechief (done in round 378) (you choose how opponents' creatures block); Sudden Substitution (exchange
+   activated abilities); Brutal Hordechief (done in round 378) (you choose how opponents' creatures block); Sudden Substitution (done in round 413) (exchange
    control of a spell and a creature); Lobelia, Defender of Bag End (exile the top card of each opponent's library face
    down, play them free); Spinerock Tyrant (copies that gain wither); Curse of Echoes (each other player may copy the
    spell); Sovereigns of Lost Alara (done in round 311) (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it

@@ -1246,6 +1246,12 @@ export interface StackItem {
   controller: PlayerId;
   /** Another player gained control of this spell (Commandeer): its controller didn't cast it (Cunning Nightbonder's rulings). */
   controlTaken?: true;
+  /**
+   * Each player who controlled this before an effect gave another player control of it (Commandeer, Perplexing Chimera),
+   * oldest first: the first is its caster's. When a player who gained control leaves the game, that effect ends (CR
+   * 800.4a) and its controller is the one before.
+   */
+  controlledBefore?: PlayerId[];
   description: string;
   /** For a triggered ability: the spell or ability on the stack that triggered it ("that spell", ward). */
   cause?: string;

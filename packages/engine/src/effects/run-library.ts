@@ -289,7 +289,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of ids) {
           moveObject(s, id, "exile");
           const o = obj(s, id);
-          if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+          // Maralen, Fae Ascendant (round 406): with the turn, for "cards exiled with ~ this turn".
+          if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0, ...(e.linkedTurn ? { turn: s.turn } : {}) });
           if (e.counters && o.zone === "exile") for (const [k, n] of Object.entries(e.counters)) o.counters[k] = (o.counters[k] ?? 0) + n;
         }
         if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };

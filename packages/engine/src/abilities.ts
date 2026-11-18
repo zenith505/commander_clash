@@ -1577,7 +1577,7 @@ export type ObjRef =
   /** "All Auras attached to that creature" (Treefolk Mystic): the permanents matching `filter` attached to the subject as this resolves. */
   | { ref: "attachedToSubject"; filter: TargetSpec; /** Corrosive Ooze: once the subject has left the battlefield, the ones attached to it just before it left, still on the battlefield as those objects (rulings, CR 400.7). */ lastKnown?: true }
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
-  | { ref: "eventGroup"; /** Pure Intentions (round B240): "return those cards from your graveyard": only those of them still in the graveyard of the ability's controller. */ inYourGraveyard?: true }
+  | { ref: "eventGroup"; /** Pure Intentions (round B240): "return those cards from your graveyard": only those of them still in the graveyard of the ability's controller. */ inYourGraveyard?: true; /** Lazav, Dimir Mastermind (round 406): "a copy of that card": the card exactly as printed, as it last existed in the graveyard wherever it is now (rulings, CR 707.2). */ printed?: true }
   /**
    * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
    * hand"). `moved`: an Aura's "when enchanted creature dies, return this card ..." (Angelic Destiny), the Aura card in a
@@ -3004,7 +3004,7 @@ export type Effect =
        */
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
       /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
-      youMay?: { anyType?: true; /** "You may play it for as long as you control ~" (Victor Mancha, Runaway): while the source stays this object under your control (GameObject.mayPlay "whileControlled"). */ whileControlled?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
+      youMay?: { anyType?: true; /** Abstruse Appropriation (round 408): "and you may spend colorless mana as though it were mana of any color to cast that spell" (MayPlay `colorlessAny`). */ colorlessAny?: true; /** "You may play it for as long as you control ~" (Victor Mancha, Runaway): while the source stays this object under your control (GameObject.mayPlay "whileControlled"). */ whileControlled?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
       /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
       suspend?: number;
       /** "Exile it with a hit counter on it" (Mari, Tinybones): put on the card in exile (CR 122.1), not a permanent's. */
@@ -3277,7 +3277,7 @@ export type Effect =
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
-  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Without paying its mana cost" (Sins of the Past): MayPlay.free. */ free?: true; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true; /** "You may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight): until then, and only as its Adventure (face 1, CR 715.3). */ asAdventure?: true; /** Synth Eradicator: "If you don't, you may play that card this turn": a card in exile (the one just exiled from the top). */ inExile?: true; /** Reno and Rude: "and mana of any type can be spent to cast it" (CR 609.4b). */ anyType?: true; /** Kaldring, the Rimestaff: "If you do, it enters tapped": MayPlay.tapped. */ tapped?: true; /** Mavinda, Students' Advocate: "If that spell doesn't target a creature you control, it costs {8} more to cast this way": MayPlay.moreUnlessTargets. */ moreUnlessTargets?: { n: number; filter: TargetSpec } }
+  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Without paying its mana cost" (Sins of the Past): MayPlay.free. */ free?: true; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true; /** "You may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight): until then, and only as its Adventure (face 1, CR 715.3). */ asAdventure?: true; /** Synth Eradicator: "If you don't, you may play that card this turn": a card in exile (the one just exiled from the top). */ inExile?: true; /** Reno and Rude: "and mana of any type can be spent to cast it" (CR 609.4b). */ anyType?: true; /** Kaldring, the Rimestaff: "If you do, it enters tapped": MayPlay.tapped. */ tapped?: true; /** Quintorius, Loremaster (round 406): "If that spell would be put into a graveyard, put it on the bottom of its owner's library instead" (MayPlay.bottomAfter). */ bottomAfter?: true; /** Mavinda, Students' Advocate: "If that spell doesn't target a creature you control, it costs {8} more to cast this way": MayPlay.moreUnlessTargets. */ moreUnlessTargets?: { n: number; filter: TargetSpec } }
   /**
    * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
    * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells
@@ -4288,6 +4288,20 @@ export type Effect =
    */
   | { type: "becomeCopyOfAmong"; what: ObjRef; from: "linked" | "eventGroup"; filter: TargetSpec }
   /**
+   * Valki, God of Lies (round 408): "Choose a creature card exiled with ~ with mana value X. ~ becomes a copy of that card.":
+   * one of the cards its enters ability exiled (linked, CR 607.2a) that's a creature card in exile now with mana value X
+   * (the X paid, CR 107.3m; in exile a modal double-faced card's front face's, rulings), chosen as this resolves (rulings;
+   * chooseOption "aegisCopy" when there are several), copied as printed (CR 707.2) with no end (CR 611.2a). With none,
+   * nothing happens (rulings).
+   */
+  | { type: "becomeCopyOfLinkedX"; filter: TargetSpec }
+  /**
+   * Valki, God of Lies (round 408): "For each opponent, exile a creature card they revealed this way until ~ leaves the
+   * battlefield": `take` (who "eachOne") done for each opponent in turn, from the active player (CR 101.4), each card
+   * chosen by this ability's controller.
+   */
+  | { type: "eachOpponentTakes"; take: Extract<Effect, { type: "takeFromHand" }> }
+  /**
    * Koh, the Face Stealer (round 399): "Choose a creature card exiled with ~": one of the cards its exile abilities exiled
    * (linked, CR 607.2a, 607.4) that's a creature card in exile now, chosen as this resolves (not a target; chooseOption
    * "kohCard" when there are several), remembered on the source as the object it is (Chosen.card, CR 607.2d, 400.7) for
@@ -4400,7 +4414,7 @@ export type Effect =
   | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   /** "For each nonland card exiled this way, put a number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (The Parting of the Ways): the cards the exileTop before it exiled. */
   | { type: "suspendExiledTop"; filter: TargetSpec }
-  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec; /** "And put a fetch counter on each of them" (Pako, Arcane Retriever): on each card exiled, in exile. */ counters?: Record<string, number>; /** The Temporal Anchor: "exile that many cards from the bottom of your library": from the bottom instead. */ bottom?: true }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "If two or more of those cards have the same name, repeat this process" (Scalpelexis): again while a batch has two with the same name. */ repeatSameName?: true; /** Orcish Librarian: "Look at the top eight cards of your library. Exile four of them at random": `n` of the top this many, at random. */ randomOf?: number; /** "If the last card exiled isn't a land card, repeat this process" (Rally the Horde): again while the last card of a batch isn't a land card; every batch's cards are "exiled this way". */ repeatUnlessLastLand?: true; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** With `linked`, Maralen, Fae Ascendant (round 406): each link records the turn (GameState.linkedExile `turn`). */ linkedTurn?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec; /** "And put a fetch counter on each of them" (Pako, Arcane Retriever): on each card exiled, in exile. */ counters?: Record<string, number>; /** The Temporal Anchor: "exile that many cards from the bottom of your library": from the bottom instead. */ bottom?: true }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -9981,6 +9995,13 @@ export interface CompiledCard {
   /** Eye of Duskmantle (round 405): "You may play lands ... from among cards in your graveyard you've surveilled this turn": only a land card its surveil put there this turn (GameObject.surveilledTurn). */
   landsFromGraveyardSurveilled?: true;
   /**
+   * Maralen, Fae Ascendant (round 406): "Once each turn, you may cast a spell with mana value less than or equal to the number
+   * of Elves and Faeries you control from among cards exiled with ~ this turn without paying its mana cost": the cards its
+   * one exile ability exiled this turn (GameState.linkedExile entries with `turn`), once each turn for this object
+   * (GameObject.linkedFreeOnceTurn), the spell's mana value at most `maxMv` (game.ts linkedFreeOnceSource).
+   */
+  linkedFreeOnce?: { maxMv: AmountExpr };
+  /**
    * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
    * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).
    */
@@ -10037,6 +10058,14 @@ export interface CompiledCard {
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).
    */
   playLinked?: true;
+  /**
+   * Tibalt, Cosmic Impostor (round 408): "As ~ enters, you get an emblem with "You may play cards exiled with ~, and you may
+   * spend mana as though it were mana of any color to cast those spells."": the emblem's ability text (CR 614.1c, 114.2),
+   * the emblem linked to this object (GameObject.emblemLink) and its exiles linked to it (CR 607.2a).
+   */
+  entersLinkedEmblem?: string;
+  /** That emblem's ability: its owner may play the cards exiled with the object it's linked to, mana of any color for spells (CR 609.4b). */
+  playLinkedEmblem?: true;
   /**
    * "During your turn, you may play cards exiled with ~. If you cast a spell this way, pay life equal to its mana value
    * rather than pay its mana cost" (Valgavoth): during its controller's turn only, cast for that alternative cost

@@ -2436,7 +2436,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
   convert: "cast it converted: its back face is the spell, and it enters with that face up",
   omniscience: "from your hand, for nothing (Omniscience, Chandra, Flame's Catalyst); X is 0",
-  linkedFree: "a card exiled with Court of Locthwain, for nothing; X is 0",
+  linkedFree: "a card exiled with Court of Locthwain (or this turn with Maralen, Fae Ascendant), for nothing; X is 0",
   nextFree: "the next such spell you cast this turn, for nothing (World War Hulk); X is 0",
   topFree: "the card Temporal Aperture revealed, while it remains on top of your library, for nothing; X is 0",
   nextLife: "life equal to its mana value instead of its mana cost, for the next spell you cast this turn (Marshland Bloodcaster); X is 0",

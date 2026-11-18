@@ -356,6 +356,8 @@ export interface GameObject {
   milledTurn?: number;
   /** Eye of Duskmantle (round 405): the turn its owner's surveil put this card into their graveyard (CR 701.25a), while it stays there. */
   surveilledTurn?: number;
+  /** Maralen, Fae Ascendant (round 406): the turn this permanent's "once each turn" free cast (CompiledCard.linkedFreeOnce) was used, as the object it was then (CR 400.7). */
+  linkedFreeOnceUsed?: { turn: number; zc: number };
   /** The turn it was last put into a graveyard from the battlefield ("put there from the battlefield this turn", Brought Back). */
   fromBattlefieldTurn?: number;
   damage: number;
@@ -376,6 +378,8 @@ export interface GameObject {
   createdWith?: { id: ObjectId; zc: number };
   /** An emblem in its owner's command zone (CR 114): neither a card nor a permanent, its abilities working there (114.4). */
   emblem?: true;
+  /** Tibalt, Cosmic Impostor's emblem (round 408): the object whose exiled cards it lets its owner play, as GameState.linkedExile keys it ("id@zc"), even after that object has left (rulings). */
+  emblemLink?: string;
   /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */
   tokenBackUp?: true;
   /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
@@ -592,8 +596,12 @@ export interface GameObject {
     anyType?: true;
     /** Gale's Redirection: "you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b): any mana pays its colored symbols, but {C} still needs colorless mana. */
     anyColor?: true;
+    /** Abstruse Appropriation (round 408): "you may spend colorless mana as though it were mana of any color to cast that spell" (CR 609.4b): colorless mana pays its colored symbols too, as though it were their color. */
+    colorlessAny?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
     exileAfter?: true;
+    /** Quintorius, Loremaster (round 406): "If that spell would be put into a graveyard, put it on the bottom of its owner's library instead": see bottomIfToGraveyard. */
+    bottomAfter?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
     castOnly?: true;
     /** "You may cast it if it's a creature spell" (Vivien, Champion of the Wilds): only as a creature spell (CR 601.3e). */
@@ -2285,7 +2293,7 @@ export interface GameState {
   /** How many times abilities that ask ("if this is the second time this ability has resolved this turn") resolved this turn, by source object and ability. */
   resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
-  linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  linkedExile?: Record<string, { id: ObjectId; zc: number; /** Maralen, Fae Ascendant (round 406): the turn it was exiled, for "cards exiled with ~ this turn". */ turn?: number }[]>;
   /** Soul Scourge, Laquatus's Champion: the player its enters ability targeted, by "sourceId@zc", for "that player" in its leaves ability (rulings). */
   linkedPlayer?: Record<string, PlayerId>;
   /** Soulgorger Orgg: the life its enters ability made its controller lose, by "sourceId@zc", for its leaves ability (CR 607.2e). */
@@ -2310,7 +2318,7 @@ export interface GameState {
    * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
    * turn it was made, for "until the end of your next turn".
    */
-  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true; /** Nuka-Nuke Launcher: only this player's spells trigger it, and "endOfYourNextTurn" is the end of this player's next turn. */ forPlayer?: PlayerId; /** With `until` "whileTapped" (Giant Oyster): its source as the object it was and how often it had untapped then; the ability is gone once that no longer holds (game.ts whileTappedHolds). */ whileTapped?: { id: ObjectId; zc: number; untaps: number } }[];
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true; /** Nuka-Nuke Launcher: only this player's spells trigger it, and "endOfYourNextTurn" is the end of this player's next turn. */ forPlayer?: PlayerId; /** With `until` "whileTapped" (Giant Oyster): its source as the object it was and how often it had untapped then; the ability is gone once that no longer holds (game.ts whileTappedHolds). */ whileTapped?: { id: ObjectId; zc: number; untaps: number }; /** Optimus Prime, Autobot Leader (round 407): how many times its source had transformed when it was made, for a trigger that transforms it (CR 701.27f). */ transformsAt?: number }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
@@ -3210,6 +3218,8 @@ export interface Resolving {
     curseMove?: string;
     /** Assimilation Aegis (Effect becomeCopyOfLinked, round 396): the exiled creature card chosen to copy (an object id), "" while asked. */
     aegisCopy?: string;
+    /** Valki, God of Lies (round 408): the opponent (an index into them, APNAP) whose hand Effect eachOpponentTakes is at. */
+    eachTakeAt?: number;
     /** Lazav, Wearer of Faces / Spirit of Resilience (round 405): the card chosen to become a copy of ("" while asked, "none"). */
     copyAmong?: string;
     /** Koh, the Face Stealer (Effect chooseLinkedCard, round 399): the exiled creature card chosen (an object id), "" while asked. */

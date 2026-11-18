@@ -578,7 +578,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           index,
           // A delayed one is about its source as it was when it was made (CR 603.7c).
           sourceZc: floating ? floating.sourceZc : (o.zoneChanges ?? 0),
-          ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}) } : {}),
+          ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}), ...(floating.transformsAt !== undefined ? { transformsAt: floating.transformsAt } : {}) } : {}),
           ...(cause ? { cause } : {}),
           ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : floating?.about ? { subject: floating.about } : {}),
           ...(lki ? { lki } : {}),

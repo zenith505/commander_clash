@@ -1,7 +1,7 @@
 # Roadmap
 
-31,661 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,915 of
+31,670 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,924 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1099,7 +1099,7 @@ line blocks.
    able"); Rebbec, Architect of Ascension (done in round 336) (protection from each mana value of artifacts you control); Nissa, Worldsoul
    Speaker (paying {E} for each mana of a permanent spell's cost); Yusri, Fortune's Flame (choose a number, flips lost,
    "if you won five flips", free casts for the turn); Party Dude ("Whenever one or more of your opponents are
-   attacked"); Feather, the Redeemed; Maralen, Fae Ascendant.
+   attacked"); Feather, the Redeemed; Maralen, Fae Ascendant (done in round 406).
    Round 220: "each Vehicle you control gets +1/+1 as long as it's a creature" and a paid "reveal the top X cards, put
    all Dwarf and Vehicle cards into your hand" (Depala, Pilot Exemplar); "If it's an Equipment, attach it to ~" after
    a put from hand (The Invincible Iron Man, CR 701.3); "When you do, return target Equipment card ... then attach it
@@ -1315,7 +1315,7 @@ line blocks.
    Freerunning cast-menu entries have an e2e test; `npm run e2e:cards` now also reads single-quoted names. +10 (28,698
    of 31,936 with round 227 and B66).
    Out after round 228 (looked at, not done): Bilbo, Thief in the Night (done in round B193) (a paid cast from a graveyard during
-   resolution); Lazav, Dimir Mastermind and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
+   resolution); Lazav, Dimir Mastermind (done in round 406) and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
    an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
@@ -3793,6 +3793,76 @@ line blocks.
    Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion, Helm of Kaldra,
    Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 406 went on down `npm run popular`, most played first, to three cards left out before. Lazav, Dimir Mastermind's
+   "Whenever a creature card is put into an opponent's graveyard from anywhere, you may have ~ become a copy of that card,
+   except its name is ~, it's legendary in addition to its other types, and it has hexproof and this ability." (once for
+   each card, CR 603.2c; tokens aren't cards, rulings; ObjRef eventGroup `printed`: the card as it last existed in the
+   graveyard, wherever it is as the ability resolves, so exactly as printed, a Clone that was copying something a 0/0
+   Clone, rulings, CR 707.2; the exceptions part of the copy, CR 707.9b, "this ability" its own text, CR 707.9a; for the
+   rest of the game). Quintorius, Loremaster's "{1}{R}{W}, {T}, Sacrifice a Spirit: Choose target card exiled with ~. You
+   may cast that card this turn without paying its mana cost. If that spell would be put into a graveyard, put it on the
+   bottom of its owner's library instead." (a card its end step trigger exiled, linked, CR 607.2a, rulings; a permission
+   for this turn with the usual timing, rulings, for free, CR 118.9; MayPlay `bottomAfter`, GameObject.bottomIfToGraveyard,
+   CR 614.1a). Maralen, Fae Ascendant's "Once each turn, you may cast a spell with mana value less than or equal to the
+   number of Elves and Faeries you control from among cards exiled with ~ this turn without paying its mana cost."
+   (CompiledCard.linkedFreeOnce: the cards its enters trigger exiled this turn, GameState.linkedExile `turn`; once each turn
+   for that object, GameObject.linkedFreeOnceUsed; a spell, not a land, its mana value as cast, its face counting, CR 601.3e,
+   X as 0, rulings; cast with the "linkedFree" alternative cost Court of Locthwain uses, whose grant is used first when both
+   apply). A "linkedFree" cast with X more than 0 is now refused (CR 107.3b). Bots copy a creature card bigger than Lazav
+   is now, and cast Maralen's cards for free. Browser tests click through Lazav's copy, Quintorius's target, sacrifice and
+   free cast, and Maralen's free cast. +3, 31,660 of 31,936 on this stacked branch. The compiled text of every other card is
+   unchanged.
+   Out after round 406 (looked at, not done): Taskmaster, Mercenary Mimic ("up to one target creature on the battlefield or
+   creature card in a graveyard" with "he's a legendary Human Mercenary Villain creature" and no rulings on which types it
+   keeps); Niko, Light of Hope ("until the next end step" copies); Abstruse Appropriation, Jasmine Boreal of the Seven,
+   Pulmonic Sliver, Filigree Vector, Wayta, Trainer Prodigy, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory,
+   Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier
+   lists).
+   Round 407 went on down `npm run popular`, most played first, to four cards left out before. The Flood of Mars's "Whenever
+   ~ attacks, put a flood counter on another target creature or land. If it's a creature, it becomes a copy of ~. If it's
+   a land, it becomes an Island in addition to its other types." (each "if" checked on the target as it is then, CR
+   608.2c: a creature land becomes a copy first, which isn't a land, so no Island, rulings; the Island type's {T}: Add {U},
+   CR 305.6; for the rest of the game). Grub, Notorious Auntie's "Whenever ~ attacks, you may blight 1. If you do, create
+   a tapped and attacking token that's a copy of the blighted creature, except it has "At the beginning of the end step,
+   sacrifice ~."" (the creature the blight picked, CR 701.68c, ObjRef "created"; copiable values only, rulings; whom the
+   token attacks its controller's choice, CR 508.4). Optimus Prime, Autobot Leader's "Whenever you attack, bolster 2. The
+   chosen creature gains trample until end of turn. When that creature deals combat damage to a player this turn, convert
+   ~." (a delayed trigger about the bolstered creature for this turn, CR 603.7b-c; a floating trigger that transforms its
+   source now remembers the source's transform count when it's made, `transformsAt`, so a double striker's second trigger
+   doesn't convert it back, CR 701.27f). Symbiote Spider-Man's "Find New Host — {2}{U/B}, Exile ~ from your graveyard: Put a
+   +1/+1 counter on target creature you control. It gains ~'s other abilities. Activate only as a sorcery." (the card's
+   other lines, gained for the rest of the game, CR 611.2a, "this creature" in them being that creature, CR 201.5b; no
+   rulings yet). Browser tests click through the Flood's target, Grub's blight pick and the token's attack choice,
+   Optimus's bolster and convert, and Find New Host from the graveyard with the gained trigger's pick. +4, 31,664 of 31,936
+   on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 407 (looked at, not done): Havengul Laboratory // Havengul Mystery (its back face's link to "the creature
+   put onto the battlefield with ~" across transforming, no rulings), Taskmaster, Niko, Abstruse Appropriation, Pulmonic
+   Sliver, Filigree Vector, Wayta, Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the
+   reasons in their earlier lists).
+   Round 408 went on down `npm run popular`, most played first, to two cards left out before. Abstruse Appropriation's
+   "Exile target nonland permanent. You may cast that card for as long as it remains exiled, and you may spend colorless
+   mana as though it were mana of any color to cast that spell." (Hostage Taker's permission, MayPlay `colorlessAny`: a
+   card, not a token, with its usual timing and costs, rulings; CR 609.4b in game.ts spellCost: each colored symbol, a
+   hybrid one's halves, a {2/W}'s one mana and a Phyrexian one's mana may be paid with colorless mana too, CostSymbol
+   `orC`, which mana.ts payFromPool spends only when the symbol's own colors aren't there; colored mana pays nothing more,
+   and {C} still takes colorless mana). Valki, God of Lies's "When ~ enters, each opponent reveals their hand. For each
+   opponent, exile a creature card they revealed this way until ~ leaves the battlefield." (Effect eachOpponentTakes: one
+   opponent at a time from the active player, CR 101.4, the card chosen by Valki's controller; linked, CR 607.2a; back to
+   its owner's hand when Valki leaves, CR 610.3; nothing exiled if Valki has already left, rulings) and "{X}: Choose a
+   creature card exiled with ~ with mana value X. ~ becomes a copy of that card." (Effect becomeCopyOfLinkedX: chosen as
+   it resolves, "aegisCopy" when two match; as printed, with no end, CR 707.2, 611.2a; nothing with none, rulings). Its back
+   face, Tibalt, Cosmic Impostor: "As ~ enters, you get an emblem with "You may play cards exiled with ~, and you may spend
+   mana as though it were mana of any color to cast those spells."" (CompiledCard.entersLinkedEmblem, made in
+   finishEntering, CR 614.1c, 114.2; the emblem keeps that Tibalt as the object it was, GameObject.emblemLink, so it works
+   after Tibalt leaves and a new Tibalt gives its own, rulings; game.ts linkedPlayPermission "anyColor": lands with a land
+   play, spells with their usual timing, {C} still colorless) and "+2: Exile the top card of each player's library.", its
+   three exile abilities all linked to it (oracle/round408.ts linkTibaltExiles). Bots copy with Valki the biggest exiled
+   creature card bigger than it that they can pay for, before combat. Browser tests click through Valki's three hand picks
+   and its {X} copy pick, Abstruse Appropriation's cast from exile with Wastes, and Tibalt's back face, +2 and the Bolt its
+   emblem casts. +2, 31,666 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (playing the top card of another player's library,
+   which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta,
+   Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5433,7 +5503,7 @@ line blocks.
    Thief, Mishra, Eminent One (done in round 337), Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon (done in round 358), Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship (done in round 358), Fisher's Talent (done in round 318), Niko, Light of Hope,
    Stick Together (done in round 302), Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
-   Augurelt, Quintorius, Loremaster, Quantum Riddler (done in round 296), Model of Unity (done in round 302), The Flood of Mars, Sigarda's Vanguard (done in round 302), Master of
+   Augurelt, Quintorius, Loremaster (done in round 406), Quantum Riddler (done in round 296), Model of Unity (done in round 302), The Flood of Mars, Sigarda's Vanguard (done in round 302), Master of
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
    Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere (done in round 277), Tangle Wire,
    Steward of the Harvest, Agent's Toolkit (done in round 296), Heroes in a Half Shell, Ran and

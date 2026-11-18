@@ -685,6 +685,8 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.tap && characteristics(s, o).cantActivateTap) return `${name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary (rulings)
   const banned = nameActivationBan(s, o, true) ?? abolisherBan(s, pid, o); // Phyrexian Revoker, Grand Abolisher: mana abilities too
   if (banned) return banned;
+  // Sen Triplets (round 412): "that player can't ... activate abilities" this turn, mana abilities too (rulings).
+  if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "noAbilities")) return "you can't activate abilities this turn";
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   // {Q} (CR 107.6): it must be tapped, a stun counter that stays keeps it so (rulings on Fear of Sleep Paralysis), and a

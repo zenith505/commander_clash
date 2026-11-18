@@ -1462,6 +1462,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "graveyardCastThisTurn":
     case "graveyardTurn":
     case "topTurn":
+    case "handTurn":
+    case "revealHandTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":

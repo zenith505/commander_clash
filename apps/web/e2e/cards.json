@@ -39206,6 +39206,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f0c5864f-83c3-4d99-8f97-0ab92608fff3",
+  "name": "Sen Triplets",
+  "manaCost": "{2}{W}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Artifact Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "At the beginning of your upkeep, choose target opponent. This turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play lands and cast spells from that player's hand this turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arb",
+  "releasedAt": "2009-04-30",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8c489e39-b9ff-400f-a855-3cddf7e112e6",
   "name": "Sensational Spider-Man",
   "manaCost": "{1}{W}{U}",
@@ -51610,6 +51648,40 @@
   "set": "mps",
   "releasedAt": "2016-09-30",
   "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a168ba5-8e11-41dd-8f8a-8cb23bbde056",
+  "name": "Xanathar, Guild Kingpin",
+  "manaCost": "{4}{U}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Beholder",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beholder"
+  ],
+  "oracleText": "At the beginning of your upkeep, choose target opponent. Until end of turn, that player can't cast spells, you may look at the top card of their library any time, you may play the top card of their library, and you may spend mana as though it were mana of any color to cast spells this way.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

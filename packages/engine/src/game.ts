@@ -5399,6 +5399,7 @@ function finishCleanup(s: GameState) {
   if (!s.entersWithCountersThisTurn?.length) s.entersWithCountersThisTurn = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.some((r) => !r.thisTurn) ? s.entersTappedUntil.filter((r) => !r.thisTurn) : undefined;
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
+  s.handTurn = undefined; // Sen Triplets' "this turn" (round 412)
   s.drawSteals = undefined; // Plagiarize's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
   for (const q of s.players) q.noLegendRuleTurn = undefined; // Hall of Echoes' "this turn" (CR 514.2)
@@ -6152,18 +6153,28 @@ export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?:
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[]; whenDo?: AbilityBody } | undefined {
-  if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[]; whenDo?: AbilityBody; anyColor?: true } | undefined {
+  if (o.zone !== "library" || player(s, o.owner).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
+  // Xanathar, Guild Kingpin (round 412): the top card of another player's library, only with a resolved effect's
+  // permission for that library this turn; a land with a land play as usual, a spell at its usual timing (rulings).
+  if (o.owner !== pid) {
+    for (const g of s.topTurn ?? []) {
+      const top = g.top;
+      if (g.player !== pid || g.of !== o.owner || g.turn !== s.turn || (!land && way && !!top.payLife !== (way === "life"))) continue;
+      if (land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(f, d))) return g.anyColor && !land ? { anyColor: true } : {};
+    }
+    return undefined;
+  }
   // Temporal Aperture: the card it revealed, a land played as usual or a spell cast without paying its mana cost only
   // (AltCostKind "topFree", not with `way`).
   if ((land || !way) && topFreeGrant(s, o, pid)) return {};
   // A resolved effect's, for the rest of the turn (Gwenom).
   for (const g of s.topTurn ?? []) {
     const top = g.top;
-    if (g.player !== pid || g.turn !== s.turn || (!land && way && !!top.payLife !== (way === "life"))) continue;
-    if (land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(f, d))) return {};
+    if (g.player !== pid || g.of !== undefined || g.turn !== s.turn || (!land && way && !!top.payLife !== (way === "life"))) continue;
+    if (land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(f, d))) return g.anyColor && !land ? { anyColor: true } : {};
   }
   let once: GameObject | undefined;
   // The Fourth Doctor: a once-a-turn permission with a "When you do" (FromTop.whenDo) is the one used while it's unused
@@ -6253,7 +6264,7 @@ function topFlash(s: GameState, o: GameObject, pid: PlayerId, way: "mana" | "lif
 export function topVisible(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
   return (
     topRevealed(s, pid) ||
-    (pid === viewer && !!s.topTurn?.some((g) => g.player === pid && g.turn === s.turn)) ||
+    !!s.topTurn?.some((g) => g.player === viewer && (g.of ?? g.player) === pid && g.turn === s.turn) ||
     (pid === viewer &&
       s.battlefield.some((id) => {
         const a = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
@@ -6278,7 +6289,13 @@ export function faceDownVisible(s: GameState, o: GameObject, viewer: PlayerId): 
 /** Cards `pid` may play from the top of their library right now (see mayPlayFromTop). */
 export function topPlayable(s: GameState, pid: PlayerId): ObjectId[] {
   const top = player(s, pid).library[0];
-  return top !== undefined && mayPlayFromTop(s, obj(s, top), pid) ? [top] : [];
+  const out = top !== undefined && mayPlayFromTop(s, obj(s, top), pid) ? [top] : [];
+  // Xanathar, Guild Kingpin (round 412): the top card of another player's library, with this turn's permission for it.
+  for (const g of s.topTurn ?? []) {
+    const theirs = g.player === pid && g.of !== undefined && g.turn === s.turn ? player(s, g.of).library[0] : undefined;
+    if (theirs !== undefined && !out.includes(theirs) && mayPlayFromTop(s, obj(s, theirs), pid)) out.push(theirs);
+  }
+  return out;
 }
 
 /** Whether everyone can see the top card of `pid`'s library (CR 401.5): "play with the top card of your library revealed". */
@@ -6299,12 +6316,28 @@ export function cantPlayYet(s: GameState, o: GameObject): { player: PlayerId; ca
 /** Whether `pid`'s hand is revealed (to `viewer`): "players play with their hands revealed", Telepathy (CR 402.3). */
 export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
   if (pid === viewer) return true;
+  // Sen Triplets (round 412): "plays with their hand revealed" this turn.
+  if (player(s, pid).handRevealedTurn === s.turn) return true;
   // Stromgald Spy: for as long as that object remains on the battlefield (CR 611.2b).
   if (player(s, pid).handRevealedWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc)) return true;
   return s.battlefield.some((id) => {
     const r = abilitiesOf(s, obj(s, id)).revealHands;
     return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid) || (r === "you" && controllerOf(s, obj(s, id)) === pid);
   });
+}
+
+/**
+ * Sen Triplets (round 412): whether `pid` may play `o`, a card in another player's hand, this turn: "You may play lands
+ * and cast spells from that player's hand this turn" (GameState.handTurn), at its usual timing (rulings).
+ */
+export function mayPlayFromHandOf(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  return o.zone === "hand" && o.owner !== pid && !!s.handTurn?.some((g) => g.player === pid && g.of === o.owner && g.turn === s.turn);
+}
+
+/** Sen Triplets (round 412): the cards in other players' hands `pid` may play this turn (see mayPlayFromHandOf). */
+export function othersHandPlayable(s: GameState, pid: PlayerId): ObjectId[] {
+  const of = [...new Set((s.handTurn ?? []).filter((g) => g.player === pid && g.turn === s.turn && g.of !== pid).map((g) => g.of))];
+  return of.flatMap((q) => player(s, q).hand);
 }
 
 /** Experimental Frenzy: the name of a permanent `pid` controls that says "You can't play lands or cast spells from your hand", or undefined. */
@@ -6355,8 +6388,8 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
     return asFace(s, o, face, () => playLand(s, p, id, untapped, face));
   }
   const d = defOf(s, o);
-  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id) || mayPlayFromTop(s, o, p.id))) throw new RulesError("land must be in your hand");
-  if (o.zone === "hand" && handPlayBanned(s, p.id)) throw new RulesError(`${handPlayBanned(s, p.id)}: you can't play lands from your hand`);
+  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id) || mayPlayFromTop(s, o, p.id) || mayPlayFromHandOf(s, o, p.id))) throw new RulesError("land must be in your hand");
+  if (o.zone === "hand" && o.owner === p.id && handPlayBanned(s, p.id)) throw new RulesError(`${handPlayBanned(s, p.id)}: you can't play lands from your hand`);
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
   if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
@@ -7063,7 +7096,7 @@ export function castProblem(
   if (via?.kind === "turnPermission" && !permitsForMv(s, choices?.permit !== undefined ? [choices.permit] : (via.permits ?? []), defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost))).length) return `${d.name}'s mana value is too high for that permission`;
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
-  if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
+  if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && !mayPlayFromHandOf(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o, pid).length ? `choose how to cast ${d.name} from ${o.owner === pid ? "your" : "a"} graveyard` : "you can only cast spells from your hand or your commander";
   // "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): the face cast must
   // be one, unless something else lets it be cast (rulings).
@@ -7094,7 +7127,7 @@ export function castProblem(
     if (choices.alt === "energyForSpell" && x) return "X is 0 when you pay energy rather than the mana cost";
     if (choices.alt === "energyForSpell" && !payZeroSource(s, pid, o, "energy")) return `nothing lets you pay energy rather than ${d.name}'s mana cost now`;
     if (choices.alt === "genericMv" && !payZeroSource(s, pid, o, "generic")) return `nothing lets you pay generic mana rather than ${d.name}'s mana cost now`;
-    if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
+    if (choices.alt === "omniscience" && (o.zone !== "hand" || o.owner !== pid)) return "only spells cast from your hand are free";
     if (choices.alt === "linkedFree" && linkedFreeGrant(s, o, pid) < 0 && !linkedFreeOnceSource(s, o, pid, d)) return linkedFreeOnceSource(s, o, pid) ? `${d.name}'s mana value is too high to cast it this way` : `${d.name} isn't a card you may cast this way`;
     if (choices.alt === "linkedFree" && x) return "X is 0 when you cast a spell without paying its mana cost";
     if (choices.alt === "topFree" && !topFreeGrant(s, o, pid)) return `${d.name} isn't a card you may cast this way`;
@@ -7152,7 +7185,7 @@ export function castProblem(
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0), !!choices?.faceDown);
   if (limit) return limit;
   // Experimental Frenzy: "You can't play lands or cast spells from your hand."
-  if (o.zone === "hand" && handPlayBanned(s, pid)) return `${handPlayBanned(s, pid)}: you can't cast spells from your hand`;
+  if (o.zone === "hand" && o.owner === pid && handPlayBanned(s, pid)) return `${handPlayBanned(s, pid)}: you can't cast spells from your hand`;
   // Grafdigger's Cage: "Players can't cast spells from graveyards or libraries" (the spell is cast from where the card is,
   // CR 601.2a; a card exiled from a library is cast from exile, rulings). Soulless Jailer: noncreature spells only.
   for (const b of s.battlefield) {
@@ -7160,8 +7193,8 @@ export function castProblem(
     if (ban && (ban.zones as string[]).includes(o.zone) && !(ban.noncreature && isType(d, "Creature"))) return `${characteristics(s, obj(s, b)).name}: players can't cast ${ban.noncreature ? "noncreature " : ""}spells from ${o.zone === "library" ? "libraries" : `${o.zone === "graveyard" ? "graveyards" : "exile"}`}`;
   }
   // Drannith Magistrate: "Your opponents can't cast spells from anywhere other than their hands", commanders from the
-  // command zone included (CR 101.2).
-  if (o.zone !== "hand") {
+  // command zone included (CR 101.2). Another player's hand (Sen Triplets, round 412) isn't the caster's own.
+  if (o.zone !== "hand" || o.owner !== pid) {
     const magistrate = s.battlefield.map((b) => obj(s, b)).find((m) => abilitiesOf(s, m).opponentsOnlyFromHand && controllerOf(s, m) !== pid);
     if (magistrate) return `${characteristics(s, magistrate).name}: opponents can't cast spells from anywhere other than their hands`;
     // Avatar's Wrath: the same until its caster's next turn.
@@ -7504,7 +7537,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const anyTypeNow = !!exiled?.anyType || (pend?.kind === "castFree" && pend.player === pid && pend.objectId === o.id && !!pend.anyType) || creatureAnyType || grantAnyType;
   // Gale's Redirection: "as though it were mana of any color": the same for colored symbols, but {C} still takes colorless
   // mana (CR 609.4b).
-  const anyColorNow = !anyTypeNow && !!exiled?.anyColor;
+  // Xanathar, Guild Kingpin (round 412): a spell cast from the top of another player's library with its permission.
+  const topAnyColor = !how.via && how.alt !== "citadel" && o.zone === "library" && !!topPermission(s, o, pid, "mana")?.anyColor;
+  const anyColorNow = !anyTypeNow && (!!exiled?.anyColor || topAnyColor);
   // Abstruse Appropriation (round 408): "you may spend colorless mana as though it were mana of any color to cast that
   // spell" (CR 609.4b): colorless mana pays a colored symbol as though it were that color, a hybrid one's halves, a {2/W}'s
   // one mana and a Phyrexian one's mana (or its 2 life) too; colored mana still pays only its own (CostSymbol `orC`).
@@ -7670,7 +7705,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.turn === "notCasters" ? s.activePlayer === pid : m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && !m.fromZones && o.zone !== "graveyard") continue;
       if (m.fromZones && !m.fromZones.includes(o.zone as "graveyard" | "exile")) continue;
-      if (m.notFromHand && o.zone === "hand") continue;
+      // Sen Triplets (round 412): another player's hand isn't "your hand".
+      if (m.notFromHand && o.zone === "hand" && o.owner === pid) continue;
       // "From your graveyard": a card cast from another player's graveyard isn't (a card is in its owner's, CR 404.2).
       if (m.fromGraveyard && o.zone === "graveyard" && o.owner !== pid) continue;
       if (m.notOwned && o.owner === pid) continue;
@@ -8571,7 +8607,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (s.zoneBatch ??= []).push({ id, zc: o.zoneChanges ?? 0, from: "graveyard", to: "stack", owner: o.owner, card: o.cardId });
     closeZoneBatch(s);
   }
-  o.castFrom = castFrom;
+  // Sen Triplets (round 412): cast from another player's hand, not "from your hand" (Effect handTurn).
+  o.castFrom = castFrom === "hand" && o.owner !== p.id ? "anotherHand" : castFrom;
   o.castBy = p.id;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
@@ -8772,7 +8809,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // reduction is used up as it becomes cast (CR 601.2i), each such one that applied to it.
   if (s.costModsThisTurn?.some((c) => c.next)) {
     const mvNow = defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost));
-    s.costModsThisTurn = s.costModsThisTurn.filter((c) => !c.next || !costModThisTurnApplies(s, c, p.id, d, mvNow, o.castFrom));
+    s.costModsThisTurn = s.costModsThisTurn.filter((c) => !c.next || !costModThisTurnApplies(s, c, p.id, d, mvNow, castFrom));
   }
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = o.castInMain = true;
   s.cards[d.oracleId] ??= d;
@@ -8794,7 +8831,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} casts a creature spell: the effects lasting until then end.`);
   }
   const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}), ...(o.faceDown ? { faceDown: true as const } : {}) });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom === "hand" && o.owner !== p.id ? undefined : castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}), ...(o.faceDown ? { faceDown: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.colorsSpent?.length ? { castColorsSpent: o.colorsSpent.length } : {}), ...(o.faceDown ? {} : { castName: d.name }) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
@@ -10730,6 +10767,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Revel in Silence: this turn only, for the players it named.
     if (turnRule(s, pid, "noLoyalty")) return "you can't activate planeswalkers' loyalty abilities this turn";
   }
+  // Sen Triplets (round 412): "that player can't ... activate abilities" this turn, mana abilities too (rulings).
+  if (turnRule(s, pid, "noAbilities")) return "you can't activate abilities this turn";
   if (ab.mana) {
     // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).
     if (!(s.priority === pid && !s.pending) && !(paysManaNow(s) && waitingOn(s) === pid)) return "you can't activate mana abilities now";
@@ -16665,11 +16704,11 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   const p = player(s, pid);
   const out: Action[] = [{ type: "passPriority", player: pid }];
   const handBan = !!handPlayBanned(s, pid);
-  for (const id of [...p.hand, ...exilePlayable(s, pid), ...topPlayable(s, pid)]) {
+  for (const id of [...p.hand, ...exilePlayable(s, pid), ...topPlayable(s, pid), ...othersHandPlayable(s, pid)]) {
     const d = defOf(s, obj(s, id));
     const o = obj(s, id);
-    // Experimental Frenzy: no land plays from the hand (casting is castProblem's).
-    const landOk = !(handBan && o.zone === "hand");
+    // Experimental Frenzy: no land plays from the hand (casting is castProblem's); not another player's hand (Sen Triplets).
+    const landOk = !(handBan && o.zone === "hand" && o.owner === pid);
     if (isType(d, "Land")) {
       if (landOk && canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });

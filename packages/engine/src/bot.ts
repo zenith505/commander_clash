@@ -100,6 +100,7 @@ import {
   availableMana,
   exilePlayable,
   topPlayable,
+  othersHandPlayable,
   castDef,
   casualtyCandidates,
   cardTypesPick,
@@ -2488,7 +2489,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Coram, the Undertaker (round 381): every graveyard's, its own permission deciding which.
     const fromYard = [...new Set([...(anyYard || playsFromAnyGraveyard(s, pid) ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
-    const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
+    // Sen Triplets (round 412): the cards in another player's hand it may play this turn.
+    const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...othersHandPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land") || castableFaces(s, obj(s, id)).length)
       // Damage prevention waits for damage coming (chooseDamageShield); Desperate Gambit for an unblocked attacker (chooseGambit).

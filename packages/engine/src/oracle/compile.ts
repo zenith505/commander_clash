@@ -149,6 +149,7 @@ import { linkTibaltExiles, round408Line } from "./round408";
 import { round409Line } from "./round409";
 import { round410Line } from "./round410";
 import { round411Line } from "./round411";
+import { round412Line } from "./round412";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1032,6 +1033,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Xanathar, Guild Kingpin, Sen Triplets (round 412): oracle/round412.ts.
+    if (round412Line(line, raw, out, isSpell)) continue;
     // Guff Rewrites History, Mysterious Stranger (round 411): oracle/round411.ts.
     if (round411Line(line, raw, out, isSpell)) continue;
     // Zinnia, Valley's Voice, Ashling, the Limitless (round 410): oracle/round410.ts.

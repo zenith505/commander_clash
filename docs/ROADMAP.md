@@ -1,7 +1,7 @@
 # Roadmap
 
-31,677 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,928 of
+31,679 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,930 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3860,7 +3860,7 @@ line blocks.
    creature card bigger than it that they can pay for, before combat. Browser tests click through Valki's three hand picks
    and its {X} copy pick, Abstruse Appropriation's cast from exile with Wastes, and Tibalt's back face, +2 and the Bolt its
    emblem casts. +2, 31,666 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
-   Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (playing the top card of another player's library,
+   Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (done in round 412) (playing the top card of another player's library,
    which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta,
    Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 409 went on down `npm run popular`, most played first, past cards left out before to three it could do whole.
@@ -3886,7 +3886,7 @@ line blocks.
    Out after round 409 (looked at, not done): God-Eternal Kefnet ("You may reveal the first card you draw each turn as you
    draw it": a choice in the middle of any draw, before the card joins the hand, rulings; draws don't pause yet); Karn
    Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
-   Triplets, Xanathar, Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta and the rest
+   Triplets (done in round 412), Xanathar (done in round 412), Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 410 took two cards back off the "Out after round N" lists, most played first: keyword costs a permanent gives the
    spells you cast "as you cast them". Zinnia, Valley's Voice's "Creature spells you cast gain offspring {2} as you cast
@@ -3934,6 +3934,31 @@ line blocks.
    settled); Nephalia Academy (an optional replacement at every discard an opponent's spell or ability causes, which
    would need a pause inside every discard); Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility Storm
    and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 412 went on down `npm run popular`, most played first, past cards left out before to two upkeep triggers that let
+   you play another player's cards for the turn. Xanathar, Guild Kingpin's "At the beginning of your upkeep, choose
+   target opponent. Until end of turn, that player can't cast spells, you may look at the top card of their library any
+   time, you may play the top card of their library, and you may spend mana as though it were mana of any color to cast
+   spells this way." (Effect topTurn `of`, GameState.topTurn: the top card of that player's library, shown only to you
+   in their seat, a land played with your land play and a spell at its usual timing with its usual costs, rulings, CR
+   305.2, 601.3; colored symbols paid with any mana for those spells only, CR 609.4b; nothing if the opponent is an
+   illegal target as it resolves, CR 608.2b). Sen Triplets' "At the beginning of your upkeep, choose target opponent. This
+   turn, that player can't cast spells or activate abilities and plays with their hand revealed. You may play lands and
+   cast spells from that player's hand this turn." (TurnRule "noAbilities": every activated ability, mana abilities too,
+   in any zone, rulings, while static and triggered abilities and replacement effects still work; Player.handRevealedTurn,
+   CR 402.3; Effect handTurn, GameState.handTurn: the cards in that hand, with your own mana, not their abilities,
+   rulings). A spell cast from another player's hand wasn't cast from "your hand" (GameObject.castFrom "anotherHand"):
+   no rebound (CR 702.88a), no "if you cast it from your hand", no Omniscience, Drannith Magistrate's "from anywhere
+   other than their hands" stops it, and Experimental Frenzy's and Memory Vessel's "from your hand" bans don't. In the app, the opponent's top card is clicked in their seat's Library,
+   and their revealed hand (Hand 👁 ✦) opens a viewer whose playable cards open the usual cast or play menu. Bots play
+   those cards like their own. Browser tests click through Xanathar's target, the Serra Angel cast with Swamps and the
+   Wastes played from Ana's library, and Sen Triplets' target, the Wastes played and the Serra Angel cast from Ana's
+   revealed hand. +2, 31,679 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 412 (looked at, not done): the lists after round 411 stay out. Judgment calls: Xanathar's "you may look
+   at the top card of their library any time" is modeled as the card being shown to you in that seat all turn (the
+   ruling's "can't look at the new top card until you finish casting" doesn't arise, since a cast is one step here); a
+   card from another player's hand cast with Sen Triplets keeps its own alternative costs (evoke, dash) but not ones given
+   only to spells from your hand (Omniscience, granted evoke), and suspend, foretell and plot (from your hand) aren't
+   offered for it.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

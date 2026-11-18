@@ -3,6 +3,7 @@
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parsePunisherOptions } from "./sentences/basics";
+import { roundB259Sentence } from "./laneb259";
 import { parseObject } from "./targets";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
@@ -45,5 +46,5 @@ export function roundB258Sentence(s: string, sentences: string[], si: number, ct
     if (sac?.length !== 1 || dmg?.length !== 1) return "fail";
     return { effect: { type: "punisher", who: { ref: "eachPlayer" }, options: [...sac, ...dmg], effects: [{ type: "destroy", what: { ref: "self" } }], mode: "ifAny", thenText: "destroy ~" }, next: si + 2 };
   }
-  return null;
+  return roundB259Sentence(s, sentences, si, ctx);
 }

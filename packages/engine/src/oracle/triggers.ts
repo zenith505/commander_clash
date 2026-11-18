@@ -3784,6 +3784,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(capital(lastCounter[2]!));
     return body ? { event: "selfLastCounterRemoved", countersKind: lastCounter[1]!, body } : "fail";
   }
+  // Divine Intervention: "When you remove the last intervention counter from ~, ...": the same, only when its controller
+  // removes it, with an effect or a cost they control (rulings: another player's Clockspinning doesn't trigger it).
+  const youLast = /^When you remove the last ([a-z]+) counter from ~, (.+)$/.exec(line);
+  if (youLast && youLast[1] !== "time") {
+    const body = parseBody(capital(youLast[2]!));
+    return body ? { event: "selfLastCounterRemoved", countersKind: youLast[1]!, removedByYou: true, body } : "fail";
+  }
   const timeExiled = /^(Whenever a|When the last) time counter is removed from ~ while it's exiled, (.+)$/.exec(line);
   if (timeExiled) {
     const body = parseBody(capital(timeExiled[2]!));

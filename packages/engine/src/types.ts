@@ -118,6 +118,8 @@ export interface DamageRule {
   shuffleIn?: true;
   /** Sokrates's granted ability (round 381): its controller and the player the damage would be dealt to each draw half that much, rounded down, prevented or not (CR 615.5, 615.12). */
   drawHalf?: true;
+  /** Swans of Bryn Argoll (round B252): the source's controller draws as many cards as this rule prevents, once the damage event is over (CR 615.5, GameState.damageDraws). */
+  drawsSource?: true;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
   countersOn?: { counter: string; tally?: true };
   /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
@@ -1825,7 +1827,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** "Unless its controller discards their hand" (Perplex): the whole hand, even an empty one. */ discardHand?: true; /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none. */ exileGraveyard?: true; /** "Ward—Discard a card at random": this many cards, chosen at random once they pay. */ discardRandom?: number; /** "Ward—Get five poison counters": this many poison counters as the payment. */ poison?: number; /** "Ward—Blight 2": this many -1/-1 counters on one creature they control as the payment, the creature chosen after saying yes (CR 701.68a). */ blight?: number; /** "Ward—Collect evidence 4": cards from their graveyard with this much total mana value, exiled as the payment, chosen after saying yes (CR 701.59a). */ collectEvidence?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** "Unless its controller discards their hand" (Perplex): the whole hand, even an empty one. */ discardHand?: true; /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none. */ exileGraveyard?: true; /** "Ward—Discard a card at random": this many cards, chosen at random once they pay. */ discardRandom?: number; /** "Ward—Get five poison counters": this many poison counters as the payment. */ poison?: number; /** "Ward—Blight 2": this many -1/-1 counters on one creature they control as the payment, the creature chosen after saying yes (CR 701.68a). */ blight?: number; /** "Ward—Collect evidence 4": cards from their graveyard with this much total mana value, exiled as the payment, chosen after saying yes (CR 701.59a). */ collectEvidence?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string; /** Rhystic Cave (round B254): paying stops a mana ability's mana (GameState.manaUnless), outside any resolution. */ manaUnless?: true }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
@@ -2605,7 +2607,9 @@ export interface GameState {
    * step, in order, made once the damage is dealt (dealCombatDamage); a draw replacement can stop them to ask (dredge), and
    * the rest follow its answer (draw `after` "damageDraws").
    */
-  damageDraws?: { player: PlayerId; n: number; card: string }[];
+  damageDraws?: { player: PlayerId; n: number; card: string; /** Lich (round B253): the draws replace a life gain; the Liches that have replaced a gain in this chain of events so far (CR 614.5). */ lich?: ObjectId[] }[];
+  /** Round B253: while a Lich's draws (`damageDraws` `lich`) are being made, through a draw replacement's question: a gain one of them turns into isn't replaced by those Liches again (CR 614.5, rulings on Nefarious Lich). */
+  gainDrawLineage?: { player: PlayerId; used: ObjectId[] };
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
@@ -2631,6 +2635,8 @@ export interface GameState {
   exileUncastTurn?: number;
   /** Hallowed Moonlight: the same for every creature that wasn't cast, tokens and copies of spells too (CR 614.1a). */
   exileUncastAnyTurn?: number;
+  /** Don't Blink (round B252): the turn creatures entering from exile, or after being cast from exile, are shuffled into their owners' libraries instead. */
+  dontBlinkTurn?: number;
   /** "If a creature an opponent controls would die this turn, exile it instead" (Malicious Eclipse): whose opponents' creatures, and the turn. */
   exileDyingOpponents?: { turn: number; player: PlayerId }[];
   /** "Players can't search libraries this turn" (Shadow of Doubt): the turn it applies in. */
@@ -2753,6 +2759,14 @@ export interface GameState {
   legendKeep?: ObjectId[];
   /** Spectral Searchlight: the mana another player adds in the color they choose (chooseOption "manaColorFor"): how much, and what made it (CR 106.3). */
   manaColorFor?: { player: PlayerId; n: number; from: ManaOrigin[]; source: string };
+  /**
+   * Rhystic Cave (round B254): "Add one mana of that color unless any player pays {1}": the mana ability's activation, its
+   * cost paid, waiting for the players in `queue` (turn order from the active player) to decline paying (payUnless
+   * `manaUnless`); `adds` the mana it makes then, `picked` its triggered mana abilities' (CR 605.1b, 605.4a).
+   */
+  manaUnless?: { player: PlayerId; id: ObjectId; zc: number; adds: ManaType[]; from: ManaOrigin[]; picked: { adds: ManaType[]; from?: ManaOrigin[][]; damage?: ObjectId[]; skipUntap?: true }; queue: PlayerId[]; cost: string; source: string };
+  /** Peace Talks (round B254): the turns ("this turn and next turn") in which creatures can't attack and players and permanents can't be the targets of spells or activated abilities. */
+  peaceTalksTurns?: number[];
   /** Charmed Pendant (round B239): the mana its milled card's hybrid symbols could add, waiting for its controller's choice (chooseOption "pendantMana"). */
   pendantMana?: { player: PlayerId; combos: ManaType[][]; from: ManaOrigin[]; source: string; id: ObjectId };
   /** The replacement a player chose for the game loss they're about to have (CR 616.1): an option of loseReplacements. */

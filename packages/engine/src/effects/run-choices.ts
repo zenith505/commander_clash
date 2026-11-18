@@ -1302,6 +1302,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((me, n) => s.resolving!.powerBefore !== undefined && s.resolving!.powerBefore !== n && me?.zone === "battlefield" && power(s, me) === n)(objects(s, { ref: "self" }, ctx)[0], e.cond.n)
             : e.cond.kind === "amountsCompare"
             ? amountNow(s, e.cond.a, ctx) >= amountNow(s, e.cond.atLeast, ctx)
+            // Lich (round B253): enough permanents it could sacrifice, as it resolves; "can't be sacrificed" ones don't count.
+            : e.cond.kind === "canSacrificeMany"
+            ? ((c) => s.battlefield.filter((id) => { const o = obj(s, id); return controllerOf(s, o) === ctx.controller && objectMatches(s, c.filter, o, ctx.controller, false) && canBeSacrificed(s, o); }).length >= amountNow(s, c.n, ctx))(e.cond)
             : e.cond.kind === "xAtLeast"
             ? (ctx.x ?? 0) >= e.cond.n
             : e.cond.kind === "hasGrantedAbility"

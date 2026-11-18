@@ -851,6 +851,50 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} adds {${made}}.`);
         return;
       }
+      if (e.costOf) {
+        // Elemental Resonance (round B252): "add mana equal to enchanted permanent's mana cost", its mana cost as the ability
+        // resolves (a face-down permanent has none, CR 708.2a), as it last existed if it's gone (CR 608.2h). Each colored
+        // symbol adds a mana of its color, a Phyrexian one too (CR 107.4f); generic mana adds that much {C}; {X} adds
+        // nothing (rulings); a hybrid symbol adds one of its colors, chosen as it resolves, the choice made anew each time
+        // (rulings). "Mana cost includes color": a symbol with one color adds that color ({2/W} adds {W}, {C/W} adds {W}),
+        // and one with none adds {C} ({C}, {S}).
+        const host = objects(s, { ref: "attached" }, ctx)[0];
+        const cost = host && !host.faceDown ? defOf(s, host).manaCost : "";
+        const fixed: ManaType[] = [];
+        const either: ManaType[][] = [];
+        for (const m of cost.matchAll(/\{([^}]+)\}/g)) {
+          const sym = m[1]!;
+          if (/^\d+$/.test(sym)) fixed.push(...Array<ManaType>(Number(sym)).fill("C"));
+          else if (sym === "X" || sym === "Y" || sym === "Z") continue;
+          else {
+            const colors = sym.split("/").filter((x): x is ManaType => (COLORS as readonly string[]).includes(x));
+            if (colors.length > 1) either.push(colors);
+            else if (colors.length === 1) fixed.push(colors[0]!);
+            else if (sym === "C" || sym === "S") fixed.push("C");
+          }
+        }
+        // Every way to make the hybrid choices, as the mana it gives (the same mana from two orders is one choice).
+        let ways: ManaType[][] = [[]];
+        for (const cs of either) ways = ways.flatMap((w) => cs.map((c) => [...w, c]));
+        const order = (ms: ManaType[]) => [...ms].sort((a, b) => "WUBRGC".indexOf(a) - "WUBRGC".indexOf(b));
+        const label = (ms: ManaType[]) => order(ms).map((m) => `{${m}}`).join("");
+        const options = [...new Map(ways.map((w) => [label([...w, ...fixed]), order([...w, ...fixed])])).values()];
+        const sc = (s.resolving!.scratch ??= {});
+        if (options.length > 1 && sc.either === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: options.map((_, i) => String(i)), labels: options.map((ms) => `Add ${label(ms)}`), prompt: "choose the mana" };
+          return "paused";
+        }
+        const made = options[options.length > 1 ? Math.max(0, Math.min(options.length - 1, sc.either!)) : 0] ?? [];
+        delete sc.either;
+        if (!made.length) {
+          log(s, `${src}: the mana cost adds no mana.`);
+          return;
+        }
+        const from = manaSourceOrigins(s, ctx);
+        for (const m of made) addMana(s, p.id, [m], { from });
+        log(s, `${p.name} adds ${label(made)}.`);
+        return;
+      }
       if (e.split) {
         // How many of the first color, the rest the second, chosen as it resolves (CR 608.2d).
         const n = amountNow(s, e.times ?? 1, ctx);

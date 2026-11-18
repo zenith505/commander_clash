@@ -101,6 +101,12 @@ export interface DamageRule {
   exileTop?: true;
   gainLife?: { colors?: Color[] };
   dealBack?: { colors?: Color[]; creatureToIt?: true };
+  /**
+   * Eye for an Eye (round B257): a replacement, not a prevention (CR 614.1a): the damage is still dealt, and the rule's card
+   * deals the same amount to the source's controller in the same damage event (rulings: the card is that damage's source).
+   * It applies even to damage that can't be prevented; with `nextTime`, once.
+   */
+  echo?: true;
   /** Bone Mask: its controller exiles that many cards from the top of their library, for damage really prevented (CR 615.5). */
   exileTopPrevented?: true;
   tokens?: TokenSpec;

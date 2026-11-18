@@ -558,7 +558,9 @@ type ShieldOp =
   /** Sokrates's granted ability (round 381): `by` (the creature's controller) and `to` each draw half of `n`, rounded down, even if it couldn't be prevented (CR 615.5, 615.12). */
   | { kind: "drawHalf"; by: PlayerId; to: PlayerId; n: number; card: string }
   /** Anti-Venom's counters for damage that can't be prevented, which is dealt too (CR 615.12). */
-  | { kind: "plusOnes"; id: ObjectId; n: number; by: PlayerId; card: string };
+  | { kind: "plusOnes"; id: ObjectId; n: number; by: PlayerId; card: string }
+  /** Eye for an Eye (round B257): `n` damage from `srcName` to `toName` is dealt, and the rule's card deals `n` to `toPlayer` in the same event; the rule is used up. */
+  | { kind: "echo"; rule: string; n: number; srcName: string; toName: string; card: string; toPlayer: PlayerId };
 
 interface ShieldPlan {
   ask?: ShieldQuestion;
@@ -581,7 +583,8 @@ interface ShieldPlan {
 /** One of the shields around a permanent or player, as the planner sees it. */
 interface PlanShield {
   key: string;
-  kind: "prevent" | "redirect";
+  /** "echo": Eye for an Eye's rule (DamageRule.echo), which takes none of the damage but adds the same amount to the event. */
+  kind: "prevent" | "redirect" | "echo";
   cap: number;
   to?: Rec;
   card?: string;
@@ -972,6 +975,12 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       if (redirectCap.get(sh.id)! > 0 && dest && !applied.has(sh.id)) out.push({ key: sh.id, kind: "redirect", cap: redirectCap.get(sh.id)!, to: dest, card: sh.source });
     }
     for (const rule of allRules) {
+      // Eye for an Eye (round B257): a replacement that keeps the damage (CR 614.1a), so "damage can't be prevented"
+      // doesn't stop it; it adds damage, so it never runs out within the event.
+      if (rule.echo) {
+        if ("player" in r && !applied.has(rule.id) && ruleCovers(s, rule, r)) out.push({ key: rule.id, kind: "echo", cap: Infinity, card: cardName(s, rule), rule });
+        continue;
+      }
       if (preventsAll(rule) || applied.has(rule.id) || !ruleCovers(s, rule, r)) continue;
       const dest = ruleDestination(s, rule);
       if (rule.redirect ? !dest : !preventing) continue;
@@ -988,6 +997,15 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   const takes = (sh: PlanShield, e: DamageEvent) =>
     (sh.kind !== "prevent" || prev(e)) && !(sh.kind === "redirect" && (e.src.noRedirect || damageUnalterableTo(s, e.to))) && !(e.applied ?? []).includes(sh.key) && !(staticRedirect(sh.key) && (e.applied ?? []).some(staticRedirect)) && (!sh.rule || ruleTakes(s, sh.rule, e));
   let queue = events.filter((e) => e.n > 0).map((e) => ({ ...e, applied: e.applied ?? [] }));
+  // Eye for an Eye (round B257): `n` of `e`'s damage is dealt as it would be, and the rule's card deals `n` to the
+  // source's controller as part of the same event (CR 614.1a, rulings), that damage meeting that player's own shields.
+  const echoNow = (sh: PlanShield, e: DamageEvent, n: number, toName: string) => {
+    const r = sh.rule;
+    const d = r ? s.cards[r.cardId] : undefined;
+    if (!r || !d || n <= 0) return;
+    ops.push({ kind: "echo", rule: sh.key, n, srcName: e.src.name, toName, card: sh.card ?? d.name, toPlayer: e.src.controller });
+    if (!player(s, e.src.controller).lost) queue.push({ src: cardSource(d, r.controller), to: { player: e.src.controller }, n, applied: [sh.key] });
+  };
   const order = turnOrderFrom(s, s.activePlayer);
   // A rule's "next N damage" shield protecting several permanents and players (Harm's Way's "you and/or permanents you
   // control"): when its source would deal more than N to them at once, its controller chooses which N (rulings).
@@ -1092,6 +1110,28 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       if (thatMany && "object" in to) {
         const src = thatMany.from ? s.objects[thatMany.from] : undefined;
         ops.push({ kind: "plusOnes", id: to.object, n: thatMany.oneEach ? 1 : e.n, by: thatMany.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" });
+      }
+      // Eye for an Eye (round B257): when a prevention effect or protection would stop this damage too, the player being
+      // dealt it chooses which applies first (CR 616.1). Eye for an Eye first: the damage is dealt to them (and then
+      // prevented) and the same amount by Eye for an Eye to the source's controller, the amount replacements applied before
+      // it as the most it can be; the prevention first: the source no longer would deal damage to them, so Eye for an Eye
+      // waits for the next time. A bot takes Eye for an Eye first unless the source is its own.
+      if ("player" in to && prev(e)) {
+        const eye = shieldsOf(to, new Set()).find((x) => x.kind === "echo" && takes(x, e));
+        const stops = allRules.some((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) || preventedAll(s, e) || playerProtectedFrom(s, to.player, e.src.controller, e.src);
+        if (eye && stops) {
+          const labels = [`${eye.card} first: ${e.src.name}'s damage is dealt and ${eye.card} deals that much to ${player(s, e.src.controller).name}`, `Prevent the damage first (${eye.card} waits for the next time)`];
+          const order = e.src.controller === to.player ? [1, 0] : [0, 1];
+          const i = choose({ player: to.player, prompt: `Damage from ${e.src.name} to ${toName}: which applies first?`, labels: order.map((k) => labels[k]!) });
+          if (i === null) return { ask, ops, final, used: next };
+          if (order[i] === 0) {
+            let n = e.n;
+            const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
+            if (boost.length && boost.length <= 6) for (const ord of permutations(boost)) n = Math.max(n, ord.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
+            echoNow(eye, e, n, toName);
+            e.applied = [...(e.applied ?? []), eye.key];
+          }
+        }
       }
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
@@ -1287,7 +1327,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       else redirectCap.set(sh.key, sh.cap - used);
     };
     const part = (x: PlanShield) => (x.cap === Infinity ? "it" : `${x.cap} of it`);
-    const label = (x: PlanShield) => (x.kind === "prevent" ? `Prevent ${part(x)}${x.rule ? ` (${x.card})` : ""}` : `Deal ${part(x)} to ${nameOf(x.to!)} instead (${x.card})`);
+    const label = (x: PlanShield) => (x.kind === "echo" ? `${x.card}: deal that much damage to that source's controller too` : x.kind === "prevent" ? `Prevent ${part(x)}${x.rule ? ` (${x.card})` : ""}` : `Deal ${part(x)} to ${nameOf(x.to!)} instead (${x.card})`);
     let paused = false;
     const mods = allMods.filter((m) => modLive(m, left, done));
     if (!mods.length) {
@@ -1297,13 +1337,20 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const same = (a: PlanShield, b: PlanShield) => a.kind === b.kind && (a.to ? recKey(a.to) : "") === (b.to ? recKey(b.to) : "");
         let sh = shields[0]!;
         if (capSum > total() && shields.some((x) => !same(x, sh))) {
-          const opts = [...shields].sort((a, b) => (a.kind === "prevent" ? 0 : 1) - (b.kind === "prevent" ? 0 : 1));
+          const rank = (x: PlanShield) => (x.kind === "echo" ? -1 : x.kind === "prevent" ? 0 : 1);
+          const opts = [...shields].sort((a, b) => rank(a) - rank(b));
           const i = choose({ player: who, prompt: `Damage to ${toName}: which shield applies first?`, labels: opts.map(label) });
           if (i === null) {
             paused = true;
             break;
           }
           sh = opts[i]!;
+        }
+        if (sh.kind === "echo") {
+          const eye = sh;
+          for (const [i, e] of incoming.entries()) if (left[i]! > 0 && takes(eye, e)) echoNow(eye, e, left[i]!, toName);
+          shields = shields.filter((x) => x !== eye);
+          continue;
         }
         const take = allocate(sh, left, askSource(sh));
         if (!take) {
@@ -1325,6 +1372,8 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const at = [...left];
         const seen = done.map((x) => new Set(x));
         const taken: number[][] = [];
+        // Eye for an Eye: the damage it would deal back, worth half a point of damage to the chooser each.
+        let echoed = 0;
         // Lichenthrope's -1/-1 counters are worse than the damage they replace (they stay), Phytohydra's +1/+1 better.
         let swapped = 0;
         for (const o of order) {
@@ -1341,10 +1390,13 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
             // costs less than a point of life, unless there aren't enough of them (the player loses).
             if (o.mod.mod.op === "sacrifice") swapped += (before - at.reduce((a, n) => a + n, 0)) * 3;
             if (o.mod.mod.op === "exileYard" && "player" in to) swapped += ((r) => (r > player(s, to.player).graveyard.length ? 1000 : r / 2))(before - at.reduce((a, n) => a + n, 0));
+          } else if (o.shield.kind === "echo") {
+            const eye = o.shield;
+            echoed += incoming.reduce((a, e, i) => a + (at[i]! > 0 && takes(eye, e) ? at[i]! : 0), 0);
           } else taken.push(allocate(o.shield, at, () => 0)!);
         }
         const used = taken.reduce((a, t) => a + t.reduce((x, y) => x + y, 0), 0);
-        return { key: JSON.stringify([at, taken]), score: at.reduce((a, n, i) => a + n * (1 + harm(incoming[i]!, to, who) / 100), 0) + swapped + used / 1000 };
+        return { key: JSON.stringify([at, taken, echoed]), score: at.reduce((a, n, i) => a + n * (1 + harm(incoming[i]!, to, who) / 100), 0) + swapped + used / 1000 - echoed / 2 };
       };
       while (total() > 0 && !paused) {
         opts = opts.filter((o) => live(o, left, done));
@@ -1374,7 +1426,10 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
           }
         }
         if ("mod" in pick) applyMod(pick.mod, left, done, true);
-        else {
+        else if (pick.shield.kind === "echo") {
+          const eye = pick.shield;
+          for (const [i, e] of incoming.entries()) if (left[i]! > 0 && takes(eye, e)) echoNow(eye, e, left[i]!, toName);
+        } else {
           const take = allocate(pick.shield, left, askSource(pick.shield));
           if (!take) {
             paused = true;
@@ -1656,7 +1711,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       log(s, `${player(s, op.to).name} gains control of ${op.toName}.`);
       syncControl(s);
     }
-    else if (op.kind === "prevent" && op.rule) {
+    else if (op.kind === "echo") {
+      log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName}, and ${op.card} deals ${op.n} damage to ${player(s, op.toPlayer).name}.`);
+      ruleUsed(op.rule, 0);
+    } else if (op.kind === "prevent" && op.rule) {
       const r = ruleById(op.rule);
       log(s, `${op.n} damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : ""}.`);
       ruleUsed(op.rule, op.n, op.src, true);

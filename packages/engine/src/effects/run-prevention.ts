@@ -218,6 +218,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   if (spec.redirectToSourceController) rule.redirect = { sourceController: true };
   if (spec.gainLife) rule.gainLife = spec.gainLife;
   if (spec.dealBack) rule.dealBack = spec.dealBack;
+  if (spec.echoToSourceController) rule.echo = true;
   if (spec.exileTopPrevented) rule.exileTopPrevented = true;
   // New Way Forward: its reflexive trigger is New Way Forward's (CR 603.12), the spell as it is while resolving.
   if (spec.reflect) {

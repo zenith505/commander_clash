@@ -1913,6 +1913,8 @@ export interface DamageRuleSpec {
   dealBack?: { colors?: Color[]; creatureToIt?: true };
   /** Bone Mask: "Exile cards from the top of your library equal to the damage prevented this way" (CR 615.5): its controller exiles that many, all their library with fewer (rulings), only for damage really prevented. */
   exileTopPrevented?: true;
+  /** Eye for an Eye (round B257): "instead that source deals that much damage to you and ~ deals that much damage to that source's controller": not a prevention (CR 614.1a), the damage is dealt and the same amount added to the same event (DamageRule.echo). */
+  echoToSourceController?: true;
   /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
   tokens?: TokenSpec;
   /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, Temper, Brace for Impact): on the creature it protects, as the damage is prevented (rulings: before state-based actions). `endStep`: "at the beginning of the next end step" (Sacred Boon), by a delayed trigger counting all it prevented (CR 603.7); `ifCreature`: only if what it protects is a creature then (Scars of the Veteran's "If it's a creature"). */

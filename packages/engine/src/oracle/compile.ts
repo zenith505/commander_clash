@@ -97,6 +97,7 @@ import { roundB252Line } from "./laneb252";
 import { roundB253Line } from "./laneb253";
 import { roundB255Line } from "./laneb255-lines";
 import { roundB256Line } from "./laneb256-lines";
+import { roundB257Line } from "./laneb257-lines";
 import { round344Line } from "./round344";
 import { roundB190Line } from "./laneb190";
 import { roundB191Line, roundB191Spell, roundB191Text } from "./laneb191";
@@ -2347,6 +2348,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB255Line(line, out, isSpell)) continue;
     // Search the City (round B256).
     if (roundB256Line(line, out, isSpell)) continue;
+    // Arcum's Whistle (round B257).
+    if (roundB257Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8152,6 +8155,9 @@ function linkExile(out: CompiledCard) {
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);
+    // Shell of the Last Kappa (round B257): its one "exile target instant or sorcery spell that targets you", the card
+    // linked as it's exiled (counterSpell `linked`).
+    const spellExiles = all.filter((e): e is Extract<Effect, { type: "counterSpell" }> => e.type === "counterSpell" && !!e.exileSpell && !e.cause && !e.plot && !e.ownerMayCost && !e.n && !e.linked);
     // Kayla's Music Box: "exile it face down", always linked to its source. River Song's Diary: its spells exiled as they
     // resolve, linked as they're exiled.
     // Summon: Esper Valigarmanda: "exile an instant or sorcery card from each graveyard", linked as it's parsed.
@@ -8160,7 +8166,8 @@ function linkExile(out: CompiledCard) {
     // Wizard's Spellbook (round 403): its rows' "copy that card" (castFromAmong fromExiledThisWay) exile nothing themselves.
     const faceDown = [...new Set(all.filter((e) => e.type === "exileFaceDown" || (e.type === "exileAsResolves" && !!e.linked) || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !!e.linked) || e.type === "exileUntilNonlandLinked"))];
     const others = all.some((e) => (e.type === "exile" && !!e.until) || (e.type === "search" && !searches.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileHand" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.linked) || (e.type === "discard" && !!e.exile) || (e.type === "castFromAmong" && !e.fromLinked && !e.fromExiledThisWay));
-    if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+    if (others || out.spell || impulses.length || tops.length + exiles.length + searches.length + faceDown.length + spellExiles.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+    else if (spellExiles[0]) spellExiles[0].linked = true;
     else if (faceDown.length) {
       // Linked as it's exiled.
     } else if (tops[0]) tops[0].linked = true;

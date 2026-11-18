@@ -2335,6 +2335,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "de691eed-d90b-48f9-bae4-f982767f2bfd",
+  "name": "Arcum's Whistle",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Choose target non-Wall creature the active player has controlled continuously since the beginning of the turn. That player may pay {X}, where X is that creature's mana value. If they don't pay, the creature attacks this turn if able, and at the beginning of the next end step, destroy it if it didn't attack this turn. Activate only before attackers are declared.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "628f2deb-519e-4810-a7e5-e31316e9a4e0",
   "name": "Arcus Acolyte",
   "manaCost": "{G}{W}",
@@ -15150,6 +15172,32 @@
   "commanderLegal": "legal",
   "set": "p02",
   "releasedAt": "1998-06-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "22647b1a-5a7c-41b5-b820-b2e9f49c7aad",
+  "name": "Eye for an Eye",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "The next time a source of your choice would deal damage to you this turn, instead that source deals that much damage to you and Eye for an Eye deals that much damage to that source's controller.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -38160,6 +38208,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dfa459a1-b065-4488-88d3-4da388261b52",
+  "name": "Safe Passage",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Prevent all damage that would be dealt to you and creatures you control this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d6c008c7-6c87-4677-ba0e-6d95f10d10bc",
   "name": "Sages of the Anima",
   "manaCost": "{3}{G}{U}",
@@ -39791,6 +39865,30 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/b/c/bc7239ea-f8aa-4a6f-87bd-c35359635673.jpg?1783929355"
    }
   ]
+ },
+ {
+  "oracleId": "a8b24b38-019c-45e7-a5f4-a1bc3014f7a2",
+  "name": "Shell of the Last Kappa",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Exile target instant or sorcery spell that targets you. (The spell has no effect.)\n{3}, {T}, Sacrifice Shell of the Last Kappa: You may cast a spell from among cards exiled with Shell of the Last Kappa without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",

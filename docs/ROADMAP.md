@@ -1,6 +1,6 @@
 # Roadmap
 
-31,686 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,689 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,925 of
 9,979 (99%).
 
@@ -3615,7 +3615,7 @@ line blocks.
    Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
    Killer, Celestial Dawn, Titania's Song, Bitter Feud, Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr,
-   Shared Fate, Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye, Spy Kit and the rest from rank 15,000 to 25,000
+   Shared Fate, Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
    Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
    round 285: Koh, the Face Stealer's "Pay 1 life: Choose a creature card exiled with Koh." and "Koh has all activated and
@@ -6114,7 +6114,7 @@ line blocks.
    - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy (done in round 378) ("before combat or
      during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
      controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it" (done in round B131).
-     Coastal Wizard, Lady Sun, Diaochan (done in round B141), Maddening Imp (done in round B223), Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
+     Coastal Wizard, Lady Sun, Diaochan (done in round B141), Maddening Imp (done in round B223), Norritt, Arcum's Whistle (done in round B257), Blood Frenzy and Berserk are out on
      their other lines.
    Left from the round after cascade ("when you lose control of", face-down exile, attach target Equipment,
    harmonize, paradigm, demonstrate):
@@ -8816,7 +8816,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B120 (looked at, not done): Nova Pentacle (done in round B141) (a target creature an opponent of your choice chooses, rulings),
   Lichenthrope, Force Bubble (done in round B135) and Crumbling Sanctuary (damage replaced by counters or exiled cards: a replacement that isn't
   a prevention, so it applies to damage that can't be prevented and is ordered with the shields, CR 616.1; the damage rules
-  only prevent or redirect), Eye for an Eye (the damage is dealt and the same amount dealt to the source's controller),
+  only prevent or redirect), Eye for an Eye (done in round B257) (the damage is dealt and the same amount dealt to the source's controller),
   Channel Harm (done in round B212) ("you may have ~ deal that much damage" each time damage is prevented, a choice inside the prevention).
 - Round B121 (least played first, from the skip lists): Coalition Honor Guard, Standard Bearer and Coalition Flag (an
   opponent choosing targets for a spell they cast or an ability they activate must choose at least one Flagbearer if able:
@@ -10953,6 +10953,35 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   left exiled with it and it still on the battlefield, it's sacrificed and its controller takes an extra turn. Browser tests
   for both reblock questions, Raiding Party's tap and Plains picks, and Search the City's question. +4, 31,686 of 31,936 with main through round 408 and B255.
   The compiled text of every other card is unchanged.
+- Round B257 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds 409-412): Shell of the
+  Last Kappa ("{3}, {T}: Exile target instant or sorcery spell that targets you." and "{3}, {T}, Sacrifice ~: You may cast a
+  spell from among cards exiled with ~ without paying its mana cost."): a spell with you among its targets (rulings), as
+  Psychic Rebuttal's counter, exiled from the stack, not countered, so one that can't be countered goes too (rulings, CR
+  701.6a); the card (a copy ceases to exist, CR 707.10a) is linked to the Shell (CR 607.2a) for its sacrifice ability's free
+  cast (oracle/laneb257.ts, compile.ts links a lone `counterSpell` exile for "cast a spell from among cards exiled with ~").
+  Arcum's Whistle ("{3}, {T}: Choose target non-Wall creature the active player has controlled continuously since the
+  beginning of the turn. That player may pay {X}, where X is that creature's mana value. If they don't pay, the creature
+  attacks this turn if able, and at the beginning of the next end step, destroy it if it didn't attack this turn. Activate
+  only before attackers are declared."): Nettling Imp's ability behind a punisher, the target's controller (the active
+  player while the target is legal) asked to pay {X} as it resolves, any turn before the first combat's declare attackers
+  step (rulings, CR 506.8a; oracle/laneb257-lines.ts). Eye for an Eye ("The next time a source of your choice would deal
+  damage to you this turn, instead that source deals that much damage to you and ~ deals that much damage to that source's
+  controller."): Deflecting Palm's rule (CR 609.7a, 615.8) as a replacement that keeps the damage (CR 614.1a), so damage that
+  can't be prevented is matched too; the same amount, dealt by the card (rulings), is added to the same damage event for
+  whoever controls the source as it would deal it, meeting that player's own shields (DamageRule.echo, a damage.ts shield
+  kind "echo"). With prevention shields or amount replacements, the player dealt the damage orders it with them (CR 616.1:
+  after a tripling it deals the tripled amount back); when a prevention effect or protection would stop the damage, they
+  choose Eye for an Eye first (dealt back, then prevented) or the prevention first (no damage would be dealt, so Eye for an
+  Eye waits for the next time). Browser tests for the Shell's exile and free cast, the Whistle's pay question both ways and
+  Eye for an Eye's source pick and order question. +3, 31,689 of 31,936 with main through round 408 and B255-B256. The
+  compiled text of every other card is unchanged.
+- Out after round B257 (looked at, not done): the lists after round B256 stay out, and Guardian Beast (still out: "can't be
+  enchanted" that "doesn't remove Auras already attached" while it toggles with the Beast's tapped state, and "other players
+  can't gain control of them", which its rulings don't settle beyond sacrifices). Known gaps: bots never activate Arcum's
+  Whistle or Shell of the Last Kappa's sacrifice ability (they do use its exile against an opponent's spell that targets
+  them), and pay the Whistle's {X} only when the punisher weighing says so; bots cast Eye for an Eye as they cast a prevention
+  shield when damage comes (it deals that much back instead of preventing it) and take it first in the order questions
+  unless the source is their own.
 - Out after round B256 (looked at, not done): the lists after round B255 stay out, and General Jarkeld (two blockers
   swapped between attackers, each needing a legal block). Judgment calls and known gaps: an effect's block isn't checked
   against blocking restrictions or costs and a tapped creature can block this way (no ruling on either card covers it; CR
@@ -11071,7 +11100,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B233 (looked at, not done): the lists after round B232 stay out, and Peace Talks ("can't be the targets
   of spells or activated abilities" still needs targets checked by whether the ability was activated or triggered),
   Charmed Pendant (done in round B239) (mana from a mana ability whose amount and colors depend on the card its cost milled, with a color chosen
-  for each hybrid symbol), Eye for an Eye (a replacement that keeps the damage and adds the same amount from another source
+  for each hybrid symbol), Eye for an Eye (done in round B257) (a replacement that keeps the damage and adds the same amount from another source
   to another player in one event), Benthic Explorers ("Untap a tapped land an opponent controls" as a cost) and Grime Gorger
   (still out: "one card of each card type" for cards with two types). Known gaps: bots never activate A Killer Among Us and,
   as Oracle en-Vec's target, choose no creatures (so none of theirs attacks that turn); Memory Vampire's "defending player" is
@@ -11125,7 +11154,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   legality doesn't yet know whether an ability was activated or triggered), False Dawn (mana from spells and abilities, not
   only lands, turned white, and white mana spent as any color), Benthic Explorers (untapping an opponent's land as a mana
   ability's cost) and the lists after round B223 stay out.
-- Out after round B223 (looked at, not done): Eye for an Eye (a replacement, not a prevention, that keeps the damage and
+- Out after round B223 (looked at, not done): Eye for an Eye (done in round B257) (a replacement, not a prevention, that keeps the damage and
   adds Eye for an Eye's own; the affected player orders it with prevention shields and redirections, CR 616.1, and the
   result differs between orders), Oracle en-Vec (done in round B233) (chosen creatures that must attack during that player's next turn while
   the others can't), and Noxious Vapors, Grime Gorger, Allure of the Unknown and Glimpse of Tomorrow (as after round
@@ -11690,7 +11719,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard and that card on top).
 - Known gaps from round B71: bots always search the library too when "and/or library" lets them skip it, even with
   Psychic Surgery or Cosi's Trickster watching.
-- Out after round B70 (looked at, not done): Shell of the Last Kappa and Gale's Redirection (done in round 363) (exiling a spell from the
+- Out after round B70 (looked at, not done): Shell of the Last Kappa (done in round B257) and Gale's Redirection (done in round 363) (exiling a spell from the
   stack), Munda, Ambush Leader (done in round B196) (cards from the top revealed and put back on top in any order), Krang & Shredder
   (each opponent exiles until a nonland card, then a free cast among them under a Disappear condition).
 - Known gaps from round B69: War Cadence with X = 0 lets creatures block free, but a cost of {0} still has to be chosen
@@ -11837,7 +11866,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "next N damage" among several recipients (Harm's Way). Turn-long rules (`GameState.damageRules`, "a source of your
   choice", Safe Passage) apply after the shields on a permanent or player. A source of your choice is offered from the
   battlefield and the stack only (not a commander in the command zone, which can't deal damage there anyway).
-  Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage, done in round B121), Eye for an Eye's
+  Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage, done in round B121), Eye for an Eye's (done in round B257)
   "instead that source deals that much damage to you and ~ deals that much damage to that source's controller",
   Nova Pentacle's "target creature of an opponent's choice",
   "if damage is prevented this way, you may have ~ deal that much damage to target creature" (Channel Harm (done in round B212)) and

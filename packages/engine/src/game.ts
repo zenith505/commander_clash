@@ -7405,6 +7405,8 @@ export function castProblem(
   if (kp) return kp;
   const rp = replicateProblem(s, pid, d, choices?.replicate);
   if (rp) return rp;
+  const op = offspringProblem(s, pid, d, choices?.offspring, !!choices?.faceDown);
+  if (op) return op;
   const or = compileCard(d).costOr;
   if (choices?.costOr !== undefined && (!or || !Number.isInteger(choices.costOr) || !or[choices.costOr])) return `${d.name} has no such cost to choose`;
   // Not chosen yet: one of the ways has to be possible (a mana one is, as far as the mana check below goes).
@@ -7470,7 +7472,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate" | "offspring"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -7487,7 +7489,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
   // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
-  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate);
+  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate) + offspringMana(s, pid, d, how.offspring);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor, kicks.length > 0 && isRealKicker(kicker));
@@ -8084,6 +8086,7 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "grantedWebSlinging") return s && pid !== undefined ? grantedWebSlinging(s, pid, d) : undefined;
   if (alt === "grantedBlitz") return s && pid !== undefined ? grantedBlitz(s, pid, d) : undefined;
   if (alt === "grantedEmerge") return s && pid !== undefined ? grantedEmerge(s, pid, d) : undefined;
+  if (alt === "grantedEvoke") return s && pid !== undefined ? grantedEvoke(s, pid, d, o) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
@@ -8179,6 +8182,28 @@ function grantedEmerge(s: GameState, pid: PlayerId, d: CardDef): NonNullable<Com
   });
   return given ? { kind: "grantedEmerge", mana: d.manaCost, costs: [{ kind: "sacrifice", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 1 }] } : undefined;
 }
+
+/**
+ * Round 410: evoke a permanent `pid` controls gives this permanent spell, checked by its characteristics as a spell (Ashling,
+ * the Limitless: "Elemental permanent spells you cast from your hand gain evoke {4} as you cast them", CR 702.74a), beside
+ * any evoke of its own. `o`, the card being cast: "from your hand" is its caster's own hand (CR 601.2a); without it, only
+ * the mana is wanted. Several: the cheapest by mana value.
+ */
+function grantedEvoke(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (!isPermanentCard(d)) return undefined;
+  const fromHand = !o || (o.zone === "hand" && o.owner === pid) || (o.zone === "stack" && o.castFrom === "hand");
+  const costs = s.battlefield.flatMap((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).spellsGainEvoke ?? []).filter((x) => (!x.fromHand || fromHand) && printedMatches(x.filter, d)).map((x) => x.mana) : [];
+  });
+  const mana = costs.sort((a, b) => manaValue(parseManaCost(a)) - manaValue(parseManaCost(b)))[0];
+  return mana ? { kind: "grantedEvoke", mana } : undefined;
+}
+
+/** Round 410: the evoke trigger a permanent spell cast for a granted evoke cost keeps as a permanent (CR 702.74a, 400.7b, 611.3d). */
+export const GRANTED_EVOKE_TRIGGER = "When ~ enters, sacrifice ~.";
+/** Round 410: the offspring trigger a creature spell keeps as a permanent for each instance of granted offspring paid (CR 702.175a-b, 400.7b, 611.3d). */
+export const GRANTED_OFFSPRING_TRIGGER = "When ~ enters, create a token that's a copy of ~, except it's 1/1.";
 
 /** Is this alternative cost emerge, the card's own or one a permanent gave it (CR 702.119a)? */
 export const isEmerge = (alt: AltCostKind | undefined) => alt === "emerge" || alt === "grantedEmerge";
@@ -8290,7 +8315,8 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const sling = grantedWebSlinging(s, pid, defOf(s, o));
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
+  const evoke = grantedEvoke(s, pid, defOf(s, o), o);
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(evoke ? [evoke] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -8497,6 +8523,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const xOut: { part?: number; any?: boolean } = {};
   // Round B248: the instances of replicate permanents give it, as its total cost is locked in (CR 702.56b, 601.2f).
   const replicateNow = choices.replicate?.some((n) => n > 0) ? replicateGranted(s, p.id, d) : [];
+  // Round 410: the instances of offspring permanents give it, as its total cost is locked in (CR 702.175b, 601.2f).
+  const offspringNow = choices.offspring?.some((n) => n > 0) ? offspringGranted(s, p.id, d) : [];
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes, xOut }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
@@ -8705,6 +8733,14 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
   const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
   if (replicated.length) item.replicated = replicated;
+  // Round 410: each instance of offspring a permanent gave it that was paid: the permanent it becomes has that instance's
+  // enters trigger for the rest of the game, even once the giver is gone (CR 702.175a-b, 400.7b, 611.3d, rulings), as an
+  // ability with the giver's timestamp (CR 613.7a). An unpaid instance's trigger would do nothing (its "if" is false).
+  const offspringPaid = offspringNow.filter((_, i) => (choices.offspring![i] ?? 0) > 0);
+  for (const g of offspringPaid) (o.spellGains ??= []).push({ mods: [{ kind: "addAbility", text: GRANTED_OFFSPRING_TRIGGER }], timestamp: g.timestamp, controller: p.id, source: nameOf(s, g.source), forever: true });
+  // Round 410: cast for evoke a permanent gave it (Ashling, the Limitless): the permanent keeps evoke's sacrifice trigger
+  // (CR 702.74a, 400.7b, 611.3d; rulings: even if Ashling has left by then).
+  if (choices.alt === "grantedEvoke" && !o.spellCopy) (o.spellGains ??= []).push({ mods: [{ kind: "addAbility", text: GRANTED_EVOKE_TRIGGER }], timestamp: s.nextTimestamp++, controller: p.id, source: d.name, forever: true });
   for (const t of spentQueue) if (!("spell" in t) || spellMatches(s, t.spell, item)) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
   if (castTrigger) s.triggerQueue.push({ sourceId: castTrigger.sourceId, sourceCardId: castTrigger.sourceCardId, sourceZc: castTrigger.sourceZc, controller: p.id, index: -1, body: castTrigger.body, cause: stackId, subject: { id, zc: o.zoneChanges ?? 0 } });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
@@ -8723,6 +8759,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
+  const offspringText = offspringPaid.map((g) => `, paying offspring ${g.cost} (from ${nameOf(s, g.source)})`).join("");
   const replicateText = replicated.map((r) => `, paying replicate ${replicateNow.find((g) => g.source === r.source)!.cost}${r.times === 1 ? " once" : r.times === 2 ? " twice" : ` ${r.times} times`} (from ${nameOf(s, r.source)})`).join("");
   // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
   const payWay = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id ? s.pending.pay : undefined;
@@ -8737,7 +8774,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -9366,6 +9403,39 @@ export function replicateGranted(s: GameState, pid: PlayerId, d: CardDef): { sou
     for (const g of abilitiesOf(s, p).spellsHaveReplicate ?? []) if (printedMatches(g.filter, d)) out.push({ source: id, cost: g.cost ?? (d.manaCost ? d.manaCost : null), text: g.text });
   }
   return out;
+}
+
+/**
+ * Round 410: the instances of offspring permanents `pid` controls give this card as they cast it ("Creature spells you cast
+ * gain offspring {2} as you cast them", Zinnia, Valley's Voice), in the order they're on the battlefield, beside any
+ * offspring it has (CR 702.175a-b), each with its giver's timestamp (CR 613.7a).
+ */
+export function offspringGranted(s: GameState, pid: PlayerId, d: CardDef): { source: ObjectId; cost: string; text: string; timestamp: number }[] {
+  const out: { source: ObjectId; cost: string; text: string; timestamp: number }[] = [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).spellsGainOffspring ?? []) if (printedMatches(g.filter, d)) out.push({ source: id, cost: g.cost, text: g.text, timestamp: p.timestamp });
+  }
+  return out;
+}
+
+/** Why these payments for the instances of offspring permanents give the spell aren't allowed: each once or not (CR 702.175a, rulings). */
+function offspringProblem(s: GameState, pid: PlayerId, d: CardDef, paid?: number[], faceDown?: boolean): string | null {
+  if (!paid?.length) return null;
+  if (paid.some((n) => n !== 0 && n !== 1)) return "an offspring cost is paid once or not at all";
+  if (paid.every((n) => n === 0)) return null;
+  // A face-down spell's token copy would be a face-down copy of a face-down permanent (CR 708.10, 707.2): not handled.
+  if (faceDown) return "offspring isn't paid for a face-down spell here";
+  if (paid.length > offspringGranted(s, pid, d).length) return `${d.name} doesn't have that many instances of offspring`;
+  return null;
+}
+
+/** The mana paid for the instances of offspring permanents give the spell (CR 702.175a, 601.2f). */
+function offspringMana(s: GameState, pid: PlayerId, d: CardDef, paid?: number[]): string {
+  if (!paid?.some((n) => n > 0)) return "";
+  const grants = offspringGranted(s, pid, d);
+  return paid.map((n, i) => (n > 0 ? (grants[i]?.cost ?? "") : "")).join("");
 }
 
 /** The most times one instance of replicate may be paid here: a cost of {0} could otherwise be paid without end. */

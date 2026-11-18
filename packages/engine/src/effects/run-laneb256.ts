@@ -35,7 +35,7 @@ export function reblockOptions(s: GameState, o: GameObject): ObjectId[] {
  * "blocked by only that creature this combat" (TurnLog.blocks). Its "blocks" and "becomes blocked" abilities trigger
  * (event blockedByEffect).
  */
-export function blockByEffect(s: GameState, bl: GameObject, at: GameObject, src: string) {
+export function blockByEffect(s: GameState, bl: GameObject, at: GameObject, src: string, /** Sorrow's Path (round B258): a swap that leaves each attacker blocked by as many creatures as before, so no "blocked by N or more" crossing. */ swap?: true) {
   const wasBlocking = !!bl.blocking?.length;
   const band = at.band ? s.battlefield.map((id) => obj(s, id)).filter((m) => m.band === at.band && m.attacking !== undefined) : [at];
   const members = band.includes(at) ? band : [at, ...band];
@@ -51,7 +51,7 @@ export function blockByEffect(s: GameState, bl: GameObject, at: GameObject, src:
   bl.blockedTurn = s.turn;
   invalidateCharacteristics(s);
   log(s, `${defOf(s, bl).name} blocks ${members.map((m) => defOf(s, m).name).join(" and ")} (${src}).`);
-  fireEvent(s, { type: "blockedByEffect", blocker: bl.id, attackers: members.map((m) => m.id), newlyBlocked, newBlocker: !wasBlocking });
+  fireEvent(s, { type: "blockedByEffect", blocker: bl.id, attackers: members.map((m) => m.id), newlyBlocked, newBlocker: !wasBlocking, ...(swap ? { swap } : {}) });
 }
 
 export function runLaneB256Effect(s: GameState, e: B256Effect, ctx: ResolveCtx, src: string): "paused" | void {

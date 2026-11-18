@@ -4,6 +4,7 @@
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseObject } from "./targets";
+import { roundB257Sentence } from "./laneb257";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -36,5 +37,5 @@ export function roundB256Sentence(s: string, sentences: string[], si: number, ct
   // raidingParty). The color is white, not chosen anew (rulings).
   if (plain(s) === "Each player may tap any number of untapped white creatures they control" && plain(sentences[si + 1]) === "For each creature tapped this way, that player chooses up to two Plains" && plain(sentences[si + 2]) === "Then destroy all Plains that weren't chosen this way by any player")
     return ctx.activated ? { effect: { type: "raidingParty" }, next: si + 3 } : "fail";
-  return null;
+  return roundB257Sentence(s, sentences, si, ctx);
 }

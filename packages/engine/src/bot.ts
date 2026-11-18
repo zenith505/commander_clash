@@ -148,6 +148,7 @@ import {
   mustAttackPlayers,
   conspireInstances,
   replicateGranted,
+  offspringGranted,
   walkersFreeToAttack,
   attackTargetScore,
   discardKeywordKinds,
@@ -438,6 +439,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.pay?.mana && s.resolving?.body.effects[s.resolving.next]?.type === "loreChoices") {
       const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
       return taps ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
+    }
+    // Arni Metalbrow (round 409): "you may pay {1}{R}. If you do, you may put a creature card with mana value less than that
+    // creature's mana value from your hand ...": paid only while a card in the hand fits (the trigger's creature now).
+    const arniMay = s.resolving?.body.effects[s.resolving.next];
+    const putting = (arniMay?.type === "may" ? arniMay.effects : []).find((x): x is Extract<Effect, { type: "putFromHand" }> => x.type === "putFromHand" && !!x.filter?.bound && x.filter.bound.amount.count.kind === "manaValue" && x.filter.bound.amount.count.of.ref === "subject");
+    if (pend.kind === "chooseMay" && pend.pay && putting && s.resolving) {
+      const subject = s.resolving.item.subject;
+      const was = subject ? s.objects[subject.id] : undefined;
+      const filter = bindBound(s, putting.filter!, { controller: pid, objects: (r) => (r.ref === "subject" && was ? [was] : []) });
+      if (!player(s, pid).hand.some((id) => printedMatches(filter, defOf(s, obj(s, id))))) return [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "chooseMay" && pend.pay) {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
@@ -3819,7 +3830,10 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       continue;
     }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
-    const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
+    // Guff Rewrites History (round 411): "for each player, choose target ... that player controls", a spell with a required
+    // slot for our own permanent that it hurts: one of ours must be chosen to cast it (the least useful, below).
+    const ownSlot = harm[i] && spec.controlledBy === pid && !spec.optional && printed.targets.some((t) => t.perPlayerAll);
+    const pool = preferred.length ? preferred : (forced || ownSlot) && !spec.optional ? all : [];
     if (!pool.length) {
       if (!spec.optional) return null;
       out.push({ kind: "none" });
@@ -4323,7 +4337,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge" || x.kind === "dreamHalls")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv" || x.kind === "nextLife" || x.kind === "genericMv" || x.kind === "energyForSpell" || x.kind === "grantedEmerge" || x.kind === "grantedEvoke" || x.kind === "dreamHalls")]) {
     // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
     if ((a.kind === "citadel" || a.kind === "lifeForMv" || a.kind === "nextLife") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
@@ -5117,6 +5131,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
         .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && extra.casualty !== o.id && extra.bargain !== o.id && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && (o.isToken || worth(s, pid, o) <= 3))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
   for (const replicate of replicateOptions(s, pid, id, free))
+  for (const offspring of offspringOptions(s, pid, id, free))
   for (const offer of offering ? [undefined, offering.id] : [undefined])
     for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
       for (const buyback of buybacks)
@@ -5125,7 +5140,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
           // Splice costs beyond mana (Torrent of Stone's "sacrifice two Mountains"): paid as our other costs would be.
           const spliceCosts = splice?.costly && !buyback && !kicks.length ? chooseExtraCosts(s, pid, id, all ?? [], via, alt, extra.costOr, x ?? 0, modes, false, undefined, splice.ids) : undefined;
           if (splice?.costly && !spliceCosts) continue;
-          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(offspring ? { offspring } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
           if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
           if (plan) return plan;
@@ -5190,6 +5205,31 @@ function replicateOptions(s: GameState, pid: PlayerId, id: string, free: boolean
   const most = priced.each > 0 ? Math.min(3, Math.floor(spare / priced.each)) : 1;
   const out: (number[] | undefined)[] = [];
   for (let n = most; n >= 1; n--) out.push(grants.map((_, i) => (i === priced.i ? n : 0)));
+  return [...out, undefined];
+}
+
+/**
+ * Round 410: payments for the instances of offspring our permanents give the spell (Zinnia, Valley's Voice), to try most
+ * first, ending with none: as many instances as the spare mana covers (each paid once, CR 702.175a-b). Not for a legendary
+ * creature spell, whose token copy the legend rule would take (CR 704.5j).
+ */
+function offspringOptions(s: GameState, pid: PlayerId, id: string, free: boolean): (number[] | undefined)[] {
+  const d = defOf(s, obj(s, id));
+  const grants = offspringGranted(s, pid, d);
+  if (!grants.length || d.supertypes.includes("Legendary")) return [undefined];
+  const spare = availableMana(s, pid) - (free ? 0 : totalWithoutX(s, pid, id));
+  const out: (number[] | undefined)[] = [];
+  let left = spare;
+  const paid = grants.map((g) => {
+    const each = manaValue(parseManaCost(g.cost));
+    if (each > left) return 0;
+    left -= each;
+    return 1;
+  });
+  for (let n = paid.filter((x) => x).length; n >= 1; n--) {
+    let k = 0;
+    out.push(paid.map((x) => (x && k++ < n ? 1 : 0)));
+  }
   return [...out, undefined];
 }
 

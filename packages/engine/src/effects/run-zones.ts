@@ -1537,6 +1537,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Jace, Architect of Thought: the cards its searches exiled this resolution (see searchEachExile).
       if (!sc.castAmong && e.fromSearched) sc.castAmong = { ids: (s.resolving!.searchedExiled ?? []).filter((x) => (obj(s, x.id).zoneChanges ?? 0) === x.zc && obj(s, x.id).zone === "exile"), declined: [] };
       // Emergent Ultimatum: the cards this resolution's search exiled, those still in exile now (one shuffled back isn't).
+      // Portent of Calamity (round 409): the cards its dig exiled, still in exile as those objects (CR 400.7); fewer than
+      // `minDug` exiled, none may be cast (they still go where `rest` says).
+      if (!sc.castAmong && e.fromDug) {
+        const dug = s.resolving!.dugExiled ?? [];
+        const ids = dug.filter((x) => s.objects[x.id]?.zone === "exile" && (s.objects[x.id]!.zoneChanges ?? 0) === x.zc);
+        const enough = e.minDug === undefined || dug.length >= e.minDug;
+        if (!enough && ids.length) log(s, `${you.name} exiled fewer than ${e.minDug} cards this way, so they can't cast any of them.`);
+        sc.castAmong = { ids, declined: [], ...(enough ? {} : { max: 0 }) };
+      }
       if (!sc.castAmong && e.fromExiledThisWay) sc.castAmong = { ids: [...new Set(s.resolving!.exiledCards ?? [])].filter((id) => s.objects[id]?.zone === "exile").map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       if (!sc.castAmong && e.pushLuck !== undefined) {
         // Dance with Calamity: one card at a time, looked at before deciding to go on (rulings), a card's mana value with
@@ -1673,6 +1682,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of ids) moveObject(s, id, "exile");
         const gone = ids.filter((id) => obj(s, id).zone === "exile");
         if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
+        // Mysterious Stranger (round 411): "If two or more cards are exiled this way, choose one of them at random and copy
+        // it": the cards this exile moved there (an illegal target isn't exiled, CR 608.2b), and only one of them, chosen at
+        // random as it resolves; with fewer, no copy at all. The copy is cast as it resolves or never (rulings).
+        const atLeast = e.fromYard.randomOfAtLeast;
+        if (atLeast !== undefined) {
+          const one = gone.length >= atLeast ? gone[Math.floor(nextRandom(s) * gone.length)] : undefined;
+          if (one !== undefined) log(s, `${src}: ${defOf(s, obj(s, one)).name} is chosen at random to copy.`);
+          else log(s, `${src}: fewer than ${atLeast} cards were exiled this way, so none is copied.`);
+          gone.splice(0, gone.length, ...(one !== undefined ? [one] : []));
+        }
         // Uldaros Theorix: "spells with total mana value 6 or less from among the copies", what's left of it as each is cast.
         sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
       }
@@ -2382,8 +2401,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.pending = { kind: "chooseMay", player: p.id, prompt: `play ${d.name} without paying its mana cost`, source: src, card: card.id };
           return "paused";
         }
-        s.pending = { kind: "castFree", player: p.id, objectId: card.id, source: src };
-        if (freeCastable(s, p.id, card.id)) return "paused";
+        // Jadzi (round 409): for an alternative cost in mana (CR 118.9), paid as it's cast.
+        s.pending = { kind: "castFree", player: p.id, objectId: card.id, source: src, ...(e.pay ? { pay: e.pay, ...(e.pay.kind === "mana" ? { how: "paid" as const } : {}) } : {}) };
+        if (freeCastable(s, p.id, card.id, !!e.pay)) return "paused";
         s.pending = null;
         log(s, `${d.name} can't be cast.`);
         return;

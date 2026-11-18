@@ -1591,6 +1591,11 @@ export interface CostChoices {
    * Signal), in the order `replicateGranted` lists them; the spell's own replicate is `kicks` (CR 702.56a-b).
    */
   replicate?: number[];
+  /**
+   * Round 410: whether to pay each instance of offspring a permanent gives the spell (Zinnia, Valley's Voice), 1 or 0, in the
+   * order `offspringGranted` lists them; the spell's own offspring is `kicks` (CR 702.175a-b, paid once each).
+   */
+  offspring?: number[];
   /** Casting from a graveyard: which way (flashback, jump-start, retrace, escape). */
   via?: CastFromGraveyardKind;
   /** Pay the buyback cost (CR 702.27a). */
@@ -3412,6 +3417,8 @@ export interface Resolving {
     /** Effect "exploreEach": the creatures still to explore, and the one exploring now. */
     exploreEach?: { left: ObjectId[]; current?: ObjectId };
     cascade?: { exiled: ObjectId[]; hit?: ObjectId; /** Discover: its value, for "whenever you discover" (Curator of Sun's Creation). */ n?: number; /** Averna: the lands from among them have been put onto the battlefield (or none chosen). */ landsDone?: true; /** The castFree prompt for `hit` has been asked. */ castAsked?: true }; // cards cascade exiled, and the one it may cast
+    /** Guff Rewrites History (round 411): each nonland card exiled and the player who may cast it, in turn order, and how many have been offered. */
+    guff?: { casts: { pid: PlayerId; id: ObjectId; zc: number }[]; i: number };
     untilNonland?: { hit?: ObjectId; caster: PlayerId; seen?: ObjectId[] }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     /** Wall of Shards' cumulative upkeep: the opponent chosen for each age counter so far (see Effect "cumulativeUpkeep" giveLife). */

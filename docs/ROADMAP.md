@@ -1,7 +1,7 @@
 # Roadmap
 
-31,679 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,924 of
+31,686 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,928 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -43,7 +43,7 @@ line blocks.
    rulings); Thieving Varmint ("spells you don't own": the mana spending rule needs the spell's owner wherever mana is
    checked and paid); Balor ("whenever ~ attacks or dies", "choose one or more. Each mode must target a different
    player", "discards three cards at random"); New Blood (changing a creature type in a card's text, CR 612); Guff
-   Rewrites History (one target for each player, then each of them exiles until a nonland card and may cast it);
+   Rewrites History (done in round 411) (one target for each player, then each of them exiles until a nonland card and may cast it);
    Deeproot Pilgrimage (done in round 265); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
    last known power on a leaves trigger of its own); Tasha, the Witch Queen (page counters, "a spell you don't own"); Mirrormind Crown and Moonlit
    Meditation ("the first time you would create one or more tokens each turn, you may instead create copies": the same
@@ -125,7 +125,7 @@ line blocks.
    blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
    separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (exchanging control of a
    permanent and a spell), Karn, Living Legacy (done in round 330) ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
-   that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (spells that gain evoke as
+   that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (done in round 410) (spells that gain evoke as
    they're cast), Omnath, Locus of All (done in round 277) ("three mana in any combination of its colors" from a trigger), Crypt Rats
    ("spend only black mana on X": a spend rule for part of a cost). Round 168 went down the list to Glen Elendra Guardian (rank 5,741), skipping over the cards still listed by
    `npm run popular`.
@@ -1246,7 +1246,7 @@ line blocks.
    Out after round 225 (looked at, not done): Wayta, Trainer Prodigy (damage triggers doubled across many events);
    Auntie Ool (done in round 266); Fell Beast's Shriek (done in round 373) (splice onto instant or sorcery); Jasmine Boreal of the Seven
    (mana for creature spells with no abilities); Kethis, the Hidden Hand (graveyard cards gain "you may play"); Cult of
-   the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (creature spells gain offspring);
+   the Waxing Moon (transforms into a non-Human creature); Zinnia, Valley's Voice (done in round 410) (creature spells gain offspring);
    Elsha of the Infinite (cast noncreature spells from the top as though they had flash); Najal, the Storm Runner (copy
    the next instant or sorcery); Garland, Knight of Cornelia (done in round 320) (return transformed from the graveyard).
    Round 226 (fresh cards from the top): "once during each of your turns, you may play a land or cast a permanent spell
@@ -2758,7 +2758,7 @@ line blocks.
    Out after round 364 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) and Nephalia Academy (still out: who controls what
    causes a discard or sacrifice, on every path); Stalking Leonin (still out: a secret choice); Celestial Reunion (still
    out: a type chosen and two creatures beheld as an optional cost); Rootpath Purifier ("land cards in your library are
-   basic": searches read library cards' printed supertypes); Mysterious Stranger (still out: one target per graveyard);
+   basic": searches read library cards' printed supertypes); Mysterious Stranger (done in round 411) (still out: one target per graveyard);
    Sala, Deck Boss (unranked, Lane B's range).
    Round 365 went on down the "Out after round N" lists and `npm run popular`, most played first, to attack triggers about
    who is attacked, a creature trap, a reflexive trigger on a prevention shield and phasing until a source leaves:
@@ -3863,6 +3863,77 @@ line blocks.
    Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (playing the top card of another player's library,
    which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta,
    Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 409 went on down `npm run popular`, most played first, past cards left out before to three it could do whole.
+   Portent of Calamity's "Reveal the top X cards of your library. For each card type, you may exile a card of that type
+   from among them. Put the rest into your graveyard. You may cast a spell from among the exiled cards without paying its
+   mana cost if you exiled four or more cards this way. Then put the rest of the exiled cards into your hand." (Atraxa's
+   dig with the picks exiled, Effect dig `oneOfEach` into "exile": a card with several card types fills one of them,
+   rulings, CR 205.2a; then castFromAmong `fromDug` with `minDug` 4: one spell, as it resolves, timing ignored, X 0, no
+   alternative costs, rulings, CR 608.2g, 118.9; the others, and all of them with fewer than four exiled, into your hand).
+   Jadzi, Oracle of Arcavios's magecraft "reveal the top card of your library. If it's a nonland card, you may cast it by
+   paying {1} rather than paying its mana cost. If it's a land card, put it onto the battlefield." (Effect playLinked
+   `revealed` with `pay`: cast from the library as it resolves for that alternative cost, CR 118.9, or it stays on top; a
+   land isn't played, rulings; a modal double-faced card judged by its front face) and its back face Journey to the
+   Oracle's "You may put any number of land cards from your hand onto the battlefield. Then if you control eight or more
+   lands, you may discard a card. If you do, return ~ to its owner's hand." (spellToHand, CR 608.2n). Arni Metalbrow's
+   "Whenever a creature you control attacks or enters attacking, you may pay {1}{R}. If you do, you may put a creature card
+   with mana value less than that creature's mana value from your hand onto the battlefield tapped and attacking." (two
+   trigger events, CR 603.2: declared as an attacker, CR 508.1, or entering attacking, CR 508.4, from an effect, a token
+   or ninjutsu; paid as it resolves, rulings; the trigger's creature as it is or last existed, CR 608.2h; the creature put
+   in triggers it again, rulings). Bots pay for Arni only when a card in their hand fits. Browser tests click through
+   Portent's picks and free cast, Jadzi's {1} cast, Journey's lands and discard, and Arni's payment and attack. +3, 31,673
+   of 31,936 on this stacked branch with main (B250, B251) merged in. The compiled text of every other card is unchanged.
+   Out after round 409 (looked at, not done): God-Eternal Kefnet ("You may reveal the first card you draw each turn as you
+   draw it": a choice in the middle of any draw, before the card joins the hand, rulings; draws don't pause yet); Karn
+   Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
+   Triplets, Xanathar, Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta and the rest
+   of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 410 took two cards back off the "Out after round N" lists, most played first: keyword costs a permanent gives the
+   spells you cast "as you cast them". Zinnia, Valley's Voice's "Creature spells you cast gain offspring {2} as you cast
+   them." (CompiledCard.spellsGainOffspring, game.ts offspringGranted: an instance beside any offspring of the spell's own,
+   CostChoices `offspring`, each paid once and making its own 1/1 token copy, CR 702.175a-b) and Ashling, the Limitless's
+   "Elemental permanent spells you cast from your hand gain evoke {4} as you cast them." (CompiledCard.spellsGainEvoke,
+   AltCostKind "grantedEvoke": an alternative cost beside any evoke of its own, CR 702.74a, only for a card in its
+   caster's own hand, judged by the spell's characteristics, a changeling an Elemental). Either way the permanent the spell
+   becomes keeps the enters trigger that goes with what was paid for the rest of the game, even once the giver has left
+   (CR 400.7b, 611.3d, rulings; GameObject.spellGains, Zinnia's with its own timestamp, CR 613.7a), and has none if it has
+   lost its abilities as it enters (rulings: Humility). The token copy is of what's printed, so it has no offspring of its
+   own (rulings). Ashling's "Whenever you sacrifice a nontoken Elemental, create a token that's a copy of it. The token
+   gains haste until end of turn. At the beginning of your next end step, sacrifice it unless you pay {W}{U}{B}{R}{G}."
+   (a copy of it as it last existed, CR 707.2, 608.2h; a delayed trigger about that token, CR 603.7, paid or sacrificed
+   as it resolves, oracle/round410.ts). Bots pay offspring with spare mana (not for a legendary creature, CR 704.5j) and
+   evoke an Elemental for Ashling's {4} when its mana cost is out of reach. Browser tests click through the offspring pick
+   and Ashling's evoke and keep payment. +2, 31,675 of 31,936 on this stacked branch. The compiled text of every other card
+   is unchanged.
+   Out after round 410 (looked at, not done): the lists after round 409 stay out. Known gaps: offspring isn't offered for a
+   face-down creature spell (its token copy would be a face-down copy of a face-down permanent, CR 708.10); bots weigh only
+   their spare mana when paying offspring, not whether the token is worth it; with two evoke costs (its own and Ashling's),
+   paying either one triggers only that one's sacrifice (CR 702.74a doesn't say which "its evoke cost" means; the permanent
+   is sacrificed once either way).
+   Round 411 went back to the top of `npm run popular`, most played first, to two cards with a target for each player or
+   graveyard. Guff Rewrites History's "For each player, choose target nonenchantment, nonland permanent that player
+   controls. Those permanents' owners shuffle them into their libraries. Each player who controlled one of those
+   permanents exiles cards from the top of their library until they exile a nonland card, then puts the rest on the
+   bottom of their library in a random order. Each player may cast the nonland card they exiled without paying its mana
+   cost." (one required target for each player, the caster's first, TargetSpec perPlayerAll as Vaevictis Asmadi's: with
+   none for some player it can't be cast, CR 601.2c, a judgment call from Vaevictis's rulings since Guff has none; the
+   targets still legal shuffled away at once, a commander to the command zone, CR 903.9b; each player who controlled one
+   as it left exiles from their own library one card at a time, in turn order, and casts what they found as it resolves,
+   in the same order, CR 101.4, 608.2g, 118.9; an illegal target's controller doesn't exile, as with Vaevictis; Effect
+   guffRewrite, effects/run-round411.ts). Mysterious Stranger's "When ~ enters, for each graveyard with an instant or
+   sorcery card in it, exile target instant or sorcery card from that graveyard. If two or more cards are exiled this
+   way, choose one of them at random and copy it. You may cast the copy without paying its mana cost." (one required
+   target in each graveyard that has one, none for the others, as Sylvan Primordial's; castFromAmong fromYard
+   `randomOfAtLeast`: the cards this exiled, a copy of one chosen at random cast as it resolves or never, rulings, CR
+   707.12; with one exiled, no copy). The targeting panel names "your graveyard" or "Ben's graveyard" for "that player's
+   graveyard". Bots casting Guff pick their own least useful permanent and the opponents' best. Browser tests click
+   through Guff's four targets and free cast and the Stranger's two graveyard picks and copy cast. +2, 31,686 of 31,936
+   on this stacked branch with main (Lane B rounds B252 to B254) merged in. The compiled text of every other card is unchanged.
+   Out after round 411 (looked at, not done): Cryptic Spires ("as you create your deck, circle two of the colors": the
+   circled colors are copiable values, rulings, and whether they count toward a Commander deck's color identity isn't
+   settled); Nephalia Academy (an optional replacement at every discard an opponent's spell or ability causes, which
+   would need a pause inside every discard); Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility Storm
+   and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4349,7 +4420,7 @@ line blocks.
    Bots: for Retraced Image a bot reveals its costliest card that would be put onto the battlefield, or else its
    cheapest card.
    Out after round 327 (looked at, not done): Hatchery Sliver (done in round B248), Djinn Illuminatus (done in round B248), Ian Chesterton (done in round B248), Threefold Signal (done in round B248)
-   ("each ... spell you cast has replicate") and Zinnia, Valley's Voice ("gain offspring {2} as you cast them"): a card
+   ("each ... spell you cast has replicate") and Zinnia, Valley's Voice (done in round 410) ("gain offspring {2} as you cast them"): a card
    has one kicker-like optional cost (CompiledCard.kicker), so a given one needs every cost, autopay, bot and UI path to
    see it, and a spell with a kicker of its own would have two; Consume Spirit and Drain Life (done in round B179) ("Spend only black mana on
    X" in a spell whose mana cost is more than {X}); Invisible Woman, Sue Storm (one trigger for +1/+1 counters put on one
@@ -4549,7 +4620,7 @@ line blocks.
    ..." (Mogg Assassin: both chosen as it's activated, yours first, the second by the first one's controller without a
    question, rulings, CR 602.2b; TargetSpec.chooserOf; a browser test). +8, 30,730 of 31,936 with B157 and B158.
    Out after round 319 (looked at, not done): Rootweaver Druid (each opponent's search, one after another, for cards
-   put onto the battlefield under their control), Guff Rewrites History (each player casting during the resolution of
+   put onto the battlefield under their control), Guff Rewrites History (done in round 411) (each player casting during the resolution of
    another spell, no rulings to settle the order), Hellish Rebuke (done in round 339) (a granted trigger that refers back to the spell's
    caster), Extract Brain, and the cards of the round 318 list (still out, for the reasons in their earlier lists).
    Bots don't activate Mogg Assassin (the second target is any creature, which can be theirs); as its second chooser
@@ -4843,7 +4914,7 @@ line blocks.
    player untaps all nonland permanents they control" (Curse of Bounty). +8, 30,516 of 31,936 with B145.
    Out after round 307 (looked at, not done): Brimaz, Blight of Oreskos ("a Phyrexian creature or artifact creature
    spell": whether "Phyrexian" also qualifies "artifact creature" isn't settled by its rulings); Zinnia, Valley's Voice
-   and Ashling, the Limitless (a keyword cost a spell gains "as you cast" it, and whether the permanent keeps the
+   and Ashling, the Limitless (done in round 410) (a keyword cost a spell gains "as you cast" it, and whether the permanent keeps the
    ability its trigger needs); Hatchery Sliver (done in round B248) (a granted replicate whose cost is each spell's own mana cost, beside its
    printed one); Geyadrone Dihada (protection from permanents with corruption counters on them); Moxite Refinery ("Remove
    X counters from an artifact or creature you control" as a cost, any kinds); Ashiok, Nightmare Muse's −7 (casting from
@@ -5038,7 +5109,7 @@ line blocks.
    to cast it" (Molten Exhale, CR 601.3c: a browser test in another player's end step). +14, 30,376 of 31,936 with
    B135 to B137.
    Out after round 299 (looked at, not done): Yurlok of Scorch Thrash, Curse of Bounty and Enchanter's Bane (as after
-   round 298); Hatchery Sliver (done in round B248), Zinnia, Valley's Voice and Ian Chesterton (done in round B248) (replicate or offspring given to other spells:
+   round 298); Hatchery Sliver (done in round B248), Zinnia, Valley's Voice (done in round 410) and Ian Chesterton (done in round B248) (replicate or offspring given to other spells:
    one kicker-like cost each, not a second one); Mirrormind Crown, Esix, Moonlit Meditation and Jinnie Fay
    (tokens created instead as copies of something else: a token-creation replacement); Spectral Searchlight (another
    player chooses the color of mana it adds); Firkraag, Cunning Instigator ("had to attack this combat": attack
@@ -5383,7 +5454,7 @@ line blocks.
    battlefield face down as Cybermen: needs a library-top face-down put); Kaervek, the Punisher (done in round 267; "You may cast the copy.
    If you do, you lose 2 life": the paid copy is there now, the "if you do" after casting a copy isn't; Nashi, Moon's
    Legacy would follow, done in round 373); Ob Nixilis, the Adversary (done in round 352) (casualty X: the copy's starting loyalty from the chosen X);
-   Mysterious Stranger and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
+   Mysterious Stranger (done in round 411) and Zethi, Arcane Blademaster (a variable number of targets per graveyard / per kick).
    Out after round 251 (looked at, not done): Ill-Timed Explosion (done in round 273; "you may discard two cards. When you do": no ruling on
    whether you can do it with fewer than two cards in hand, as with Thrilling Discovery).
    Out after round 250 (looked at, not done): Owlbear Cub ("attacks a player who controls eight or more lands" and a
@@ -10942,7 +11013,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   still apply in timestamp order rather than asking (only different kinds of copy effect are asked); the app's decks have
   no way to choose a color for a commander like The Prismatic Piper yet (no sample deck has one).
 - Out after round B248 (looked at, not done): the lists after round B247 stay out, and Zinnia, Valley's Voice and Ashling, the
-  Limitless (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
+  Limitless (done in round 410) (still out: "gain offspring {2}" or "evoke {4}" as you cast them, and whether the permanent keeps the ability
   its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
 - Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich (done in round B253) and Swans of
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done

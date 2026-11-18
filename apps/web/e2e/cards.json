@@ -213,6 +213,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "61a23402-3244-4b5e-9134-98e1f82eda65",
+  "name": "Abstruse Appropriation",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Devoid (This card has no color.)\nExile target nonland permanent. You may cast that card for as long as it remains exiled, and you may spend colorless mana as though it were mana of any color to cast that spell.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Devoid"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "eccc9a54-2b56-4a02-9926-258d5b2e25fb",
   "name": "Abundance",
   "manaCost": "{2}{G}{G}",
@@ -2176,6 +2203,43 @@
   "set": "otj",
   "releasedAt": "2024-04-19",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fd19a009-d1ab-4148-a829-3d4c3af1b0b2",
+  "name": "Archelos, Lagoon Mystic",
+  "manaCost": "{1}{B}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Turtle Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Turtle",
+   "Shaman"
+  ],
+  "oracleText": "As long as Archelos is tapped, other permanents enter tapped.\nAs long as Archelos is untapped, other permanents enter untapped.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6827,6 +6891,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3a5a6732-bdfa-4b64-b897-6817983dbb0e",
+  "name": "Capricopian",
+  "manaCost": "{X}{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Goat Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goat",
+   "Hydra"
+  ],
+  "oracleText": "This creature enters with X +1/+1 counters on it.\n{2}: Put a +1/+1 counter on this creature, then you may reselect which player this creature is attacking. Only the player this creature is attacking may activate this ability and only during the declare attackers step. (It can't attack its controller.)",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6d86d783-7116-4426-8c0f-718c2d904887",
   "name": "Captain Marvel, Apex Avenger",
   "manaCost": "{5}{R}{W}",
@@ -8787,6 +8882,34 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4c9bcba6-87b5-4fb3-97ee-6fe5b739337d",
+  "name": "Consider",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Surveil 1. (Look at the top card of your library. You may put it into your graveyard.)\nDraw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2026-10-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12244,6 +12367,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "38ece0fa-2c94-4eae-b6ab-74b783862f3e",
+  "name": "Doomskar",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all creatures.\nForetell {1}{W}{W} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Foretell"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "be48877f-97b1-4a10-a618-cbc57515e617",
   "name": "Doubling Chant",
   "manaCost": "{5}{G}",
@@ -13953,6 +14104,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "710a3499-64f8-4d2c-8c9c-d58950e47ea7",
+  "name": "Eriette, the Beguiler",
+  "manaCost": "{1}{W}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Lifelink\nWhenever an Aura you control becomes attached to a nonland permanent an opponent controls with mana value less than or equal to that Aura's mana value, gain control of that permanent for as long as that Aura is attached to it.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a0380b63-58ef-4545-beec-6ad307bbc21b",
   "name": "Eruth, Tormented Prophet",
   "manaCost": "{1}{U}{R}",
@@ -14961,6 +15151,39 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "04e7f739-fe50-440d-aa3d-e547295044a8",
+  "name": "Eye of Duskmantle",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Eye",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eye"
+  ],
+  "oracleText": "Flying, lifelink\nYou may play lands and cast spells from among cards in your graveyard you've surveilled this turn. If you cast a spell this way, you pay life equal to its mana value rather than paying its mana cost.",
+  "power": "3",
+  "toughness": "8",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19555,6 +19778,95 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "180286e4-67fa-44d5-9e90-4a4e99c016a7",
+  "name": "Grub, Storied Matriarch // Grub, Notorious Auntie",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Goblin Warlock // Legendary Creature — Goblin Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warlock"
+  ],
+  "oracleText": "Menace\nWhenever this creature enters or transforms into Grub, Storied Matriarch, return up to one target Goblin card from your graveyard to your hand.\nAt the beginning of your first main phase, you may pay {R}. If you do, transform Grub.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Blight",
+   "Transform",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Grub, Storied Matriarch",
+    "manaCost": "{2}{B}",
+    "typeLine": "Legendary Creature — Goblin Warlock",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Goblin",
+     "Warlock"
+    ],
+    "oracleText": "Menace\nWhenever this creature enters or transforms into Grub, Storied Matriarch, return up to one target Goblin card from your graveyard to your hand.\nAt the beginning of your first main phase, you may pay {R}. If you do, transform Grub.",
+    "power": "2",
+    "toughness": "1",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468"
+   },
+   {
+    "name": "Grub, Notorious Auntie",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Goblin Warrior",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Goblin",
+     "Warrior"
+    ],
+    "oracleText": "Menace\nWhenever Grub attacks, you may blight 1. If you do, create a tapped and attacking token that's a copy of the blighted creature, except it has \"At the beginning of the end step, sacrifice this token.\"\nAt the beginning of your first main phase, you may pay {B}. If you do, transform Grub.",
+    "power": "2",
+    "toughness": "1",
+    "colors": [
+     "R"
+    ],
+    "colorIndicator": [
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/1/f/1f51adf8-8234-4dae-aedf-7633310d5111.jpg?1783904468"
+   }
+  ]
  },
  {
   "oracleId": "d38476e9-2e47-4c0c-8129-483c0bd09ec0",
@@ -25727,6 +26039,79 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8027a610-613e-4640-9840-c8778694f312",
+  "name": "Lazav, Dimir Mastermind",
+  "manaCost": "{U}{U}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Shapeshifter",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "Hexproof\nWhenever a creature card is put into an opponent's graveyard from anywhere, you may have Lazav become a copy of that card, except its name is Lazav, Dimir Mastermind, it's legendary in addition to its other types, and it has hexproof and this ability.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Hexproof"
+  ],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4ec0b64d-c793-47a6-9c26-9ad4d9e9c182",
+  "name": "Lazav, Wearer of Faces",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Shapeshifter Detective",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter",
+   "Detective"
+  ],
+  "oracleText": "Whenever Lazav attacks, exile target card from a graveyard, then investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nWhenever you sacrifice a Clue, you may have Lazav become a copy of a creature card exiled with it until end of turn.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Investigate"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7df50107-25d8-47dc-9a13-27b257cfbf6f",
   "name": "Lens of Clarity",
   "manaCost": "{1}",
@@ -27628,6 +28013,46 @@
   "commanderLegal": "legal",
   "set": "c16",
   "releasedAt": "2016-11-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "114e1d2c-cefc-4e2a-922e-3b2ceed1871d",
+  "name": "Maralen, Fae Ascendant",
+  "manaCost": "{2}{B}{G}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elf Faerie Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Faerie",
+   "Noble"
+  ],
+  "oracleText": "Flying\nWhenever Maralen or another Elf or Faerie you control enters, exile the top two cards of target opponent's library.\nOnce each turn, you may cast a spell with mana value less than or equal to the number of Elves and Faeries you control from among cards exiled with Maralen this turn without paying its mana cost.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -32113,6 +32538,105 @@
   "gameChanger": false
  },
  {
+  "oracleId": "199c4a1a-2082-417c-a174-f479d7334d15",
+  "name": "Optimus Prime, Hero // Optimus Prime, Autobot Leader",
+  "manaCost": "{3}{U}{R}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {2}{U}{R}{W} (You may cast this card converted for {2}{U}{R}{W}.)\nAt the beginning of each end step, bolster 1. (Choose a creature with the least toughness among creatures you control and put a +1/+1 counter on it.)\nWhen Optimus Prime dies, return it to the battlefield converted under its owner's control.",
+  "power": "4",
+  "toughness": "8",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Living metal",
+   "Trample",
+   "Convert",
+   "More Than Meets the Eye",
+   "Bolster"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Optimus Prime, Hero",
+    "manaCost": "{3}{U}{R}{W}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {2}{U}{R}{W} (You may cast this card converted for {2}{U}{R}{W}.)\nAt the beginning of each end step, bolster 1. (Choose a creature with the least toughness among creatures you control and put a +1/+1 counter on it.)\nWhen Optimus Prime dies, return it to the battlefield converted under its owner's control.",
+    "power": "4",
+    "toughness": "8",
+    "colors": [
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902"
+   },
+   {
+    "name": "Optimus Prime, Autobot Leader",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nTrample\nWhenever you attack, bolster 2. The chosen creature gains trample until end of turn. When that creature deals combat damage to a player this turn, convert Optimus Prime.",
+    "power": "6",
+    "toughness": "8",
+    "colors": [
+     "R",
+     "U",
+     "W"
+    ],
+    "colorIndicator": [
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/f/0/f04ed2cc-aae1-400b-9cc5-5d4e3e3dd714.jpg?1783919902"
+   }
+  ]
+ },
+ {
   "oracleId": "367faa8c-617a-41a0-901c-f65106e86d56",
   "name": "Oracle en-Vec",
   "manaCost": "{1}{W}",
@@ -35102,6 +35626,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c3d38129-b955-4fb5-8486-095f918935b9",
+  "name": "Quintorius, Loremaster",
+  "manaCost": "{3}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elephant Cleric",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elephant",
+   "Cleric"
+  ],
+  "oracleText": "Vigilance\nAt the beginning of your end step, exile target noncreature, nonland card from your graveyard. Create a 3/2 red and white Spirit creature token.\n{1}{R}{W}, {T}, Sacrifice a Spirit: Choose target card exiled with Quintorius. You may cast that card this turn without paying its mana cost. If that spell would be put into a graveyard, put it on the bottom of its owner's library instead.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "307be184-176a-40a8-944c-48aa00cfdd29",
   "name": "Radiant Lotus",
   "manaCost": "{6}",
@@ -35325,6 +35886,44 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c73a9939-0742-4919-94d6-c3b537697f17",
+  "name": "Ranar the Ever-Watchful",
+  "manaCost": "{2}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Spirit Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Warrior"
+  ],
+  "oracleText": "Flying, vigilance\nThe first card you foretell each turn costs {0} to foretell.\nWhenever one or more cards are put into exile from your hand or a spell or ability you control exiles one or more permanents from the battlefield, create a 1/1 white Spirit creature token with flying.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "khc",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -41544,6 +42143,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ddc85b23-113a-46e9-ab09-fae9312c72fa",
+  "name": "Spirit of Resilience",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Warrior"
+  ],
+  "oracleText": "Whenever one or more cards leave your graveyard, put a +1/+1 counter on this creature, then you may have this creature become a copy of an artifact or creature card from among those cards until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "83914a83-4de2-4d64-9770-f68a12014167",
   "name": "Spirit-Sister's Call",
   "manaCost": "{3}{W}{B}",
@@ -43244,6 +43874,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bc681ecf-2a52-4782-9a47-90f5a9f435d8",
+  "name": "Symbiote Spider-Man",
+  "manaCost": "{2}{U/B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Symbiote Spider Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Symbiote",
+   "Spider",
+   "Hero"
+  ],
+  "oracleText": "Whenever this creature deals combat damage to a player, look at that many cards from the top of your library. Put one of them into your hand and the rest into your graveyard.\nFind New Host — {2}{U/B}, Exile this card from your graveyard: Put a +1/+1 counter on target creature you control. It gains this card's other abilities. Activate only as a sorcery.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Find New Host"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c40c823c-5954-457a-81a6-02683da57f7f",
   "name": "Szadek, Lord of Secrets",
   "manaCost": "{3}{U}{U}{B}{B}",
@@ -44615,6 +45283,42 @@
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "677bd655-b240-4862-912c-29209fb295e1",
+  "name": "The Flood of Mars",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Alien Zombie Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Alien",
+   "Zombie",
+   "Horror"
+  ],
+  "oracleText": "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWater Always Wins — Whenever this creature attacks, put a flood counter on another target creature or land. If it's a creature, it becomes a copy of this creature. If it's a land, it becomes an Island in addition to its other types.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Water Always Wins",
+   "Islandwalk"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -47819,6 +48523,88 @@
   "gameChanger": false
  },
  {
+  "oracleId": "907ae517-22d5-4ac7-bc3a-3f4d5eaeeb57",
+  "name": "Valki, God of Lies // Tibalt, Cosmic Impostor",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — God // Legendary Planeswalker — Tibalt",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "God"
+  ],
+  "oracleText": "When Valki enters, each opponent reveals their hand. For each opponent, exile a creature card they revealed this way until Valki leaves the battlefield.\n{X}: Choose a creature card exiled with Valki with mana value X. Valki becomes a copy of that card.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Valki, God of Lies",
+    "manaCost": "{1}{B}",
+    "typeLine": "Legendary Creature — God",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "God"
+    ],
+    "oracleText": "When Valki enters, each opponent reveals their hand. For each opponent, exile a creature card they revealed this way until Valki leaves the battlefield.\n{X}: Choose a creature card exiled with Valki with mana value X. Valki becomes a copy of that card.",
+    "power": "2",
+    "toughness": "1",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/e/3/e3e5c965-a689-4726-b8c2-63b836895939.jpg?1783928157",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/e/3/e3e5c965-a689-4726-b8c2-63b836895939.jpg?1783928157"
+   },
+   {
+    "name": "Tibalt, Cosmic Impostor",
+    "manaCost": "{5}{B}{R}",
+    "typeLine": "Legendary Planeswalker — Tibalt",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Planeswalker"
+    ],
+    "subtypes": [
+     "Tibalt"
+    ],
+    "oracleText": "As Tibalt enters, you get an emblem with \"You may play cards exiled with Tibalt, Cosmic Impostor, and you may spend mana as though it were mana of any color to cast those spells.\"\n+2: Exile the top card of each player's library.\n−3: Exile target artifact or creature.\n−8: Exile all graveyards. Add {R}{R}{R}.",
+    "loyalty": "5",
+    "colors": [
+     "B",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/e/3/e3e5c965-a689-4726-b8c2-63b836895939.jpg?1783928157",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/e/3/e3e5c965-a689-4726-b8c2-63b836895939.jpg?1783928157"
+   }
+  ]
+ },
+ {
   "oracleId": "57098671-016e-4adb-ba7d-ab2dd2bc34e3",
   "name": "Valleymaker",
   "manaCost": "{5}{R/G}",
@@ -50491,6 +51277,34 @@
   "releasedAt": "2024-08-02",
   "rarity": "uncommon",
   "layout": "class",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "740fe41a-16bb-4c97-a03c-f678f15a0a0c",
+  "name": "Wizard's Spellbook",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Artifact — Book",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Book"
+  ],
+  "oracleText": "{T}: Exile target instant or sorcery card from a graveyard. Roll a d20. Activate only as a sorcery.\n1—9 | Copy that card. You may cast the copy.\n10—19 | Copy that card. You may cast the copy by paying {1} rather than paying its mana cost.\n20 | Copy each card exiled with this artifact. You may cast any number of the copies without paying their mana costs.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

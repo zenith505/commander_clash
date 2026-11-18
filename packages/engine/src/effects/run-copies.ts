@@ -22,6 +22,14 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
     return o && o.zone !== "battlefield" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
   }
   if (ref.ref === "subjectCard" && ctx.lki?.copyKey) return key(ctx.lki.copyKey);
+  // Lazav, Dimir Mastermind (round 406): "a copy of that card", the creature card the trigger saw put into an opponent's
+  // graveyard: as it last existed there, wherever it is now (rulings), so exactly as printed (CR 707.2: copy effects on the
+  // permanent it was aren't copied), the front face of a double-faced card (CR 712.8a).
+  if (ref.ref === "eventGroup" && ref.printed) {
+    const g = ctx.event?.group?.[0];
+    const o = g ? s.objects[g.id] : undefined;
+    return o && !o.isToken && !o.spellCopy ? restingDef(s.cards[o.cardId]!) : undefined;
+  }
   // Lazav, Familiar Stranger: "a copy of that card", the card exiled this way: exactly what's printed on it (rulings, CR
   // 707.2), the front face of a double-faced card (CR 712.8a).
   // Scion of the Ur-Dragon: the card the search put into the graveyard, as printed (CR 707.2), the front face of a

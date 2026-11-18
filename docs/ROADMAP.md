@@ -1,6 +1,6 @@
 # Roadmap
 
-31,666 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,669 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,923 of
 9,979 (99%).
 
@@ -3863,6 +3863,31 @@ line blocks.
    Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (playing the top card of another player's library,
    which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta,
    Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
+   Round 409 went on down `npm run popular`, most played first, past cards left out before to three it could do whole.
+   Portent of Calamity's "Reveal the top X cards of your library. For each card type, you may exile a card of that type
+   from among them. Put the rest into your graveyard. You may cast a spell from among the exiled cards without paying its
+   mana cost if you exiled four or more cards this way. Then put the rest of the exiled cards into your hand." (Atraxa's
+   dig with the picks exiled, Effect dig `oneOfEach` into "exile": a card with several card types fills one of them,
+   rulings, CR 205.2a; then castFromAmong `fromDug` with `minDug` 4: one spell, as it resolves, timing ignored, X 0, no
+   alternative costs, rulings, CR 608.2g, 118.9; the others, and all of them with fewer than four exiled, into your hand).
+   Jadzi, Oracle of Arcavios's magecraft "reveal the top card of your library. If it's a nonland card, you may cast it by
+   paying {1} rather than paying its mana cost. If it's a land card, put it onto the battlefield." (Effect playLinked
+   `revealed` with `pay`: cast from the library as it resolves for that alternative cost, CR 118.9, or it stays on top; a
+   land isn't played, rulings; a modal double-faced card judged by its front face) and its back face Journey to the
+   Oracle's "You may put any number of land cards from your hand onto the battlefield. Then if you control eight or more
+   lands, you may discard a card. If you do, return ~ to its owner's hand." (spellToHand, CR 608.2n). Arni Metalbrow's
+   "Whenever a creature you control attacks or enters attacking, you may pay {1}{R}. If you do, you may put a creature card
+   with mana value less than that creature's mana value from your hand onto the battlefield tapped and attacking." (two
+   trigger events, CR 603.2: declared as an attacker, CR 508.1, or entering attacking, CR 508.4, from an effect, a token
+   or ninjutsu; paid as it resolves, rulings; the trigger's creature as it is or last existed, CR 608.2h; the creature put
+   in triggers it again, rulings). Bots pay for Arni only when a card in their hand fits. Browser tests click through
+   Portent's picks and free cast, Jadzi's {1} cast, Journey's lands and discard, and Arni's payment and attack. +3, 31,669
+   of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 409 (looked at, not done): God-Eternal Kefnet ("You may reveal the first card you draw each turn as you
+   draw it": a choice in the middle of any draw, before the card joins the hand, rulings; draws don't pause yet); Karn
+   Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
+   Triplets, Xanathar, Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta and the rest
+   of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

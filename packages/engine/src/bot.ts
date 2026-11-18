@@ -439,6 +439,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = planMana(s, pid, parseManaCost(pend.pay.mana));
       return taps ? [...taps, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
+    // Arni Metalbrow (round 409): "you may pay {1}{R}. If you do, you may put a creature card with mana value less than that
+    // creature's mana value from your hand ...": paid only while a card in the hand fits (the trigger's creature now).
+    const arniMay = s.resolving?.body.effects[s.resolving.next];
+    const putting = (arniMay?.type === "may" ? arniMay.effects : []).find((x): x is Extract<Effect, { type: "putFromHand" }> => x.type === "putFromHand" && !!x.filter?.bound && x.filter.bound.amount.count.kind === "manaValue" && x.filter.bound.amount.count.of.ref === "subject");
+    if (pend.kind === "chooseMay" && pend.pay && putting && s.resolving) {
+      const subject = s.resolving.item.subject;
+      const was = subject ? s.objects[subject.id] : undefined;
+      const filter = bindBound(s, putting.filter!, { controller: pid, objects: (r) => (r.ref === "subject" && was ? [was] : []) });
+      if (!player(s, pid).hand.some((id) => printedMatches(filter, defOf(s, obj(s, id))))) return [{ type: "chooseMay", player: pid, yes: false }];
+    }
     if (pend.kind === "chooseMay" && pend.pay) {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
       const { mana, life = 0 } = pend.pay;

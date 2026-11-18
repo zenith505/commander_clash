@@ -5387,7 +5387,7 @@ function Controls({
             <>
               {/* The Infamous Cruelclaw, Anrakyr the Traveller: cast now for that alternative cost (CR 118.9), or not at all. */}
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong>
-              {o.zone === "hand" ? " from your hand" : o.zone === "graveyard" ? " from your graveyard" : o.zone === "exile" ? " from exile" : ""} {castPayText(pending.pay)}
+              {o.zone === "hand" ? " from your hand" : o.zone === "graveyard" ? " from your graveyard" : o.zone === "exile" ? " from exile" : o.zone === "library" ? " from the top of your library" : ""} {castPayText(pending.pay)}
               {pending.pay.kind === "lifeMv" || pending.pay.kind === "energyMv" ? ` (${manaValue(parseManaCost(d.manaCost))})` : ""} rather than paying its mana cost?
               {o.spellCopy || o.zone === "exile" ? " Only now." : ""}
             </>

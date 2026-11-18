@@ -145,6 +145,7 @@ import { round405Line } from "./round405";
 import { round406Line } from "./round406";
 import { round407Line } from "./round407";
 import { linkTibaltExiles, round408Line } from "./round408";
+import { round409Line } from "./round409";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1028,6 +1029,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Portent of Calamity, Jadzi, Arni Metalbrow (round 409): oracle/round409.ts.
+    if (round409Line(line, raw, out, isSpell)) continue;
     // Abstruse Appropriation, Valki (round 408): oracle/round408.ts.
     if (round408Line(line, raw, out, isSpell)) continue;
     // Symbiote Spider-Man (round 407): "It gains this card's other abilities", the card's other lines (oracle/round407.ts).

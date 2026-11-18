@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource } from "./targeting";
+import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource, itemQuality } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runGameOfChaosEffect, runCoinEachEffect, runFlipClashEffect, runEachPlayerFlipsEffect, runFlipEachOpponentEffect, runCoinEffect, runDiceEffect } from "./run-dice";
@@ -97,6 +97,7 @@ import { runLaneB234Effect } from "./run-laneb234";
 import { runLaneB235Effect } from "./run-laneb235";
 import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB238Effect } from "./run-laneb238";
+import { runLaneB254Effect } from "./run-laneb254";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -186,7 +187,8 @@ export function gifteeOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
  */
 export function beginResolution(s: GameState, item: StackItem, body: AbilityBody): Resolution {
   const targets = item.targets ?? [];
-  const src = item.kind === "spell" ? spellQuality(s, s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined, item) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  // Peace Talks (round B254): an activated ability, not a triggered one (itemQuality).
+  const src = itemQuality(s, item);
   // An amount bound ("with power less than or equal to ~'s power") is worked out again now (CR 608.2b), with the source as
   // it last existed if it has left (608.2h).
   const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
@@ -2105,6 +2107,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "consulateRedirect":
     case "piracy":
       return runLaneB238Effect(s, e, ctx, src);
+    case "peaceTalks":
+      return runLaneB254Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

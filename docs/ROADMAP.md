@@ -10739,6 +10739,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Dralnu); Dralnu may be one of them, and with more damage than permanents all of them are (rulings); with fewer cards in the
   graveyard than the damage, none is exiled and the player loses. Browser tests for Dralnu's and Nefarious Lich's choices
   and Lich's sacrifice. +3, 31,656 of 31,936. The compiled text of every other card is unchanged.
+- Round B254 (least played first, from the Lane B skip lists, none of them in Lane A's open rounds): Cultivator Drone ("Spend
+  this mana only to cast a colorless spell, activate an ability of a colorless permanent, or pay a cost that contains {C}.":
+  ManaSpend `costsWithC`): the cost being paid is now known to the mana (spend.ts spendAllows, poolFor, usableLots and
+  autopay's sources take it), so any cost with a {C} symbol (CR 107.4c) can use it, all of it, a cost paid as something
+  resolves too (rulings: two Drones pay Bearer of Silence's {1}{C}); otherwise a spell colorless as it's cast (CR 105.2c), a
+  face-down one too (CR 708.2a, rulings), or an ability of a colorless permanent. Rhystic Cave ("{T}: Choose a color. Add one
+  mana of that color unless any player pays {1}. Activate only as an instant.": ManaAbility `unlessAnyPays`): still a mana
+  ability (CR 605.1a), only when its controller could cast an instant (CR 602.5e), so never while paying for something (its
+  errata) and never by automatic payment; once its cost is paid, the other players are asked in turn order from the active
+  player (rulings) with a payUnless question outside any resolution (GameState.manaUnless); if one pays, it adds nothing and
+  isn't tapped for mana (rulings: Mana Flare adds nothing), otherwise its mana is added and it was tapped for mana then.
+  Peace Talks ("This turn and next turn, creatures can't attack, and players and permanents can't be the targets of spells
+  or activated abilities.": Effect peaceTalks, GameState.peaceTalksTurns): exactly this turn and the next one taken, whoever's
+  (rulings); targets are now told whether they're chosen for an activated ability (SourceQuality `activated`, as it's
+  activated, and on the stack an ability that wasn't triggered, a copy of one too, CR 707.10), so triggered abilities still
+  target; spells on the stack and cards in other zones can still be targeted. Browser tests for Rhystic Cave's menu button and
+  its Pay and Don't pay question. +3, 31,659 of 31,936. The compiled text of every other card is unchanged.
+- Out after round B254 (looked at, not done): the lists after round B253 stay out. Judgment calls and known gaps: Rhystic
+  Cave doesn't ask its own controller (who would never pay to stop their own mana, though "any player" includes them); bots
+  never pay to stop another player's Rhystic Cave and never tap their own (automatic payment can't use it); new targets chosen
+  for a copy of an activated ability aren't checked against Peace Talks as they're chosen, only as the copy resolves (it then
+  does nothing); bots cast Peace Talks only when the opponents' creatures are much bigger than theirs.
 - Out after round B253 (looked at, not done): the lists after round B252 stay out. Judgment calls and known gaps: "If
   you can't" is read as all or nothing for Lich's sacrifice and Nefarious Lich's exile, as Egon, God of Death's rulings
   read it (no ruling on either card says so); the order of a gain's replacements is chosen for a Lich's controller (the

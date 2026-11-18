@@ -3,7 +3,7 @@ import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification,
 import { compileCard, compileGranted } from "../oracle";
 import { PLANESWALKER_TYPES } from "../oracle/targets";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, printedManaAbilities, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
+import { abilitiesOf, cardIdOf, printedManaAbilities, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, nearestOpponent, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
@@ -513,6 +513,27 @@ export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): Sou
  */
 export const spellQuality = (s: GameState, cardId?: string, item?: StackItem): SourceQuality => ({ ...sourceQuality(s, undefined, cardId), spell: true, ...(item ? { manaValue: spellManaValue(s, item) } : {}) });
 
+/** An activated ability of `id` as a source of targeting (CR 113.7a), as it's activated: its source's characteristics, and that it's activated (Peace Talks). */
+export const activatedQuality = (s: GameState, id: ObjectId): SourceQuality => ({ ...sourceQuality(s, id), activated: true });
+
+/**
+ * A spell or ability on the stack as a source of targeting: the spell's own characteristics, or its source's (CR 113.7a);
+ * an ability that wasn't triggered is an activated one (a copy of one too, CR 707.10), for Peace Talks.
+ */
+export function itemQuality(s: GameState, item: StackItem): SourceQuality {
+  const o = item.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  if (item.kind === "spell") return spellQuality(s, o ? cardIdOf(o) : undefined, item);
+  const q = sourceQuality(s, item.sourceId, item.sourceCardId);
+  return item.triggered ? q : { ...q, activated: true };
+}
+
+/**
+ * Peace Talks (round B254, GameState.peaceTalksTurns): during its two turns, players and permanents can't be the targets of
+ * spells or activated abilities (triggered abilities still can; spells on the stack and cards elsewhere still can).
+ */
+export const peaceTalksNow = (s: GameState): boolean => !!s.peaceTalksTurns?.includes(s.turn);
+const peaceForbids = (s: GameState, src?: SourceQuality): boolean => !!src && (!!src.spell || !!src.activated) && peaceTalksNow(s);
+
 /**
  * "An ability ... from an enchantment source": the source as it is now if it's still the same object, on the battlefield
  * (its characteristics, CR 613) or in another zone (a channel ability: its card's); if it has left the battlefield, as it
@@ -745,6 +766,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   if (t.kind === "player") {
     const p = s.players[t.id];
     if (!p || p.lost) return false;
+    if (peaceForbids(s, src)) return false;
     // "You have hexproof": not by opponents' spells and abilities (CR 702.11d); "you have shroud": by none (CR 702.18d).
     const prot = playerProtection(s, t.id);
     // Detection Tower: its controller's opponents can be targeted as though they didn't have hexproof (CR 702.11e).
@@ -798,6 +820,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   // "Target permanent or suspended card": a card in exile fits if it's suspended (CR 702.62b); its characteristics there
   // are the printed card's, and hexproof and the like only work on the battlefield.
   if (spec.kind === "object" && spec.orSuspended && o.zone === "exile") return isSuspended(s, o) && !s.players[o.owner]?.lost && (spec.orSuspended !== "you" || o.owner === controller);
+  // Peace Talks (round B254): no permanent can be the target of a spell or an activated ability (CR 110.1).
+  if (o.zone === "battlefield" && peaceForbids(s, src)) return false;
   if (spec.kind === "card") {
     // A card in a graveyard (CR 109.2a). Nothing in the engine changes characteristics in a
     // graveyard, so the printed card is what's checked; hexproof only works on the battlefield.

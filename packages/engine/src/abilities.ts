@@ -4997,6 +4997,8 @@ export type Effect =
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec; /** Eunuchs' Intrigues: "Other creatures they control": controlled by this player, as it resolves, except the creature that player just chose (ObjRef "created"). */ ofPlayer?: PlayerRef; exceptChosen?: true; /** Mark for Death: "Other creatures that player controls can't block this turn": not this target, while it's the same object (CR 400.7). */ exceptTarget?: number }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
+  /** Peace Talks (round B254): "This turn and next turn, creatures can't attack, and players and permanents can't be the targets of spells or activated abilities." (GameState.peaceTalksTurns). */
+  | { type: "peaceTalks" }
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number; /** Overencumbered: "creatures can't attack this combat": only in the combat phase it's made in (GameState.combatsThisTurn). */ combat?: true }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }
@@ -7888,6 +7890,11 @@ export interface ManaAbility {
   millCost?: true;
   /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
   instantOnly?: true;
+  /**
+   * Rhystic Cave (round B254): "Add one mana of that color unless any player pays {1}": each other player in turn order may
+   * pay this cost as it resolves (GameState.manaUnless). Never used by automatic payment.
+   */
+  unlessAnyPays?: string;
   /** "Activate only as a sorcery" (Grinning Ignus): only when its controller could cast a sorcery (CR 307.1), so never while paying. */
   sorceryOnly?: true;
   /** "Return ~ to its owner's hand" as part of the cost (Grinning Ignus): never used by automatic payment. */
@@ -8043,6 +8050,11 @@ export interface ManaSpend {
   faceUp?: FaceDownKind[];
   /** "Only to pay cumulative upkeep costs" (Adarkar Unicorn): ManaUse.cumulativeUpkeep. */
   cumulativeUpkeep?: true;
+  /**
+   * Cultivator Drone (round B254): "Spend this mana only to cast a colorless spell, activate an ability of a colorless
+   * permanent, or pay a cost that contains {C}": all three, with the other fields unset (spend.ts spendAllows).
+   */
+  costsWithC?: true;
   /** "Only to activate power-up abilities" (Quinjet Technician): ManaUse.powerUp. */
   powerUpAbilities?: true;
   /** "Only to foretell cards or cast spells that have foretell" (Niko Defies Destiny): ManaUse.foretell, or a spell with foretell. */

@@ -34,6 +34,15 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     const ab = parseManaAbility(`${theyChoose[1]}: Add one mana of any color.`);
     return ab && ab.produces.kind === "oneOf" && ab.produces.amount === 1 && ab.produces.options.length === 5 && !ab.produces.n ? { ...ab, text: line0, toChosenPlayer: true, getterChooses: true } : null;
   }
+  // Rhystic Cave (round B254): "{T}: Choose a color. Add one mana of that color unless any player pays {1}. Activate only as
+  // an instant." Still a mana ability (CR 605.1, 605.1a), the color chosen as it's activated; each other player in turn order
+  // may pay as it resolves (rulings), and if one does it adds nothing and isn't tapped for mana (rulings). Only as an instant
+  // (CR 602.5e): never while paying for something (its errata), so automatic payment doesn't use it.
+  const rhystic = /^(.+): Choose a color\. Add one mana of that color unless any player pays (\{\d+\})\. Activate only as an instant\.$/.exec(line0);
+  if (rhystic) {
+    const ab = parseManaAbility(`${rhystic[1]}: Add one mana of any color. Activate only as an instant.`);
+    return ab && ab.produces.kind === "oneOf" && ab.produces.amount === 1 && ab.produces.options.length === 5 && !ab.produces.n && ab.instantOnly ? { ...ab, text: line0, unlessAnyPays: rhystic[2]! } : null;
+  }
   const chosen = /^(.+): A player of your choice adds ((?:\{[WUBRGC]\})+)\.$/.exec(line0);
   if (chosen) {
     const ab = parseManaAbility(`${chosen[1]}: Add ${chosen[2]}.`);
@@ -535,6 +544,9 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   // morph cost": a face-down spell is a 2/2 creature spell (CR 708.2a); a megamorph cost is a morph cost (CR 702.37b); not a
   // disguise cost, nor a cloaked permanent's mana cost (a cloaked permanent isn't a manifested one, CR 701.58a).
   if (sentence === "Spend this mana only to cast a face-down creature spell, pay a mana cost to turn a manifested creature face up, or pay a morph cost.") return { faceDownSpells: true, faceUp: ["morph", "megamorph", "manifest"], text: sentence };
+  // Cultivator Drone (round B254): "... to cast a colorless spell, activate an ability of a colorless permanent, or pay a cost
+  // that contains {C}" (CR 106.6, 105.2c, 107.4c): see spend.ts spendAllows.
+  if (sentence === "Spend this mana only to cast a colorless spell, activate an ability of a colorless permanent, or pay a cost that contains {C}.") return { costsWithC: true, text: sentence };
   // Adarkar Unicorn: "Spend this mana only to pay cumulative upkeep costs" (CR 702.24a).
   if (sentence === "Spend this mana only to pay cumulative upkeep costs.") return { cumulativeUpkeep: true, text: sentence };
   // Quinjet Technician: "Spend this mana only to activate power-up abilities" (CR 702.193).

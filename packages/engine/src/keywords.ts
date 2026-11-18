@@ -107,6 +107,8 @@ export interface SourceQuality {
   allCreatureTypes?: boolean;
   /** It's a spell (not an ability of the source), for "can't be the target of spells". */
   spell?: true;
+  /** It's an activated ability (not a triggered one, CR 113.3b-c), for Peace Talks' "can't be the targets of spells or activated abilities" (round B254). */
+  activated?: true;
   /** Its name, for protection from a card name (Runed Halo, CR 702.16a). */
   name?: string;
   /** A permanent that was cast this turn (it resolved as a spell this turn), for Emrakul, the World Anew's protection. */

@@ -2,6 +2,7 @@
 // sentences, read at the end of round B240's chain (roundB240Sentence in oracle/laneb240.ts).
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { roundB254Sentence } from "./laneb254";
 import { parseSearch } from "./search";
 import { X } from "./words";
 
@@ -50,5 +51,6 @@ export function roundB243Sentence(s: string, sentences: string[], si: number, ct
     if (!search || search.type !== "search" || search.others || search.dest.zone !== "battlefield") return "fail";
     return { effect: { ...search, andGraveyard: true, split: { n: 2, to: { zone: "libraryTop", shuffleIn: true } } }, next: si + 3 };
   }
-  return null;
+  // Round B254's sentences (oracle/laneb254.ts).
+  return roundB254Sentence(s, sentences, si, ctx);
 }

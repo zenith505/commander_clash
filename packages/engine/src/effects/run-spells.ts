@@ -8,7 +8,7 @@ import { castProblem, collectEvidence, destroyPermanent, enterTogether, evidence
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
+import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal, itemQuality } from "./targeting";
 import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -1859,7 +1859,7 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, 
 export function changeTargetOptions(s: GameState, item: StackItem, spec: TargetSpec, current: TargetChoice): TargetChoice[] {
   // A spell's own characteristics, or an ability's source's (CR 113.7a), for protection and hexproof.
   const o = item.objectId ? s.objects[item.objectId] : undefined;
-  const src = o ? spellQuality(s, cardIdOf(o), item) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  const src = o ? spellQuality(s, cardIdOf(o), item) : itemQuality(s, item);
   const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src, item.sourceId);
   const self = s.resolving?.item;
   if (spec.kind === "spell" && self && self.id !== item.id && isLegalTarget(s, spec, { kind: "stack", id: self.id }, item.controller, src)) all.push({ kind: "stack", id: self.id });

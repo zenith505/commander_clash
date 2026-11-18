@@ -303,13 +303,15 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       const st = (sc.fromEach ??= {
-        queue: e.votedFor !== undefined ? (r.votes ?? []).filter((v) => v.choice === e.votedFor).map((v) => v.voter) : apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)),
+        // Elrond of the White Council: each voter once for each such vote of theirs, in APNAP order (rulings).
+        queue: e.votedFor !== undefined && e.voterChooses ? apnap(s, [...new Set((r.votes ?? []).filter((v) => v.choice === e.votedFor).map((v) => v.voter))]).flatMap((p) => (r.votes ?? []).filter((v) => v.choice === e.votedFor && v.voter === p).map(() => p)) : e.votedFor !== undefined ? (r.votes ?? []).filter((v) => v.choice === e.votedFor).map((v) => v.voter) : apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)),
         ids: [],
       });
       while (st.queue.length) {
         const pid = st.queue[0]!;
         // The answer to the question asked for this player (game.ts pickPermanents keeps it as the chooser's pick).
-        const picked = sc.chosen?.[ctx.controller];
+        const chooser = e.voterChooses ? pid : ctx.controller;
+        const picked = sc.chosen?.[chooser];
         if (picked) {
           st.ids.push(...picked);
           sc.chosen = undefined;
@@ -317,7 +319,15 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           continue;
         }
         // A permanent the voter owns, whoever controls it now (Expropriate); the same one may be chosen again.
-        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => (e.votedFor !== undefined ? obj(s, id).owner === pid : controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")));
+        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => (e.votedFor !== undefined && !e.voterChooses ? obj(s, id).owner === pid : controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")));
+        // Elrond: the voter chooses one of their own creatures (CR 701.38), even with only one (it's still their choice).
+        if (e.voterChooses && options.length) {
+          sc.queue = [pid];
+          sc.chosen = {};
+          const left = st.queue.filter((q) => q === pid).length;
+          s.pending = { kind: "pickPermanents", player: pid, source: src, action: "choose", what: "creature", options, count: 1, prompt: `choose a creature you control for your ${e.votedFor} vote${left > 1 ? ` (${left} such votes left; the same one may be chosen again)` : ""}: ${pid === ctx.controller ? "you" : player(s, ctx.controller).name} ${pid === ctx.controller ? "gain" : "gains"} control of it` };
+          return "paused";
+        }
         if (options.length > 1) {
           sc.queue = [ctx.controller];
           sc.chosen = {};

@@ -3,7 +3,7 @@ import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, CastPay, Man
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
-import { liveEmblems } from "./emblems";
+import { createEmblem, liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
 import { askYardExile, yardExileChosen } from "./enters-yard";
 import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, sameName, setFace, transformedFace } from "./faces";
@@ -31,7 +31,7 @@ import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects,
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
-import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
+import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type CostSymbol, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
@@ -1789,6 +1789,13 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   }
   // Heightened Awareness: "As ~ enters, discard your hand" (CR 614.1c), before what its entering triggers.
   if (printed.entersDiscardHand) discardCards(s, controllerOf(s, o), [...player(s, controllerOf(s, o)).hand]);
+  // Tibalt, Cosmic Impostor (round 408): "As ~ enters, you get an emblem with ..." (CR 614.1c, 114.2): its controller's,
+  // linked to this object (rulings: the cards exiled with that specific Tibalt, even after it leaves).
+  if (printed.entersLinkedEmblem) {
+    const em = createEmblem(s, controllerOf(s, o), [printed.entersLinkedEmblem], defOf(s, o).name);
+    em.emblemLink = `${o.id}@${o.zoneChanges ?? 0}`;
+    log(s, `${player(s, controllerOf(s, o)).name} gets an emblem with "${printed.entersLinkedEmblem.replace("⟪source⟫", defOf(s, o).name)}"`);
+  }
   // Urborg Lhurgoyf: "mill three cards for each time it was kicked", as it enters (rulings: it doesn't use the stack).
   if (printed.entersMillPerKick && o.kicked?.length) {
     const pid = controllerOf(s, o);
@@ -5675,9 +5682,13 @@ export function checkAscend(s: GameState) {
  * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
-function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "life" | "plain" {
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" {
   if (o.zone !== "exile") return false;
-  let how: false | "anyType" | "life" | "plain" = false;
+  let how: false | "anyType" | "anyColor" | "life" | "plain" = false;
+  // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
+  // now (rulings), mana of any color for the spells (CR 609.4b).
+  for (const em of liveEmblems(s))
+    if (em.owner === pid && em.emblemLink && compileCard(defOf(s, em)).playLinkedEmblem && (s.linkedExile?.[em.emblemLink] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) how = "anyColor";
   for (const id of s.battlefield) {
     const p = obj(s, id);
     if (controllerOf(s, p) !== pid) continue;
@@ -5701,7 +5712,7 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";
     // Azula, Cunning Usurper: "Mana of any type can be spent to cast those spells."
     if (plain && a.playLinkedAnyType) return "anyType";
-    if (life) how = "life";
+    if (life && how !== "anyColor") how = "life";
     else if (!how) how = "plain";
   }
   return how;
@@ -5742,10 +5753,10 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
-  return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
+  return how === "anyType" ? { anyType: true } : how === "anyColor" ? { anyColor: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
 }
 
 /**
@@ -7417,8 +7428,14 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Gale's Redirection: "as though it were mana of any color": the same for colored symbols, but {C} still takes colorless
   // mana (CR 609.4b).
   const anyColorNow = !anyTypeNow && !!exiled?.anyColor;
+  // Abstruse Appropriation (round 408): "you may spend colorless mana as though it were mana of any color to cast that
+  // spell" (CR 609.4b): colorless mana pays a colored symbol as though it were that color, a hybrid one's halves, a {2/W}'s
+  // one mana and a Phyrexian one's mana (or its 2 life) too; colored mana still pays only its own (CostSymbol `orC`).
+  const colorlessAnyNow = !anyTypeNow && !anyColorNow && !!exiled?.colorlessAny;
+  const orColorless = (y: CostSymbol): CostSymbol =>
+    y.kind === "colored" && y.color !== "C" ? { kind: "hybrid", options: [y.color], orC: true } : y.kind === "hybrid" || y.kind === "twoHybrid" ? { ...y, orC: true } : y.kind === "phyrexian" && !y.krrik && !y.any ? { kind: "hybrid", options: [y.color], life: true, phyrexian: true, orC: true } : y;
   const anyType = (c: ParsedCost): ParsedCost =>
-    anyTypeNow || anyColorNow ? { ...c, symbols: c.symbols.map((y) => ((y.kind === "colored" && (anyTypeNow || y.color !== "C")) || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c;
+    anyTypeNow || anyColorNow ? { ...c, symbols: c.symbols.map((y) => ((y.kind === "colored" && (anyTypeNow || y.color !== "C")) || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : colorlessAnyNow ? { ...c, symbols: c.symbols.map(orColorless) } : c;
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   // Prototyped isn't an alternative cost (CR 718.3): it's still free.
   const realAlt = how.alt && how.alt !== "prototype";

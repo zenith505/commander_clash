@@ -1,7 +1,7 @@
 # Roadmap
 
-31,664 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,921 of
+31,666 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,981 of 4,988 (99%), top 10,000: 9,923 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3839,6 +3839,30 @@ line blocks.
    put onto the battlefield with ~" across transforming, no rulings), Taskmaster, Niko, Abstruse Appropriation, Pulmonic
    Sliver, Filigree Vector, Wayta, Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the
    reasons in their earlier lists).
+   Round 408 went on down `npm run popular`, most played first, to two cards left out before. Abstruse Appropriation's
+   "Exile target nonland permanent. You may cast that card for as long as it remains exiled, and you may spend colorless
+   mana as though it were mana of any color to cast that spell." (Hostage Taker's permission, MayPlay `colorlessAny`: a
+   card, not a token, with its usual timing and costs, rulings; CR 609.4b in game.ts spellCost: each colored symbol, a
+   hybrid one's halves, a {2/W}'s one mana and a Phyrexian one's mana may be paid with colorless mana too, CostSymbol
+   `orC`, which mana.ts payFromPool spends only when the symbol's own colors aren't there; colored mana pays nothing more,
+   and {C} still takes colorless mana). Valki, God of Lies's "When ~ enters, each opponent reveals their hand. For each
+   opponent, exile a creature card they revealed this way until ~ leaves the battlefield." (Effect eachOpponentTakes: one
+   opponent at a time from the active player, CR 101.4, the card chosen by Valki's controller; linked, CR 607.2a; back to
+   its owner's hand when Valki leaves, CR 610.3; nothing exiled if Valki has already left, rulings) and "{X}: Choose a
+   creature card exiled with ~ with mana value X. ~ becomes a copy of that card." (Effect becomeCopyOfLinkedX: chosen as
+   it resolves, "aegisCopy" when two match; as printed, with no end, CR 707.2, 611.2a; nothing with none, rulings). Its back
+   face, Tibalt, Cosmic Impostor: "As ~ enters, you get an emblem with "You may play cards exiled with ~, and you may spend
+   mana as though it were mana of any color to cast those spells."" (CompiledCard.entersLinkedEmblem, made in
+   finishEntering, CR 614.1c, 114.2; the emblem keeps that Tibalt as the object it was, GameObject.emblemLink, so it works
+   after Tibalt leaves and a new Tibalt gives its own, rulings; game.ts linkedPlayPermission "anyColor": lands with a land
+   play, spells with their usual timing, {C} still colorless) and "+2: Exile the top card of each player's library.", its
+   three exile abilities all linked to it (oracle/round408.ts linkTibaltExiles). Bots copy with Valki the biggest exiled
+   creature card bigger than it that they can pay for, before combat. Browser tests click through Valki's three hand picks
+   and its {X} copy pick, Abstruse Appropriation's cast from exile with Wastes, and Tibalt's back face, +2 and the Bolt its
+   emblem casts. +2, 31,666 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (playing the top card of another player's library,
+   which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta,
+   Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

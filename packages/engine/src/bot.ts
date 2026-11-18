@@ -2522,7 +2522,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Brutal Hordechief (round 378): the opponents' blocks before we attack.
       // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
       // Koh, the Face Stealer (round 399): its card chosen before combat, so a borrowed attack ability works this turn.
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Valki, God of Lies (round 408): its copy before combat too.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard" || e.type === "becomeCopyOfLinkedX")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -7155,6 +7156,17 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Osgir, the Reconstructor: two copies of the most valuable artifact card in our graveyard we can pay for.
       if (ab.costs?.some((c) => c.kind === "exileFromGraveyard" && c.mvX)) {
         const plan = exileMvXPlan(s, pid, o, i, ab);
+        if (plan) return plan;
+        continue;
+      }
+      // Valki, God of Lies (round 408): once, in our main phase with the stack empty, X the mana value of the biggest creature
+      // card exiled with it that's bigger than Valki is now and that we can pay for.
+      if (ab.body.effects.some((e) => e.type === "becomeCopyOfLinkedX")) {
+        const room = availableMana(s, pid) - (ab.tap ? 1 : 0);
+        const now = defWorth(defOf(s, o));
+        const best = linkedCards(s, id).map((l) => restingDef(s.cards[obj(s, l.id).cardId]!)).filter((d) => isType(d, "Creature") && defMv(d) <= room && defWorth(d) > now).sort((a, b) => defWorth(b) - defWorth(a))[0];
+        if (!best || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length || o.activatedThisTurn?.includes(i)) continue;
+        const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, defMv(best));
         if (plan) return plan;
         continue;
       }

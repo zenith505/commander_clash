@@ -3002,7 +3002,7 @@ export type Effect =
        */
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
       /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
-      youMay?: { anyType?: true; /** "You may play it for as long as you control ~" (Victor Mancha, Runaway): while the source stays this object under your control (GameObject.mayPlay "whileControlled"). */ whileControlled?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
+      youMay?: { anyType?: true; /** Abstruse Appropriation (round 408): "and you may spend colorless mana as though it were mana of any color to cast that spell" (MayPlay `colorlessAny`). */ colorlessAny?: true; /** "You may play it for as long as you control ~" (Victor Mancha, Runaway): while the source stays this object under your control (GameObject.mayPlay "whileControlled"). */ whileControlled?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
       /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
       suspend?: number;
       /** "Exile it with a hit counter on it" (Mari, Tinybones): put on the card in exile (CR 122.1), not a permanent's. */
@@ -4280,6 +4280,20 @@ export type Effect =
    * "copyAmong"), or none (effects/run-round405.ts).
    */
   | { type: "becomeCopyOfAmong"; what: ObjRef; from: "linked" | "eventGroup"; filter: TargetSpec }
+  /**
+   * Valki, God of Lies (round 408): "Choose a creature card exiled with ~ with mana value X. ~ becomes a copy of that card.":
+   * one of the cards its enters ability exiled (linked, CR 607.2a) that's a creature card in exile now with mana value X
+   * (the X paid, CR 107.3m; in exile a modal double-faced card's front face's, rulings), chosen as this resolves (rulings;
+   * chooseOption "aegisCopy" when there are several), copied as printed (CR 707.2) with no end (CR 611.2a). With none,
+   * nothing happens (rulings).
+   */
+  | { type: "becomeCopyOfLinkedX"; filter: TargetSpec }
+  /**
+   * Valki, God of Lies (round 408): "For each opponent, exile a creature card they revealed this way until ~ leaves the
+   * battlefield": `take` (who "eachOne") done for each opponent in turn, from the active player (CR 101.4), each card
+   * chosen by this ability's controller.
+   */
+  | { type: "eachOpponentTakes"; take: Extract<Effect, { type: "takeFromHand" }> }
   /**
    * Koh, the Face Stealer (round 399): "Choose a creature card exiled with ~": one of the cards its exile abilities exiled
    * (linked, CR 607.2a, 607.4) that's a creature card in exile now, chosen as this resolves (not a target; chooseOption
@@ -10021,6 +10035,14 @@ export interface CompiledCard {
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).
    */
   playLinked?: true;
+  /**
+   * Tibalt, Cosmic Impostor (round 408): "As ~ enters, you get an emblem with "You may play cards exiled with ~, and you may
+   * spend mana as though it were mana of any color to cast those spells."": the emblem's ability text (CR 614.1c, 114.2),
+   * the emblem linked to this object (GameObject.emblemLink) and its exiles linked to it (CR 607.2a).
+   */
+  entersLinkedEmblem?: string;
+  /** That emblem's ability: its owner may play the cards exiled with the object it's linked to, mana of any color for spells (CR 609.4b). */
+  playLinkedEmblem?: true;
   /**
    * "During your turn, you may play cards exiled with ~. If you cast a spell this way, pay life equal to its mana value
    * rather than pay its mana cost" (Valgavoth): during its controller's turn only, cast for that alternative cost

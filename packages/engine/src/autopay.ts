@@ -144,6 +144,8 @@ function namedColors(cost: ParsedCost): Set<ManaType> {
   for (const sym of cost.symbols) {
     if (sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid") out.add(sym.color);
     if (sym.kind === "hybrid") sym.options.forEach((c) => out.add(c));
+    // Abstruse Appropriation (round 408): colorless mana pays it too.
+    if ((sym.kind === "hybrid" || sym.kind === "twoHybrid") && sym.orC) out.add("C");
   }
   return out;
 }
@@ -258,7 +260,8 @@ function planFreeWith(cost: ParsedCost, extraGeneric: number, life: number, pool
   }
   for (const sym of cost.symbols) {
     if (sym.kind !== "hybrid") continue;
-    const opts = sym.options as ManaType[];
+    // Abstruse Appropriation (round 408): a colorless source too, after the colors.
+    const opts: ManaType[] = [...sym.options, ...(sym.orC ? ["C" as const] : [])];
     let have = opts.find((c) => reserved[c] > 0 && !harmOf(c)) ?? opts.find((c) => reserved[c] > 0);
     if (!have || harmOf(have)) {
       // A color whose spending hurts the caster (`harm`, see spendPlan) only when no other will do.

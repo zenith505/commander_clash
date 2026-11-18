@@ -376,6 +376,8 @@ export interface GameObject {
   createdWith?: { id: ObjectId; zc: number };
   /** An emblem in its owner's command zone (CR 114): neither a card nor a permanent, its abilities working there (114.4). */
   emblem?: true;
+  /** Tibalt, Cosmic Impostor's emblem (round 408): the object whose exiled cards it lets its owner play, as GameState.linkedExile keys it ("id@zc"), even after that object has left (rulings). */
+  emblemLink?: string;
   /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */
   tokenBackUp?: true;
   /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
@@ -592,6 +594,8 @@ export interface GameObject {
     anyType?: true;
     /** Gale's Redirection: "you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b): any mana pays its colored symbols, but {C} still needs colorless mana. */
     anyColor?: true;
+    /** Abstruse Appropriation (round 408): "you may spend colorless mana as though it were mana of any color to cast that spell" (CR 609.4b): colorless mana pays its colored symbols too, as though it were their color. */
+    colorlessAny?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
     exileAfter?: true;
     /** Quintorius, Loremaster (round 406): "If that spell would be put into a graveyard, put it on the bottom of its owner's library instead": see bottomIfToGraveyard. */
@@ -3206,6 +3210,8 @@ export interface Resolving {
     curseMove?: string;
     /** Assimilation Aegis (Effect becomeCopyOfLinked, round 396): the exiled creature card chosen to copy (an object id), "" while asked. */
     aegisCopy?: string;
+    /** Valki, God of Lies (round 408): the opponent (an index into them, APNAP) whose hand Effect eachOpponentTakes is at. */
+    eachTakeAt?: number;
     /** Lazav, Wearer of Faces / Spirit of Resilience (round 405): the card chosen to become a copy of ("" while asked, "none"). */
     copyAmong?: string;
     /** Koh, the Face Stealer (Effect chooseLinkedCard, round 399): the exiled creature card chosen (an object id), "" while asked. */

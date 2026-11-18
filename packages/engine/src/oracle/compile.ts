@@ -144,6 +144,7 @@ import { round404Line } from "./round404";
 import { round405Line } from "./round405";
 import { round406Line } from "./round406";
 import { round407Line } from "./round407";
+import { linkTibaltExiles, round408Line } from "./round408";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1027,6 +1028,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Abstruse Appropriation, Valki (round 408): oracle/round408.ts.
+    if (round408Line(line, raw, out, isSpell)) continue;
     // Symbiote Spider-Man (round 407): "It gains this card's other abilities", the card's other lines (oracle/round407.ts).
     if (line.includes(": Put a +1/+1 counter on target creature you control. It gains ~'s other abilities.") && round407Line(line, raw, out, isSpell, lines.filter((_, i) => i !== li))) continue;
     // Maralen, Fae Ascendant (round 406): once each turn, a free cast from among cards exiled with it this turn (oracle/round406.ts).
@@ -7779,6 +7782,8 @@ const castsTheExiled = new WeakSet<CompiledCard>();
  * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
  */
 function linkExile(out: CompiledCard) {
+  // Tibalt, Cosmic Impostor (round 408): its emblem plays the cards all its exile abilities exiled (oracle/round408.ts).
+  linkTibaltExiles(out);
   // Kylox's Voltstrider (round 401): "cards exiled with it" are those its one "Collect evidence N:" cost exiled (CR 607.2a),
   // with no other exile instruction on the card.
   const bodies0 = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];

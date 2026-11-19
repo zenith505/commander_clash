@@ -4776,6 +4776,12 @@ export type Effect =
    */
   | { type: "portalPiles"; n: number; by: number }
   /**
+   * Power Pack (round B266): "At the beginning of your next upkeep, you may cast that card without paying its mana cost. If
+   * that spell would be put into your graveyard, exile it instead.": after this ability exiled target `index`, a delayed
+   * trigger about that card in exile (CR 603.7c, 400.7), cast from there as it resolves (castFromExileFree `exileAfter`).
+   */
+  | { type: "delayedCastExiledTarget"; index: number; text: string }
+  /**
    * Raging River (round B265): "each defending player divides all creatures without flying they control into a "left" pile
    * and a "right" pile. Then, for each attacking creature you control, choose "left" or "right." That creature can't be
    * blocked this combat except by creatures with flying and creatures in a pile with the chosen label." (GameObject.riverOnly)
@@ -5523,6 +5529,8 @@ export type Effect =
       type: "castFromExileFree";
       /** "Counter target spell. If that spell is countered this way, exile it instead ..., then you may cast it without paying its mana cost" (Transcendent Dragon): the card countered and exiled this way (Resolving.counteredExiled), cast as this resolves (CR 608.2g). */
       countered?: true;
+      /** Power Pack (round B266): "If that spell would be put into your graveyard, exile it instead" (GameObject.exileIfToGraveyard). */
+      exileAfter?: true;
     }
   /**
    * Jeweled Amulet: "Note the type of mana spent to pay this activation cost." As the ability resolves, its source notes
@@ -7231,6 +7239,8 @@ export interface TriggeredAbility {
   lifeFromSpell?: TargetSpec;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
+  /** A backup N ability (CR 702.165a, grants.ts backupTriggers): put on the stack as StackItem.backup, for Mirror-Shield Hoplite (round B266). */
+  backup?: true;
   /** "This ability triggers only once." (Acrobatic Cheerleader): once ever for this object (rulings; a new object starts over, CR 400.7). See GameObject.triggeredEver. */
   onceEver?: true;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */
@@ -7243,7 +7253,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** Skophos Maze-Warden: "of an ability of a land you control named Labyrinth of Skophos": an ability (not a spell) whose source matches this, from the trigger's controller's view. */ abilityOf?: TargetSpec; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** With `orYou`: "Whenever you become the target ..." (Amulet of Safekeeping): you only, no permanent. */ onlyYou?: true; /** With `orYou`: "Whenever a player or permanent becomes the target ..." (Loki, God of Mischief): any player, not only this ability's controller. */ anyPlayer?: true; /** "Of an ability" (Loki, God of Mischief): an activated or triggered ability, not a spell. */ ability?: true; /** With `ability`, Professor Hojo: "of an activated ability", not a triggered one. */ activatedOnly?: true; /** Agrus Kos, Eternal Soldier (round 415): "of an ability that targets only it": every target the spell or ability has is this permanent (rulings: several targets all naming it count). */ onlySelf?: true; /** With `orYou`: "Whenever you and/or at least one permanent you control becomes the target ..." (Leyline of Combustion): once for each spell or ability that targets any of them, however many (rulings). */ once?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** Skophos Maze-Warden: "of an ability of a land you control named Labyrinth of Skophos": an ability (not a spell) whose source matches this, from the trigger's controller's view. */ abilityOf?: TargetSpec; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** With `orYou`: "Whenever you become the target ..." (Amulet of Safekeeping): you only, no permanent. */ onlyYou?: true; /** With `orYou`: "Whenever a player or permanent becomes the target ..." (Loki, God of Mischief): any player, not only this ability's controller. */ anyPlayer?: true; /** "Of an ability" (Loki, God of Mischief): an activated or triggered ability, not a spell. */ ability?: true; /** With `ability`, Professor Hojo: "of an activated ability", not a triggered one. */ activatedOnly?: true; /** Agrus Kos, Eternal Soldier (round 415): "of an ability that targets only it": every target the spell or ability has is this permanent (rulings: several targets all naming it count). */ onlySelf?: true; /** With `orYou`: "Whenever you and/or at least one permanent you control becomes the target ..." (Leyline of Combustion): once for each spell or ability that targets any of them, however many (rulings). */ once?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec; /** Mirror-Shield Hoplite (round B266): "of a backup ability": a triggered ability from a backup keyword (StackItem.backup, CR 702.165a), a copy of one too. */ backup?: true };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -9310,6 +9320,12 @@ export interface CompiledCard {
   spendOnlyOnX?: ManaType;
   /** Soul Burn (round B234): "Spend only black and/or red mana on X.": each mana paying X is one of these colors, as a hybrid symbol (spellCost). */
   spendOnlyOnXHybrid?: Color[];
+  /**
+   * Defensive Formation (round B266): "Rather than the attacking player, you assign the combat damage of each creature
+   * attacking you. You can divide that creature's combat damage as you choose among any of the creatures blocking it."
+   * (game.ts combatDamageAssigner, as banding's CR 702.22j).
+   */
+  assignsAttackersDamage?: true;
   /** Soul Burn (round B234): "not more than the amount of {B} spent on X": note the most mana of this type that could have paid X (GameObject.spentOnX). */
   spentOnXOf?: ManaType;
   /** Tapestry Warden: "Each creature you control with toughness greater than its power stations permanents using its toughness rather than its power." (amounts.ts stationPower, rulings). */

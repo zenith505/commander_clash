@@ -1398,6 +1398,8 @@ export interface StackItem {
   castInMain?: true;
   /** A triggered ability (CR 603), not an activated one (CR 602). */
   triggered?: true;
+  /** A backup ability (CR 702.165a, TriggeredAbility.backup): Mirror-Shield Hoplite (round B266) copies it. A copy keeps it (CR 707.10). */
+  backup?: true;
 }
 
 /**

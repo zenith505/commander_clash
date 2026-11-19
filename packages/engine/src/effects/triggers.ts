@@ -2802,6 +2802,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (w.spell && item!.kind !== "spell") return false;
         if (w.ability && item!.kind !== "ability") return false;
         if (w.activatedOnly && (item!.kind !== "ability" || !!item!.triggered)) return false;
+        // Mirror-Shield Hoplite (round B266): "of a backup ability" (CR 702.165a).
+        if (w.backup && !(item!.kind === "ability" && item!.backup)) return false;
         // Agrus Kos, Eternal Soldier (round 415): "an ability that targets only it" (rulings: several targets all naming it).
         if (w.onlySelf && !targetsOnlyOne(s, item!.targets ?? [], "self", o, watcher)) return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
@@ -3598,6 +3600,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     targets: stampTargets(s, targets),
     modes: t.modes,
     triggered: true,
+    ...(t.index >= 0 && triggerOf(s, t)?.backup ? { backup: true as const } : {}),
     ...(t.cause ? { cause: t.cause } : {}),
     ...(t.subject ? { subject: t.subject } : {}),
     ...(t.lki ? { lki: t.lki } : {}),

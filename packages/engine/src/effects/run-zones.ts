@@ -1341,9 +1341,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // its counter exiled.
       const at = e.countered ? s.resolving?.counteredExiled : ctx.subject;
       const o = at ? s.objects[at.id] : undefined;
+      const sc = (s.resolving!.scratch ??= {});
+      // Power Pack (round B266): "If that spell would be put into your graveyard, exile it instead": the spell the card
+      // became, cast just now (the engine keeps a card's zone count as it's cast).
+      if (sc.may !== undefined && e.exileAfter && o?.zone === "stack" && (o.zoneChanges ?? 0) === at!.zc) o.exileIfToGraveyard = true;
       if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== at!.zc) return;
       const p = player(s, ctx.controller);
-      const sc = (s.resolving!.scratch ??= {});
       if (sc.may !== undefined) return; // asked already
       sc.may = false;
       s.pending = { kind: "castFree", player: p.id, objectId: o.id, source: src };

@@ -4234,6 +4234,31 @@ line blocks.
    from the hand and the defending player's guess) and the rest of `npm run popular` above rank 17,500 (still out, for
    the reasons in their earlier lists). Known gaps: bots cast spells from their hands into Possibility Storm and
    Knowledge Pool without weighing what they lose.
+   Round 423 went on down the "Out after round N" lists and `npm run popular`, most played first, to two copy effects and
+   round 422's Ashnod's twin. Verrak, Warped Sengir's "Whenever you activate an ability that isn't a mana ability, if life
+   was paid to activate it, you may pay that much life again. If you do, copy that ability. You may choose new targets for
+   the copy." (any source's ability; the life its costs paid, Phyrexian mana paid with life among it, CR 602.2b, 107.4f,
+   counted as they're paid; an intervening if, CR 603.4; not with less life than that, CR 119.4; activated event
+   `costLifePaid`, TriggeredAbility.activates `costLifePaid`, the may's `payLife` its event amount). Mirror of the
+   Forebears's "{1}: Until end of turn, ~ becomes a copy of target creature you control of the chosen type, except it's an
+   artifact in addition to its other types." (the target bound to the type chosen as it was activated, so a second
+   activation in response still resolves, rulings; while it's a copy, the type chosen for it is set aside,
+   GameObject.chosenTypeAside, so a copied creature's abilities that read "the chosen type" find none, CR 707.2, rulings;
+   back once no copy effect is left, CR 611.2a). Dermotaxi's "Imprint — As ~ enters, exile a creature card from a
+   graveyard." (any player's graveyard, mandatory if there's one, CR 614.12a; entersExileFromYard `anyGraveyard`) and "Tap
+   two untapped creatures you control: Until end of turn, ~ becomes a copy of the exiled card, except it's a Vehicle
+   artifact in addition to its other types." (the card linked to it, as printed, CR 607.2a, 707.2; tapping isn't crewing,
+   rulings; with that card gone from exile, nothing). Browser tests click through Dermotaxi's pick of Ana's Serra Angel and
+   its copy, Verrak's payment for Greed and Mirror of the Forebears becoming an Elvish Archdruid. +3, 31,754 of 31,936 on
+   this stacked branch; the compiled text of every other card is unchanged.
+   Out after round 423 (looked at, not done): Pulmonic Sliver (an optional "put it on top of its owner's library instead"
+   for each Sliver about to go to a graveyard: the engine has no way to ask during a zone change), Nephalia Academy (an
+   opponent-caused discard put on top instead: Library of Leng's prompt covers some discard paths, not punishers, ward,
+   random reveals or Chains of Mephistopheles), Sunken Palace (its mana ability's {1}{U} and "Exile seven cards from your
+   graveyard" costs, and mana that copies an ability it's spent on), Cryptic Spires (colors circled as the deck is built),
+   Grip of Chaos, Taster of Wares, Curse of Leeches and The Seventh Doctor (Lane B's round B267), and the rest of `npm run
+   popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps: bots activate Dermotaxi
+   and Mirror of the Forebears without weighing what the copy is worth; Verrak's bot pays while it keeps more than 5 life after paying.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5549,7 +5574,7 @@ line blocks.
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
-   them); Verrak, Warped Sengir, Ashnod the Uncaring and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
+   them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
    Prowl, Stoic Strategist and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
@@ -12391,9 +12416,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
   (Deepfathom Echo, Sakashima's Will; Cytoshape and Polymorphous Rush done in round B139); "for as long as" durations (Assimilation Aegis,
   Blade of Shared Souls and Zygon Infiltrator done in round 396, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
-  Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
+  Mimeoplasm, Dermotaxi (done in round 423), Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
-  Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
+  Forebears, done in round 423), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
   Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection (done in round B249); planeswalkers (Saheeli,
   Oko, Kaya).
 - Madness: "if its madness cost was paid" (Grave Scrabbler), X or non-mana madness costs, granting madness (Falkenrath

@@ -4364,7 +4364,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Frankenstein's Monster's X is capped below by our creature cards in the graveyard (see the X choices).
   const yard = compileCard(d).entersExileFromYard;
   if (yard && yard.n !== "x") {
-    const cards = player(s, pid).graveyard.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c))));
+    // Dermotaxi (round 423): a creature card from any graveyard, worth casting only with one there.
+    const yards = yard.anyGraveyard ? s.turnOrder.flatMap((p) => player(s, p).graveyard) : player(s, pid).graveyard;
+    const cards = yards.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c))));
     if (!cards.some((c) => (yard.n === "one" ? mv(s, c) : characteristics(s, obj(s, c)).toughness) > 0)) return null;
   }
   // Mox Diamond with no other land card to discard would only go to the graveyard.

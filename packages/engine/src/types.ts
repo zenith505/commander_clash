@@ -904,6 +904,12 @@ export interface GameObject {
   castEntersTapped?: true;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
+  /**
+   * Mirror of the Forebears (round 423): the creature type chosen as it entered, set aside while it's a copy of something
+   * else because a resolving effect made it one (CR 707.2: a choice made as it entered isn't a copiable value; the copied
+   * abilities that read "the chosen type" have none, rulings). Back in `chosen` once no copy effect is left.
+   */
+  chosenTypeAside?: string;
   /** Jeweled Amulet: the type of mana last noted for it ("note the type of mana spent to pay this activation cost"). */
   notedMana?: ManaType;
   /** A battle's protector (CR 310.9), chosen as it enters (310.9a) and again when that player can't be (704.5x-y). */

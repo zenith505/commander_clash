@@ -236,7 +236,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "You may search your library for an Aura card with mana value less than or equal to that Aura" (Light-Paws): the number.
           const first = e.effects[0];
           const text = first?.type === "search" ? sayBound(s, e.text, first.filter, amountCtx(s, ctx)) : e.text;
-          const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : e.payTimes !== undefined || e.payManaCost || e.payOneOf ? `${text} (${describePay(pay!) || "{0}"})` : text;
+          const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : typeof e.payLife === "object" && "count" in e.payLife && e.payLife.count.kind === "eventAmount" ? `${text} (${pay!.life} life)` /* Verrak (round 423): "that much life" */ : e.payTimes !== undefined || e.payManaCost || e.payOneOf ? `${text} (${describePay(pay!) || "{0}"})` : text;
           // Pardic Dragon: "that player may": the event's player decides (none left in the game: not done).
           const decider = e.decider ? players(s, e.decider, ctx)[0] : ctx.controller;
           if (decider === undefined) {

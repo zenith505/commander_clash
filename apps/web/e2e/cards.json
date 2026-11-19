@@ -11186,6 +11186,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3b21abb0-9a58-4e62-9650-4b04ce2bfb12",
+  "name": "Dack Fayden, Helping Hand",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "When Dack Fayden enters, reveal cards from the top of your library until you reveal X creature cards, where X is the number of opponents you have. Put those creature cards onto the battlefield, then shuffle. They're goaded for the rest of the game. For each of those permanents, choose a different opponent. Each opponent gains control of the permanent for which they were chosen.",
+  "power": "4",
+  "toughness": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "frc",
+  "releasedAt": "2026-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cdc4048a-73ec-4ec1-a179-2b36c397bf1a",
   "name": "Dakmor Salvage",
   "manaCost": "",
@@ -14886,6 +14919,39 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/c/4/c470539a-9cc7-4175-8f7c-c982b6072b6d.jpg?1783929425"
    }
   ]
+ },
+ {
+  "oracleId": "b415684e-40f0-43c1-b8d5-1a90b75c5a47",
+  "name": "Emissary of Grudges",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Efreet",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Efreet"
+  ],
+  "oracleText": "Flying, haste\nAs this creature enters, secretly choose an opponent.\nReveal the player you chose: Choose new targets for target spell or ability if it's controlled by the chosen player and if it targets you or a permanent you control. Activate only once.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "99eb572b-85b1-4d78-aea8-4400a5b7e508",
@@ -46224,6 +46290,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e3ff6134-10dd-4565-afcb-0f41a2933d19",
+  "name": "Swindler's Scheme",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever an opponent casts a spell from their hand, you may reveal the top card of your library. If it shares a card type with that spell, counter that spell and that opponent may cast the revealed card without paying its mana cost.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -6045,6 +6045,23 @@ export type Effect =
    * .revealed), still that card in exile (CR 400.7), cast as this resolves or never (CR 608.2g). Effects/run-round421.ts.
    */
   | { type: "castRevealedFree" }
+  /**
+   * Swindler's Scheme (round 424): "reveal the top card of your library. If it shares a card type with that spell, counter
+   * that spell and that opponent may cast the revealed card without paying its mana cost.": in a cast trigger (after its
+   * "you may"), the top card of its controller's library revealed (CR 701.20a); if it shares a card type (CR 205.2a) with the
+   * spell that triggered this (ResolveCtx.cause, as it is on the stack, or as it last existed there, CR 608.2h), that spell
+   * is countered if it's still there (CR 701.6a) and the event player may cast the revealed card from that library as this
+   * resolves, free, or never (CR 608.2g). Otherwise the card stays on top. Effects/run-round424.ts.
+   */
+  | { type: "revealTopCounterSharing" }
+  /**
+   * Dack Fayden, Helping Hand (round 424): "For each of those permanents, choose a different opponent. Each opponent gains
+   * control of the permanent for which they were chosen.": the permanents this resolution remembered (ResolvingState
+   * .created) still on the battlefield, each given by its controller's choice to a different opponent of the ability's
+   * controller (PendingDecision chooseOption "giveControlTo"), then all at once each opponent gains control of theirs for
+   * the rest of the game (CR 613.1b, 611.2a). Effects/run-round424.ts.
+   */
+  | { type: "giveEachToDifferentOpponent" }
   /** Vaevictis Asmadi, the Dire: "Those players sacrifice those permanents. Each player who sacrificed a permanent this way
    * reveals the top card of their library, then puts it onto the battlefield if it's a permanent card." Each target still
    * legal is sacrificed by its controller, all at once; each player who sacrificed one reveals, and the permanent cards
@@ -6564,6 +6581,8 @@ export type SpellCondition =
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** Stalking Leonin (round 377): "if it's controlled by the chosen player": that target, still legal, is controlled by the player chosen for the source (its last known one if it's gone, CR 608.2h). */
   | { kind: "targetControlledByChosen"; index: number }
+  /** Emissary of Grudges (round 424): "if it's controlled by the chosen player and if it targets you or a permanent you control": target `index`, a spell or ability still on the stack, controlled by the player chosen for the source, with one or more of its targets you or a permanent you control now. */
+  | { kind: "targetItemOfChosenTargetsYou"; index: number }
   /**
    * Dead Ringers: "unless either one is a color the other isn't": targets `index` to `index + n - 1` have exactly the same
    * colors (all colorless counts), as they are now or, gone from the battlefield, as they last existed (CR 608.2b, 608.2h).

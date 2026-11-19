@@ -1176,6 +1176,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "targetControlledByChosen"
             ? // Stalking Leonin (round 377): that target, still legal, controlled by the player chosen for the source now.
               ((o, chosen) => !!o && o.zone === "battlefield" && chosen !== undefined && controllerOf(s, o) === chosen)(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined, chosenPlayerOf(s, ctx))
+            : e.cond.kind === "targetItemOfChosenTargetsYou"
+            ? // Emissary of Grudges (round 424): that spell or ability, still a legal target (CR 608.2b), controlled by the
+              // player chosen for the source, and targeting you or a permanent you control as this resolves (rulings: one
+              // such target among others is enough).
+              ((t, chosen) => {
+                const item = t?.kind === "stack" && ctx.legal[e.cond.index] ? s.stack.find((x) => x.id === t.id) : undefined;
+                if (!item || chosen === undefined || item.controller !== chosen) return false;
+                return (item.targets ?? []).some((x) => (x.kind === "player" && x.id === ctx.controller) || (x.kind === "object" && s.objects[x.id]?.zone === "battlefield" && controllerOf(s, s.objects[x.id]!) === ctx.controller));
+              })(ctx.targets[e.cond.index], chosenPlayerOf(s, ctx))
             : e.cond.kind === "targetSharesName"
             ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
               ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)

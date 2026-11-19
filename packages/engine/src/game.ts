@@ -12848,6 +12848,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "giveControlTo") {
+    // Dack Fayden, Helping Hand (round 424): the opponent who gains control of `about` (Effect giveEachToDifferentOpponent).
+    (r.scratch ??= {}).giveControlTo = Number(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "riverSide") {
     // Raging River (round B265): the label for the attacking creature `about` (Effect ragingRiver).
     (r.scratch ??= {}).riverSide = choice === "right" ? "right" : "left";

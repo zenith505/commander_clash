@@ -4259,6 +4259,32 @@ line blocks.
    Grip of Chaos, Taster of Wares, Curse of Leeches and The Seventh Doctor (Lane B's round B267), and the rest of `npm run
    popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps: bots activate Dermotaxi
    and Mirror of the Forebears without weighing what the copy is worth; Verrak's bot pays while it keeps more than 5 life after paying.
+   Round 424 went on down the "Out after round N" lists and `npm run popular`, most played first, to three cards whose
+   pieces were all there but one each. Swindler's Scheme's "Whenever an opponent casts a spell from their hand, you may
+   reveal the top card of your library. If it shares a card type with that spell, counter that spell and that opponent may
+   cast the revealed card without paying its mana cost." (decided without looking, rulings; the spell's card types as it
+   is on the stack, or as it last existed there, CR 205.2a, 608.2h; countered only if it's still there, the free cast from
+   your library not depending on it, CR 608.2c, 608.2g; not cast, the card stays on top; Effect revealTopCounterSharing).
+   Dack Fayden, Helping Hand's "When ~ enters, reveal cards from the top of your library until you reveal X creature
+   cards, where X is the number of opponents you have. Put those creature cards onto the battlefield, then shuffle.
+   They're goaded for the rest of the game. For each of those permanents, choose a different opponent. Each opponent gains
+   control of the permanent for which they were chosen." (revealUntil `n` with `remember`, a goad for the game, CR
+   701.15a-b, then Effect giveEachToDifferentOpponent: a "giveControlTo" pick for each, the last one without asking, and
+   all the control changes at once, CR 613.1b, 611.2a). Emissary of Grudges's "Reveal the player you chose: Choose new
+   targets for target spell or ability if it's controlled by the chosen player and if it targets you or a permanent you
+   control. Activate only once." (any spell or ability targeted; StaticCondition `targetItemOfChosenTargetsYou` checked as
+   it resolves, one such target among several enough, rulings; any target may be kept, CR 115.7d). Browser tests click
+   through Dack's picks, casting Ana's Serra Angel from her library after her Scheme counters your Hill Giant, and
+   Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f; the
+   compiled text of every other card is unchanged.
+   Out after round 424 (looked at, not done): Secret Invasion (the enchanted creature a copy of the creature the Aura
+   exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (its
+   back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
+   other permanents while it's untapped), Redemptor Dreadnought (its Plasma Incinerator line compiles wrongly, review
+   follow-up 18: fix it with the card), Selective Adaptation, Supper for Spiders and Brilliant Ultimatum (Lane B's round
+   B268), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known
+   gaps: bots never reveal Emissary of Grudges's player; Swindler's Scheme's bot reveals only against spells of mana value
+   3 or more; Dack's bot gives each creature to the opponent with the least power on the battlefield.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5568,7 +5594,7 @@ line blocks.
    from the cards its collect evidence exiled); Reversal of Fortune (done in round B265) (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
-   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
+   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand (done in round 424);
    Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force (done in round B247).
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
@@ -6522,7 +6548,7 @@ line blocks.
      Noctis, Raubahn (ward-pay life), Sokka Swordmaster.
    - Harmonize (CR 702.180) works on 8 cards; still out: Glacial Dragonhunt, Nature's Rhythm, Synchronized Charge,
      Songcrafter Mage (granting harmonize). Paradigm works on all 5 cards and demonstrate on all 6.
-   - Secret choices in triggers (Stalking Leonin, Emissary of Grudges) are out.
+   - Secret choices in triggers (Stalking Leonin, Emissary of Grudges) are out (both done since, in rounds 377 and 424).
    Left from the round after harmonize (Khârn, dice, face-down exile you may play, main phase triggers, more cascade
    grants, exile until a nonland card):
    - Khârn the Betrayer: damage dealt to it by several sources at once is one control change, and the opponent for
@@ -12211,7 +12237,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   other legendary creatures" lands (done in round B161) (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
   for a card exiled by a different ability), Split the Spoils (done in round B153) (piles), Swindler's Scheme (counter and cast the revealed
-  card), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
+  card; done in round 424), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
   entered; B98 fixed that: see round B98.)
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card

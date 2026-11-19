@@ -3002,27 +3002,37 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "predicament": {
       // Master of Predicaments (rulings): the card chosen without revealing it; the guess made blind; nothing revealed
-      // unless it's cast.
+      // unless it's cast. The Seventh Doctor (round B267): "greater than the number of artifacts you control", counted as
+      // the guess is checked, and whether a spell was cast this way (ResolvingState.did) for "If you don't cast a spell
+      // this way, investigate".
       const sc = (s.resolving!.scratch ??= {});
       const you = player(s, ctx.controller);
+      const st = (sc.predicament ??= {});
+      if (st.card === undefined && st.guess === undefined && !st.offered) s.resolving!.did = false;
       const guesser = players(s, e.who, ctx).find((pid) => !player(s, pid).lost);
       if (guesser === undefined) return;
-      const st = (sc.predicament ??= {});
+      const than = e.overCount ? `the number of artifacts ${you.name} controls` : String(e.over);
       if (st.card === undefined) {
         if (!you.hand.length) return log(s, `${you.name} has no card in hand to choose.`);
-        s.pending = { kind: "chooseOption", player: you.id, source: src, what: "predicamentCard", options: [...you.hand], labels: you.hand.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a card in your hand: ${player(s, guesser).name} guesses whether its mana value is greater than ${e.over}; if they guess wrong, you may cast it without paying its mana cost` };
+        s.pending = { kind: "chooseOption", player: you.id, source: src, what: "predicamentCard", options: [...you.hand], labels: you.hand.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a card in your hand: ${player(s, guesser).name} guesses whether its mana value is greater than ${e.overCount ? "the number of artifacts you control" : e.over}; if they guess wrong, you may cast it without paying its mana cost` };
         return "paused";
       }
       if (st.guess === undefined) {
-        s.pending = { kind: "chooseOption", player: guesser, source: src, what: "predicamentGuess", options: ["over", "notOver"], labels: [`Greater than ${e.over}`, `${e.over} or less`], prompt: `${you.name} chose a card in their hand. Guess whether its mana value is greater than ${e.over}: if you guess wrong, they may cast it without paying its mana cost` };
+        const now = e.overCount ? ` (now ${amountNow(s, e.overCount, ctx)})` : "";
+        s.pending = { kind: "chooseOption", player: guesser, source: src, what: "predicamentGuess", options: ["over", "notOver"], labels: [`Greater than ${than}${now}`, `${e.overCount ? "Not greater than that" : `${e.over} or less`}`], prompt: `${you.name} chose a card in their hand. Guess whether its mana value is greater than ${than}${now}: if you guess wrong, they may cast it without paying its mana cost` };
         return "paused";
       }
-      if (st.offered) return;
-      st.offered = true;
       const o = s.objects[st.card.id];
+      if (st.offered) {
+        // Cast: it's on the stack now as the same object.
+        if (o?.zone === "stack") s.resolving!.did = true;
+        return;
+      }
+      st.offered = true;
       if (!o || o.zone !== "hand" || (o.zoneChanges ?? 0) !== st.card.zc) return;
-      // A split card's mana value is that of both halves together (CR 709.4, rulings).
-      const right = (defMv(defOf(s, o)) > e.over) === (st.guess === "over");
+      // A split card's mana value is that of both halves together (CR 709.4, rulings); X is 0 (rulings).
+      const over = e.overCount ? amountNow(s, e.overCount, ctx) : e.over;
+      const right = (defMv(defOf(s, o)) > over) === (st.guess === "over");
       if (right) return log(s, `${player(s, guesser).name} guessed right.`);
       log(s, `${player(s, guesser).name} guessed wrong.`);
       s.pending = { kind: "castFree", player: you.id, objectId: o.id, source: src };

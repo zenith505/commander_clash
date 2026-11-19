@@ -1,6 +1,6 @@
 # Roadmap
 
-31,764 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,767 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
@@ -11428,6 +11428,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B269 (least played first, from the cards round B268 named next in line; Dack Fayden, Helping Hand went to Lane A's
+  round 424, and none of these is in Lane A's rounds 423-424): Prowl, Stoic Strategist's "Whenever a player plays a card
+  exiled with ~, you draw a card and convert ~." (any player casting a spell or playing a land from among the cards its
+  attack trigger exiled, CR 607.2a: the one "exile ... its owner may play it" linked to it in compile.ts; an ability of
+  the front face only, so it triggers only while it's Prowl, Stoic Strategist, rulings; converting is transforming, CR
+  701.28a, 701.27f). Lucy MacLean, Positively Armed's "Golden Rule — Whenever a token enters, you may have target player
+  other than its controller create a token that's a copy of it, then you draw a card if an opponent created a token this
+  way. Do this only once each turn." (anyone's token; the target a player other than the token's controller as the
+  trigger is put on the stack, TargetSpec.notSubjectController; the copy of the token as it is or last was, CR 707.2,
+  608.2h, created by that player, CR 111.2; you draw only if a token an opponent of yours created was made, SpellCondition
+  createdByOpponent; once you've chosen to do it this turn it doesn't trigger again, so its own copy doesn't, CR 603.2h; a
+  "no" lets it trigger again). Apple of Eden, Isu Relic's "{T}, Pay 4 life, Sacrifice ~: Look at target opponent's hand
+  and exile those cards face down. You may play those cards this turn, and mana of any type can be spent to cast them.
+  Until end of turn, whenever you play a land or cast a spell this way, its owner draws a card. At the beginning of the
+  next end step, return the exiled cards to their owner's hand. Activate only as a sorcery." (the cards in that hand as it
+  resolves, face down, CR 406.3, seen only by you; played with their usual timing and costs, a land as your land play,
+  rulings; mana of any type, CR 609.4b; each card played with the permission triggers a delayed ability, CR 603.7, and its
+  owner draws, FaceDownPlay `onPlay`; only the cards still exiled as the same objects return at the next end step, CR
+  400.7, rulings). UI fix: two identical triggers asking for a target one after the other (Lucy's for two tokens entering
+  at once) now each get their own target prompt (App.tsx keyed the prompt by its text only, so the second never opened).
+  Browser tests click through Prowl's exile of your attacking Grizzly Bears and casting them from exile, Lucy's two
+  targets and her "Yes" for a Soldier copy for Ana, and Apple of Eden's activation at Ana and casting her Grizzly Bears
+  from her exile pile. +3, 31,767 of 31,936 on this branch (B268's, stacked on B267). The compiled text of every other
+  card is unchanged.
+- Out after round B269 (looked at, not done): the lists after round B268 stay out. Judgment calls and known gaps: bots
+  take Lucy MacLean's copy for themselves whenever they're the target and give one to an opponent unless the token is a
+  creature with power 3 or more, aiming the trigger with the usual target choice; bots use Apple of Eden like any other
+  activated ability, without weighing the 4 life against what the opponent's hand holds. Ian Malcolm, Chaotician,
+  Spellweaver Helix, Araumi of the Dead Tide, Haldan, Avid Arcanist, Abstract Performance, Cass, Hand of Vengeance,
+  Draugr Necromancer and Bruna, Light of Alabaster are next in line (not looked at yet).
 - Round B268 (least played first, from the cards round B267 named next in line, none of them in Lane A's rounds 422-423):
   Selective Adaptation ("Reveal the top seven cards of your library. Choose from among them a card with flying, a card with
   first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample,

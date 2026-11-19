@@ -29,6 +29,8 @@ export interface FaceDownPlay {
   castOnly?: true;
   /** "You may play them if you control a Wizard" (Gandalf, Goblins' Bane's Flameshape): only while that player controls a permanent like this (GameObject.mayPlay.ifControl). */
   ifControl?: TargetSpec;
+  /** Apple of Eden, Isu Relic (round B269): "Until end of turn, whenever you play a land or cast a spell this way, its owner draws a card": this triggers, from the ability's source, as a card is played with this permission (GameObject.mayPlay.castTrigger, with `play` for lands). */
+  onPlay?: AbilityBody;
 }
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
@@ -1017,6 +1019,8 @@ export interface TargetSpec {
   outnumbers?: { stat: "life" | "creatures" | "lands" | "hand" | "creatureCardsInGraveyard"; fewer?: true; than: "eventPlayer" | PlayerId };
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
+  /** For players: "target player other than its controller" (Lucy MacLean, Positively Armed, round B269): not the controller of the trigger's subject as the trigger is put on the stack (as it last existed, if it has left); `notPlayer` once it's known. */
+  notSubjectController?: true;
   /**
    * "Target card with the same name as that spell" in a cast trigger (Harness the Storm): a card with the name the spell
    * had as it was cast (StackItem.castName; a split card has both its halves' names, CR 709.4), fixed as the trigger is
@@ -6406,6 +6410,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** Expert-Level Safe (round B247): "If they match": the numbers just chosen secretly (Effect secretNumbers "match") were all the same. */
   | { kind: "numbersMatched" }
+  /** Lucy MacLean, Positively Armed (round B269): "if an opponent created a token this way": a token the last "create" made (ResolvingState.created) is owned, so was created, by an opponent of this ability's controller (CR 111.2). */
+  | { kind: "createdByOpponent" }
   /** Vault 11: Voter's Dilemma (round 416): "If no creature got votes": the vote just made (Effect vote `upTo`) has no vote for anything (CR 701.38). */
   | { kind: "noVotes" }
   /** Guard Dogs: "if it shares a color with that permanent": both objects as they are now, on the battlefield, with a color in common (CR 105.2). */

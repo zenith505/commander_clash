@@ -2566,9 +2566,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // The permission belongs to this object only (CR 400.7), and to the player who exiled it, whoever controls the
         // source later (rulings on Gonti).
         if (e.play) {
-          const { until, ...how } = e.play;
+          const { until, onPlay, ...how } = e.play;
           const source = until === "source" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {};
-          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until, turn: s.turn, ...how, ...source };
+          // Apple of Eden (round B269): playing a land or casting a spell with this permission triggers (CR 603.2, 603.7).
+          const trig = onPlay && ctx.sourceId && s.objects[ctx.sourceId] ? { castTrigger: { body: onPlay, sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0, sourceCardId: cardIdOf(obj(s, ctx.sourceId)), play: true as const } } : {};
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until, turn: s.turn, ...how, ...source, ...trig };
         }
         if (e.endStepHand)
           addDelayed(s, "yourNextEndStep", p.id, o, { targets: [], effects: [{ type: "bounce", what: { ref: "subjectCard" }, hidden: true }], text: "Put that card into your hand." }, ctx.sourceDef.oracleId);

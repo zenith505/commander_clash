@@ -24,6 +24,7 @@ import { roundB265Line } from "./laneb265-lines";
 import { roundB266Line } from "./laneb266-lines";
 import { roundB267Line } from "./laneb267-lines";
 import { roundB268Line } from "./laneb268-lines";
+import { roundB269Line } from "./laneb269-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2423,6 +2424,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB267Line(line, out, isSpell)) continue;
     // Selective Adaptation, Supper for Spiders, Brilliant Ultimatum (round B268).
     if (roundB268Line(line, out, isSpell)) continue;
+    // Prowl, Stoic Strategist, Lucy MacLean, Positively Armed (round B269).
+    if (roundB269Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8188,6 +8191,15 @@ function linkExile(out: CompiledCard) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
+  }
+  // Prowl, Stoic Strategist (round B269): "Whenever a player plays a card exiled with ~" with no impulse: the cards its one
+  // "exile ... For as long as that card remains exiled, its owner may play it" exiled (CR 607.2a).
+  if (!impulses.length && out.triggers.some((t) => !!t.cast?.fromLinked)) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until && !!e.ownerMay?.play && !e.linked);
+    const others = all.some((e) => (e.type === "exile" && !exiles.includes(e)) || e.type === "exileTop" || e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "exileHand" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile"));
+    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
   }
   // "Cast a spell from among cards exiled with ~" with no impulse: Idol of Endurance's one exile of graveyard cards until
   // it leaves (CR 607.2a).

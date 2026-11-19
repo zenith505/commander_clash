@@ -347,6 +347,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const cheaper = !!c && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).types.some((ty) => c.types.includes(ty)) && (obj(s, id).isToken ? 0 : characteristics(s, obj(s, id)).manaValue) < c.manaValue);
       return [{ type: "chooseMay", player: pid, yes: cheaper }];
     }
+    // Lucy MacLean, Positively Armed (round B269): a copy of the token for ourselves is free; for an opponent it's worth
+    // the card drawn only if the token isn't a creature with power 3 or more (as it is now, or last was).
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.effects[0]?.type === "createTokenCopy" && theirMay.effects.some((x) => x.type === "if" && x.cond.kind === "createdByOpponent")) {
+      const t = s.resolving!.item.targets?.[0];
+      const to = t?.kind === "player" ? t.id : undefined;
+      const sub = s.resolving!.item.subject;
+      const tok = sub ? s.objects[sub.id] : undefined;
+      const here = tok?.zone === "battlefield" && (tok.zoneChanges ?? 0) === sub!.zc;
+      const big = here ? objIsType(s, tok!, "Creature") && power(s, tok!) >= 3 : (s.lastKnown?.[sub?.id ?? ""]?.power ?? 0) >= 3;
+      return [{ type: "chooseMay", player: pid, yes: to === pid || !big }];
+    }
     if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
       const asked = s.resolving!.scratch?.mayExile?.queue[0];
       const o = asked ? s.objects[asked.id] : undefined;

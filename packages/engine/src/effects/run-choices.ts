@@ -1056,6 +1056,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? !!s.resolving!.putOnTop
           : e.cond.kind === "numbersMatched"
           ? !!s.resolving!.numbersMatched
+          : e.cond.kind === "createdByOpponent"
+          ? !!s.resolving!.created?.some((id) => s.objects[id] !== undefined && opponents(s, ctx.controller).includes(s.objects[id]!.owner))
           : e.cond.kind === "noVotes"
           ? !s.resolving!.votes?.length
           : e.cond.kind === "wonClash"

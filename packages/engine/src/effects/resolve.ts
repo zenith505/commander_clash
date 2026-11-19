@@ -31,6 +31,7 @@ import { runKinCountersEffect } from "./run-round361";
 import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
 import { runRound420Effect } from "./run-round420";
+import { runRound421Effect } from "./run-round421";
 import { runChooseSourceNowEffect } from "./run-round364";
 import { runMillUntilEffect } from "./run-round373";
 import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
@@ -2022,6 +2023,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealOpponentExilesCasts":
     case "exileFromHandOrTarget":
       return runRound420Effect(s, e, ctx, src);
+    case "exileCause":
+    case "castRevealedFree":
+      return runRound421Effect(s, e, ctx, src);
     case "mayCastExiledSpell":
       return runMayCastExiledSpellEffect(s, e, ctx);
     case "sacrificeTargetsReveal":

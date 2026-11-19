@@ -6764,6 +6764,29 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
     });
     return String(Math.max(r.min, Math.min(r.max, big ? 3 : 4)));
   }
+  // Squall, Gunblade Duelist (round 421): damage whenever creatures with that power or toughness attack an opponent, so
+  // the power or toughness most common among our creatures and creature cards (hand and library), the smaller on a tie.
+  if (c?.triggers.some((t) => t.groupPTEqualsChosen)) {
+    const me = player(s, pid);
+    const counts = new Map<number, number>();
+    const bump = (n: number) => Number.isFinite(n) && n >= r.min && n <= r.max && counts.set(n, (counts.get(n) ?? 0) + 1);
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) !== pid || !objIsType(s, o, "Creature")) continue;
+      bump(power(s, o));
+      if (toughness(s, o) !== power(s, o)) bump(toughness(s, o));
+    }
+    for (const id of [...me.hand, ...me.library]) {
+      const d = defOf(s, obj(s, id));
+      if (!isType(d, "Creature")) continue;
+      const p = /^\d+$/.test(d.power ?? "") ? Number(d.power) : NaN;
+      const t = /^\d+$/.test(d.toughness ?? "") ? Number(d.toughness) : NaN;
+      bump(p);
+      if (t !== p) bump(t);
+    }
+    const best = [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+    return String(best ? best[0] : Math.max(r.min, Math.min(r.max, 2)));
+  }
   // Volcano Hellion: the chosen amount dealt to us and to its target creature: just enough to destroy an opponent's
   // creature while that leaves us 10 life or more, else none (our own creature, or one damage can't destroy).
   const toUs = s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "damage" && e.to.ref === "you" && typeof e.amount === "object" && "count" in e.amount && e.amount.count.kind === "chosenNumber") : undefined;

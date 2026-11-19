@@ -363,7 +363,7 @@ export type TriggerSourceEvent =
   /** One of this permanent's mana abilities resolved (CR 605.3b), making this much mana (Tyvar the Bellicose). */
   | { type: "manaAbilityResolved"; id: ObjectId; amount: number }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; /** Ashnod the Uncaring (round 422): one or more permanents were sacrificed to pay its costs (not for mana to pay them, rulings). */ costSacrificed?: true; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -2012,7 +2012,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.attacksOpponent) {
           for (const p of s.turnOrder.filter((q) => opponents(s, watcher).includes(q))) {
             const at = hit.filter(([x]) => attackingYouNow(s, x, p, !!t.attacksOpponent!.orPlaneswalkers)).map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-            if (at.length) add(o, watcher, (_, tt) => same(tt) && JSON.stringify(tt.attacksOpponent) === JSON.stringify(t.attacksOpponent), list, undefined, undefined, undefined, undefined, undefined, { player: p, group: at });
+            // Squall, Gunblade Duelist: only if one of them has power or toughness equal to the chosen number (CR 603.4).
+            const ptEquals = t.groupPTEqualsChosen ? (o.chosen?.number ?? 0) : undefined;
+            if (ptEquals !== undefined && !at.some((g) => power(s, obj(s, g.id)) === ptEquals || toughness(s, obj(s, g.id)) === ptEquals)) continue;
+            if (at.length) add(o, watcher, (_, tt) => same(tt) && JSON.stringify(tt.attacksOpponent) === JSON.stringify(t.attacksOpponent) && !!tt.groupPTEqualsChosen === !!t.groupPTEqualsChosen, list, undefined, undefined, undefined, undefined, undefined, { player: p, group: at, ...(ptEquals !== undefined ? { ptEquals } : {}) });
           }
           continue;
         }
@@ -2974,6 +2977,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Way of the Paradox: "Whenever you activate a loyalty ability"; Way of the Mind Sculptor: "if you removed two or
         // more loyalty counters to activate it" (the cost paid, CR 606.4; fixed once paid, so true as it resolves too).
         if (a.loyalty && (!ev.loyalty || ev.loyalty.removed < (a.loyaltyRemoved ?? 0))) return false;
+        // Ashnod the Uncaring (round 422): "if one or more permanents were sacrificed to activate it": to pay its costs (CR
+        // 602.2b; a Treasure sacrificed for the mana doesn't count, rulings), fixed once paid, so as true as it resolves (CR 603.4).
+        if (a.costSacrificed && !ev.costSacrificed) return false;
         // Ertha Jo: "an ability that targets a creature or player": its targets as it was activated (CR 602.2i, 115.1).
         if (a.targetsCreatureOrPlayer) {
           const item = ev.stackId ? s.castItems?.[ev.stackId] : undefined;

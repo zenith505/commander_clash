@@ -1281,7 +1281,7 @@ export function moveObject(
     const before = !s.leftTogether?.length && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).triggers.some((t) => t.dies?.greatestPowerOfController)) ? s.battlefield.flatMap((b) => (objIsType(s, obj(s, b), "Creature") ? [{ id: b, controller: controllerOf(s, obj(s, b)), power: power(s, obj(s, b)) }] : [])) : undefined;
     (s.leftTogether ??= []).push({ ...(before ? { before } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.name !== undefined ? { chosenName: o.chosen.name } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -5614,7 +5614,18 @@ function resolveTop(s: GameState) {
     const lk = mvc && item.sourceId ? s.lastKnown?.[item.sourceId] : undefined;
     const srcCounters = src && src.zone === "battlefield" && (src.zoneChanges ?? 0) === (item.sourceZc ?? 0) ? src.counters : lk && lk.zc === (item.sourceZc ?? 0) ? (lk.counters ?? {}) : undefined;
     const mvNo = !!mvc && (!mvSpell || !srcCounters || spellManaValue(s, mvSpell) !== (srcCounters[mvc.counter] ?? 0) + mvc.plus);
-    if (sharesNo || mvNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
+    // Squall, Gunblade Duelist (round 421): those creatures again, each as it is now, or as it last existed on the
+    // battlefield once it has left (rulings, CR 603.4, 608.2h).
+    const ptEq = item.event?.ptEquals;
+    const ptNo =
+      ptEq !== undefined &&
+      !(item.event!.group ?? []).some((g) => {
+        const a = s.objects[g.id];
+        if (a && a.zone === "battlefield" && (a.zoneChanges ?? 0) === g.zc) return power(s, a) === ptEq || toughness(s, a) === ptEq;
+        const lk = s.lastKnown?.[g.id];
+        return !!lk && lk.zc === g.zc && (lk.power === ptEq || lk.toughness === ptEq);
+      });
+    if (sharesNo || mvNo || ptNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -11702,6 +11713,10 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const extraCosts = extraCosts0;
+  // Ashnod the Uncaring (round 422): the sacrifices its costs make from here (CR 602.2b), counted as moveObject logs them:
+  // ones its costs name, this permanent itself or the one granting it. Mana was paid before (rulings: a Treasure
+  // sacrificed for mana doesn't count).
+  const sacrificesBefore = s.turnLog?.sacrificed?.length ?? 0;
   const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   // Kylox's Voltstrider (round 401): the cards its collect evidence cost exiled are "exiled with it" (CR 607.2a), the
   // object it is now (CR 400.7).
@@ -11723,6 +11738,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.revealSecretType && o.secretType) log(s, `${p.name} reveals the creature type chosen for ${d.name}: ${o.secretType.type}.`);
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
+  const costSacrificed = (s.turnLog?.sacrificed?.length ?? 0) > sacrificesBefore;
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Dodgy Jalopy: its power in the graveyard as it's exiled for scavenge (rulings), by its characteristic-defining ability.
   const scavengedPower = ab.scavengeVariable && o.zone === "graveyard" ? cardPT(s, o, "power") : undefined;
@@ -11807,7 +11823,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

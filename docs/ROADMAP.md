@@ -1,7 +1,7 @@
 # Roadmap
 
-31,758 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,983 of 4,988 (99%), top 10,000: 9,938 of
+31,764 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -64,7 +64,7 @@ line blocks.
    Osteoharmonist (the creature "has no abilities" as it enters, so its own enters-tapped, enters-with-counters and "as
    it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Out after round 161:
    Toralf, God of Fury // Toralf's Hammer (done in round 266). Out after round 162, each with a
-   piece of its own: Possibility Storm (the spell cast from a hand is exiled by its trigger, then cards until one that
+   piece of its own: Possibility Storm (done in round 422) (the spell cast from a hand is exiled by its trigger, then cards until one that
    shares a card type with it), Izzet Generatorium (an energy replacement and "if you've paid or lost four or more {E}
    this turn"), Triple Triad (every player's exiled top card, playable for free by mana value), Mm'menon, the Right Hand
    (done in round 271), Arvinox, the Mind Flail ("isn't a creature unless
@@ -1318,7 +1318,7 @@ line blocks.
    resolution); Lazav, Dimir Mastermind (done in round 406) and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
-   an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
+   an additional counter"); River Song's Diary, Knowledge Pool (done in round 422), Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
    the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan (done in round 315), Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
    mechanism).
@@ -4182,6 +4182,58 @@ line blocks.
    Gunblade Duelist, Supper for Spiders, C.A.M.P., Filigree Vector and the rest of `npm run popular` above rank 15,100
    (still out, for the reasons in their earlier lists). Known gaps: bots exile the card with the highest mana value with
    Cloak and Dagger and target the first opponent; Kotose's bot use takes any graveyard card.
+   Round 421 went on down the "Out after round N" lists and `npm run popular`, most played first. Lady Loki, Agent of
+   Chaos's "Whenever you cast your first instant, sorcery, or Villain spell each turn, exile it, then exile cards from the
+   top of your library until you exile a nonland card. ~ deals damage to each opponent equal to the difference between
+   that spell's mana value and that nonland card's mana value. You may cast that card without paying its mana cost." (the
+   spell exiled from the stack, not countered, Effect exileCause; the cards exiled one at a time stay in exile; the
+   difference is the larger less the smaller, the spell's as it last existed on the stack, X included, CR 202.3e, 608.2h;
+   no nonland card found counts 0, CR 107.2; the card cast as it resolves or never, Effect castRevealedFree, CR 608.2g).
+   Medomai's Prophecy's chapter II name kept on the Saga (CR 607.2; bots name a card of their own) and chapter III's "When
+   you cast a spell with the chosen name for the first time this turn, draw two cards." (a delayed trigger for this turn
+   that triggers once, CR 603.7c, not if a spell with that name was cast earlier this turn; the name as the Saga last
+   existed if it's gone, CR 608.2h, LastKnown.chosenName; with no name chosen, nothing, rulings; floatingTrigger
+   `needsName`). Squall, Gunblade Duelist's "Whenever one or more creatures attack one of your opponents, if any of those
+   creatures have power or toughness equal to the chosen number, ~ deals damage equal to its power to defending player."
+   (any player's creatures, once for each opponent of yours attacked; the intervening if checked as it triggers and again
+   as it resolves, a creature gone by then as it last existed, rulings, CR 603.4; TriggeredAbility.groupPTEqualsChosen,
+   TriggerEventInfo.ptEquals; bots choose the power or toughness most common among their creatures and creature cards).
+   No new prompts (the free cast, card name and number pickers are the ones browser tests already click through). +3,
+   31,736 of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
+   Out after round 421 (looked at, not done): The Dragon-Kami Reborn (hatching counters on cards exiled face down), The
+   Face of Boe (a spell cast for its suspend cost: the "Suspend X" cards' {X} in that cost isn't worked out), Skyway
+   Robber, Parnesse, the Subtle Brush, Uvilda, Dean of Perfection, Nihiloor (a reflexive trigger for each creature tapped,
+   one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone, Redemptor
+   Dreadnought (an optional additional cost exiling one creature card; note its Plasma Incinerator line compiles "the
+   power of the exiled card" as a sacrificed cost's, which an attack trigger has none of: fix that with the cost),
+   Selective Adaptation, Tahngarth, First Mate and the rest of `npm run popular` above rank 15,100 (still out, for the
+   reasons in their earlier lists). Known gaps: bots cast into Lady Loki's trigger without weighing the spell they lose;
+   Medomai's Prophecy's bot name may be a land card.
+   Round 422 went on down the "Out after round N" lists and `npm run popular`, most played first, to three cards whose
+   pieces round 421's Lady Loki brought (a spell exiled from the stack by its own cast trigger, cards exiled from the top,
+   one cast as the trigger resolves). Possibility Storm's "Whenever a player casts a spell from their hand, that player
+   exiles it, then exiles cards from the top of their library until they exile a card that shares a card type with it.
+   That player may cast that card without paying its mana cost. Then they put all cards exiled with ~ on the bottom of
+   their library in a random order." (any player's spell, that player doing it all; the spell's card types as it last
+   existed on the stack, CR 608.2h, ResolvingState.causeTypes, and a land shares them too: an artifact land stops an
+   artifact spell and can't be cast; if something else exiled the spell first, it still goes on, rulings; the original
+   spell and the card not cast go to the bottom with the rest, rulings; exileUntilNonland `untilSharesCauseType`,
+   `withExiledCause`). Knowledge Pool's imprint linked to it (CR 607.2a) and "Whenever a player casts a spell from their
+   hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with ~ without
+   paying its mana cost." (the spell exiled with it, not countered; nothing if it wasn't exiled, so a second Knowledge
+   Pool does nothing, rulings; any player's cards, timing ignored, X as 0, CR 608.2g; castFromAmong fromYard
+   `othersOnly`). Ashnod the Uncaring's "Whenever you activate an ability of an artifact or creature that isn't a mana
+   ability, if one or more permanents were sacrificed to activate it, you may copy that ability." (a sacrifice its costs
+   made, the permanent itself or another, counted as they're paid; not a Treasure sacrificed for the mana, rulings;
+   TriggeredAbility.activates `costSacrificed`). Browser tests click through Possibility Storm's free cast, Knowledge
+   Pool's pick of Ana's Lightning Bolt and Ashnod's copy of a Mogg Fanatic's ability. +3, 31,751 of 31,936 on this
+   stacked branch with main ba0e12b; the compiled text of every other card is unchanged.
+   Out after round 422 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability; the targeting code, the browser's target picker and the bots all assume one), Verrak, Warped Sengir (the
+   same trigger as Ashnod's on the life paid to activate it, then that much life paid again: looked at, not started), The Seventh Doctor (a card chosen face down
+   from the hand and the defending player's guess) and the rest of `npm run popular` above rank 17,500 (still out, for
+   the reasons in their earlier lists). Known gaps: bots cast spells from their hands into Possibility Storm and
+   Knowledge Pool without weighing what they lose.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -11400,7 +11452,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   expensive nonland onto the battlefield; don't cast Supper for Spiders while nothing would come back (doesNothingNow);
   split Brilliant Ultimatum's cards evenly and take the pile worth more free. Browser tests for Selective Adaptation's
   choice (Done disabled until it's a full one) and battlefield pick, Brilliant Ultimatum's pile and free cast, and you
-  separating Ana's cards for her Brilliant Ultimatum. +3, 31,758 of 31,936 with B261-B267 and main through round 420. The
+  separating Ana's cards for her Brilliant Ultimatum. +3, 31,764 of 31,936 with B261-B267 and main through round 422. The
   compiled text of every other card is unchanged.
 - Out after round B268 (looked at, not done): the lists after round B267 stay out. Judgment calls and known gaps:
   Selective Adaptation reads a card's keywords from its printed keyword abilities (Scryfall's list), so a card whose text
@@ -11439,17 +11491,17 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (none in hand, a right guess, a land, or declined; Effect predicament `overCount`, ResolvingState.did). Bots attach the
   Curse to the opponent with the least life; the rest use the existing reveal, guess and free-cast answers. Browser tests
   for Taster of Wares's pick, the Curse's player as night becomes day at Ana's untap step, and both sides of the Doctor's
-  guess. +4, 31,755 of 31,936 with B261-B266 and main through round 420. The compiled text of every other card is
+  guess. +4, 31,761 of 31,936 with main through round 422. The compiled text of every other card is
   unchanged.
 - Out after round B267 (looked at, not done): the lists after round B266 stay out. Judgment calls and known gaps: bots
   don't weigh Grip of Chaos before casting a spell with a single target; a player whose new target from Grip of Chaos is a
   player doesn't fire "becomes the target" triggers for players (as for Deflection's change of target); the cards Taster
   of Wares exiles aren't remembered as "exiled with" it for other cards. Golgothian Sylex, Apocalypse Chime and City in a
   Bottle stay out (the set a name was first printed in isn't in the card data: Scryfall's oracle-cards file keeps one
-  recent printing per card); Verrak, Warped Sengir is close to Lane A round 422's Ashnod the Uncaring (copying an ability
-  by what paid its cost) and waits for it; Prowl, Stoic Strategist ("whenever a player plays a card exiled with ~"),
-  Apple of Eden, Isu Relic, Dermotaxi, Lucy MacLean, Dack Fayden, Helping Hand, Brilliant Ultimatum (done in round B268) and
-  Selective Adaptation (done in round B268) were looked at and are next in line.
+  recent printing per card); Verrak, Warped Sengir can now build on Lane A round 422's Ashnod the Uncaring (merged; copying an ability
+  by what paid its cost); Prowl, Stoic Strategist ("whenever a player plays a card exiled with ~"),
+  Apple of Eden, Isu Relic, Dermotaxi, Lucy MacLean, Dack Fayden, Helping Hand, Brilliant Ultimatum (done in round B268) and Selective
+  Adaptation (done in round B268) were looked at and are next in line.
 - Round B266 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 420-421): Mirror-Shield
   Hoplite ("Whenever a creature you control becomes the target of a backup ability, copy that ability. You may choose new
   targets for the copy. This ability triggers only once each turn."): any player's backup ability (CR 702.165a; a backup

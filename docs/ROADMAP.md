@@ -4121,7 +4121,7 @@ line blocks.
    attacks, copy each exiled card you own with a kick counter on it. You may cast the copies." (any card you own in exile
    with a kick counter, the copies cast paying their costs since nothing says otherwise, CR 601.2f-h, in the order you
    choose). Browser tests click through Surge's free copy, Gale's graveyard pick and paid cast, Zethi kicked twice and
-   its attack. +3, 31,721 of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
+   its attack. +3, 31,727 of 31,936 on this stacked branch with main 9b0c8ca (B259, B260) merged in; the compiled text of every other card is unchanged.
    Out after round 418 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
    ability; fitMany can't tell where the first group ends in the chosen targets), Captain America, First Avenger (its
    damage "divided as you choose" is announced before the cost that picks the Equipment, CR 601.2d, 601.2h, and no ruling

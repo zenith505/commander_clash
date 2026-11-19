@@ -31,6 +31,7 @@ interface ReplacedOp {
   player?: PlayerId;
   sacrifice?: PlayerId;
   exileYard?: true;
+  upTo?: true;
 }
 
 /** Labels for a list of objects, told apart where two have the same name. */
@@ -70,14 +71,17 @@ function pickSome(s: GameState, pid: PlayerId, options: ObjectId[], n: number, b
 export function replacementPicks(s: GameState, ops: readonly ReplacedOp[], choose: (q: ShieldQuestion) => number | null): ReplacementPicks | undefined | null {
   const sac = new Map<PlayerId, { n: number; card: string }>();
   const ex = new Map<PlayerId, { n: number; card: string }>();
+  // Immortal Coil (round B262): "Exile a card from your graveyard for each 1 damage prevented this way", as many as there are.
+  const upTo = new Map<PlayerId, { n: number; card: string }>();
   for (const op of ops) {
     if (op.kind !== "modify") continue;
     const n = (op.from ?? 0) - (op.n ?? 0);
     if (n <= 0) continue;
     if (op.sacrifice !== undefined) sac.set(op.sacrifice, { n: (sac.get(op.sacrifice)?.n ?? 0) + n, card: sac.get(op.sacrifice)?.card ?? op.card ?? "" });
+    else if (op.exileYard && op.upTo && op.player !== undefined) upTo.set(op.player, { n: (upTo.get(op.player)?.n ?? 0) + n, card: upTo.get(op.player)?.card ?? op.card ?? "" });
     else if (op.exileYard && op.player !== undefined) ex.set(op.player, { n: (ex.get(op.player)?.n ?? 0) + n, card: ex.get(op.player)?.card ?? op.card ?? "" });
   }
-  if (!sac.size && !ex.size) return undefined;
+  if (!sac.size && !ex.size && !upTo.size) return undefined;
   const out: ReplacementPicks = { sacrifices: [], exiles: [], losers: [] };
   for (const pid of turnOrderFrom(s, s.activePlayer)) {
     const p = player(s, pid);
@@ -101,6 +105,19 @@ export function replacementPicks(s: GameState, ops: readonly ReplacedOp[], choos
         const ids = pickSome(s, pid, yard, b.n, false, (k) => `${b.card}: exile ${b.n === 1 ? "a card" : `${b.n} cards`} from your graveyard instead of the damage${b.n > 1 ? ` (${k + 1} of ${b.n})` : ""}. Which one?`, choose);
         if (!ids) return null;
         out.exiles.push({ player: pid, ids, card: b.card });
+      }
+    }
+    // Immortal Coil: the cards left after Nefarious Lich's (both apply only with two such effects ordered for one damage
+    // event, the Lich's first), a bot's in the same order; with no more than that many there, all of them (rulings).
+    const c = upTo.get(pid);
+    if (c) {
+      const taken = new Set(out.exiles.filter((x) => x.player === pid).flatMap((x) => x.ids));
+      const yard = [...p.graveyard].filter((id) => !taken.has(id)).sort((x, y) => (objIsType(s, obj(s, y), "Land") ? 1 : 0) - (objIsType(s, obj(s, x), "Land") ? 1 : 0) || defMv(defOf(s, obj(s, x))) - defMv(defOf(s, obj(s, y))) || (x < y ? -1 : 1));
+      const n = Math.min(c.n, yard.length);
+      if (n > 0) {
+        const ids = pickSome(s, pid, yard, n, false, (k) => `${c.card}: exile ${n === 1 ? "a card" : `${n} cards`} from your graveyard for the damage prevented${n > 1 ? ` (${k + 1} of ${n})` : ""}. Which one?`, choose);
+        if (!ids) return null;
+        out.exiles.push({ player: pid, ids, card: c.card });
       }
     }
   }

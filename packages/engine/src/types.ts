@@ -3302,6 +3302,8 @@ export interface Resolving {
     tidal?: { queue: { id: ObjectId; zc: number; pid: PlayerId }[]; unpaid: ObjectId[] };
     /** Heroism (Effect attackersPayOrPrevent, round B232): the attackers whose controllers are still to choose, and those not paid for. */
     heroism?: { queue: { id: ObjectId; zc: number; pid: PlayerId }[]; unpaid: ObjectId[] };
+    /** Winter's Chill (Effect payFullOrPart, round B262): the targets whose controllers are still to choose (`part`: {2} was declined, {1} is asked), those paid {1} for, and those not paid for. */
+    chill?: { queue: { id: ObjectId; zc: number; pid: PlayerId; part?: true }[]; part: ObjectId[]; unpaid: ObjectId[] };
     /** A Killer Among Us (Effect secretCreatureType, round B233): the creature type chosen. */
     secretType?: { pick?: string };
     /** Balduvian Fallen (round B232): the mana spent on the cumulative upkeep just paid ("may" with `cumulativeUpkeep`). */

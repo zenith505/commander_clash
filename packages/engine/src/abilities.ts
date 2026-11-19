@@ -2066,6 +2066,17 @@ export interface DamageMod {
   shareColor?: true;
   /** Battletide Alchemist: "you may prevent X of that damage": the mod's controller chooses, for each player and each source's damage, whether it applies (rulings). */
   may?: true;
+  /**
+   * Bitter Feud (round B262): damage from a source controlled by one of the two players chosen as the holder entered, dealt
+   * to the other chosen player or a permanent that player controls (both as the damage is dealt).
+   */
+  feud?: true;
+  /**
+   * With op "exileYard" and `prevent` (Immortal Coil, round B262): "prevent that damage. Exile a card from your graveyard for
+   * each 1 damage prevented this way": all of it prevented however many cards there are, and as many exiled as there are
+   * (rulings), never a loss.
+   */
+  upTo?: true;
   text: string;
 }
 
@@ -4724,6 +4735,13 @@ export type Effect =
    * attacker's controller in turn order (CR 101.4).
    */
   | { type: "attackersPayOrPrevent"; filter: TargetSpec; cost: string }
+  /**
+   * Winter's Chill (round B262): "For each of those creatures, its controller may pay {1} or {2}. If that player doesn't,
+   * destroy that creature at end of combat. If that player pays only {1}, prevent all combat damage that would be dealt to
+   * and dealt by that creature this combat." The targets from `index` (CR 608.2b), each controller choosing as it resolves
+   * (rulings) in turn order (CR 101.4): `full` ({2}), `part` ({1}) or nothing.
+   */
+  | { type: "payFullOrPart"; index: number; full: string; part: string }
   /**
    * Oracle en-Vec (round B233): "Target opponent chooses any number of creatures they control. During that player's next
    * turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step,
@@ -10515,6 +10533,8 @@ export interface CompiledCard {
   evidenceTargetsMv?: true;
   /** Open the Way: "X can't be greater than the number of players in the game." */
   xMaxPlayers?: true;
+  /** Winter's Chill (round B262): "X can't be greater than the number of snow lands you control", as X is announced (CR 601.2b). */
+  xMaxSnowLands?: true;
   /** Soul Immolation: "X can't be greater than the greatest toughness among creatures you control", as X is announced (CR 601.2b). */
   xMaxGreatestToughness?: true;
   /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */

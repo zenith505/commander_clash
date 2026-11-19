@@ -2,7 +2,7 @@ import { bindBound, cardPT, isLegalTarget, linkedCards, playerProtectedFrom, pla
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
 import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
-import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type StaticCondition, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
@@ -3547,6 +3547,13 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (forced) return ours[0] ? [ours[0]] : all[0] ? [all[0]] : null;
     return attacked && ours[0] ? [ours[0]] : null;
   }
+  // Winter's Chill (round B262): only other players' creatures attacking us, the strongest first, exactly X of them.
+  if (printed.targets.length === 1 && printed.effects.some((e) => e.type === "payFullOrPart")) {
+    const all = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const at: typeof all = all.flatMap((t) => (t.kind === "object" && obj(s, t.id).attacking === pid && controllerOf(s, obj(s, t.id)) !== pid ? [t] : [])).sort((a, b) => (a.kind === "object" && b.kind === "object" ? power(s, obj(s, b.id)) - power(s, obj(s, a.id)) : 0));
+    if (forced) return x <= all.length ? [...at, ...all.filter((t) => !at.includes(t))].slice(0, Math.max(1, x)) : null;
+    return x > 0 && at.length >= x ? at.slice(0, x) : null;
+  }
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
@@ -4385,6 +4392,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const life = player(s, pid).life;
     if (life > 10 || opponents(s, pid).some((q) => player(s, q).life <= life)) return null;
   }
+  // Immortal Coil (round B262): its controller loses once their graveyard is empty, and damage to them eats it: only with a
+  // graveyard big enough to last a while.
+  if (graveyardLifeline(compileCard(d)) && player(s, pid).graveyard.length < 8) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -7444,6 +7454,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Heroism (round B232): once a turn, after blockers are declared, against red attackers of another player's that would
       // deal us 4 or more combat damage in all.
       if (ab.body.effects.some((e) => e.type === "attackersPayOrPrevent") && (o.activatedThisTurn?.includes(i) || s.step !== "declareBlockers" || s.activePlayer === pid || s.battlefield.map((b) => obj(s, b)).filter((a) => a.attacking === pid && !a.attackingPermanent && characteristics(s, a).colors.includes("R")).reduce((n, a) => n + Math.max(0, power(s, a)), 0) < 4)) continue;
+      // Immortal Coil (round B262): no exiling our own graveyard down to fewer than five cards while we'd lose with none.
+      const exiles = (ab.costs ?? []).reduce((n, c) => n + (c.kind === "exileFromGraveyard" ? c.n || 1 : 0), 0);
+      if (exiles && player(s, pid).graveyard.length - exiles < 5 && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && graveyardLifeline(abilitiesOf(s, obj(s, b))))) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;
@@ -10323,3 +10336,8 @@ function swapWorth(s: GameState, pid: PlayerId, kind: "swapBlockers" | "swapBloc
   return gain > 0 ? 2 + gain : -10;
 }
 
+
+/** Immortal Coil (round B262): "When there are no cards in your graveyard, you lose the game." (a state trigger). */
+function graveyardLifeline(c: { triggers?: readonly { event: string; state?: StaticCondition; body: AbilityBody }[] }): boolean {
+  return (c.triggers ?? []).some((tr) => tr.event === "state" && tr.state?.kind === "amount" && tr.state.max === 0 && typeof tr.state.amount === "object" && "count" in tr.state.amount && tr.state.amount.count.kind === "cardsInGraveyard" && tr.body.effects.some((e) => e.type === "loseGame"));
+}

@@ -7475,6 +7475,8 @@ export function castProblem(
   if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   // Open the Way: "X can't be greater than the number of players in the game" (a player who left isn't, CR 800.4a).
   if (compileCard(d).xMaxPlayers && (x ?? 0) > livingPlayers(s).length) return "X can't be greater than the number of players in the game";
+  // Winter's Chill (round B262): the snow lands its caster controls as X is announced (CR 601.2b).
+  if (compileCard(d).xMaxSnowLands && (x ?? 0) > s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Land") && characteristics(s, b).supertypes.includes("Snow")).length) return "X can't be greater than the number of snow lands you control";
   if (compileCard(d).xMaxGreatestToughness && (x ?? 0) > Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Creature")).map((b) => toughness(s, b))))
     return "X can't be greater than the greatest toughness among creatures you control";
   const kp = kickProblem(d, choices?.kicks);

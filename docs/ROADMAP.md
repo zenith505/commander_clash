@@ -1,7 +1,7 @@
 # Roadmap
 
-31,748 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
+31,761 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4275,8 +4275,8 @@ line blocks.
    control. Activate only once." (any spell or ability targeted; StaticCondition `targetItemOfChosenTargetsYou` checked as
    it resolves, one such target among several enough, rulings; any target may be kept, CR 115.7d). Browser tests click
    through Dack's picks, casting Ana's Serra Angel from her library after her Scheme counters your Hill Giant, and
-   Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f; the
-   compiled text of every other card is unchanged.
+   Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f (31,767 with main 4d75ae2,
+   B267, merged in); the compiled text of every other card is unchanged.
    Out after round 424 (looked at, not done): Secret Invasion (the enchanted creature a copy of the creature the Aura
    exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (its
    back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
@@ -11479,6 +11479,42 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B267 (least played first, from the cards left without a recorded reason, none of them in Lane A's rounds
+  421-422): Taster of Wares ("When ~ enters, target opponent reveals X cards from their hand, where X is the number of
+  Goblins you control. You choose one of those cards. That player exiles it. If an instant or sorcery card is exiled this
+  way, you may cast it for as long as you control ~, and mana of any type can be spent to cast that spell."): X counted as
+  it resolves (rulings), Thieving Sprite's reveal (that many cards of the opponent's choice, all of them with fewer, CR
+  609.3), the chosen card exiled; only an instant or sorcery card may then be cast, by you, while you control ~ as that
+  object (CR 611.2b: not at all if it's gone by then), with its usual timing and costs (rulings) and mana of any type (CR
+  609.4b; takeFromHand youMay `whileControlled`, `ifTypes`). Grip of Chaos ("Whenever a spell or ability is put onto the
+  stack, if it has a single target, reselect its target at random."): any spell or ability put onto the stack (cast,
+  activated, triggered or copied, CR 707.10) with exactly one target chosen (CR 115.6), checked as it triggers and as it
+  resolves (CR 603.4); the spell keeps its target until then (rulings), and one of its legal targets now is picked at
+  random, the original among them if it's still legal; with no other it keeps its target (rulings). The new target becomes
+  a target of it (ward, "becomes the target" triggers) but nothing new is put onto the stack, so it doesn't trigger again
+  (TriggerEvent stackItemSingleTarget, Effect gripReselect). Curse of Leeches // Leeching Lurker ("As this permanent
+  transforms into Curse of Leeches, attach it to a player."): part of transforming (CR 712.20), a player it could enchant
+  chosen by its controller (not targeted, so hexproof doesn't stop it, rulings), asked before anyone gets priority, and
+  state-based actions don't treat it as an Aura attached to nothing while that's asked (CompiledCard.asTransformsAttachPlayer,
+  entersChoices "attachPlayer"); transformed into Leeching Lurker, it becomes unattached (CR 704.5q). The Seventh Doctor
+  ("Whenever ~ attacks, choose a card in your hand. Defending player guesses whether that card's mana value is greater
+  than the number of artifacts you control. If they guessed wrong, you may cast it without paying its mana cost. If you
+  don't cast a spell this way, investigate."): Master of Predicaments's secret choice and blind guess (rulings), the
+  artifacts counted as the guess is checked, X 0 (rulings), a land never cast; investigate when no spell was cast this way
+  (none in hand, a right guess, a land, or declined; Effect predicament `overCount`, ResolvingState.did). Bots attach the
+  Curse to the opponent with the least life; the rest use the existing reveal, guess and free-cast answers. Browser tests
+  for Taster of Wares's pick, the Curse's player as night becomes day at Ana's untap step, and both sides of the Doctor's
+  guess. +4, 31,761 of 31,936 with main through round 422. The compiled text of every other card is
+  unchanged.
+- Out after round B267 (looked at, not done): the lists after round B266 stay out. Judgment calls and known gaps: bots
+  don't weigh Grip of Chaos before casting a spell with a single target; a player whose new target from Grip of Chaos is a
+  player doesn't fire "becomes the target" triggers for players (as for Deflection's change of target); the cards Taster
+  of Wares exiles aren't remembered as "exiled with" it for other cards. Golgothian Sylex, Apocalypse Chime and City in a
+  Bottle stay out (the set a name was first printed in isn't in the card data: Scryfall's oracle-cards file keeps one
+  recent printing per card); Verrak, Warped Sengir can now build on Lane A round 422's Ashnod the Uncaring (merged; copying an ability
+  by what paid its cost); Prowl, Stoic Strategist ("whenever a player plays a card exiled with ~"),
+  Apple of Eden, Isu Relic, Dermotaxi, Lucy MacLean, Dack Fayden, Helping Hand, Brilliant Ultimatum and Selective
+  Adaptation were looked at and are next in line.
 - Round B266 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 420-421): Mirror-Shield
   Hoplite ("Whenever a creature you control becomes the target of a backup ability, copy that ability. You may choose new
   targets for the copy. This ability triggers only once each turn."): any player's backup ability (CR 702.165a; a backup

@@ -4019,7 +4019,19 @@ export type Effect =
    * without seeing it (rulings); a wrong guess lets you cast it as this resolves, timing ignored, X as 0 (CR 608.2g,
    * 107.3b); a land can't be cast (rulings).
    */
-  | { type: "predicament"; who: PlayerRef; over: number }
+  /**
+   * Master of Predicaments: "choose a card in your hand. That player guesses whether the card's mana value is greater
+   * than 4. If the player guessed wrong, you may cast the card without paying its mana cost." The Seventh Doctor (round
+   * B267): `overCount`, "greater than the number of artifacts you control", counted as the guess is checked; it sets
+   * whether a spell was cast this way (ResolvingState.did) for "If you don't cast a spell this way, investigate".
+   */
+  | { type: "predicament"; who: PlayerRef; over: number; overCount?: Amount }
+  /**
+   * Grip of Chaos (round B267): "reselect its target at random (Select from among all legal targets.)" for the spell or
+   * ability that triggered it (ResolveCtx.cause), if it still has a single target (CR 603.4): one of its legal targets
+   * now, the original among them if it's still legal, chosen at random (rulings); with none, it keeps its target.
+   */
+  | { type: "gripReselect" }
   /**
    * Memories Returning: "Reveal the top five cards of your library. Put one of them into your hand. Then choose an
    * opponent. They put one on the bottom of your library. Then you put one into your hand. Then they put one on the
@@ -4948,7 +4960,7 @@ export type Effect =
       /** With `orGraveyard`: Agonizing Remorse's "a nonland card from it or a card from their graveyard": `filter` is for the hand's cards only. */
       anyFromYard?: true;
       /** Covetous Urge: "You may cast that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast that spell": the ability's controller may (action "exile"). */
-      youMay?: { anyType?: true; /** Cruelclaw's Heist: "If the gift was promised, you may cast that card ...": only then. */ ifGift?: true; /** Psychic Theft: "At the beginning of the next end step, if you haven't cast the card, return it to its owner's hand": a delayed trigger for the card while it's still exiled as that object. */ returnAtEnd?: true };
+      youMay?: { anyType?: true; /** Taster of Wares (round B267): "you may cast it for as long as you control ~": while the source stays this object under your control (MayPlay "whileControlled"). */ whileControlled?: true; /** Taster of Wares: "If an instant or sorcery card is exiled this way, you may cast it": only a card with one of these card types (as it is in exile). */ ifTypes?: string[]; /** Cruelclaw's Heist: "If the gift was promised, you may cast that card ...": only then. */ ifGift?: true; /** Psychic Theft: "At the beginning of the next end step, if you haven't cast the card, return it to its owner's hand": a delayed trigger for the card while it's still exiled as that object. */ returnAtEnd?: true };
       /** Rakdos Augermage: "discard a card of target opponent's choice": who chooses the card, if not the controller (CR 701.9b). */
       by?: PlayerRef;
       /** Distended Mindbender: "a nonland card with mana value 3 or less and a card with mana value 4 or greater": a second card, matching this, chosen after the first (one of each if able, rulings), both then discarded at once (action "discard"). */
@@ -6767,6 +6779,8 @@ export interface AbilityBody {
 export type TriggerEvent =
   /** "Whenever a mana ability of ~ resolves" (Tyvar the Bellicose's): one of its mana abilities resolved (CR 605.3b), `eventAmount` the mana it made. */
   | "selfManaAbilityResolves"
+  /** Grip of Chaos (round B267): "Whenever a spell or ability is put onto the stack, if it has a single target": any spell or ability, cast, activated, triggered or copied (CR 707.10), with exactly one target chosen; the event's cause is it. */
+  | "stackItemSingleTarget"
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
   /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */
@@ -8743,6 +8757,8 @@ export interface CompiledCard {
   asTransforms?: AbilityBody;
   /** "As this creature transforms into Shinryu, choose an opponent." (CR 712.20): asked as it transforms (an entersChoices "player" entry), into Chosen.player. */
   asTransformsChoose?: "opponent";
+  /** Curse of Leeches (round B267): "As this permanent transforms into ~, attach it to a player." (CR 712.20, 701.3a): a player it could enchant, chosen by its controller as it transforms (not targeted, rulings), asked before anyone gets priority. */
+  asTransformsAttachPlayer?: true;
   triggers: TriggeredAbility[];
   activated: ActivatedAbility[];
   /** Mana abilities (CR 605), kept apart from the others since they don't use the stack. */

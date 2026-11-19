@@ -2229,6 +2229,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Master of Predicaments: most cards in a hand have mana value 4 or less, so we guess that; as the chooser, our
     // costliest nonland card, the one a wrong guess pays off most for.
     if (pend.kind === "chooseOption" && pend.what === "predicamentGuess") return [{ type: "chooseOption", player: pid, choice: "notOver" }];
+    // Curse of Leeches (round B267): on the opponent with the least life (it drains 1 each upkeep), else anyone.
+    if (pend.kind === "chooseOption" && pend.what === "attachPlayer") {
+      const opp = pend.options.filter((x) => Number(x) !== pid).sort((a, b) => player(s, Number(a)).life - player(s, Number(b)).life)[0];
+      return [{ type: "chooseOption", player: pid, choice: opp ?? pend.options[0]! }];
+    }
     // Liar's Pendulum: a deck is singleton (CR 903.5b), so a named card (other than a basic land) seen anywhere outside the
     // namer's hand isn't in it; otherwise we expect them to have named a card they hold. Only public information is used.
     // Liberated Livestock (round B208): the costliest Aura that helps a creature of ours, else none.

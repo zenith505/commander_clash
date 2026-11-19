@@ -381,6 +381,9 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (v.pick !== "none") {
             r.votes!.push({ voter, choice: v.pick });
             log(s, e.choose ? `${player(s, voter).name} chose ${voteLabel(s, v.pick)}.` : e.secret ? `${player(s, voter).name} votes.` : `${player(s, voter).name} votes for ${voteLabel(s, v.pick)}.`);
+          } else if (e.upTo && v.left > 0) {
+            // Vault 11 (round 416): "votes for up to one creature": this vote for nothing, a vote all the same (CR 701.38a).
+            log(s, e.secret ? `${player(s, voter).name} votes.` : `${player(s, voter).name} votes for no creature.`);
           } else {
             if (e.choose) log(s, `${player(s, voter).name} chose nothing.`);
             v.may = 0;
@@ -391,6 +394,7 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (v.left > 0 || v.may) {
           const optional = v.left === 0;
+          const none = e.upTo && !optional;
           const chooser = !e.choose && s.votesChosenBy?.turn === s.turn && !player(s, s.votesChosenBy.player).lost ? s.votesChosenBy.player : voter;
           const mine = r.votes!.filter((x) => x.voter === voter).length;
           // In turn order, everyone knows the votes made before theirs (rulings on Council's Judgment); a secret vote shows
@@ -406,8 +410,8 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             player: chooser,
             source: src,
             what: "vote",
-            options: [...options, ...(optional ? ["none"] : [])],
-            labels: [...options.map((o) => voteLabel(s, o)), ...(optional ? [e.choose ? "Choose nothing" : "No additional vote"] : [])],
+            options: [...options, ...(optional || none ? ["none"] : [])],
+            labels: [...options.map((o) => voteLabel(s, o)), ...(optional ? [e.choose ? "Choose nothing" : "No additional vote"] : none ? ["Vote for no creature"] : [])],
             prompt,
             ...(chooser !== voter ? { voter } : {}),
           };

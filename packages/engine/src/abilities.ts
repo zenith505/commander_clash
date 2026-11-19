@@ -3894,7 +3894,7 @@ export type Effect =
    * 603.7) watches the target as it is now, for good, and returns that card from exile while it's still that object.
    */
   | { type: "exileSelfUntilTargetLeaves" }
-  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; /** Nuka-Nuke Launcher: "until the end of defending player's next turn, that player gets two rad counters whenever they cast a spell": only spells this player casts trigger it, and with `until` "endOfYourNextTurn" it lasts until the end of this player's next turn, not its controller's. */ forPlayer?: PlayerRef; about?: number; /** "Whenever either of those creatures deals combat damage ..." in a group attack trigger (Love on the Battlefield): one about each of the trigger's creatures (ObjRef eventGroup) still on the battlefield. */ aboutGroup?: true; /** "Choose a creature. Whenever that creature deals combat damage to a player this turn" (Azra Oddsmaker): about the permanent this resolution chose (ObjRef "created"), if it's on the battlefield; none if nothing was chosen. */ aboutCreated?: true; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true; /** Song of Blood: the amounts in its effects that count this resolution's cards ("for each creature card put into your graveyard this way") are fixed as it's made (CR 608.2h). */ bound?: true; /** Surge to Victory (round 418): "copy the exiled card" in it is the card target `bindExiled` was, exiled by this resolution: its castCipher effects are bound to that card as it is in exile when this is made (none made if it isn't there). */ bindExiled?: number }
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; /** Nuka-Nuke Launcher: "until the end of defending player's next turn, that player gets two rad counters whenever they cast a spell": only spells this player casts trigger it, and with `until` "endOfYourNextTurn" it lasts until the end of this player's next turn, not its controller's. */ forPlayer?: PlayerRef; about?: number; /** "Whenever either of those creatures deals combat damage ..." in a group attack trigger (Love on the Battlefield): one about each of the trigger's creatures (ObjRef eventGroup) still on the battlefield. */ aboutGroup?: true; /** "Choose a creature. Whenever that creature deals combat damage to a player this turn" (Azra Oddsmaker): about the permanent this resolution chose (ObjRef "created"), if it's on the battlefield; none if nothing was chosen. */ aboutCreated?: true; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true; /** Song of Blood: the amounts in its effects that count this resolution's cards ("for each creature card put into your graveyard this way") are fixed as it's made (CR 608.2h). */ bound?: true; /** Surge to Victory (round 418): "copy the exiled card" in it is the card target `bindExiled` was, exiled by this resolution: its castCipher effects are bound to that card as it is in exile when this is made (none made if it isn't there). */ bindExiled?: number; /** Medomai's Prophecy (round 421): its "the chosen name" is the name chosen for its source (or, gone, as it last existed, CR 608.2h); with no name chosen, none is made (it couldn't trigger, rulings). */ needsName?: true }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
@@ -5979,6 +5979,17 @@ export type Effect =
    * still legal), or nothing, exiled until the source leaves (CR 610.3). Effects/run-round420.ts.
    */
   | { type: "exileFromHandOrTarget"; player: number; creature: number; filter: TargetSpec }
+  /**
+   * Lady Loki, Agent of Chaos (round 421): "exile it" in a cast trigger: the spell that triggered it, if it's still on the
+   * stack, exiled (not countered); a copy ceases to exist (CR 707.10a). Effects/run-round421.ts.
+   */
+  | { type: "exileCause" }
+  /**
+   * Lady Loki (round 421): "You may cast that card without paying its mana cost." after "exile cards from the top of your
+   * library until you exile a nonland card" (exileUntilNonland `then` "keep"): the nonland card exiled (Resolution
+   * .revealed), still that card in exile (CR 400.7), cast as this resolves or never (CR 608.2g). Effects/run-round421.ts.
+   */
+  | { type: "castRevealedFree" }
   /** Vaevictis Asmadi, the Dire: "Those players sacrifice those permanents. Each player who sacrificed a permanent this way
    * reveals the top card of their library, then puts it onto the battlefield if it's a permanent card." Each target still
    * legal is sacrificed by its controller, all at once; each player who sacrificed one reveals, and the permanent cards
@@ -7446,6 +7457,8 @@ export interface TriggeredAbility {
    * group the creatures attacking them (and, `orPlaneswalkers`, their planeswalkers).
    */
   attacksOpponent?: { orPlaneswalkers?: true };
+  /** With `attacksOpponent`, Squall, Gunblade Duelist (round 421): "if any of those creatures have power or toughness equal to the chosen number", an intervening if (CR 603.4) on the creatures attacking that opponent and the number chosen as this permanent entered (0 with none, CR 107.2), checked as it triggers and again as it resolves (TriggerEventInfo.ptEquals), a creature gone by then as it last existed on the battlefield (rulings). */
+  groupPTEqualsChosen?: true;
   /** "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once, if it or a commander you own is among the attackers. */
   selfOrCommander?: true;
   /**

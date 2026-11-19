@@ -2007,7 +2007,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.attacksOpponent) {
           for (const p of s.turnOrder.filter((q) => opponents(s, watcher).includes(q))) {
             const at = hit.filter(([x]) => attackingYouNow(s, x, p, !!t.attacksOpponent!.orPlaneswalkers)).map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-            if (at.length) add(o, watcher, (_, tt) => same(tt) && JSON.stringify(tt.attacksOpponent) === JSON.stringify(t.attacksOpponent), list, undefined, undefined, undefined, undefined, undefined, { player: p, group: at });
+            // Squall, Gunblade Duelist: only if one of them has power or toughness equal to the chosen number (CR 603.4).
+            const ptEquals = t.groupPTEqualsChosen ? (o.chosen?.number ?? 0) : undefined;
+            if (ptEquals !== undefined && !at.some((g) => power(s, obj(s, g.id)) === ptEquals || toughness(s, obj(s, g.id)) === ptEquals)) continue;
+            if (at.length) add(o, watcher, (_, tt) => same(tt) && JSON.stringify(tt.attacksOpponent) === JSON.stringify(t.attacksOpponent) && !!tt.groupPTEqualsChosen === !!t.groupPTEqualsChosen, list, undefined, undefined, undefined, undefined, undefined, { player: p, group: at, ...(ptEquals !== undefined ? { ptEquals } : {}) });
           }
           continue;
         }

@@ -4182,6 +4182,33 @@ line blocks.
    Gunblade Duelist, Supper for Spiders, C.A.M.P., Filigree Vector and the rest of `npm run popular` above rank 15,100
    (still out, for the reasons in their earlier lists). Known gaps: bots exile the card with the highest mana value with
    Cloak and Dagger and target the first opponent; Kotose's bot use takes any graveyard card.
+   Round 421 went on down the "Out after round N" lists and `npm run popular`, most played first. Lady Loki, Agent of
+   Chaos's "Whenever you cast your first instant, sorcery, or Villain spell each turn, exile it, then exile cards from the
+   top of your library until you exile a nonland card. ~ deals damage to each opponent equal to the difference between
+   that spell's mana value and that nonland card's mana value. You may cast that card without paying its mana cost." (the
+   spell exiled from the stack, not countered, Effect exileCause; the cards exiled one at a time stay in exile; the
+   difference is the larger less the smaller, the spell's as it last existed on the stack, X included, CR 202.3e, 608.2h;
+   no nonland card found counts 0, CR 107.2; the card cast as it resolves or never, Effect castRevealedFree, CR 608.2g).
+   Medomai's Prophecy's chapter II name kept on the Saga (CR 607.2; bots name a card of their own) and chapter III's "When
+   you cast a spell with the chosen name for the first time this turn, draw two cards." (a delayed trigger for this turn
+   that triggers once, CR 603.7c, not if a spell with that name was cast earlier this turn; the name as the Saga last
+   existed if it's gone, CR 608.2h, LastKnown.chosenName; with no name chosen, nothing, rulings; floatingTrigger
+   `needsName`). Squall, Gunblade Duelist's "Whenever one or more creatures attack one of your opponents, if any of those
+   creatures have power or toughness equal to the chosen number, ~ deals damage equal to its power to defending player."
+   (any player's creatures, once for each opponent of yours attacked; the intervening if checked as it triggers and again
+   as it resolves, a creature gone by then as it last existed, rulings, CR 603.4; TriggeredAbility.groupPTEqualsChosen,
+   TriggerEventInfo.ptEquals; bots choose the power or toughness most common among their creatures and creature cards).
+   No new prompts (the free cast, card name and number pickers are the ones browser tests already click through). +3,
+   31,736 of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
+   Out after round 421 (looked at, not done): The Dragon-Kami Reborn (hatching counters on cards exiled face down), The
+   Face of Boe (a spell cast for its suspend cost: the "Suspend X" cards' {X} in that cost isn't worked out), Skyway
+   Robber, Parnesse, the Subtle Brush, Uvilda, Dean of Perfection, Nihiloor (a reflexive trigger for each creature tapped,
+   one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone, Redemptor
+   Dreadnought (an optional additional cost exiling one creature card; note its Plasma Incinerator line compiles "the
+   power of the exiled card" as a sacrificed cost's, which an attack trigger has none of: fix that with the cost),
+   Selective Adaptation, Tahngarth, First Mate and the rest of `npm run popular` above rank 15,100 (still out, for the
+   reasons in their earlier lists). Known gaps: bots cast into Lady Loki's trigger without weighing the spell they lose;
+   Medomai's Prophecy's bot name may be a land card.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

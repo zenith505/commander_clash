@@ -3526,7 +3526,7 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
     };
     return { ...body, targets: body.targets.map((x) => kin(x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
   }
-  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.otherTypeThanCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {
     const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
@@ -3536,6 +3536,13 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
       if (name === undefined) return x;
       const { sameNameAsCause: _, ...rest } = x;
       return fix({ ...rest, named: name });
+    }
+    // Gale, Waterdeep Prodigy (round 418): "of the other type": the type of the two the spell wasn't, as it was cast.
+    if (x.otherTypeThanCause) {
+      const types = t.cause !== undefined ? s.castItems?.[t.cause]?.castTypes : undefined;
+      const instant = !!types?.includes("Instant"), sorcery = !!types?.includes("Sorcery");
+      const { otherTypeThanCause: _, ...rest } = x;
+      return fix({ ...rest, types: instant !== sorcery ? [instant ? "Sorcery" : "Instant"] : ["(none)"], text: instant !== sorcery ? `target ${instant ? "sorcery" : "instant"} card from your graveyard` : rest.text });
     }
     if (x.notEventPlayer && who !== undefined) {
       const { notEventPlayer: _, ...rest } = x;

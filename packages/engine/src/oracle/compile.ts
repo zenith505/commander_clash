@@ -160,6 +160,7 @@ import { round414Line } from "./round414";
 import { round415Line } from "./round415";
 import { round416Line } from "./round416";
 import { round417Line } from "./round417";
+import { round418Line } from "./round418";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1044,6 +1045,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Surge to Victory's sentences (round418Sentence), Gale, Waterdeep Prodigy and Zethi, Arcane Blademaster (round 418): oracle/round418.ts.
+    if (round418Line(line, raw, out, isSpell)) continue;
     // Helm of Kaldra's sentences (round417Sentence), Lodestone Bauble (round 417): oracle/round417.ts.
     if (round417Line(line, raw, out, isSpell)) continue;
     // Vault 11: Voter's Dilemma's sentences (round416Sentence), Blim, Invisible Woman, Aragorn, Company Leader (round 416): oracle/round416.ts.

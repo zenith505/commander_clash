@@ -1024,6 +1024,13 @@ export interface TargetSpec {
    */
   sameNameAsCause?: true;
   /**
+   * "Target card of the other type" in a cast trigger for an instant or sorcery spell (Gale, Waterdeep Prodigy, round
+   * 418): a sorcery card for an instant spell, an instant card for a sorcery spell, by its card types as it was cast
+   * (StackItem.castTypes), fixed as the trigger is put on the stack (triggerBodyAsIs makes it `types`). Unfixed, or for
+   * a spell that's both or neither, nothing matches.
+   */
+  otherTypeThanCause?: true;
+  /**
    * "If it has the same name as a permanent" (Mitotic Manipulation, Retraced Image): a card named like a permanent on the
    * battlefield as it resolves, anyone's (rulings); a face-down permanent has no name (CR 708.2). `bindBound` makes it
    * `namedAny`; unbound, nothing matches.
@@ -3885,7 +3892,7 @@ export type Effect =
    * 603.7) watches the target as it is now, for good, and returns that card from exile while it's still that object.
    */
   | { type: "exileSelfUntilTargetLeaves" }
-  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; /** Nuka-Nuke Launcher: "until the end of defending player's next turn, that player gets two rad counters whenever they cast a spell": only spells this player casts trigger it, and with `until` "endOfYourNextTurn" it lasts until the end of this player's next turn, not its controller's. */ forPlayer?: PlayerRef; about?: number; /** "Whenever either of those creatures deals combat damage ..." in a group attack trigger (Love on the Battlefield): one about each of the trigger's creatures (ObjRef eventGroup) still on the battlefield. */ aboutGroup?: true; /** "Choose a creature. Whenever that creature deals combat damage to a player this turn" (Azra Oddsmaker): about the permanent this resolution chose (ObjRef "created"), if it's on the battlefield; none if nothing was chosen. */ aboutCreated?: true; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true; /** Song of Blood: the amounts in its effects that count this resolution's cards ("for each creature card put into your graveyard this way") are fixed as it's made (CR 608.2h). */ bound?: true }
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; /** Nuka-Nuke Launcher: "until the end of defending player's next turn, that player gets two rad counters whenever they cast a spell": only spells this player casts trigger it, and with `until` "endOfYourNextTurn" it lasts until the end of this player's next turn, not its controller's. */ forPlayer?: PlayerRef; about?: number; /** "Whenever either of those creatures deals combat damage ..." in a group attack trigger (Love on the Battlefield): one about each of the trigger's creatures (ObjRef eventGroup) still on the battlefield. */ aboutGroup?: true; /** "Choose a creature. Whenever that creature deals combat damage to a player this turn" (Azra Oddsmaker): about the permanent this resolution chose (ObjRef "created"), if it's on the battlefield; none if nothing was chosen. */ aboutCreated?: true; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true; /** Song of Blood: the amounts in its effects that count this resolution's cards ("for each creature card put into your graveyard this way") are fixed as it's made (CR 608.2h). */ bound?: true; /** Surge to Victory (round 418): "copy the exiled card" in it is the card target `bindExiled` was, exiled by this resolution: its castCipher effects are bound to that card as it is in exile when this is made (none made if it isn't there). */ bindExiled?: number }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.

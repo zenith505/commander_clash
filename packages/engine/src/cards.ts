@@ -114,6 +114,14 @@ export const identityOf = (s: GameState, o: GameObject, d: CardDef | undefined =
 const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";
 export const cardIdOf = (o: GameObject): string => (o.faceDown ? faceDownDef(o).oracleId : wordsKey(o, textKey(o) ?? copiedId(o)));
 
+/**
+ * Whether it's a copy of something (CR 707): a "becomes a copy" effect on it (707.4) or what it entered as a copy of
+ * (707.5), and not face down (708.2). The face of its card that's up (a transformed or converted permanent's back face,
+ * CR 712.8e, 701.28), a melded permanent (712.8g), a Room's unlocked doors (709.5) and text changes (612) aren't copy
+ * effects, though each gives it another definition key.
+ */
+export const isCopy = (o: GameObject): boolean => !o.faceDown && roomlessId(o) !== ownId(o);
+
 /** Text changes apply on the stack and the battlefield (GameObject.textChanges, CR 612, 400.7a). */
 const textChanged = (o: GameObject): boolean => !!o.textChanges?.length && !o.faceDown && (o.zone === "stack" || o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged");
 /** With text-changing effects on it: the key its definition with the changed text has (registered by defOf). */

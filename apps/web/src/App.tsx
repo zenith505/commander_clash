@@ -108,6 +108,7 @@ import {
   pairedWith,
   hauntedBy,
   cardIdOf,
+  isCopy,
   realDefOf,
   legalTargets,
   characteristics,
@@ -3525,7 +3526,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
   const paired = pairedWith(s, o);
   const haunts = hauntedBy(s, o);
   // A copy (CR 707): it looks like what it copies, so say what it really is.
-  const copying = !o.faceDown && cardIdOf(o) !== o.cardId ? cardOf(s, o.id) : undefined;
+  const copying = isCopy(o) ? cardOf(s, o.id) : undefined;
   const copyEnds = o.copyEffects?.[o.copyEffects.length - 1]?.until;
   const chosen = chosenText(s, o);
   return (
@@ -5495,7 +5496,9 @@ function Controls({
               {/* Chandra, Torch of Defiance: the card just exiled, cast now or not at all. */}
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={(madnessCastOf(s, HUMAN, pending.objectId) ?? "") + (pending.addedMana ?? "")} size="sm" />
               {/* Ogre Battlecaster (round 401): its mana cost and {R}{R} more, an additional cost (CR 601.2f). */}
-              {pending.addedMana ? <> (its mana cost and <ManaCost cost={pending.addedMana} size="sm" />)</> : null}? Only now{o.zone === "exile" || pending.addedMana ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
+              {pending.addedMana ? <> (its mana cost and <ManaCost cost={pending.addedMana} size="sm" />)</> : null}? Only now{pending.thenNoMore ? <>, and then you can&apos;t cast other spells this turn.</> : "."}
+              {/* Gale, Waterdeep Prodigy, Harness the Storm's kin (round 418): said only when the ability says so. */}
+              {pending.exileAfter ? " If it would go to your graveyard, it's exiled instead." : null}
             </>
           ) : pending.how === "discover" ? (
             <>

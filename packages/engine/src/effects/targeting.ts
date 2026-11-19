@@ -184,7 +184,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
-  if (spec.sameNameAsCause || spec.sameNameAsPermanent || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
+  if (spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
   if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
   if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
@@ -634,7 +634,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
-  if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause || spec.sameNameAsPermanent || spec.namedAsYourLegendary) return false; // not worked out yet (sameNameAsPermanent: bindBound; namedAsYourLegendary: bindLegendaryNames)
+  if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsYourLegendary) return false; // not worked out yet (sameNameAsPermanent: bindBound; namedAsYourLegendary: bindLegendaryNames)
   if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.sharesTypeWithSelf || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;

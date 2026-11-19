@@ -297,6 +297,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (linkedNames && (o.faceDown || !linkedNames.some((nm) => sameName(view(o)?.name, nm)))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
+        // Blim, Comedic Genius (round 416): "permanents they control but don't own" (CR 108.3, 108.4).
+        if (c.notOwnedByController && o.owner === ch.controller) continue;
         if (c.counterKinds) for (const [k, v] of Object.entries(o.counters)) (v ?? 0) > 0 && names.add(k);
         else if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
         else if (c.differentManaValues) names.add(String(o.faceDown ? 0 : defMv(defOf(s, o))));

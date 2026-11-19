@@ -1238,6 +1238,8 @@ export interface StackItem {
   chosenType?: string;
   /** Liquid Fire: the number chosen as it was cast (CostChoices.number), "the chosen number" as it resolves; copied with it (CR 707.10). */
   chosenNumber?: number;
+  /** Lodestone Bauble (round 417): "a player's graveyard", "that player": the owner of the cards it targeted as it was activated, or with none, the player chosen then (CostChoices.yardPlayer, rulings). */
+  yardPlayer?: PlayerId;
   /** "An opponent chooses one —" (Misfortune): the opponent who chose its mode as it was cast (CostChoices.modeChooser), "that player" as it resolves; copied with it (CR 707.10). */
   modeChooser?: PlayerId;
   /** "Target spell can't be countered" (Vexing Shusher): from then on, while it's this stack object (CR 101.2). */
@@ -1728,6 +1730,8 @@ export interface CostChoices {
   modeChooser?: PlayerId;
   /** The mode that opponent chose: set by the game once they've chosen (the cast's own `modes` are left out). */
   chooserModes?: number[];
+  /** Lodestone Bauble (round 417, ActivatedAbility.choosesYardPlayer): the player chosen as it's activated with no target chosen (rulings); with one, it's their owner. */
+  yardPlayer?: PlayerId;
 }
 
 /**
@@ -2927,6 +2931,8 @@ export interface TriggerEventInfo {
   sourceOf?: { id: ObjectId; zc: number };
   /** A counters-put trigger: the kind of counter put (Bold Plagiarist's "the same number and kind of counters"). */
   counter?: string;
+  /** Round 416 (event "countersPutBatch"): the kinds of counters put on the trigger's object in that one event (Aragorn, Company Leader). */
+  counterKinds?: string[];
   /** "Whenever players finish voting" (Erestor of the Council): the votes cast (CR 701.38). */
   votes?: { voter: PlayerId; choice: string }[];
   /** "Whenever you roll one or more dice": the highest of the dice's results ("if any of those results was 10 or higher", Farideh). */

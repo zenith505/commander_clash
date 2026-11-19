@@ -515,6 +515,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // that much {C}": the X its cost announced, as many as were removed. With a target, it isn't a mana ability (CR 605.1a,
   // rulings): it uses the stack.
   if (oneOrMoreCounters) effectText = effectText.replace(/^Target player adds that much \{C\}\./, "Target player adds X {C}.");
+  // Arcee, Sharpshooter: "{1}, Remove one or more +1/+1 counters from ~: It deals that much damage to target creature.
+  // Convert ~.": "it" is ~, the one thing named (as it last existed if it has left, CR 608.2h), and "that much" the X its
+  // cost announced, as many as were removed (CR 601.2b, 601.2h).
+  if (oneOrMoreCounters && removeCounters && !removeCounters.all) effectText = effectText.replace(/^It deals that much damage to (target [a-z ]+)\./, "~ deals X damage to $1.");
   // The Astonishing Ant-Man: "Create that many 1/1 green Insect creature tokens": the X its cost announced.
   if (anyCountersSelf) effectText = effectText.replace(/^Create that many /, "Create X ");
   if (removeCounters?.all) effectText = effectText.replace(/^It deals that much damage to (target [a-z ]+)\.$/, "~ deals X damage to $1, where X is the number of counters removed this way.");

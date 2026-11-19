@@ -1,6 +1,6 @@
 # Roadmap
 
-31,723 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,730 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -2169,7 +2169,7 @@ line blocks.
    chosen as it resolves, with a browser test for the picker). +9, 29,980 of 31,936 with B113-B115.
    Out after round 283 (looked at, not done): Squall, Gunblade Duelist (an intervening if over the creatures attacking
    one opponent and a chosen number); Barroom Brawl (done in round 389) ("the opponent to your left", then that player may copy it with new
-   targets); Vault 11: Voter's Dilemma (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
+   targets); Vault 11: Voter's Dilemma (done in round 416) (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
    one of the revealed cards and may cast it free); Hew the Entwood (done in round B204) (sacrifice any number of lands as it resolves);
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (done in round 397) (the greatest mana value
@@ -2605,7 +2605,7 @@ line blocks.
    saddled if it's a Mount and becomes an artifact creature if it's a Vehicle." No new prompt: each uses the existing
    target, discard and creature-type paths. +6, 31,251 of 31,936. The compiled text of every other card is unchanged.
    Out after round 358 (looked at, not done): Garland, Royal Kidnapper (control "for as long as they're the monarch"),
-   Urza Assembles the Titans (loyalty abilities twice this turn), Invisible Woman, Sue Storm (still no batched counters
+   Urza Assembles the Titans (loyalty abilities twice this turn), Invisible Woman, Sue Storm (done in round 416) (still no batched counters
    event), Obsidian Charmaw (done in round 367) ("each land your opponents control that could produce {C}": every mana ability of every land
    read for {C}, conditional ones too).
    Round 359 went on down `npm run popular`, most played first: Sin, Spira's Punishment's "Whenever ~ enters or attacks,
@@ -2870,7 +2870,7 @@ line blocks.
    that card into its owner's hand." (moveLinked). Browser tests click through Gorex's X and its graveyard picks, Three
    Dog's payment and Codie's mana and free card. Bots cast Gorex with the cards it needs and answer Three Dog with the
    existing may and pick logic. +4, 31,362 of 31,936 with Lane B's B207-B208. The compiled text of every other card is unchanged.
-   Out after round 368 (looked at, not done): Aragorn, Company Leader ("one or more counters" put on a creature at once
+   Out after round 368 (looked at, not done): Aragorn, Company Leader (done in round 416) ("one or more counters" put on a creature at once
    comes as one event per kind of counter); Captain America, First Avenger (the damage division announced before the
    cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
    ability); Sanctuary Blade (done in round 390) and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
@@ -2915,7 +2915,7 @@ line blocks.
    unchanged.
    Out after round 370 (looked at, not done): Words of Waste (done in round 383) ("each opponent discards a card instead": a discard choice in
    the middle of a replaced draw, with nothing to resume the draws after it); Verdant Mastery (done in round 390) (three destinations for the
-   lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (still out, as in
+   lands found, one under an opponent's control); Wayta, Trainer Prodigy and Invisible Woman, Sue Storm (done in round 416) (still out, as in
    their earlier lists). Polish: the free-cast prompt of Bre, Breaching Dragonstorm and Solstice
    Revelations doesn't say the card goes to the hand if not cast.
    Round 371 went on down `npm run popular`, most played first, to a graveyard card's eerie, a dread counter on the
@@ -3228,7 +3228,7 @@ line blocks.
    Moon's name picker text. +4, 31,481 of 31,936. The compiled text of every other card is unchanged. Bots name an
    opponent's biggest creature whose name none of theirs has for Day of the Moon, and tap the Refractor for mana like any
    land.
-   Out after round 382 (looked at, not done): Aragorn, Company Leader ("Whenever you put one or more counters on ~, put one
+   Out after round 382 (looked at, not done): Aragorn, Company Leader (done in round 416) ("Whenever you put one or more counters on ~, put one
    of each of those kinds of counters on up to one other target creature": counters of several kinds put at once are one
    event, but the engine fires one countersPut event for each kind); Crafty Cutpurse (done in round 394) (tokens that would be created under an
    opponent's control this turn are created under yours: applied before every other token replacement, and with several
@@ -3263,7 +3263,7 @@ line blocks.
    Out after round 383 (looked at, not done): Reed Richards, Smartest Man (still out: with Alhammarret's Archive replacing
    the same first draw, whether the Archive's two draws are still "the first time you would draw" isn't settled, CR 614.6,
    616.1); Lodestone Bauble (still out: a player chosen as it's activated even with no target, rulings); Pulmonic Sliver,
-   Filigree Vector, Lich's Mirror, Over the Top (done in round 389), Vault 11: Voter's Dilemma, Riddles in the Dark and the rest above rank
+   Filigree Vector, Lich's Mirror, Over the Top (done in round 389), Vault 11: Voter's Dilemma (done in round 416), Riddles in the Dark and the rest above rank
    14,000 (still out, for the reasons in their earlier lists).
    Polish: Explosion of Riches's reflexive triggers log the target before "triggers ... targeting" (two lines for each).
    Round 384 went on down `npm run popular` and the "Out after round N" lists, most played first, to a council's dilemma
@@ -3390,7 +3390,7 @@ line blocks.
    cast with flashback (yes, then the copy's new target) and chapter II's two player targets; no new prompts. +4, 31,539
    of 31,936 with main's rounds B223 to B231 merged into the Lane A chain. The compiled text of every other card is
    unchanged. Bots copy with Spider-Verse, pay for Mizzix's copy when they can, and obey chapter II's attack requirement.
-   Out after round 388 (looked at, not done): Invisible Woman, Sue Storm (still out: no batched "one or more counters on
+   Out after round 388 (looked at, not done): Invisible Woman, Sue Storm (done in round 416) (still out: no batched "one or more counters on
    one or more creatures" event); Ziatora's Envoy and Pulmonic Sliver (still out, as in their earlier lists); Guff
    Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest above rank 13,000 (still out,
    for the reasons in their earlier lists).
@@ -4047,6 +4047,63 @@ line blocks.
    Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known
    gaps: with many copies (Radiate on a Lightning Bolt in a full game) you answer the copy-order prompt once per copy; bots
    weigh each copy's target by a rough value, not what the spell actually does to it.
+   Round 416 went on down `npm run popular`, most played first, past cards left out before to a secret vote for up to one
+   creature, a gift that costs everyone who controls what they don't own, and counters put at the same time as one event.
+   Vault 11: Voter's Dilemma's "II, III — Each player secretly votes for up to one creature, then those votes are
+   revealed. If no creature got votes, each player draws a card. Otherwise, destroy each creature with the most votes or
+   tied for most votes." (Effect vote `upTo`: in turn order from you, each vote a player has, extra votes too, may be for
+   a creature or for nothing, the "Vote for no creature" button, CR 701.38a, 701.38d; secret until all are revealed,
+   rulings; Condition noVotes; with no creature on the battlefield nobody votes and each player draws). Blim, Comedic
+   Genius's "Whenever ~ deals combat damage to a player, that player gains control of target permanent you control. Then
+   each player loses life and discards cards equal to the number of permanents they control but don't own." (the target
+   yours to choose as the trigger goes on the stack, for good, rulings; Count permanents `notOwnedByController`, each
+   player's own, every such permanent and not only Blim's gifts, rulings, CR 108.3; nothing at all with the target gone,
+   CR 608.2b). Counters put at the same time are one event now (counters.ts batchCountersPut: everything one instruction
+   of a resolving spell or ability puts, Inspiring Roar's counters, proliferate, as one "countersPutBatch" event after
+   their own, CR 122.6, 603.2c): Invisible Woman, Sue Storm's "Whenever you put one or more +1/+1 counters on one or more
+   other Heroes you control, you may create a 0/4 colorless Wall creature token with defender." triggers once for them,
+   and Aragorn, Company Leader's "Whenever you put one or more counters on ~, put one of each of those kinds of counters on
+   up to one other target creature." once, whatever kinds, one of each kind on the target (Effect counters
+   `eventCounterKinds`); its "Whenever the Ring tempts you, if you chose a creature other than ~ as your Ring-bearer, put
+   your choice of a counter from among first strike, vigilance, deathtouch, and lifelink on ~." is an intervening if as
+   Faramir's. Bots vote with Vault 11 for an opponent's most valuable creature, or for nothing rather than their own, and
+   give away a token or their cheapest permanent with Blim (never their commander while there's another). Browser tests
+   click through Vault 11's "Vote for no creature" and a vote at chapter III, Blim's target after it hits Ana, Aragorn's
+   Ring-bearer, deathtouch counter and target, and Invisible Woman's one Yes for Inspiring Roar. +4, 31,715 of 31,936 on
+   this stacked branch. The compiled text of every other card is unchanged.
+   Out after round 416 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability), Jasmine Boreal of the Seven, Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
+   rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: counters put outside a resolving
+   instruction are each their own event (a cost, combat damage with wither or infect, replacement-made counters as
+   several permanents enter from different instructions), and an instruction that stops for a choice part way puts the
+   counters before and after it as two events; Invisible Woman reads the Heroes as they are just after the counters are
+   put; bots voting with Vault 11 don't weigh the card each player would draw.
+   Round 417 went on down `npm run popular`, most played first, past cards left out before to three whose open questions
+   their rulings settle. Helm of Kaldra's "{1}: If you control Equipment named Helm of Kaldra, Sword of Kaldra, and Shield
+   of Kaldra, create Kaldra, a legendary 4/4 colorless Avatar creature token. Attach those Equipment to it." (the names
+   are names, not this object, CR 201.5: any Equipment you control with each name, checked as it resolves, rulings; each
+   one then moves onto the token, CR 701.3a, one that can't staying where it is, CR 701.3b; attachAll `toCreated`).
+   Judgment call: with two Equipment of one name (the legend rule not applying), "those Equipment" are all of them.
+   Arcee, Sharpshooter // Arcee, Acrobatic Coupe: "{1}, Remove one or more +1/+1 counters from Arcee: It deals that much
+   damage to target creature. Convert Arcee." (X announced as the counters removed, at least one, CR 601.2b, 601.2h) and
+   "Whenever you cast a spell that targets one or more creatures or Vehicles you control, put that many +1/+1 counters on
+   Arcee. Convert Arcee." (TriggeredAbility.cast `targetsCount`: the number of distinct objects of yours it targets as
+   it's cast, as Hinata's rulings count objects and not uses of the word "target"; fixed then, one gone in response
+   still counted; CR 701.28 convert). Lodestone Bauble's "{1}, {T}, Sacrifice ~: Put up to four target basic land cards
+   from a player's graveyard on top of their library in any order. That player draws a card at the beginning of the next
+   turn's upkeep." (all from one graveyard; the player chosen as it's activated even with no target, rulings: "If you
+   choose zero targets, you still choose a player", ActivatedAbility `choosesYardPlayer`, CostChoices and StackItem
+   `yardPlayer`, the cards' owner when there are any; the owner orders the cards, CR 401.4; the delayed draw, CR 603.7,
+   made unless every target is gone, CR 608.2b). The UI asks for the player with the opponent picker when no card is
+   targeted; bots crack the Bauble at the end of the turn before an opponent's, on that opponent's basic lands (two or
+   more). Browser tests click through the Bauble with no target (choose Ana, who draws at her upkeep) and with two of
+   Ana's lands, Arcee's X counters and target, Giant Growth on the Coupe, and Helm of Kaldra's Kaldra. +3, 31,724 of
+   31,936 with round 416 and main (B259, B260). The compiled text of every other card is unchanged.
+   Out after round 417 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
+   counts once or twice), Lara Croft, Tomb Raider, Filigree Vector, Sunken Palace, Ulalek, Possibility Storm and the rest
+   of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: a converted or transformed
+   permanent shows a "Copy" chip in the UI (App.tsx compares its face's key with its card's; on main too); bots don't
+   use Arcee's counters or aim spells at it for the trigger on purpose; Lodestone's bot use ignores which lands matter.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -4536,7 +4593,7 @@ line blocks.
    ("each ... spell you cast has replicate") and Zinnia, Valley's Voice (done in round 410) ("gain offspring {2} as you cast them"): a card
    has one kicker-like optional cost (CompiledCard.kicker), so a given one needs every cost, autopay, bot and UI path to
    see it, and a spell with a kicker of its own would have two; Consume Spirit and Drain Life (done in round B179) ("Spend only black mana on
-   X" in a spell whose mana cost is more than {X}); Invisible Woman, Sue Storm (one trigger for +1/+1 counters put on one
+   X" in a spell whose mana cost is more than {X}); Invisible Woman, Sue Storm (done in round 416) (one trigger for +1/+1 counters put on one
    or more other Heroes at once: no batched counters event yet); Spiteful Repossession (damage to each opponent equal to
    their own difference, then "the damage dealt this way"); Codie, Vociferous Codex (done in round 368) (its mana ability's "when you next
    cast a spell this turn" exile); Hellish Rebuke, Greater Gargadon and Foggy Swamp Visions (still out, for the reasons
@@ -5394,7 +5451,7 @@ line blocks.
    X is 5 or more); Canoptek Wraith (basic lands with the same name as a chosen land); Rootweaver Druid (each opponent's
    search, one card put onto the battlefield under your control).
    Out after round 287 (looked at, not done): Haldan, Avid Arcanist and Evelyn, the Covetous ("cards you exiled": who
-   exiled a card isn't tracked); Blim, Comedic Genius ("permanents they control but don't own"); The Beamtown Bullies
+   exiled a card isn't tracked); Blim, Comedic Genius (done in round 416) ("permanents they control but don't own"); The Beamtown Bullies
    ("Target opponent whose turn it is puts ... onto the battlefield under their control"); Forger's Foundry (an exile as it
    resolves chosen as mana is spent).
    Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (damage replaced by milling,
@@ -5580,7 +5637,7 @@ line blocks.
    targets a creature you control).
    Out after round 249 (looked at, not done): The Eleventh Hour (a copy with a new name: the copied text's self-references
    and the rulings' loss of non-Alien subtypes); Stitcher Geralf (done in round B202) ("exile up to two creature cards put into graveyards
-   this way" and their total power); Aragorn, Company Leader ("if you chose a creature other than ~ as your Ring-bearer"
+   this way" and their total power); Aragorn, Company Leader (done in round 416) ("if you chose a creature other than ~ as your Ring-bearer"
    and "one of each of those kinds of counters"); Fervent Mastery ("If the {2}{R}{R} cost was paid": which alternative
    cost was paid, and an opponent discarding any number then drawing that many); Plunge into Darkness (done in round 362) ("Pay any amount of
    life, then look at that many cards" inside an entwined mode); Lukka, Coppercoat Outcast (done in round 392) (cards exiled this way gaining
@@ -5667,7 +5724,7 @@ line blocks.
    down, play them free); Spinerock Tyrant (copies that gain wither); Curse of Echoes (each other player may copy the
    spell); Sovereigns of Lost Alara (done in round 311) (an Aura that could enchant that creature); Durnan of the Yawning Portal (cast it
    with undaunted).
-   Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (counters put on several creatures at once as one
+   Out after round 233 (looked at, not done): Invisible Woman, Sue Storm (done in round 416) (counters put on several creatures at once as one
    trigger); Sorceress's Schemes (done in round 272); Cursecloth Wrappings (done in round 303) (embalm granted to a
    graveyard card); Oblivious Bookworm (a creature that entered face down or was turned face up this turn); Cait, Cage
    Brawler; Augusta, Order Returned; Vault 101: Birthday Party (done in round 367); The First Tyrannic War; Kitt Kanto;
@@ -11260,7 +11317,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   opponents for Bitter Feud, cast Immortal Coil only with eight or more cards in their graveyard and don't exile their
   graveyard below five cards with it out, cast Winter's Chill only on other players' creatures attacking them (the
   strongest first) and pay {2}, else {1}, when they can. Browser tests for the two players, the Coil's graveyard picks,
-  Winter's Chill's X and targets, and its {2} and {1} questions. +3, 31,723 of 31,936 with main through round 415 and
+  Winter's Chill's X and targets, and its {2} and {1} questions. +3, 31,730 of 31,936 with main through round 417 and
   B255-B261. The compiled text of every other card is unchanged.
 - Out after round B262 (looked at, not done): the lists after round B261 stay out. Judgment calls and known gaps: when
   Nefarious Lich and Immortal Coil each take a different source's damage in one damage event, the Lich's cards are

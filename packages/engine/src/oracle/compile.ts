@@ -174,6 +174,7 @@ import { round421Line } from "./round421";
 import { round422Line } from "./round422";
 import { round423Line } from "./round423";
 import { round424Line } from "./round424";
+import { round425Line } from "./round425";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1058,6 +1059,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Redemptor Dreadnought, Kaya, Spirits' Justice (round 425): oracle/round425.ts.
+    if (round425Line(line, raw, out, isSpell)) continue;
     // Swindler's Scheme, Dack Fayden, Helping Hand (round 424): oracle/round424.ts.
     if (round424Line(line, raw, out, isSpell)) continue;
     // Verrak, Warped Sengir (round 423): oracle/round423.ts.

@@ -3115,7 +3115,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
         // Tamiyo, the Moon Sage's emblem: "a card is put into your graveyard from anywhere, you may return it": that card is
         // the group, alone.
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard" || (b.what === "leaves" && b.them)) && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard" || b.what === "exiledYourCreatures" || (b.what === "leaves" && b.them)) && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };
@@ -3778,6 +3778,14 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   // Hero of Bretagard, Ranar the Ever-Watchful (round 404): cards put into exile from your hand, for any reason (foretell
   // too), and permanents, tokens too, a spell or ability you control exiled from the battlefield (rulings).
   if (b.what === "exiledFromHandOrByYou") return m.to === "exile" && ((m.from === "hand" && m.owner === you && !m.notCard) || (m.from === "battlefield" && m.exiledBy === you));
+  // Kaya, Spirits' Justice (round 425): a creature you controlled as it left the battlefield (CR 603.10a), a token too,
+  // or a creature card from your graveyard (as a card there), put into exile.
+  if (b.what === "exiledYourCreatures") {
+    if (m.to !== "exile" || m.createdBy !== undefined) return false;
+    if (m.from === "battlefield") return m.controller === you && !!m.chars?.types.includes("Creature");
+    const card = m.notCard ? undefined : s.cards[m.card];
+    return m.from === "graveyard" && m.owner === you && !!card && restingDef(card).types.includes("Creature");
+  }
   if (m.createdBy !== undefined) return false;
   // The rest are about cards (not tokens or copies of spells, CR 111.1, 707.10), as they are in that zone.
   if (m.notCard) return false;

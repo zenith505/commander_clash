@@ -24,7 +24,7 @@ export function runBecomeCopyOfAmongEffect(s: GameState, e: Extract<Effect, { ty
   const sc = (r.scratch ??= {});
   const host = objects(s, e.what, ctx).find((o) => o.zone === "battlefield");
   const pool = objects(s, e.from === "linked" ? { ref: "linkedCard" } : { ref: "eventGroup" }, ctx);
-  const cards = pool.filter((o) => !o.isToken && !o.spellCopy && (e.from !== "linked" || o.zone === "exile") && printedMatches(e.filter, restingDef(s.cards[o.cardId]!)));
+  const cards = pool.filter((o) => !o.isToken && !o.spellCopy && (e.from !== "linked" || o.zone === "exile") && (!e.inExile || o.zone === "exile") && printedMatches(e.filter, restingDef(s.cards[o.cardId]!)));
   if (!host || !cards.length) {
     sc.copyAmong = undefined;
     if (host) log(s, `${src}: there's no ${e.filter.text} to copy.`);
@@ -32,6 +32,7 @@ export function runBecomeCopyOfAmongEffect(s: GameState, e: Extract<Effect, { ty
   }
   if (sc.copyAmong === undefined) {
     sc.copyAmong = "";
+    sc.copyAmongHost = host.id;
     s.pending = {
       kind: "chooseOption",
       player: ctx.controller,
@@ -39,18 +40,20 @@ export function runBecomeCopyOfAmongEffect(s: GameState, e: Extract<Effect, { ty
       what: "copyAmong",
       options: [...cards.map((o) => o.id), "none"],
       labels: [...cards.map((o) => restingDef(s.cards[o.cardId]!).name), `Don't copy (stay ${defOf(s, host).name})`],
-      prompt: `you may have ${defOf(s, host).name} become a copy of ${/^[aeiou]/.test(e.filter.text) ? "an" : "a"} ${e.filter.text} until end of turn.`,
+      prompt: `you may have ${defOf(s, host).name} become a copy of ${/^[aeiou]/.test(e.filter.text) ? "an" : "a"} ${e.filter.text}${e.except?.keywords?.length ? `, except it has ${e.except.keywords.join(" and ").toLowerCase()},` : ""} until end of turn.`,
     };
     return "paused";
   }
   const card = cards.find((o) => o.id === sc.copyAmong);
   sc.copyAmong = undefined;
+  sc.copyAmongHost = undefined;
   if (!card) {
     log(s, `${defOf(s, host).name} doesn't become a copy of anything (${src}).`);
     return;
   }
   const base = restingDef(s.cards[card.cardId]!);
   const was = defOf(s, host).name;
-  addCopyEffect(s, host, copyKey(s, base), "endOfTurn");
-  log(s, `${was} becomes a copy of ${base.name} until end of turn.`);
+  // Kaya, Spirits' Justice (round 425): "except it has flying" (CR 707.9a).
+  addCopyEffect(s, host, copyKey(s, base, e.except), "endOfTurn");
+  log(s, `${was} becomes a copy of ${base.name}${e.except?.keywords?.length ? `, except it has ${e.except.keywords.join(" and ").toLowerCase()},` : ""} until end of turn.`);
 }

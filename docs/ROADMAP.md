@@ -4285,6 +4285,35 @@ line blocks.
    B268), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known
    gaps: bots never reveal Emissary of Grudges's player; Swindler's Scheme's bot reveals only against spells of mana value
    3 or more; Dack's bot gives each creature to the opponent with the least power on the battlefield.
+   Round 425 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card exiled to pay
+   for a spell and linked to the permanent it becomes, and a copy of a card from among those just exiled. Redemptor
+   Dreadnought's "Fallen Warrior — As an additional cost to cast this spell, you may exile a creature card from your
+   graveyard." (an optional cost chosen and paid like a kicker cost with no mana, CR 601.2b; the card linked to the
+   permanent the spell becomes, CR 607.2q, CompiledCard.costExileLinked) and "Plasma Incinerator — Whenever this creature
+   attacks, if a card is exiled with it, it gets +X/+X until end of turn, where X is the power of the exiled card." (an
+   intervening if, CR 603.4; that card's power as a card in exile, its own characteristic-defining ability included, CR
+   604.3; none once the card has left exile, CR 400.7). This closes review follow-up 18: the attack line no longer reads a
+   sacrificed cost's power. Kaya, Spirits' Justice's "Whenever one or more creatures you control and/or creature cards in
+   your graveyard are put into exile, you may choose a creature card from among them. Until end of turn, target token you
+   control becomes a copy of it, except it has flying." (once for each event, CR 603.2c, BatchTrigger `exiledYourCreatures`:
+   a creature as it last existed on the battlefield, CR 603.10a, tokens too though no card of theirs can be chosen; the
+   card chosen as it resolves, only one still in exile, rulings; copied as printed, rulings, CR 707.2, plus flying, CR
+   707.9a; Effect becomeCopyOfAmong `inExile` and `except`) and "−2: Exile target creature you control. For each other
+   player, exile up to one target creature that player controls." (you choose every target, rulings; each other player
+   an opponent in a free-for-all game, CR 102.3; TargetSpec perOpponent after the first target). Browser tests click
+   through Redemptor Dreadnought's offered exile of Serra Angel, its attack as an 8/8, and Kaya's −2 on your Serra Angel
+   and Ana's Hill Giant with your token becoming a Serra Angel. +2, 31,765 of 31,936 on this stacked branch; the compiled
+   text of every other card is unchanged.
+   Out after round 425 (looked at, not done): Ulalek, Fused Atrocity (copies of all spells and then of all other
+   abilities you control put on the stack at once: their order is their controller's choice, CR 405.3, and nothing lets a
+   player order copies yet), Galea, Kindler of Hope (its "When you cast an Equipment spell this way" needs the permission
+   a spell was cast with, and the ability it gives the spell kept on the permanent, CR 400.7a), Taskmaster, Mercenary
+   Mimic ("target creature on the battlefield or creature card in a graveyard": one target from either zone), Codie,
+   Ravenous Codex ("a prepared spell" isn't a term the Comprehensive Rules define; CR 722.3d speaks of a spell cast as a
+   prepare spell), Battlefield Thaumaturge (still out, as in its earlier lists), Sanar, Innovative First-Year ("for each
+   of those colors, you may exile a card of that color": whether one multicolored card can count for two colors isn't
+   settled), Lara Croft, Tomb Raider (still out), and the rest of `npm run popular` above rank 17,500 (still out, for the
+   reasons in their earlier lists). Known gaps: Kaya's bot copies the card worth the most, if worth more than the token.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

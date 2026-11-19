@@ -12,7 +12,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { crewedWith, inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -1928,7 +1928,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
     const attackWatch = (w: GameObject, wc: PlayerId, triggers?: TriggeredAbility[]) => {
       const at = attackingYou(o, wc);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && (!t.attacker.crewedBySelf || crewedWith(s, o, w)) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems((w, wc) => attackWatch(w, wc));
@@ -3549,7 +3549,7 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
     };
     return { ...body, targets: body.targets.map((x) => kin(x.opponentOfSubjectController ? (({ opponentOfSubjectController: _, ...rest }) => ({ ...rest, controlledByAny: opponents(s, chooser) }))(x) : x)) };
   }
-  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.anyOf?.some(isEvent);
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || x.outnumbers?.than === "eventPlayer" || !!x.sameNameAsCause || !!x.otherTypeThanCause || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {
     const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
@@ -3559,6 +3559,13 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
       if (name === undefined) return x;
       const { sameNameAsCause: _, ...rest } = x;
       return fix({ ...rest, named: name });
+    }
+    // Gale, Waterdeep Prodigy (round 418): "of the other type": the type of the two the spell wasn't, as it was cast.
+    if (x.otherTypeThanCause) {
+      const types = t.cause !== undefined ? s.castItems?.[t.cause]?.castTypes : undefined;
+      const instant = !!types?.includes("Instant"), sorcery = !!types?.includes("Sorcery");
+      const { otherTypeThanCause: _, ...rest } = x;
+      return fix({ ...rest, types: instant !== sorcery ? [instant ? "Sorcery" : "Instant"] : ["(none)"], text: instant !== sorcery ? `target ${instant ? "sorcery" : "instant"} card from your graveyard` : rest.text });
     }
     if (x.notEventPlayer && who !== undefined) {
       const { notEventPlayer: _, ...rest } = x;

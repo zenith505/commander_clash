@@ -3034,7 +3034,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || (!e.anyOwner && o.owner !== ctx.controller))) return;
         if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
         sc.castNow = { id: o.id };
-        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}), ...(e.addedMana ? { addedMana: e.addedMana } : {}) };
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}), ...(e.addedMana ? { addedMana: e.addedMana } : {}), ...(e.thenNoMore ? { thenNoMore: true as const } : {}), ...(e.exileAfter ? { exileAfter: true as const } : {}) };
         // Mana abilities can still be activated to pay for it (CR 601.2g), so only the mana in the pool may be short.
         const problem = castProblem(s, ctx.controller, o.id);
         if (problem === null || /^not enough mana/.test(problem)) return "paused";
@@ -3308,8 +3308,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (s.resolving) s.resolving.created = [];
         enterTogether(s, () => {
           for (const o of list) {
-            log(s, e.faceDown === "cyberman" ? `${src} puts a card onto the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : e.faceDown === "plain" ? `${src} returns a card to the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
-            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown });
+            log(s, e.faceDown === "cyberman" ? `${src} ${e.tapped ? "returns" : "puts"} a card ${e.tapped ? "to" : "onto"} the battlefield face down${e.tapped ? " and tapped" : ""} under ${player(s, under(o)).name}'s control: it's a 2/2 Cyberman artifact creature.` : e.faceDown === "plain" ? `${src} returns a card to the battlefield face down under ${player(s, under(o)).name}'s control: it's a 2/2 creature.` : `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
+            // Missy (round 419): "face down and tapped".
+            moveObject(s, o.id, "battlefield", { controller: under(o), putBy: putter, faceDown: e.faceDown === "plain" ? "morph" : e.faceDown, ...(e.tapped ? { tapped: true } : {}) });
             if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
           }
         });

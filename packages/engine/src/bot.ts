@@ -181,7 +181,7 @@ import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
 import { pileCards } from "./effects/run-round386";
 import { eachOtherTargets } from "./effects/run-spells";
-import { onlyPermanentOrPlayer } from "./effects/targeting";
+import { onlyPermanentOrPlayer, relatedOk } from "./effects/targeting";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -1558,6 +1558,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Boreas Charger: "an opponent who controls more lands than you. Search ... for a number of Plains cards equal to the
       // difference": the one with the most lands.
       const cur = r && pend.what === "opponent" ? r.body.effects[r.next] : undefined;
+      // Allure of the Unknown (round 420): that opponent gets to cast one of our cards for free, so the one with the least
+      // power on the battlefield.
+      if (cur?.type === "revealOpponentExilesCasts" && opps.length) {
+        const weakest = [...opps].sort((a, b) => might(Number(a)) - might(Number(b)))[0]!;
+        return [{ type: "chooseOption", player: pid, choice: weakest }];
+      }
       if (cur?.type === "choose" && cur.moreLandsThanYou && opps.length) {
         const lands = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Land")).length;
         return [{ type: "chooseOption", player: pid, choice: [...opps].sort((a, b) => lands(Number(b)) - lands(Number(a)))[0]! }];
@@ -3870,7 +3876,8 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const guard = targetGuard(s, pid, body.effects, i, sourceId);
     const holds = (t: TargetChoice) => !guard || guard(t);
     const all0 = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && !(countersFrom && t.kind === "player" && !playerCountersWorthRemoving(s, pid, t.id)),
+      // "Target creature that player controls" (Cloak and Dagger, Entwined, round 420): controlled by the player target already chosen.
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && (spec.controlledByTarget === undefined || relatedOk(s, spec, out, t)) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && !(countersFrom && t.kind === "player" && !playerCountersWorthRemoving(s, pid, t.id)),
     );
     // A target only the guard rules out still has to be chosen when the ability must have one (a trigger): Triumph of
     // Cruelty's opponent when we don't control the greatest power now (it's checked again as it resolves).

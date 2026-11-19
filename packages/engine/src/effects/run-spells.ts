@@ -1,4 +1,4 @@
-import { allEffects, isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
+import { allEffects, isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type TriggeredAbility, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, opponentForbidsDiscard } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
@@ -756,6 +756,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // already over, there's nothing to make (as for the continuous effect, run-permanents).
       const whileTapped = e.until === "whileTapped" ? { id: o.id, zc: ctx.sourceZc ?? o.zoneChanges ?? 0, untaps: ctx.sourceUntaps ?? o.untaps ?? 0 } : undefined;
       if (whileTapped && !whileTappedHolds(s, whileTapped)) return;
+      // Surge to Victory (round 418): "the exiled card" is the target card this resolution exiled, the same object in
+      // exile (CR 400.7, 707.12); if it isn't there now, the delayed trigger would have nothing to copy, so it isn't made.
+      const exiledCard = e.bindExiled !== undefined ? objects(s, { ref: "target", index: e.bindExiled }, ctx)[0] : undefined;
+      if (e.bindExiled !== undefined && exiledCard?.zone !== "exile") return;
+      const trigger0 = exiledCard ? bindCipherCard(e.trigger, exiledCard.id, exiledCard.zoneChanges ?? 0) : e.trigger;
       for (const about of e.each || e.aboutGroup ? abouts : abouts.slice(0, 1)) {
         (s.floatingTriggers ??= []).push({
           ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
@@ -770,7 +775,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           // The Clone Saga: "a creature with the chosen name" is the name chosen as this resolved, kept with the delayed
           // trigger (its source may be gone by the time it triggers).
           // Zombie Boa: "a creature of that color", the color chosen as this resolved, likewise.
-          trigger: e.bound ? bindMilledCounts(s, ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger, ctx) : ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(e.trigger, ctx.chosen) : e.trigger,
+          trigger: e.bound ? bindMilledCounts(s, ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(trigger0, ctx.chosen) : trigger0, ctx) : ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(trigger0, ctx.chosen) : trigger0,
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
@@ -1961,4 +1966,9 @@ function bindChosenName<T>(t: T, chosen: Chosen): T {
     return ((o.chosen === "name" && chosen.name !== undefined) || (o.chosen === "color" && chosen.color !== undefined) || (o.chosen === "planeswalkerType" && chosen.planeswalkerType !== undefined)) && typeof o.kind === "string" ? bindChosen(out as unknown as TargetSpec, chosen) : out;
   };
   return walk(t) as T;
+}
+
+/** The trigger with each castCipher effect in its body about this card in exile (Effect floatingTrigger `bindExiled`). */
+function bindCipherCard(trigger: TriggeredAbility, card: ObjectId, zc: number): TriggeredAbility {
+  return { ...trigger, body: { ...trigger.body, effects: trigger.body.effects.map((x) => (x.type === "castCipher" ? { ...x, card, zc } : x)) } };
 }

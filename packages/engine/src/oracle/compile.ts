@@ -20,6 +20,8 @@ import { roundB261Line } from "./laneb261-lines";
 import { roundB262Line } from "./laneb262-lines";
 import { roundB263Line } from "./laneb263-lines";
 import { roundB264Line } from "./laneb264-lines";
+import { roundB265Line } from "./laneb265-lines";
+import { roundB266Line } from "./laneb266-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2408,6 +2410,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB263Line(line, out, isSpell)) continue;
     // Soul Echo's upkeep trigger (round B264).
     if (roundB264Line(line, out, isSpell)) continue;
+    // Phyrexian Portal's ability and Raging River's trigger (round B265).
+    if (roundB265Line(line, out, isSpell)) continue;
+    // Mirror-Shield Hoplite, Defensive Formation, Power Pack (round B266).
+    if (roundB266Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

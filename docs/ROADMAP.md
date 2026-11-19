@@ -4104,6 +4104,32 @@ line blocks.
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: a converted or transformed
    permanent shows a "Copy" chip in the UI (App.tsx compares its face's key with its card's; on main too); bots don't
    use Arcee's counters or aim spells at it for the trigger on purpose; Lodestone's bot use ignores which lands matter.
+   Round 418 went on down `npm run popular`, most played first, past cards left out before to three whose pieces the engine
+   now has. First the UI bug round 417 found: the "Copy" chip went by the permanent's definition key, so a transformed or
+   converted permanent's back face, a melded permanent, a Room with an unlocked door and a text-changed permanent all read
+   as copies; it now shows only for a copy effect (CR 707.4, 707.5; cards.ts isCopy), with a browser test. And a paid cast
+   from your graveyard (Harness the Storm, Gale) no longer says "and then you can't cast other spells this turn", which is
+   Conduit of Worlds's alone (castFree `thenNoMore`, `exileAfter`). Surge to Victory: "Whenever a creature you control
+   deals combat damage to a player this turn, copy the exiled card. You may cast the copy without paying its mana cost."
+   (a delayed trigger for the turn, CR 603.7b, bound to the card it exiled as it is in exile, Effect floatingTrigger
+   `bindExiled`; each copy cast as the trigger resolves or gone, CR 707.12, as cipher's; none made if the card has left
+   exile). Gale, Waterdeep Prodigy's "you may cast up to one target card of the other type from your graveyard. If a spell
+   cast from your graveyard this way would be put into your graveyard, exile it instead." (TargetSpec
+   `otherTypeThanCause`: sorcery for an instant spell, instant for a sorcery, by StackItem.castTypes as it was cast;
+   cast paying its costs, timing ignored, CR 608.2g). Zethi, Arcane Blademaster: "exile up to X target instant cards from
+   your graveyard, where X is the number of times ~ was kicked. Put a kick counter on each of them." and "Whenever ~
+   attacks, copy each exiled card you own with a kick counter on it. You may cast the copies." (any card you own in exile
+   with a kick counter, the copies cast paying their costs since nothing says otherwise, CR 601.2f-h, in the order you
+   choose). Browser tests click through Surge's free copy, Gale's graveyard pick and paid cast, Zethi kicked twice and
+   its attack. +3, 31,721 of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
+   Out after round 418 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability; fitMany can't tell where the first group ends in the chosen targets), Captain America, First Avenger (its
+   damage "divided as you choose" is announced before the cost that picks the Equipment, CR 601.2d, 601.2h, and no ruling
+   settles it), Jasmine Boreal of the Seven (a spell's abilities granted by effects, which its mana can't be spent on per
+   its rulings, aren't gathered in one place), Wayta, Trainer Prodigy (a cost reduction by its targets, and triggers
+   doubled for creatures dealt damage), Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
+   rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: bots don't hold Surge to Victory for a
+   big attack or pick the best card for it; Gale's bot use takes any legal card.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

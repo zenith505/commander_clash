@@ -42,6 +42,11 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   }
   // Shinryu: "choose an opponent" as it transforms, asked before anyone gets priority (askEntersChoice).
   if (compileCard(defOf(s, o)).asTransformsChoose === "opponent") (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "player", except: "you" });
+  // Curse of Leeches (round B267): "attach it to a player" as it transforms into its Aura face, asked the same way,
+  // before state-based actions would put an Aura attached to nothing into the graveyard (CR 704.5m).
+  if (compileCard(defOf(s, o)).asTransformsAttachPlayer) {
+    (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "attachPlayer" });
+  }
   fireEvent(s, { type: "transformed", id: o.id, face: to });
   return true;
 }

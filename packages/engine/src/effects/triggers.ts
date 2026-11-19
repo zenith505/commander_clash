@@ -2787,6 +2787,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) crime(obj(s, id), controllerOf(s, obj(s, id)));
       fromGraveyards(crime);
     }
+    // Grip of Chaos (round B267): "Whenever a spell or ability is put onto the stack, if it has a single target": as it's put
+    // there (not when its targets change later), with exactly one target chosen (CR 115.6, 603.4).
+    if (item && !ev.only && (item.targets ?? []).filter((t) => t.kind !== "none").length === 1)
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        add(w, controllerOf(s, w), (e) => e === "stackItemSingleTarget", undefined, ev.stackId);
+      }
     const seen = new Set<ObjectId>();
     for (const t of item?.targets ?? []) {
       if (t.kind !== "object" || seen.has(t.id) || (ev.only && !ev.only.includes(t.id))) continue;

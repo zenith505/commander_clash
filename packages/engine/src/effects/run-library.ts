@@ -916,7 +916,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
           // Covetous Urge: "You may cast that card for as long as it remains exiled" (not a land: "cast").
-          if (e.youMay && (!e.youMay.ifGift || gifteeOf(s, ctx) !== undefined)) o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
+          // Taster of Wares: only an instant or sorcery card (ifTypes), and only while you control ~ as the same object
+          // (rulings: its usual timing and costs).
+          if (e.youMay && (!e.youMay.ifGift || gifteeOf(s, ctx) !== undefined) && (!e.youMay.ifTypes || e.youMay.ifTypes.some((t) => objIsType(s, o, t))))
+            o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: e.youMay.whileControlled ? "whileControlled" : "exiled", turn: s.turn, castOnly: true, ...(e.youMay.whileControlled && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.youMay.anyType ? { anyType: true as const } : {}) };
           // Psychic Theft: returned at the beginning of the next end step if it's still this object in exile (not cast, CR
           // 400.7), a delayed trigger (CR 603.7) of the spell's.
           if (e.youMay?.returnAtEnd) {

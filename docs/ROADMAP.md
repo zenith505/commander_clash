@@ -1,6 +1,6 @@
 # Roadmap
 
-31,717 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,723 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -3294,7 +3294,7 @@ line blocks.
    Out after round 384 (looked at, not done): Whims of the Fates (still out: each player separates all their permanents
    into three piles, a choice the browser has no prompt for yet); Stardew Valley ("another player of your choice may gain
    control of that permanent"); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Hero of
-   Bretagard, Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil, Nefarious Lich (done in round B253) and the rest above rank 15,000 (still
+   Bretagard, Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil (done in round B262), Nefarious Lich (done in round B253) and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Polish: the Trap's log reads "You reveals" and "You guesses" (the "You plays" grammar of the log).
    Round 385 went on down `npm run popular` and the "Out after round N" lists, most played first, to three more shields
@@ -3320,7 +3320,7 @@ line blocks.
    Out after round 385 (looked at, not done): Domri, Chaos Bringer ("If that mana is spent on a creature spell, it gains
    riot": mana from a loyalty ability, not a mana ability, CR 605.1a, and whether riot a spell gains applies as the
    permanent enters, CR 614.12, isn't settled by its rulings); Blood Scrivener and Breathstealer's Crypt (still out: a
-   draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil,
+   draw replacement whose own draws other replacements can replace); Rinoa, Angel Wing (done in round 394), Supper for Spiders, Immortal Coil (done in round B262),
    Nefarious Lich (done in round B253) and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 386 went on down `npm run popular` and the "Out after round N" lists, most played first, to the pieces rounds 241
    to 385 had left them waiting for: Parallel Thoughts' "When ~ enters, search your library for seven cards, exile them in a
@@ -3415,7 +3415,7 @@ line blocks.
    compiled text of every other card is unchanged.
    Out after round 389 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with
    no target); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
-   Coil, Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame (done in round 402), Wizard's Spellbook and the rest above rank 15,000 (still
+   Coil (done in round B262), Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame (done in round 402), Wizard's Spellbook and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Round 390 went on down `npm run popular` and the "Out after round N" lists, most played first: Glimpse of Tomorrow's
    "Shuffle all permanents you own into your library, then reveal that many cards from the top of your library. Put all
@@ -3438,7 +3438,7 @@ line blocks.
    opponent and the three-way search, and Sanctuary Blade's color as it's equipped. +4, 31,546 of 31,936. The compiled text
    of every other card is unchanged.
    Out after round 390 (looked at, not done): Psychic Paper (still out: a name and a creature type chosen as it becomes
-   attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil, Supper for Spiders, Duelist's Flame (done in round 402),
+   attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil (done in round B262), Supper for Spiders, Duelist's Flame (done in round 402),
    Wizard's Spellbook, Lodestone Bauble and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 391 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards exiled in a
    face-down pile, shuffled, then manifested or cloaked, and every creature a player controls attacking during their next
@@ -3595,7 +3595,7 @@ line blocks.
    Out after round 397 (looked at, not done): Sentinel of Lost Lore (still out: targets in exile, "a card you own in exile
    that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown, Synthesis Pod,
    Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack, Medomai's Prophecy,
-   Monastery Raid, Winter's Chill, Divine Intervention (done in round B259), Kotose and the rest from rank 15,000 to 20,000 (still out, for the
+   Monastery Raid, Winter's Chill (done in round B262), Divine Intervention (done in round B259), Kotose and the rest from rank 15,000 to 20,000 (still out, for the
    reasons in their earlier lists).
    Round 398 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards of each card
    type (CR 205.2a), a card with several card types taken for any one of them (Atraxa, Grand Unifier's rulings, as for
@@ -3614,7 +3614,7 @@ line blocks.
    this stacked branch. The compiled text of every other card is unchanged.
    Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
-   Killer, Celestial Dawn, Titania's Song, Bitter Feud, Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr,
+   Killer, Celestial Dawn, Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr,
    Shared Fate, Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
    Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
@@ -6388,7 +6388,7 @@ line blocks.
      counters), Contested Game Ball (done in round B164) and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
      "all but N", "can't be prevented"; the affected player orders them with shields, CR 616.1); still out: Neriv
-     (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (both done in round 364) (next-time doubling on a chosen or
+     (mana value of the source), Bitter Feud (done in round B262), Desperate Gambit and Forcefield (both done in round 364) (next-time doubling on a chosen or
      unblocked source), Quest for Pure Flame, Taii Wakeen, Goblin Goliath and Jeska (other lines), Rankle and Torbran
      (a "player or battle" trigger), the Ajani emblem, Lightning Surge, Arrow Storm, Banefire and Demonfire
      (conditional "can't be prevented"), Flames of the Blood Hand, Volcano Hellion, and prevention with extra effects
@@ -8115,7 +8115,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   turn), Churning Reservoir (oil counters put this turn), Dutiful Knowledge Seeker (cards put into a library from
   anywhere), Simic Manipulator (done in round 315) and Arcee (remove one or more counters as a variable cost), Benalish Commander and
   Detritivore (suspend X), Darigaaz Reincarnated (done in round B202), Sekki, Seasons' Guide, Fugitive Codebreaker, Reroute (done in round B196), Serum Powder,
-  Delaying Shield (done in round B201), Immortal Coil, Fires of Mount Doom (done in round B217).
+  Delaying Shield (done in round B201), Immortal Coil (done in round B262), Fires of Mount Doom (done in round B217).
 - Round B64 (the unlisted ones from EDHREC rank about 19,700 up to 15,000): "return to the battlefield target creature
   card in your graveyard that was put there from the battlefield this turn" (Moira, Urborg Haunt), "Whenever you put a
   +1/+1 counter on a creature, ... This ability triggers only once each turn" (Ant-Man, Colony Commander), a Gingerbrute
@@ -11241,6 +11241,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B262 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-417): Immortal Coil
+  ("If damage would be dealt to you, prevent that damage. Exile a card from your graveyard for each 1 damage prevented
+  this way." and "When there are no cards in your graveyard, you lose the game."): a prevention effect (CR 615.1a), so
+  damage that can't be prevented is dealt (CR 615.12) and the player orders it with the other shields (CR 616.1); all the
+  damage is prevented however few cards there are, and that many are exiled, all of them with fewer (rulings), right
+  after (CR 615.5), the player choosing which (DamageMod exileYard with `prevent` and `upTo`, damage-picks.ts); the loss is
+  a state trigger (CR 603.8) that loses as it resolves even if a card is back by then (rulings). Bitter Feud ("As this
+  enchantment enters, choose two players." and "If a source controlled by one of the chosen players would deal damage to
+  the other chosen player or a permanent that player controls, that source deals double that damage ... instead."): the
+  two players as it enters (CR 614.12), any damage both ways, a replacement and not prevention (CR 614.1a), ordered by
+  the player dealt it (CR 616.1), two Feuds with the same players doubling it twice (rulings; DamageMod `feud`). Winter's
+  Chill ("X can't be greater than the number of snow lands you control." and "Choose X target attacking creatures. For
+  each of those creatures, its controller may pay {1} or {2}. ..."): X capped as it's announced (CR 601.2b); as it
+  resolves (rulings) each target's controller, in turn order (CR 101.4), is asked for {2}, then for {1} if they don't pay
+  it: {2} and the creature fights as usual, {1} and all combat damage to and by it this combat is prevented (CR 615.1),
+  nothing and it's destroyed at end of combat (a delayed trigger, CR 511.2, 603.7; Effect payFullOrPart). Bots choose two
+  opponents for Bitter Feud, cast Immortal Coil only with eight or more cards in their graveyard and don't exile their
+  graveyard below five cards with it out, cast Winter's Chill only on other players' creatures attacking them (the
+  strongest first) and pay {2}, else {1}, when they can. Browser tests for the two players, the Coil's graveyard picks,
+  Winter's Chill's X and targets, and its {2} and {1} questions. +3, 31,723 of 31,936 with main through round 415 and
+  B255-B261. The compiled text of every other card is unchanged.
+- Out after round B262 (looked at, not done): the lists after round B261 stay out. Judgment calls and known gaps: when
+  Nefarious Lich and Immortal Coil each take a different source's damage in one damage event, the Lich's cards are
+  chosen first (for one source's damage only the one applied first applies: the damage is gone after it); bots' other ways of exiling their own graveyard (delve,
+  escape, Nefarious Lich) don't look at Immortal Coil; Winter's Chill's three-way choice is asked as two questions, {2}
+  first, then {1}; Snowblind, Noxious Vapors, Land Equilibrium, Glyph of Delusion and Lich's Mirror were looked at again
+  and stay out for the reasons in the earlier lists.
 - Out after round B261 (looked at, not done): the lists after round B260 stay out. Judgment calls and known gaps: Turf
   War's has no rulings of its own, so with a player who controls no land its enters ability follows Vaevictis Asmadi's
   rulings (no legal choice, removed from the stack); a token put onto the battlefield blocking (Brimaz, Mirror Match) still
@@ -11327,7 +11354,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done
   after it merges), Divine Intervention (done in round B259) (still out: who removed its last counter isn't recorded), Allure of the Unknown
   (still out: another player casting one of the cards in the middle of the resolution), Medomai's Prophecy (still out: its
-  rulings don't settle the "named card" check) and Immortal Coil (still out: a graveyard card chosen for each point of
+  rulings don't settle the "named card" check) and Immortal Coil (done in round B262) (still out: a graveyard card chosen for each point of
   damage prevented, and its state trigger "when there are no cards in your graveyard"). Known gaps: bots choose the Safe's
   number at random, and pick Inniaz's gifts by worth alone.
 - Out after round B246 (looked at, not done): the lists after round B245 stay out, and Hero of Bretagard (still out: "a spell
@@ -11407,7 +11434,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B231 (looked at, not done): Torrent of Lava (an activated ability creatures have while it's on the stack,
   and a shield against damage from that spell only), Guardian Beast ("other players can't gain control of them" while it's
   untapped, and "can't be enchanted" that doesn't remove Auras already attached), Spy Kit (all names of nonlegendary creature
-  cards), Immortal Coil (a card of your choice exiled for each 1 damage, in the middle of damage) and the lists after round
+  cards), Immortal Coil (done in round B262) (a card of your choice exiled for each 1 damage, in the middle of damage) and the lists after round
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
@@ -11484,10 +11511,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   autopay can't plan it), Cemetery Desecrator (a reflexive modal trigger after exiling a card from any graveyard, X its mana
   value) stays out for now.
 - Out after round B216 (looked at, not done): Swans of Bryn Argoll (done in round B252) (see round B66: its draws in the middle of damage can
-  be replaced by dredge) and Immortal Coil (a card of your choice exiled from your graveyard for each 1 damage, a choice
+  be replaced by dredge) and Immortal Coil (done in round B262) (a card of your choice exiled from your graveyard for each 1 damage, a choice
   in the middle of damage) stay out.
 - Out after round B215 (looked at, not done): Land Equilibrium (whether it applies once for each land when several enter
-  at once isn't settled by its rulings), Winter's Chill (a three-way payment for each target, {1}, {2} or nothing),
+  at once isn't settled by its rulings), Winter's Chill (done in round B262) (a three-way payment for each target, {1}, {2} or nothing),
   Sacred Ground (what caused a land to go to the graveyard) and Over the Top (done in round 389) (every player's permanent cards entering at
   once, Auras among them) stay out.
 - Out after round B214 (looked at, not done): Decaying Soil (done in round B234) (a threshold-granted dies trigger that looks back, CR 603.10a),
@@ -11848,7 +11875,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
   resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),
   Mischievous Quanar (turning itself face down), Revealing Wind (done in round B186) and Lumbering Laundry (done in round B186) (looking at face-down creatures),
-  Delif's Cone (done in round B207) (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (pay {1} or {2} per creature),
+  Delif's Cone (done in round B207) (a delayed "attacks and isn't blocked" with no combat damage), Winter's Chill (done in round B262) (pay {1} or {2} per creature),
   Rhystic Cave (a mana ability with "unless any player pays {1}"), Booby Trap (revealed draws), Sasaya (flip by revealing
   seven lands).
 - Out after round B98 (looked at, not done): Teferi, Timeless Voyager (done in round B153) ("Until the end of your next turn, they can't phase

@@ -3564,6 +3564,15 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (!cards.length && !forced) return null;
     return [{ kind: "player", id: best.q }, ...(cards.length ? cards.map((id): TargetChoice => ({ kind: "object", id })) : [{ kind: "none" as const }])];
   }
+  // Blim, Comedic Genius (round 416): "that player gains control of target permanent you control": the permanent we'd
+  // miss least (a token or the cheapest thing, never our commander while there's another), since each one they control
+  // but don't own costs them life and a card.
+  const gift0 = printed.effects[0];
+  if (gift0?.type === "continuous" && gift0.giveTo?.ref === "eventPlayer" && gift0.what.ref === "target" && gift0.what.index === 0 && gift0.mods.some((m) => m.kind === "control") && printed.targets.length === 1 && many < 0) {
+    const mine = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" ? [obj(s, t.id)] : []));
+    const pick = [...mine].sort((a, b) => Number(!!a.isCommander) - Number(!!b.isCommander) || Number(!!b.isToken) - Number(!!a.isToken) || worth(s, pid, a) - worth(s, pid, b))[0];
+    return pick ? [{ kind: "object", id: pick.id }] : null;
+  }
   // Coveted Falcon: "target opponent gains control of any number of target permanents you control. Draw a card for each
   // one ...": a bot gives away none of its permanents (a card isn't worth a permanent to it); the opponent with the least
   // life gets nothing.
@@ -7394,7 +7403,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const hoard = ab.sacrificeSelf && fx.length === 2 && fx[0]!.type === "discard" && fx[0]!.hand && fx[0]!.who.ref === "you" && fx[1]!.type === "draw" && fx[1]!.who.ref === "you" && typeof fx[1]!.n === "object" && "count" in fx[1]!.n && fx[1]!.n.count.kind === "counters" && fx[1]!.n.count.of?.ref === "self"
         ? ((n) => s.activePlayer === pid && s.step === "main2" && !s.stack.length && (o.counters[n.count.kind === "counters" ? n.count.counter : ""] ?? 0) >= player(s, pid).hand.length + 2)(fx[1]!.n)
         : false;
-      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay && !hoard) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
+      // Lodestone Bauble (round 417): sacrificed when it's worth it (baubleTargets below).
+      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay && !hoard && !ab.choosesYardPlayer) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
       // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
       if (ab.grantSourceCost?.action === "sacrifice") continue;
       // Hankyu: "Remove all aim counters from Hankyu" for that much damage: only once three have built up.
@@ -7617,6 +7627,19 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (!att.length) continue;
         leoninTarget = [{ kind: "object", id: att[0]! }];
       }
+      // Lodestone Bauble (round 417): only at an opponent's basic land cards, two or more from the graveyard of the one who
+      // has the most (they draw lands again, and one more card at the next upkeep), at the end of the turn before theirs.
+      let baubleTargets: TargetChoice[] | undefined;
+      if (ab.choosesYardPlayer) {
+        const spec = ab.body.targets[0];
+        const legal = spec ? legalTargets(s, spec, pid, undefined, activatedQuality(s, id), id).flatMap((t) => (t.kind === "object" && s.objects[t.id] && opponents(s, pid).includes(s.objects[t.id]!.owner) ? [s.objects[t.id]!] : [])) : [];
+        const alive = s.turnOrder.filter((q) => !player(s, q).lost);
+        const next = alive[(alive.indexOf(s.activePlayer) + 1) % alive.length];
+        const theirs = (q: PlayerId) => legal.filter((c) => c.owner === q).slice(0, ab.body.targets.length);
+        const pick = opponents(s, pid).map(theirs).sort((a, b) => b.length - a.length)[0] ?? [];
+        if (pick.length < 2 || s.step !== "end" || next === pid || !pick.every((c) => c.owner === next)) continue;
+        baubleTargets = ab.body.targets.map((_, k): TargetChoice => (pick[k] ? { kind: "object", id: pick[k]!.id } : { kind: "none" }));
+      }
       // Sorrow's Path, General Jarkeld (round B258): the two creatures whose swap does us the most good (swapWorth), if any.
       let swapTargets: TargetChoice[] | undefined;
       const swapFx = ab.body.effects.find((e) => e.type === "swapBlockers" || e.type === "swapBlocked");
@@ -7639,7 +7662,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const body = withModes(ab.body, modes);
       // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
       const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
-      if (!craft && !vessel && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      if (!craft && !vessel && !baubleTargets && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
@@ -7659,7 +7682,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       for (const x of xs) {
         // Krumar Initiate: "Pay X life" too; keep at least 10 life.
         if (ab.lifeCostX && (x ?? 0) > player(s, pid).life - 10) continue;
-        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : leoninTarget ?? swapTargets ?? (body.targets.length ? chooseTargets(s, pid, body, false, id, x) : []);
+        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : baubleTargets ?? leoninTarget ?? swapTargets ?? (body.targets.length ? chooseTargets(s, pid, body, false, id, x) : []);
         if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
         // Zygon Infiltrator (round 396): only to become a copy of a creature at least as big as it is.
         const tappedCopy = body.effects.find((e) => e.type === "becomeCopy" && e.duration === "whileTargetTapped");
@@ -8289,7 +8312,8 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   // Tidal Flats (round B214), Heroism (round B232): after blockers are declared (see chooseActivation).
   // Stalking Leonin (round 377): while a creature of the chosen player's is attacking us (see chooseActivation).
   // Sorrow's Path (round B258): after blockers are declared (weighed in modeValue, swapWorth).
-  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent" || (e.type === "if" && e.cond.kind === "targetControlledByChosen") || (e.type === "swapBlockers" && s.step === "declareBlockers"));
+  // Lodestone Bauble (round 417): at the end of the turn before an opponent's (see chooseActivation).
+  const timed = (ab: ActivatedAbility) => !!ab.choosesYardPlayer || timedCondition(ab.activateIf) || ab.body.effects.some((e) => e.type === "attackersPayOrBlockersGain" || e.type === "attackersPayOrPrevent" || (e.type === "if" && e.cond.kind === "targetControlledByChosen") || (e.type === "swapBlockers" && s.step === "declareBlockers"));
   // The Words (Words of Wilding, Words of Worship): in our own upkeep, one to replace the draw step's draw.
   if (s.step === "upkeep" && s.activePlayer === pid && !player(s, pid).nextDrawInstead?.some((w) => w.turn === s.turn)) {
     // Not Words of Wind (round 385), which costs every player a permanent, ours too; Mangara's Tome only while its pile

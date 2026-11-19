@@ -929,6 +929,16 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
 }
 
 /**
+ * Arcee, Acrobatic Coupe (round 417): how many different objects among `targets` match `what` (as targetsMatch reads one),
+ * each counted once however many times it's targeted.
+ */
+export function targetsMatchCount(s: GameState, targets: TargetChoice[], what: TargetSpec, controller: PlayerId): number {
+  const ids = new Set<ObjectId>();
+  for (const t of targets) if (t.kind === "object" && !ids.has(t.id) && targetsMatch(s, [t], what, controller)) ids.add(t.id);
+  return ids.size;
+}
+
+/**
  * Radiate, Radiant Performer (round 415): "a spell or ability that targets only a single permanent or player": the one
  * player (still in the game) or permanent (still that object on the battlefield, CR 400.7) every one of its targets names,
  * with at least one target (rulings on Radiant Performer: several targets all naming it count; a card in a graveyard or a

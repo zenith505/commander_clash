@@ -476,8 +476,39 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
       invalidateCharacteristics(s); // "as long as you've put one or more +1/+1 counters on a creature this turn"
     }
     fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m, by });
+    // Round 416: the same counters as part of the instruction putting them now (batchCountersPut), or an event of their own.
+    const put = { id: o.id, zc: o.zoneChanges ?? 0, counter: kind, amount: m, by };
+    if (putBatch) {
+      const x = putBatch.find((p) => p.id === put.id && p.zc === put.zc && p.counter === kind && p.by === by);
+      if (x) x.amount += m;
+      else putBatch.push(put);
+    } else fireEvent(s, { type: "countersPutBatch", puts: [put] });
   }
   return m;
+}
+
+/** While set, the counters put by the instruction being carried out now (see batchCountersPut). */
+let putBatch: { id: ObjectId; zc: number; counter: string; amount: number; by: PlayerId }[] | null = null;
+
+/**
+ * Round 416: counters put during `fn`, one instruction of an ability or spell as it resolves (effects/resolve.ts
+ * runEffect), are put at the same time ("put a +1/+1 counter on each creature you control", proliferate): after their
+ * own "countersPut" events, one "countersPutBatch" event for all of them, so "whenever you put one or more +1/+1
+ * counters on one or more other Heroes you control" (Invisible Woman, Sue Storm) triggers once. The innermost
+ * instruction is the batch: an "if" or "may" holding several instructions makes one for each.
+ */
+export function batchCountersPut<T>(s: GameState, fn: () => T): T {
+  const outer = putBatch;
+  const mine: { id: ObjectId; zc: number; counter: string; amount: number; by: PlayerId }[] = [];
+  putBatch = mine;
+  let out: T;
+  try {
+    out = fn();
+  } finally {
+    putBatch = outer;
+  }
+  if (mine.length) fireEvent(s, { type: "countersPutBatch", puts: mine });
+  return out;
 }
 
 /** While set, counter removals happening at the same time, gathered into one event each (see batchCountersRemoved). */

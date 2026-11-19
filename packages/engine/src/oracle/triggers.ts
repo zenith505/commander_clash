@@ -1095,7 +1095,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
       const one = /^an? (.+)$/.exec(part);
       const many = /^one or more (.+)$/.exec(part);
       const phrase = one ? one[1]! : many ? many[1]!.replace(/^(\w+?)s\b/, "$1") : undefined;
-      const spec = phrase && !/\bonly\b|~/.test(phrase) ? parseTargetPhrase(phrase) : null;
+      let spec = phrase && !/\bonly\b|~/.test(phrase) ? parseTargetPhrase(phrase) : null;
+      // Arcee, Acrobatic Coupe: "one or more creatures or Vehicles you control": both plurals made singular, only when the
+      // first alone didn't read (round 417).
+      if (!spec && many && phrase && / or [A-Za-z]+s\b/.test(phrase)) spec = parseTargetPhrase(phrase.replace(/ or ([A-Za-z]+?)s\b/, " or $1"));
       if (spec?.kind !== "object" && spec?.kind !== "player") return "fail";
       targets.push(spec);
     }
@@ -1204,6 +1207,12 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (symMany) text = text.replace(/\bthat many\b/g, "X");
   const tgtsMany = !!tgtsM && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
   if (tgtsMany) text = text.replace(/\bthat many\b/g, "X");
+  // Arcee, Acrobatic Coupe (round 417): "Whenever you cast a spell that targets one or more creatures or Vehicles you
+  // control, put that many +1/+1 counters on ~": that many of them, each different object the spell targeted as it was
+  // cast that matched then (once however many times it's targeted: "that many" counts the creatures and Vehicles, as
+  // Hinata's rulings count objects, not uses of the word "target"), fixed as it triggers (the trigger's X).
+  const tgtCount = !!tg && !orTargeting && targets?.length === 1 && targets[0] !== "you" && targets[0]!.kind === "object" && /^one or more /.test(tg[1]!) && /\bthat many\b/.test(text) && !/\bX\b/.test(text) && !tgtsMany && !symMany && !thatMuch;
+  if (tgtCount) text = text.replace(/\bthat many\b/g, "X");
   // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
   const subjectRef = targetsOnly && onlyM && text.includes(`that ${onlyM[1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
   if (subjectRef) {
@@ -1227,8 +1236,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (tgtsMany) body = { ...replaceX(body, { count: { kind: "castSpellTargets" } }), text: body.text.replace(/\bX\b/g, "that many") };
+  if (tgtCount) body = { ...body, text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(mvCounters ? { mvIsSelfCountersPlus: { counter: mvKind!, plus: Number(mvCounters[1]) } } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(orSpell ? { orSpell } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(mvCounters ? { mvIsSelfCountersPlus: { counter: mvKind!, plus: Number(mvCounters[1]) } } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(orSpell ? { orSpell } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(nameExiled ? { nameExiledWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(phyM ? { phyrexianInCost: true as const } : {}), ...(tgtsM ? { hasTargets: true as const } : {}), ...(tgtCount ? { targetsCount: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMain ? { ownTurn: true as const, mainPhase: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(teamworkM ? { teamwork: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

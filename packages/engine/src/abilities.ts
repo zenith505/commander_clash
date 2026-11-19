@@ -1944,6 +1944,8 @@ export interface DamageRuleSpec {
   dealTo?: DamageRecipient;
   /** With dealTo, Channel Harm's "you may have ~ deal that much damage": its controller chooses each time it prevents damage (rulings). */
   dealToMay?: true;
+  /** With redirect, Blood of the Martyr's "you may have that damage dealt to you instead" (round B263): its controller chooses for each source's damage to each creature (DamageRule.redirectMay). */
+  redirectMay?: true;
   /** New Way Forward: "When damage is prevented this way, ..." (CR 603.12): a reflexive trigger of this rule's source, once for each damage event it prevents damage in, "that much" the damage prevented then and "that source's controller" the controller of the source whose damage it was. */
   reflect?: AbilityBody;
   /** Judgment of Alexander (round 380): "Whenever damage from a creature is prevented this way, ...": with `reflect`, only damage from a creature source, one trigger for each such source in a damage event, about that creature (the trigger's subject). */
@@ -2033,7 +2035,7 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill" | /** Dralnu, Lich Lord (round B253): none of it is dealt; the holder's controller sacrifices that many permanents (all of them, with fewer, rulings). */ "sacrifice" | /** Nefarious Lich (round B253): none of it is dealt; the player exiles that many cards from their graveyard, or with fewer there, none and loses the game (rulings on Egon, God of Death). */ "exileYard";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill" | /** Dralnu, Lich Lord (round B253): none of it is dealt; the holder's controller sacrifices that many permanents (all of them, with fewer, rulings). */ "sacrifice" | /** Nefarious Lich (round B253): none of it is dealt; the player exiles that many cards from their graveyard, or with fewer there, none and loses the game (rulings on Egon, God of Death). */ "exileYard" | /** Soul Echo (round B264): none of it is dealt; that many `counter`s are removed from `removeFrom` instead, as many as it has (rulings: once it has none, it still replaces the damage). */ "removeCounters";
   /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
   counter?: CounterKind;
   /** With op "counters": "put that many -1/-1 counters on that creature instead" (Soul-Scar Mage): on the permanent the damage would be dealt to, not the holder. */
@@ -2075,6 +2077,19 @@ export interface DamageMod {
   shareColor?: true;
   /** Battletide Alchemist: "you may prevent X of that damage": the mod's controller chooses, for each player and each source's damage, whether it applies (rulings). */
   may?: true;
+  /**
+   * Bitter Feud (round B262): damage from a source controlled by one of the two players chosen as the holder entered, dealt
+   * to the other chosen player or a permanent that player controls (both as the damage is dealt).
+   */
+  feud?: true;
+  /**
+   * With op "exileYard" and `prevent` (Immortal Coil, round B262): "prevent that damage. Exile a card from your graveyard for
+   * each 1 damage prevented this way": all of it prevented however many cards there are, and as many exiled as there are
+   * (rulings), never a loss.
+   */
+  upTo?: true;
+  /** With op "removeCounters" (Soul Echo, round B264): the permanent the counters come off, as the object it was as the effect began (CR 400.7). */
+  removeFrom?: { id: ObjectId; zc: number };
   text: string;
 }
 
@@ -3334,7 +3349,7 @@ export type Effect =
       /** Ogre Battlecaster (round 401): "by paying {R}{R} in addition to its other costs": an additional cost of that cast (CR 118.8, 601.2f), paid with its mana cost; the spell's mana value is kept for a reflexive "when you cast that spell" (ResolvingState.castThisWayMv). */
       addedMana?: string;
     }
-  | { type: "putFromHand"; who?: PlayerRef; /** Tezzeret, Cruel Machinist: "onto the battlefield face down. They're 5/5 artifact creatures" (FaceDownKind "artifact55"): any card, put face down, so no Aura is attached (CR 708.2a). */ faceDown?: "artifact55"; /** Cryptic Gateway: "that shares a creature type with each creature tapped this way": with each creature its activation cost tapped, as each is now or last existed (CR 608.2h); not the same type for each (rulings). */ kinOfCostTapped?: true; /** With `any`: "a creature card and/or a land card" (Yuna's Decision): up to one card for each of these, each card put matching a different one, all put at once. */ oneOfEach?: TargetSpec[]; /** "Put all land cards from it onto the battlefield" (Manabond): every card in the hand that fits, no choice. */ all?: true; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; /** The First Tyrannic War: "If its mana cost contains {X}, it enters with a number of +1/+1 counters on it equal to the number of lands you control": counted as it resolves, put on as it enters if the permanent it enters as has {X} in its mana cost (CR 614.1c, rulings: a copy's). */ countersIfXCost?: { counter: string; n: Amount }; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; /** Vault 101: Birthday Party: an Aura card that couldn't be attached to anything can't be chosen at all (rulings, CR 303.4f). */ hostableAuras?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
+  | { type: "putFromHand"; who?: PlayerRef; /** Tezzeret, Cruel Machinist: "onto the battlefield face down. They're 5/5 artifact creatures" (FaceDownKind "artifact55"): any card, put face down, so no Aura is attached (CR 708.2a). */ faceDown?: "artifact55"; /** Cryptic Gateway: "that shares a creature type with each creature tapped this way": with each creature its activation cost tapped, as each is now or last existed (CR 608.2h); not the same type for each (rulings). */ kinOfCostTapped?: true; /** With `any`: "a creature card and/or a land card" (Yuna's Decision): up to one card for each of these, each card put matching a different one, all put at once. */ oneOfEach?: TargetSpec[]; /** "Put all land cards from it onto the battlefield" (Manabond): every card in the hand that fits, no choice. */ all?: true; /** Aura swap (CR 702.65a): "You may exchange this permanent with an Aura card in your hand": an Aura card that could enchant what the source enchants, put onto the battlefield attached to it as the source returns to your hand; nothing if either half can't be done (702.65b). */ auraSwap?: true; /** "If that card is an enchantment card, it enters tapped and attacking" (Summoner's Grimoire): `tapped` and `attacking` only for a card matching this. */ onlyIf?: TargetSpec; /** "Whenever equipped creature deals combat damage, you may put an Aura card from your hand onto the battlefield attached to it" (Holy Avenger): only to the trigger's creature, still on the battlefield as the same object (CR 400.7, 303.4f). */ attachToSubject?: true; /** Aetherplasm (round B261): "onto the battlefield blocking that creature": blocking the trigger's subject, an attacking creature, if it's still that object attacking this player (CR 506.3e, 509.4, 509.4a), never declared as a blocker (rulings). */ blockingSubject?: true; /** "If it's an Equipment, attach it to ~" (The Invincible Iron Man): after it enters, an Equipment put this way is attached to the source, still on the battlefield as the same object, if it could be (CR 701.3a-b). */ equipToSelf?: true; /** "And attach ~ to it" (Deathrender): the source Equipment, still on the battlefield as the same object, to the creature it became (CR 701.3). */ attachSelf?: true; /** "Look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control" (Zara): a card from that player's hand, attacking only them or a planeswalker of theirs. */ fromHandOf?: PlayerRef; filter?: TargetSpec; tapped?: boolean; /** "With a finality counter on it" (Kastral, the Windcrested): it enters with these (CR 122.6). */ counters?: Record<string, number>; /** The First Tyrannic War: "If its mana cost contains {X}, it enters with a number of +1/+1 counters on it equal to the number of lands you control": counted as it resolves, put on as it enters if the permanent it enters as has {X} in its mana cost (CR 614.1c, rulings: a copy's). */ countersIfXCost?: { counter: string; n: Amount }; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; /** Vault 101: Birthday Party: an Aura card that couldn't be attached to anything can't be chosen at all (rulings, CR 303.4f). */ hostableAuras?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number; /** With `manifest`: "Cloak a card from your hand" (Vannifar, Evolved Enigma): cloaked instead, so with ward {2} (CR 701.58a). */ cloak?: true;
     /** "Onto the battlefield attached to ~" (Danitha, Benalia's Hope): an Aura only onto the source, if it could enchant it, or it stays where it is (CR 303.4f-g); an Equipment attached to it if it could be, else unattached (rulings, CR 301.5c). */ attachToSelf?: true; /** Evershrike: attached to the permanent the source card became as this ability returned it (ObjRef selfCard `returned`). */ attachToReturned?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -4734,6 +4749,15 @@ export type Effect =
    */
   | { type: "attackersPayOrPrevent"; filter: TargetSpec; cost: string }
   /**
+   * Winter's Chill (round B262): "For each of those creatures, its controller may pay {1} or {2}. If that player doesn't,
+   * destroy that creature at end of combat. If that player pays only {1}, prevent all combat damage that would be dealt to
+   * and dealt by that creature this combat." The targets from `index` (CR 608.2b), each controller choosing as it resolves
+   * (rulings) in turn order (CR 101.4): `full` ({2}), `part` ({1}) or nothing.
+   */
+  | { type: "payFullOrPart"; index: number; full: string; part: string }
+  /** Guardian Angel (round B263): until end of turn, its controller may pay `cost` any time they could cast an instant for a shield of `n` more on target `index` (GameState.payShields, CR 116.2c). */
+  | { type: "payShieldGrant"; index: number; cost: string; n: number }
+  /**
    * Oracle en-Vec (round B233): "Target opponent chooses any number of creatures they control. During that player's next
    * turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step,
    * destroy each of the chosen creatures that didn't attack this turn." (GameState.chosenAttackers.)
@@ -4745,6 +4769,12 @@ export type Effect =
    * (`kind` "attack") or block ("block") this turn (GameState.pilesOnlyThisTurn).
    */
   | { type: "pilesOnly"; who: PlayerRef; kind: "attack" | "block" }
+  /**
+   * Bend or Break (round B264): each player separates all nontoken lands they control into two piles (CR 700.3), then, for
+   * each player, an opponent of that player's choice chooses one of the piles; the lands in the chosen piles are destroyed
+   * at once, then the lands in the other piles are tapped.
+   */
+  | { type: "bendOrBreak" }
   /**
    * Whippoorwill (round B235): "Damage that would be dealt to that creature this turn can't be prevented or dealt instead to
    * another permanent or player" (CR 615.12, 614.9): GameObject.damageUnalterableTurn, while it's the object it is (CR 400.7).
@@ -5729,7 +5759,7 @@ export type Effect =
    * would deal damage ... this turn" (Overblaze: `byTarget`), "until your next turn, if a source would deal damage to that
    * player or a permanent that player controls" (Lightning, Army of One: `toPlayer`). Its amounts are counted as it resolves.
    */
-  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true }
+  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true; /** Soul Echo (round B264): op "removeCounters" takes them off this ability's source, as the object it is now. */ fromSource?: true }
   /** Desperate Gambit: "Choose a source you control": a source of damage chosen as it resolves (CR 609.7a), before the rest of it, kept for "that source" (ResolvingInfo.chosenSource); `yours`: one its controller controls (a spell on the stack, or a source an ability refers to, too: rulings). */
   | { type: "chooseSourceNow"; choose: TargetSpec; yours?: true }
   /**
@@ -7148,6 +7178,8 @@ export type TriggerEvent =
   | "combatDamageToYouOrYourPlaneswalker"
   /** "Whenever a source an opponent controls deals damage to you or a permanent you control" (Elesh Norn): once for each source and each of them dealt damage (rulings); the source's controller is "that player". */
   | "opponentSourceDamagesYouOrYours"
+  /** Mangara's Equity (round B261): "Whenever a creature of the chosen color deals damage to you or a white creature you control": once for each such creature and each of them it dealt damage to (rulings on Flameblade Angel and Elesh Norn), "that much" what it dealt that one; the creature is the subject. See `creatureDamagesYours`. */
+  | "creatureDamagesYouOrYours"
   /** "Whenever one or more creatures an opponent controls deal combat damage to you" (Norn's Decree): once for each such opponent, who is "that opponent". */
   | "opponentCreaturesDealCombatDamageToYou"
   /** "Whenever one or more creatures an opponent controls deal combat damage to one or more of your opponents" (Nelly Borca): once for each such opponent in a combat damage step, who is "the controller of those creatures". */
@@ -7396,6 +7428,8 @@ export interface TriggeredAbility {
    * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its
    * controller); `combat`: only combat damage.
    */
+  /** For "creatureDamagesYouOrYours" (Mangara's Equity, round B261): a creature permanent of the color chosen as this permanent entered dealing damage to this ability's controller or to a creature of `creatureColor` they control, each as the damage is dealt (CR 109.2). */
+  creatureDamagesYours?: { creatureColor: Color };
   damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true; /** "Whenever a source of the chosen color deals damage to you" (Circle of Affliction): a source of the color chosen as this permanent entered, spells too. */ chosenColor?: true };
   /**
    * For "groupDealsDamageToPlayers": the permanents you control dealing it (`filter`), all damage dealt at the same time
@@ -8421,7 +8455,7 @@ export type AdditionalCost =
    * (CR 701.4a): an Elf card from your hand or an Elf permanent you control. `exile`: "behold a Kithkin and exile it": the
    * card or permanent is exiled, linked to the permanent the spell becomes (CR 607.2q).
    */
-  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true; /** "Reveal two cards from your hand that share a color" (Illuminated Folio): all of them have one color in common; colorless isn't a color (rulings, CR 105.2c). */ shareColor?: true }
+  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** Close Encounter (round B264): "or a warped creature card you own in exile": `filter` is for a warped card in exile (CR 702.185b), not one in the hand. */ warped?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true; /** "Reveal two cards from your hand that share a color" (Illuminated Folio): all of them have one color in common; colorless isn't a color (rulings, CR 105.2c). */ shareColor?: true }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
   | {
       kind: "exileFromHand";
@@ -10573,6 +10607,10 @@ export interface CompiledCard {
   evidenceTargetsMv?: true;
   /** Open the Way: "X can't be greater than the number of players in the game." */
   xMaxPlayers?: true;
+  /** Winter's Chill (round B262): "X can't be greater than the number of snow lands you control", as X is announced (CR 601.2b). */
+  xMaxSnowLands?: true;
+  /** Torrent of Lava (round B263): "As long as ~ is on the stack, each creature has "..."": abilities the spell gives the permanents `affects` covers while it's on the stack (CR 113.6, layer 6), "⟪source⟫" in `text` the spell. */
+  stackGrants?: { text: string; affects: Affects }[];
   /** Soul Immolation: "X can't be greater than the greatest toughness among creatures you control", as X is announced (CR 601.2b). */
   xMaxGreatestToughness?: true;
   /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */

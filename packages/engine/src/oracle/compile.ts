@@ -16,6 +16,10 @@ import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseC
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { addedCostLine } from "./laneb260-lines";
+import { roundB261Line } from "./laneb261-lines";
+import { roundB262Line } from "./laneb262-lines";
+import { roundB263Line } from "./laneb263-lines";
+import { roundB264Line } from "./laneb264-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2390,6 +2394,14 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB256Line(line, out, isSpell)) continue;
     // Arcum's Whistle (round B257).
     if (roundB257Line(line, out, isSpell)) continue;
+    // Mangara's Equity, Turf War, Aetherplasm (round B261).
+    if (roundB261Line(line, out, isSpell)) continue;
+    // Immortal Coil, Bitter Feud, Winter's Chill's limit on X (round B262).
+    if (roundB262Line(line, out, isSpell)) continue;
+    // Torrent of Lava's ability on the stack (round B263).
+    if (roundB263Line(line, out, isSpell)) continue;
+    // Soul Echo's upkeep trigger (round B264).
+    if (roundB264Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8557,7 +8569,8 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   if (choices.has("basicLandType")) choices.add("landType");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // Sower of Discord's trigger is about the two players chosen as it entered, and only that.
-  if (out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") !== !!out.entersChooseTwoPlayers) bad = true;
+  // Sower of Discord's trigger and Bitter Feud's damage (round B262) are what the two chosen players are for.
+  if ((out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") || out.statics.some((st) => st.mods.some((m) => m.kind === "damageMod" && !!m.mod.feud))) !== !!out.entersChooseTwoPlayers) bad = true;
   // "The chosen player's upkeep", "whenever the chosen player casts" (Black Vise, Sewer Nemesis): the player its
   // "As ~ enters, choose a player" chose.
   if (out.triggers.some((tr) => tr.chosenPlayersTurn || tr.cast?.by === "chosen") && !out.entersChoosePlayer) bad = true;

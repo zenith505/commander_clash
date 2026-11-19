@@ -1048,6 +1048,10 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   // Monstrous Emergence: "choose a creature you control or reveal a creature card from your hand": beholding a creature in
   // all but name (CR 701.4a), a creature card from the hand or a creature you control, which the spell's text then names.
   if (text === "choose a creature you control or reveal a creature card from your hand") return { kind: "reveal", filter: { kind: "card", types: ["Creature"], text: "creature" }, n: 1, orControl: { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" } };
+  // Close Encounter (round B264): "choose a creature you control or a warped creature card you own in exile": a choice made
+  // as it's cast (CR 601.2f), a creature you control or a card warp's delayed trigger exiled (CR 702.185b), which the spell
+  // then names, as Monstrous Emergence's.
+  if (text === "choose a creature you control or a warped creature card you own in exile") return { kind: "reveal", filter: { kind: "card", types: ["Creature"], text: "warped creature card" }, n: 1, orControl: { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" }, warped: true };
   if ((m = /^reveal an? (.+? card) from your hand$/i.exec(text))) {
     const filter = parseSearchFilter(m[1]!);
     return filter ? { kind: "reveal", filter, n: 1 } : null;

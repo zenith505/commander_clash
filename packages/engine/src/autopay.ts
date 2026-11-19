@@ -4,6 +4,7 @@ import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, p
 import { addedAbilityCosts, addedSpellCosts, anyAddedCosts, anyAddedSacrifice } from "./added-costs";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilityCostOf, withManaTax, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax, piracyTap, PIRACY_SPEND } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
+import { payableShields, payShieldProblem } from "./pay-shields";
 import { abilityProblem, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
@@ -923,6 +924,16 @@ export function planPayDelayed(s: GameState, pid: PlayerId, id: number): Action[
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(d.unlessPaid!.cost)) : [];
   return taps ? [...taps, { type: "payDelayed", player: pid, id }] : null;
+}
+
+/** Tap mana to pay for one more of Guardian Angel's shields (GameState.payShields; CR 116.2c), then pay it, or null if that can't be done now. */
+export function planPayShield(s: GameState, pid: PlayerId, id: number): Action[] | null {
+  const ps = payableShields(s, pid).find((x) => x.id === id);
+  if (!ps) return null;
+  const problem = payShieldProblem(s, pid, id);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost(ps.cost)) : [];
+  return taps ? [...taps, { type: "payShield", player: pid, id }] : null;
 }
 
 /** Tap mana to pay to end an effect on this permanent (a Licid; CR 116.2c), then end it, or null if that can't be done now. */

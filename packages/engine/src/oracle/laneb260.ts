@@ -2,6 +2,7 @@
 // Meddling's "discards each card with the same name as a card spliced onto that spell".
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
+import { roundB263Sentence } from "./laneb263";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -17,5 +18,5 @@ export function roundB260Sentence(s: string, sentences: string[], si: number, ct
     if (!ctx.spell || i === undefined || ctx.targets.length !== 1 || ctx.targets[i]?.kind !== "spell" || ctx.targets[i]!.many) return "fail";
     return { effect: { type: "discardSplicedNames", spell: i }, next: si + 2 };
   }
-  return null;
+  return roundB263Sentence(s, sentences, si, ctx);
 }

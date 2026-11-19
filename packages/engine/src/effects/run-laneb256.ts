@@ -54,6 +54,25 @@ export function blockByEffect(s: GameState, bl: GameObject, at: GameObject, src:
   fireEvent(s, { type: "blockedByEffect", blocker: bl.id, attackers: members.map((m) => m.id), newlyBlocked, newBlocker: !wasBlocking, ...(swap ? { swap } : {}) });
 }
 
+/**
+ * `bl` was put onto the battlefield blocking `at` (Aetherplasm, round B261; CR 509.4): only a creature that isn't a battle
+ * (CR 506.3a, 506.3f), and only if `at` is attacking its controller, a planeswalker they control or a battle they protect
+ * (CR 506.3e, 509.4a). It's blocking but it never "blocked" (CR 509.4): not declared, not in TurnLog.blocks, none of its
+ * "blocks" abilities trigger (CR 509.3a-b), while the attacker's "becomes blocked by a creature" ones do (CR 509.3d), and
+ * "becomes blocked" only if it was unblocked then (CR 509.3c). Requirements and restrictions on blocks don't apply (CR
+ * 509.4b).
+ */
+export function enterBlocking(s: GameState, bl: GameObject, at: GameObject, src: string) {
+  if (bl.zone !== "battlefield" || !objIsType(s, bl, "Creature") || objIsType(s, bl, "Battle") || at.zone !== "battlefield" || at.attacking === undefined || !defendingAgainst(s, controllerOf(s, bl), at)) return;
+  const fresh = !at.blockedBy;
+  bl.blocking = [at.id];
+  (at.blockedBy ??= []).push(bl.id);
+  at.becameBlockedTurn = s.turn;
+  invalidateCharacteristics(s);
+  log(s, `${defOf(s, bl).name} is blocking ${defOf(s, at).name} (${src}).`);
+  fireEvent(s, { type: "blockedByEffect", blocker: bl.id, attackers: [at.id], newlyBlocked: fresh ? [at.id] : [], newBlocker: false, entered: true });
+}
+
 export function runLaneB256Effect(s: GameState, e: B256Effect, ctx: ResolveCtx, src: string): "paused" | void {
   const sc = (s.resolving!.scratch ??= {});
   switch (e.type) {

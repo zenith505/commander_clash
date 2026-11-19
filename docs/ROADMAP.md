@@ -1,6 +1,6 @@
 # Roadmap
 
-31,755 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,758 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,983 of 4,988 (99%), top 10,000: 9,938 of
 9,979 (99%).
 
@@ -322,7 +322,7 @@ line blocks.
    Pyromancer Ascension (done in round 367), Verdant Mastery (done in round 390), Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld (done in round 374), Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
-   Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
+   Vitality, Helm of Kaldra, Brilliant Ultimatum (done in round B268), Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence (done in round 402), Oath of Lieges (done in round B143), Helm of Obedience (done in round 373), Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom (done in round B210), Soul-Scar Mage,
@@ -11376,6 +11376,44 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B268 (least played first, from the cards round B267 named next in line, none of them in Lane A's rounds 422-423):
+  Selective Adaptation ("Reveal the top seven cards of your library. Choose from among them a card with flying, a card with
+  first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample,
+  and vigilance. Put one of the chosen cards onto the battlefield, the other chosen cards into your hand, and the rest into
+  your graveyard."): a card for each keyword there's a card with among them, a card with several chosen for any one of them
+  (rulings), so a card can be left over only if each of its keywords is one a chosen card is for (dig oneOfEach
+  `oneOfEachAll`, game.ts oneOfEachAllFits; the Done button waits for that); "hexproof from" is hexproof (CR 702.11e),
+  double strike isn't first strike; the cards' own printed keywords; then the chooser picks the one put onto the
+  battlefield (`oneOnto`, chooseOption "oneOnto"), the others into the hand, the rest into the graveyard. Supper for Spiders
+  ("Put onto the battlefield under your control all creature cards in your opponents' graveyards that were put there from
+  the battlefield this turn. They are Food artifacts with "{2}, {T}, Sacrifice ~: You gain 3 life.""): Cry of the
+  Carnarium's this-turn check, all at once under your control (CR 110.2a), each entering as only a Food artifact (layer 4,
+  CR 205.1a; supertypes, name, mana cost and abilities kept, rulings) with the Food's ability, for good (rulings, CR
+  611.2c). Round 419's question, whether they're Food artifacts as they enter: yes, as Tezzeret, Cruel Machinist's rulings
+  say of the same wording ("Put ... onto the battlefield ... They're 5/5 artifact creatures": they enter as that, not with
+  their own characteristics first), and as Grimoire of the Dead and Storm of Souls already work here (entersAs). Brilliant Ultimatum ("Exile the top five cards of your library. An opponent separates those cards into two
+  piles. You may play lands and cast spells from one of those piles. If you cast a spell this way, you cast it without
+  paying its mana cost."): exiled face up, an opponent you choose as it resolves separates them (CR 700.3; a pile may be
+  empty), and you play from the pile you choose as it resolves (castFromAmong `piles`, pileMode "play"): spells in any
+  order without paying their mana costs, timing ignored (rulings, CR 608.2g, 118.9), a land only on your turn with a land
+  play left (rulings, CR 305.2); the rest stay exiled. Bots: choose a card for every keyword they can and put the most
+  expensive nonland onto the battlefield; don't cast Supper for Spiders while nothing would come back (doesNothingNow);
+  split Brilliant Ultimatum's cards evenly and take the pile worth more free. Browser tests for Selective Adaptation's
+  choice (Done disabled until it's a full one) and battlefield pick, Brilliant Ultimatum's pile and free cast, and you
+  separating Ana's cards for her Brilliant Ultimatum. +3, 31,758 of 31,936 with B261-B267 and main through round 420. The
+  compiled text of every other card is unchanged.
+- Out after round B268 (looked at, not done): the lists after round B267 stay out. Judgment calls and known gaps:
+  Selective Adaptation reads a card's keywords from its printed keyword abilities (Scryfall's list), so a card whose text
+  only grants a keyword to others isn't "a card with" it, and one with a conditional keyword ("has flying as long as") is;
+  bots cast Brilliant Ultimatum without weighing the piles an opponent could make. Golgothian Sylex, Apocalypse Chime and
+  City in a Bottle: checked again (Nov 19): not a loader bug. tools/scryfall-extract.mjs keeps one printing per card (the
+  best-looking, usually a recent reprint: Mishra's Factory is from slc, Strip Mine from zne), so the set a name was first
+  printed in is only known for cards never reprinted; they need a first-printing set field added to the extract on Ken's
+  PC (the all-cards bulk file has every printing), then `npm run build:cards`. Apple of Eden, Isu Relic ("whenever you play
+  a land or cast a spell this way, its owner draws a card"), Lucy MacLean, Positively Armed ("do this only once each turn"
+  on an optional copy with a target player), Dack Fayden, Helping Hand (goaded for the rest of the game, then each opponent
+  gains control of a different one) and Prowl, Stoic Strategist ("whenever a player plays a card exiled with ~") are next
+  in line.
 - Round B267 (least played first, from the cards left without a recorded reason, none of them in Lane A's rounds
   421-422): Taster of Wares ("When ~ enters, target opponent reveals X cards from their hand, where X is the number of
   Goblins you control. You choose one of those cards. That player exiles it. If an instant or sorcery card is exiled this
@@ -11410,8 +11448,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bottle stay out (the set a name was first printed in isn't in the card data: Scryfall's oracle-cards file keeps one
   recent printing per card); Verrak, Warped Sengir is close to Lane A round 422's Ashnod the Uncaring (copying an ability
   by what paid its cost) and waits for it; Prowl, Stoic Strategist ("whenever a player plays a card exiled with ~"),
-  Apple of Eden, Isu Relic, Dermotaxi, Lucy MacLean, Dack Fayden, Helping Hand, Brilliant Ultimatum and Selective
-  Adaptation were looked at and are next in line.
+  Apple of Eden, Isu Relic, Dermotaxi, Lucy MacLean, Dack Fayden, Helping Hand, Brilliant Ultimatum (done in round B268) and
+  Selective Adaptation (done in round B268) were looked at and are next in line.
 - Round B266 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 420-421): Mirror-Shield
   Hoplite ("Whenever a creature you control becomes the target of a backup ability, copy that ability. You may choose new
   targets for the copy. This ability triggers only once each turn."): any player's backup ability (CR 702.165a; a backup

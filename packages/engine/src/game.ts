@@ -12346,6 +12346,8 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend.oneName && found.some((id) => !sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, found[0]!)).name))) throw new RulesError("choose cards with the same name");
   if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError(`find one card for each: ${pend.oneOfEach.map((f) => f.text).join(", ")}`);
+  if (pend.oneOfEach && pend.oneOfEachAll && !oneOfEachAllFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id))), pend.cards.filter((id) => !found.includes(id)).map((id) => defOf(s, obj(s, id)))))
+    throw new RulesError(`choose a card for each of ${pend.oneOfEach.map((f) => f.text).join(", ")} that there's one for`);
   r.scratch = { ...r.scratch, found };
   s.pending = null;
   continueResolution(s);
@@ -12357,6 +12359,20 @@ export function oneOfEachFits(specs: TargetSpec[], defs: CardDef[]): boolean {
   const [d, ...rest] = defs;
   if (!d) return true;
   return specs.some((f, i) => printedMatches(f, d) && oneOfEachFits(specs.filter((_, j) => j !== i), rest));
+}
+
+/**
+ * Selective Adaptation (round B268): "Choose from among them a card with flying, a card with first strike, and so on":
+ * the chosen cards are each for a different one of `specs` (a card with several is for any one of them, rulings), and
+ * every one of `specs` that a card left over (`others`) matches is one a chosen card is for: there was a card for it.
+ */
+export function oneOfEachAllFits(specs: TargetSpec[], chosen: CardDef[], others: CardDef[]): boolean {
+  const go = (left: TargetSpec[], cards: CardDef[]): boolean => {
+    const [d, ...rest] = cards;
+    if (!d) return left.every((f) => !others.some((o) => printedMatches(f, o)));
+    return left.some((f, i) => printedMatches(f, d) && go(left.filter((_, j) => j !== i), rest));
+  };
+  return chosen.length <= specs.length && go(specs, chosen);
 }
 
 /** A creature type or color named for a permanent entering (CR 614.12) or a resolving spell. */
@@ -12804,6 +12820,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "reselectAttack") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the players or permanents offered");
     (r.scratch ??= {}).reselect = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "oneOnto") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the chosen cards");
+    (r.scratch ??= {}).oneOnto = choice;
     continueResolution(s);
     return;
   }

@@ -5181,6 +5181,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0e69e6c2-fdc5-4c1a-bd96-c4283b82743a",
+  "name": "Blood of the Martyr",
+  "manaCost": "{W}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, if damage would be dealt to any creature, you may have that damage dealt to you instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3f0c9466-5ab9-4205-a84f-b4b27b5a678e",
   "name": "Bloodbraid Elf",
   "manaCost": "{2}{R}{G}",
@@ -20506,6 +20532,32 @@
   "commanderLegal": "legal",
   "set": "rna",
   "releasedAt": "2019-01-25",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a91ca69-e890-41dc-866b-3aabf10c9a9c",
+  "name": "Guardian Angel",
+  "manaCost": "{X}{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -48380,6 +48432,32 @@
   "set": "frf",
   "releasedAt": "2015-01-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f467ec85-ffe2-4963-82e0-509a7873fd63",
+  "name": "Torrent of Lava",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Torrent of Lava deals X damage to each creature without flying.\nAs long as Torrent of Lava is on the stack, each creature has \"{T}: Prevent the next 1 damage that would be dealt to this creature by Torrent of Lava this turn.\"",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

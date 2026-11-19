@@ -1,6 +1,7 @@
 // Lane B round B262's whole spells, read after round B250's (roundB250Spell in oracle/laneb250.ts): Winter's Chill.
 import type { AbilityBody } from "../abilities";
 import { parseBody } from "./body";
+import { roundB263Spell } from "./laneb263";
 
 const CHILL = "Choose X target attacking creatures. For each of those creatures, its controller may pay {1} or {2}. If that player doesn't, destroy that creature at end of combat. If that player pays only {1}, prevent all combat damage that would be dealt to and dealt by that creature this combat.";
 
@@ -15,5 +16,5 @@ export function roundB262Spell(text: string): AbilityBody | null | undefined {
     if (!b || b.targets.length !== 1 || t?.kind !== "object" || t.many !== "exactX" || t.combat !== "attacking") return null;
     return { targets: [{ ...t, text: "target attacking creature" }], effects: [{ type: "payFullOrPart", index: 0, full: "{2}", part: "{1}" }], text };
   }
-  return undefined;
+  return roundB263Spell(text);
 }

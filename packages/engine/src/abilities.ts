@@ -1935,6 +1935,8 @@ export interface DamageRuleSpec {
   dealTo?: DamageRecipient;
   /** With dealTo, Channel Harm's "you may have ~ deal that much damage": its controller chooses each time it prevents damage (rulings). */
   dealToMay?: true;
+  /** With redirect, Blood of the Martyr's "you may have that damage dealt to you instead" (round B263): its controller chooses for each source's damage to each creature (DamageRule.redirectMay). */
+  redirectMay?: true;
   /** New Way Forward: "When damage is prevented this way, ..." (CR 603.12): a reflexive trigger of this rule's source, once for each damage event it prevents damage in, "that much" the damage prevented then and "that source's controller" the controller of the source whose damage it was. */
   reflect?: AbilityBody;
   /** Judgment of Alexander (round 380): "Whenever damage from a creature is prevented this way, ...": with `reflect`, only damage from a creature source, one trigger for each such source in a damage event, about that creature (the trigger's subject). */
@@ -4742,6 +4744,8 @@ export type Effect =
    * (rulings) in turn order (CR 101.4): `full` ({2}), `part` ({1}) or nothing.
    */
   | { type: "payFullOrPart"; index: number; full: string; part: string }
+  /** Guardian Angel (round B263): until end of turn, its controller may pay `cost` any time they could cast an instant for a shield of `n` more on target `index` (GameState.payShields, CR 116.2c). */
+  | { type: "payShieldGrant"; index: number; cost: string; n: number }
   /**
    * Oracle en-Vec (round B233): "Target opponent chooses any number of creatures they control. During that player's next
    * turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step,
@@ -10535,6 +10539,8 @@ export interface CompiledCard {
   xMaxPlayers?: true;
   /** Winter's Chill (round B262): "X can't be greater than the number of snow lands you control", as X is announced (CR 601.2b). */
   xMaxSnowLands?: true;
+  /** Torrent of Lava (round B263): "As long as ~ is on the stack, each creature has "..."": abilities the spell gives the permanents `affects` covers while it's on the stack (CR 113.6, layer 6), "⟪source⟫" in `text` the spell. */
+  stackGrants?: { text: string; affects: Affects }[];
   /** Soul Immolation: "X can't be greater than the greatest toughness among creatures you control", as X is announced (CR 601.2b). */
   xMaxGreatestToughness?: true;
   /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */

@@ -688,6 +688,19 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
   }
   return out;
 }
+/**
+ * Blood of the Martyr (round B263): does a bot controlling this optional redirection want this damage dealt to it instead?
+ * Only for a creature it controls that the damage would destroy (lethal, or deathtouch), and only with life to spare: at
+ * least 15 left afterwards.
+ */
+function redirectBotWants(s: GameState, r: DamageRule, to: Rec, e: DamageEvent): boolean {
+  if (!("object" in to)) return false;
+  const o = s.objects[to.object];
+  if (!o || controllerOf(s, o) !== r.controller || characteristics(s, o).keywords.includes("Indestructible")) return false;
+  const lethal = e.src.keywords.some((k) => k.toLowerCase() === "deathtouch") || e.n >= Math.max(1, toughness(s, o) - o.damage);
+  return lethal && player(s, r.controller).life - e.n >= 15;
+}
+
 /** A rule that prevents all the damage it applies to, using nothing up, as opposed to a shield (CR 615.1, 615.7-8). */
 const preventsAll = (r: DamageRule) => r.left === undefined && !r.nextTime && !r.redirect;
 const cardName = (s: GameState, r: DamageRule) => s.cards[r.cardId]?.name ?? "a damage shield";
@@ -1241,6 +1254,23 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       else merged.set(k, { ...e });
     }
     incoming = [...merged.values()];
+    // Blood of the Martyr (round B263): "you may have that damage dealt to you instead": its controller chooses for each
+    // source's damage to each permanent it covers, as that damage would be dealt (CR 614.9, 616.1); declined, it doesn't
+    // apply to that damage. Accepted, it's one of the shields its player orders (CR 616.1). A bot takes its own creature's
+    // lethal damage while it has life to spare (redirectBotWants), never another player's.
+    for (const rule of allRules) {
+      if (!rule.redirectMay) continue;
+      const sh = shieldsOf(to, new Set()).find((x) => x.key === rule.id);
+      if (!sh) continue;
+      for (const e of incoming) {
+        if (!takes(sh, e)) continue;
+        const labels = [`Deal it to ${player(s, rule.controller).name} instead`, "Don't redirect it"];
+        const order = redirectBotWants(s, rule, to, e) ? [0, 1] : [1, 0];
+        const i = choose({ player: rule.controller, prompt: `${cardName(s, rule)}: ${e.src.name} would deal ${e.n} damage to ${toName}. Have that damage dealt to you instead?`, labels: order.map((k) => labels[k]!) });
+        if (i === null) return { ask, ops, final, used: next };
+        if (order[i] === 1) e.applied = [...(e.applied ?? []), rule.id];
+      }
+    }
     let shields = shieldsOf(to, new Set()).filter((x) => incoming.some((e) => takes(x, e)));
     const who = chooserOf(to);
     const left = incoming.map((e) => e.n);

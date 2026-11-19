@@ -18,6 +18,7 @@ import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from ".
 import { addedCostLine } from "./laneb260-lines";
 import { roundB261Line } from "./laneb261-lines";
 import { roundB262Line } from "./laneb262-lines";
+import { roundB263Line } from "./laneb263-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2378,6 +2379,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB261Line(line, out, isSpell)) continue;
     // Immortal Coil, Bitter Feud, Winter's Chill's limit on X (round B262).
     if (roundB262Line(line, out, isSpell)) continue;
+    // Torrent of Lava's ability on the stack (round B263).
+    if (roundB263Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

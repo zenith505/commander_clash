@@ -132,6 +132,8 @@ export interface DamageRule {
   dealTo?: { object: ObjectId; zc: number } | { player: PlayerId };
   /** Channel Harm: dealTo only if its controller chooses to, each time it prevents damage (rulings). */
   dealToMay?: true;
+  /** Blood of the Martyr (round B263): with `redirect`, only if its controller chooses to, for each source's damage to each permanent it covers (CR 614.9). */
+  redirectMay?: true;
   /** New Way Forward: the reflexive trigger's body, and the object that made the rule (the spell, as it was then). */
   reflect?: { body: AbilityBody; source?: { id: ObjectId; zc: number }; /** Judgment of Alexander: one trigger for each creature source, about it (DamageRuleSpec.reflectEachCreature). */ eachCreature?: true };
 }
@@ -1456,6 +1458,19 @@ export interface DelayedTrigger {
   unlessPaid?: { id: number; player?: PlayerId; subjectController?: true; cost: string; source: string };
 }
 
+/** One of GameState.payShields (Guardian Angel): who may pay `cost`, any number of times this turn, for a shield of `n` more on `to`. */
+export interface PayShield {
+  id: number;
+  player: PlayerId;
+  /** The permanent (as the object it was as the spell resolved, CR 400.7) or player the shield goes on. */
+  to: { object: ObjectId; zc: number } | { player: PlayerId };
+  cost: string;
+  n: number;
+  /** The card's name, for the log. */
+  source: string;
+  turn: number;
+}
+
 /** An extra turn (CR 500.7). */
 export interface ExtraTurn {
   player: PlayerId;
@@ -2683,6 +2698,12 @@ export interface GameState {
   /** The last DelayedTrigger.unlessPaid id given out (Nafs Asp). */
   unlessPaidSeq?: number;
   /**
+   * Guardian Angel (round B263): "Until end of turn, you may pay {1} any time you could cast an instant. If you do, prevent
+   * the next 1 damage that would be dealt to that permanent or player this turn": the "payShield" special action (CR
+   * 116.2c), until the cleanup step (CR 514.2). Ids from `unlessPaidSeq`.
+   */
+  payShields?: PayShield[];
+  /**
    * Extra turns still to be taken (CR 500.7): the most recently created is taken first. `loseAtEnd`: "At the beginning of
    * that turn's end step, you lose the game", a delayed trigger of that player's.
    */
@@ -3872,6 +3893,8 @@ export type Action =
   | { type: "payUnless"; player: PlayerId; pay: boolean; /** Waterbend (CR 701.67a): untapped artifacts and creatures tapped to pay {1} each of the cost. */ tap?: ObjectId[] }
   /** Pay to stop a delayed trigger "unless they pay {1} before that draw step" (Nafs Asp; DelayedTrigger.unlessPaid): a special action (rulings). */
   | { type: "payDelayed"; player: PlayerId; id: number }
+  /** Guardian Angel (GameState.payShields): pay for one more shield, a special action (CR 116.2c). */
+  | { type: "payShield"; player: PlayerId; id: number }
   | { type: "concede"; player: PlayerId };
 
 export class RulesError extends Error {}

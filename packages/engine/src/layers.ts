@@ -631,6 +631,17 @@ function gather(s: GameState): Inst[] {
       // A damage replacement's (Ajani Steadfast's emblem) is read in damage.ts.
       if (st.affects.kind === "filter") out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true });
     });
+  // Torrent of Lava (round B263): a spell's static ability that gives permanents an ability while the spell is on the stack
+  // (CR 113.6), with the spell's timestamp (CR 613.7a), "⟪source⟫" in it bound to that spell (grants.ts). A copy of the
+  // spell has it too (CR 707.10).
+  for (const item of s.stack) {
+    const so = item.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+    if (!so || so.zone !== "stack") continue;
+    const d = defOf(s, so);
+    (compileCard(d).stackGrants ?? []).forEach((g, i) =>
+      out.push({ key: `stack:${so.id}#${i}`, timestamp: so.timestamp, order: order++, sourceId: so.id, sourceName: d.name, untilEndOfTurn: false, mods: [{ kind: "addAbility", text: g.text }], affects: g.affects, controller: item.controller, emblem: true }),
+    );
+  }
   // Static abilities that work from a graveyard (CR 113.6b), each with its card's timestamp there (CR 613.7d).
   for (const pid of s.turnOrder)
     for (const id of s.players[pid]!.graveyard) {

@@ -175,6 +175,13 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
     rule.by = { ...rule.by, chosen: { id: me.id, zc: me.zoneChanges ?? 0 } };
+  } else if (spec.by?.target?.ref === "grantSource") {
+    // Torrent of Lava's granted ability (round B263): "by Torrent of Lava", the spell that gave it, as the object it was
+    // as the layers gave the ability (CR 400.7), wherever it is now: damage from it once it has left the stack is
+    // another object's (none).
+    const g = spec.by.target;
+    if (g.id === undefined) return;
+    rule.by = { ...rule.by, chosen: { id: g.id, zc: g.zc ?? 0 } };
   } else if (spec.by?.target) {
     // "Prevent all damage target spell would deal this turn" (Hallow): that spell, and the permanent it becomes.
     const i = spec.by.target.ref === "target" ? spec.by.target.index : -1;
@@ -214,6 +221,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     const r = fixedRecipient(s, spec.redirect, ctx);
     if (!r) return;
     rule.redirect = r;
+    if (spec.redirectMay) rule.redirectMay = true;
   }
   if (spec.redirectToSourceController) rule.redirect = { sourceController: true };
   if (spec.gainLife) rule.gainLife = spec.gainLife;

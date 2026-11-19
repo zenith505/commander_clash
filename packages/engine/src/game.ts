@@ -21,6 +21,7 @@ import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protect
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
+import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
@@ -532,6 +533,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "payDelayed":
       requireNoPending(s);
       payDelayed(s, p, action.id);
+      break;
+    case "payShield":
+      requireNoPending(s);
+      payShield(s, p, action.id);
       break;
     case "ignoreEffect":
       requireNoPending(s);
@@ -5520,6 +5525,8 @@ function finishCleanup(s: GameState) {
     p.redirectNext = undefined;
   }
   s.preventCombatDamage = undefined;
+  // Guardian Angel's "until end of turn" permission (round B263, CR 514.2).
+  s.payShields = undefined;
   // Ascent of the Worthy's "until your next turn" ones stay until that turn begins (CR 611.2b).
   // Old Fat Spider Can't See Me's last while its source is on the battlefield (CR 611.2b).
   const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn || whileSourceHolds(s, r));
@@ -17010,6 +17017,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
   for (const d of payableDelayed(s, pid)) if (payDelayedProblem(s, pid, d.unlessPaid!.id) === null) out.push({ type: "payDelayed", player: pid, id: d.unlessPaid!.id });
+  for (const ps of payableShields(s, pid)) if (payShieldProblem(s, pid, ps.id) === null) out.push({ type: "payShield", player: pid, id: ps.id });
   for (const id of s.battlefield) if (!ignorableBy(s, pid, id)?.costs && ignoreEffectProblem(s, pid, id) === null) out.push({ type: "ignoreEffect", player: pid, objectId: id });
   // "You may play lands from your graveyard" (Crucible of Worlds). Coram, the Undertaker (round 381): any graveyard's.
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))

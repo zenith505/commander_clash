@@ -6,7 +6,8 @@ import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type Abili
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
-import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPayDelayed, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { payableShields, payShieldHolder } from "./pay-shields";
+import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPayDelayed, planPayShield, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
@@ -2524,7 +2525,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid) ?? chooseSendAttackerAway(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? choosePayShield(s, pid) ?? chooseStackShield(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid) ?? chooseSendAttackerAway(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -8973,6 +8974,94 @@ function chooseRedirect(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/**
+ * Damage the top of the stack would deal to this permanent or player as it resolves, estimated: its targets and "each
+ * creature" effects (Torrent of Lava), whoever controls it.
+ */
+function stackDamageTo(s: GameState, to: { kind: "object"; id: ObjectId } | { kind: "player"; id: PlayerId }): number {
+  const top = s.stack[s.stack.length - 1];
+  if (!top) return 0;
+  const spell = top.kind === "spell" && top.objectId ? s.objects[top.objectId] : undefined;
+  const body = top.body ?? (spell ? castingBody(defOf(s, spell)) : undefined);
+  if (!body) return 0;
+  let n = 0;
+  for (const e of allEffects(body.effects)) {
+    if (e.type !== "damage") continue;
+    const amount = estimate(e.amount, top.x ?? 0);
+    if (to.kind === "player" && (e.to.ref === "eachPlayer" || (e.to.ref === "eachOpponent" && top.controller !== to.id))) n += amount;
+    if (to.kind === "object" && e.to.ref === "each" && objectMatches(s, e.to.filter, obj(s, to.id), top.controller, false)) n += amount;
+    for (const [i, t] of (top.targets ?? []).entries()) {
+      if (!refCovers(e.to, i)) continue;
+      if ((t.kind === "player" && to.kind === "player" && t.id === to.id) || (t.kind === "object" && to.kind === "object" && t.id === to.id)) n += t.amount ?? amount;
+    }
+  }
+  return n;
+}
+
+/** Combat damage the permanent or player would be dealt once blockers are declared, before damage: blockers' or attackers' power. */
+function combatDamageTo(s: GameState, to: { kind: "object"; id: ObjectId } | { kind: "player"; id: PlayerId }): number {
+  if (s.step !== "declareBlockers" || s.stack.length) return 0;
+  if (to.kind === "player") return s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === to.id && !o.blockedBy?.length).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+  const c = obj(s, to.id);
+  const foes = c.blocking ? c.blocking : c.attacking !== undefined ? (c.blockedBy ?? []) : [];
+  return foes.reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? Math.max(0, power(s, obj(s, f))) : 0), 0);
+}
+
+/**
+ * Guardian Angel (round B263, GameState.payShields): a special action (CR 116.2c), {1} at a time, while damage about to be
+ * dealt (the top of the stack, or combat damage once blockers are declared) gets past the shields already there and would
+ * destroy the creature, or would leave the bot itself at 15 life or less.
+ */
+function choosePayShield(s: GameState, pid: PlayerId): Action[] | null {
+  for (const ps of payableShields(s, pid)) {
+    const h = payShieldHolder(s, ps);
+    if (!h) continue;
+    const coming = Math.max(stackDamageTo(s, h), combatDamageTo(s, h));
+    if (coming <= 0) continue;
+    let need: boolean;
+    if (h.kind === "object") {
+      const c = obj(s, h.id);
+      need = controllerOf(s, c) === pid && objIsType(s, c, "Creature") && !objHasKeyword(s, c, "Indestructible") && coming - (c.preventNext ?? 0) >= Math.max(1, lethalDamage(s, c));
+    } else {
+      const left = coming - (player(s, h.id).preventNext ?? 0);
+      need = h.id === pid && left > 0 && player(s, pid).life - left <= 15;
+    }
+    if (!need) continue;
+    const plan = planPayShield(s, pid, ps.id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Torrent of Lava's granted "{T}: Prevent the next 1 damage that would be dealt to this creature by Torrent of Lava this
+ * turn" (round B263): tap a creature of ours while that spell is on top of the stack when the 1 prevented is what lets it
+ * survive the spell's damage.
+ */
+function chooseStackShield(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  const so = top?.kind === "spell" && top.objectId ? s.objects[top.objectId] : undefined;
+  if (!so || !compileCard(defOf(s, so)).stackGrants?.length) return null;
+  for (const id of s.battlefield) {
+    const c = obj(s, id);
+    if (controllerOf(s, c) !== pid || c.tapped || !objIsType(s, c, "Creature")) continue;
+    const coming = stackDamageTo(s, { kind: "object", id }) - (c.preventNext ?? 0);
+    const lethal = Math.max(1, lethalDamage(s, c));
+    if (coming < lethal || coming - 1 >= lethal) continue;
+    const abilities = abilitiesOf(s, c).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const e = abilities[i]!.body.effects[0];
+      if (!abilities[i]!.tap || e?.type !== "damageRule" || e.rule.by?.target?.ref !== "grantSource" || e.rule.by.target.id !== so.id) continue;
+      if ((s.damageRules ?? []).some((r) => r.to?.object?.id === id && r.by?.chosen?.id === so.id)) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
 /** Damage about to be dealt to a bot or its creatures: an opponent's spell or ability on the stack, or unblocked attackers. */
 type DamageThreat =
   | { kind: "stack"; item: StackItem; def: CardDef; source?: GameObject; toMe: number; creatures: GameObject[] }
@@ -9072,6 +9161,11 @@ function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageTh
     // Redirections count when the damage can go to an opponent: any target, or back to the threat (Reverberation's spell's
     // controller, Aegis of Honor's, Turn the Tables' attacking creature).
     const back = (r.redirect?.ref === "targetController" && !!r.by?.target) || (r.redirect?.ref === "target" && t.kind === "combat" && r.combat === "only" && r.to?.players === "you" && !r.by);
+    // Blood of the Martyr (round B263): its own creatures' lethal damage taken instead, with life to spare (redirectBotWants).
+    if (r.redirectMay && r.redirect?.ref === "you") {
+      if (t.kind === "stack" && t.creatures.length && player(s, pid).life >= 25) best = Math.max(best, t.creatures.reduce((n, c) => n + worth(s, pid, c), 0));
+      continue;
+    }
     if (r.redirect && r.redirect.ref !== "anyTarget" && !back) continue;
     // Reflect Damage: a chosen attacker's damage goes back to its controller too.
     if (r.redirectToSourceController && t.kind !== "stack" && !r.by?.choose) continue;

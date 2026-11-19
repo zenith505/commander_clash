@@ -1,6 +1,6 @@
 # Roadmap
 
-31,723 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,726 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -2348,7 +2348,7 @@ line blocks.
    Out after round 293 (looked at, not done): Spellweaver Helix (copying the other imprinted card when a card with one's
    name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
    activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (refine
-   counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (a redirection chosen for each
+   counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (done in round B263) (a redirection chosen for each
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
    Caller of the Hunt (done in round B245), Enigmatic Incarnation (how it was cast); Don't Blink (done in round B252) (entering from exile replaced by a shuffle);
    Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
@@ -3614,7 +3614,7 @@ line blocks.
    this stacked branch. The compiled text of every other card is unchanged.
    Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
-   Killer, Celestial Dawn, Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr,
+   Killer, Celestial Dawn, Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr (done in round B263),
    Shared Fate, Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
    Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
@@ -11241,6 +11241,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B263 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-418): Guardian Angel
+  ("Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you
+  could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this
+  turn."): a shield of X (CR 615.7), then a permission for the turn: paying is an action an effect lets a player take
+  later, a special action (CR 116.2c) any time its controller has priority, which doesn't use the stack and gives them
+  priority again (CR 116.3), each {1} one more shield on the target as the object it was (CR 400.7); it ends in the
+  cleanup step (CR 514.2; GameState.payShields, pay-shields.ts, a "Pay {1}" button). Blood of the Martyr ("Until end of
+  turn, if damage would be dealt to any creature, you may have that damage dealt to you instead."): a redirection effect
+  (CR 614.9) its controller chooses for each source's damage to each creature, combat damage too, ordered with the other
+  shields by the creature's controller (CR 616.1; DamageRule.redirectMay); redirected damage is still its source's (so
+  deathtouch damage dealt to the player destroys nothing). Torrent of Lava ("As long as ~ is on the stack, each creature
+  has "{T}: Prevent the next 1 damage that would be dealt to this creature by ~ this turn.""): a static ability of a spell
+  that works on the stack (CR 113.6), giving each creature, fliers too, an activated ability in layer 6 (CR 613.1f) with
+  the spell's timestamp (CR 613.7a), "~" in it bound to that spell (a copy has its own), a shield against that spell's
+  damage only (CR 609.7a; CompiledCard.stackGrants). Bots pay for Guardian Angel's shields while damage on the stack or
+  in combat would destroy the creature or leave them at 15 life or less, cast Blood of the Martyr against a spell that
+  would destroy their creatures at 25 life or more and take their own creatures' lethal damage with 15 life left after,
+  and tap a creature for Torrent of Lava when the 1 prevented lets it survive. Browser tests for the Pay button, Blood's
+  question and Torrent's ability. +3, 31,726 of 31,936 with main through round 415 and B255-B262. The compiled text of
+  every other card is unchanged.
+- Out after round B263 (looked at, not done): the lists after round B262 stay out. Judgment calls and known gaps: Guardian
+  Angel's {1} is offered only while its permanent is still on the battlefield as the same object (or its player in the
+  game): paying for a shield on nothing would do nothing; Blood of the Martyr's choice is asked for each source's damage
+  before the creature's other shields apply, and once declined for some damage it isn't asked again if another effect
+  then sends that damage to another creature; bots never answer another player's Blood of the Martyr in their favor, and
+  cast Guardian Angel through the general spell logic only; Battlefield Thaumaturge, Sacred Ground, Emblazoned Golem,
+  Equinox and Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
 - Round B262 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-417): Immortal Coil
   ("If damage would be dealt to you, prevent that damage. Exile a card from your graveyard for each 1 damage prevented
   this way." and "When there are no cards in your graveyard, you lose the game."): a prevention effect (CR 615.1a), so
@@ -11407,7 +11434,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star ("for one spell this turn":
   only the mana cost's symbols, not additional costs, and the player picks the spell), Sanctuary Blade (a choice in the middle
   of every way an Equipment becomes attached), Hollow Warrior (done in round B259) (attack and block costs that tap another creature), Blood of the
-  Martyr (an optional redirection asked for each damage event) and Guardian Angel (paying {1} any time you could cast an
+  Martyr (done in round B263) (an optional redirection asked for each damage event) and Guardian Angel (done in round B263) (paying {1} any time you could cast an
   instant for a new shield). Known gaps: Blood Scrivener counts the Scriveners that already applied in a chain of draws, not
   which ones, so one leaving in the middle of a chain could leave another unapplied; its life is lost as the draw is
   replaced, before the two draws; bots order a Scrivener and an Archive the Archive first (fewer cards).
@@ -11431,14 +11458,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the engine picks which mana in the pool pays a cumulative upkeep's generic cost, so a player who wants Balduvian Fallen's
   bonus should add only {B} or {R} for it; bots' combat predictions don't know Ogre Enforcer survives damage from several
   sources.
-- Out after round B231 (looked at, not done): Torrent of Lava (an activated ability creatures have while it's on the stack,
+- Out after round B231 (looked at, not done): Torrent of Lava (done in round B263) (an activated ability creatures have while it's on the stack,
   and a shield against damage from that spell only), Guardian Beast ("other players can't gain control of them" while it's
   untapped, and "can't be enchanted" that doesn't remove Auras already attached), Spy Kit (all names of nonlegendary creature
   cards), Immortal Coil (done in round B262) (a card of your choice exiled for each 1 damage, in the middle of damage) and the lists after round
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
-  target whose legality depends on another target), Runesword, Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava
+  target whose legality depends on another target), Runesword, Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava (done in round B263)
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
   effects; Aetherplasm done in round B261) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
@@ -11537,7 +11564,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counter) stay out.
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its
   mana cost": the activation's mana cost is set by the card the cost exiles, and activationCost doesn't see the cost's
-  choices yet), Blood of the Martyr, Piracy (done in round B238), Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
+  choices yet), Blood of the Martyr (done in round B263), Piracy (done in round B238), Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
 - Out after round B206 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability: only one
   per ability is modeled), Reap (a target count set by another target as it's cast), Pulmonic Sliver (an optional
   granted "put it on top of its owner's library instead", with several Slivers ordered at once), Day of the Moon (the
@@ -11870,7 +11897,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B100 (looked at, not done): Necrotic Plague (done in round B215) (a target chosen by the dead creature's controller, not the
   ability's), Nyla, Shirshu Sleuth (done in round B203) and Sentinel of Lost Lore (done in round B246) (targeting cards in exile, linked or with an Adventure), Close
   Encounter (a warped card in exile as an additional cost), Redemptor Dreadnought (an optional additional cost that exiles a
-  card linked to the permanent), Torrent of Lava (an ability creatures have while it's on the stack), Speedball (new targets
+  card linked to the permanent), Torrent of Lava (done in round B263) (an ability creatures have while it's on the stack), Speedball (new targets
   for a spell that targets it), Tetravus (done in round B171) (tokens created with it exiled to put counters back).
 - Out after round B99 (looked at, not done): Cultivator Drone (its mana may also pay a cost with {C} paid as something
   resolves, rulings; such costs don't say what they contain yet), C.A.M.P. (the color of the mana its land produced),

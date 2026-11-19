@@ -109,6 +109,7 @@ import { runLaneB258Effect } from "./run-laneb258";
 import { runLaneB259Effect } from "./run-laneb259";
 import { runLaneB260Effect } from "./run-laneb260";
 import { runLaneB262Effect } from "./run-laneb262";
+import { runLaneB263Effect } from "./run-laneb263";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -2154,6 +2155,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB260Effect(s, e, ctx, src);
     case "payFullOrPart":
       return runLaneB262Effect(s, e, ctx, src);
+    case "payShieldGrant":
+      return runLaneB263Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

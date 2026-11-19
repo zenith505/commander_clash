@@ -652,6 +652,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0cd99210-8d34-4112-8e41-7e8c5d2a95b9",
+  "name": "Aetherplasm",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Illusion",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Illusion"
+  ],
+  "oracleText": "Whenever this creature blocks a creature, you may return this creature to its owner's hand. If you do, you may put a creature card from your hand onto the battlefield blocking that creature.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "gpt",
+  "releasedAt": "2006-02-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "151c867f-cc77-42de-9ae5-5fd2233ccdab",
   "name": "Afterlife from the Loam",
   "manaCost": "{5}{B}{B}{B}",
@@ -4824,6 +4854,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e4add901-3f2b-4f92-bb26-7f599e288802",
+  "name": "Bitter Feud",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose two players.\nIf a source controlled by one of the chosen players would deal damage to the other chosen player or a permanent that player controls, that source deals double that damage to that player or permanent instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Double"
+  ],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f5cdb413-2b72-4dc6-b93d-2532ac2ae568",
   "name": "Black Cat, Cunning Thief",
   "manaCost": "{3}{B}{B}",
@@ -5343,6 +5401,32 @@
   "set": "rix",
   "releasedAt": "2018-01-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0e69e6c2-fdc5-4c1a-bd96-c4283b82743a",
+  "name": "Blood of the Martyr",
+  "manaCost": "{W}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, if damage would be dealt to any creature, you may have that damage dealt to you instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drk",
+  "releasedAt": "1994-08-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -20677,6 +20761,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1a91ca69-e890-41dc-866b-3aabf10c9a9c",
+  "name": "Guardian Angel",
+  "manaCost": "{X}{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c7748659-0206-448f-8567-83565cb0b51a",
   "name": "Guardian Archon",
   "manaCost": "{4}{W}{W}",
@@ -22932,6 +23042,32 @@
   "set": "ice",
   "releasedAt": "1995-06-03",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c85fc672-12d8-4ab0-b18d-ccd590ac063c",
+  "name": "Immortal Coil",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Exile two cards from your graveyard: Draw a card.\nIf damage would be dealt to you, prevent that damage. Exile a card from your graveyard for each 1 damage prevented this way.\nWhen there are no cards in your graveyard, you lose the game.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28994,6 +29130,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c7986014-30e0-4999-ab95-b86620471419",
+  "name": "Mangara's Equity",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose black or red.\nAt the beginning of your upkeep, sacrifice this enchantment unless you pay {1}{W}.\nWhenever a creature of the chosen color deals damage to you or a white creature you control, this enchantment deals that much damage to that creature.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f515c691-07be-47ea-8bc0-46221eab8b46",
   "name": "Mangara's Tome",
   "manaCost": "{5}",
@@ -29519,6 +29681,28 @@
   "set": "rav",
   "releasedAt": "2005-10-07",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38a12bd7-4394-44a8-91a0-6a4ff7fa4f71",
+  "name": "Maze of Ith",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Untap target attacking creature. Prevent all combat damage that would be dealt to and dealt by that creature this turn.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmr",
+  "releasedAt": "2023-01-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -42265,6 +42449,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5b2460a5-6ae5-4cad-ba94-1a9e98e6e4c0",
+  "name": "Snow-Covered Island",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Basic Snow Land — Island",
+  "supertypes": [
+   "Basic",
+   "Snow"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Island"
+  ],
+  "oracleText": "({T}: Add {U}.)",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac8cc74d-e43b-4118-bba0-dfa8b9c04d45",
   "name": "Snow-Covered Plains",
   "manaCost": "",
@@ -48647,6 +48863,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f467ec85-ffe2-4963-82e0-509a7873fd63",
+  "name": "Torrent of Lava",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Torrent of Lava deals X damage to each creature without flying.\nAs long as Torrent of Lava is on the stack, each creature has \"{T}: Prevent the next 1 damage that would be dealt to this creature by Torrent of Lava this turn.\"",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bc6ee33a-4245-4edb-a6b3-0bdcc2883fbc",
   "name": "Torrent of Stone",
   "manaCost": "{3}{R}",
@@ -49292,6 +49534,32 @@
   "commanderLegal": "legal",
   "set": "lea",
   "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8e1b84d7-b0ae-4e9d-bc1a-c84832fea9f9",
+  "name": "Turf War",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, for each player, put a contested counter on target land that player controls.\nWhenever a creature deals combat damage to a player, if that player controls one or more lands with contested counters on them, that creature's controller gains control of one of those lands of their choice and untaps it.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -52662,6 +52930,32 @@
   "commanderLegal": "legal",
   "set": "mh3",
   "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ae78d498-11c7-427f-9d13-3f1b7096f803",
+  "name": "Winter's Chill",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Cast this spell only during combat before blockers are declared.\nX can't be greater than the number of snow lands you control.\nChoose X target attacking creatures. For each of those creatures, its controller may pay {1} or {2}. If that player doesn't, destroy that creature at end of combat. If that player pays only {1}, prevent all combat damage that would be dealt to and dealt by that creature this combat.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

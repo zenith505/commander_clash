@@ -18,7 +18,9 @@ import {
   planActivate,
   planCast,
   planPayDelayed,
+  planPayShield,
   payableDelayed,
+  payableShields,
   createGame,
   registerMeldResults,
   defOf,
@@ -185,6 +187,8 @@ function hasInstantPlay(s: GameState): boolean {
       const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt: "sneak" });
       if (!problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt: "sneak" }))) return true;
     }
+  // Guardian Angel (round B263): paying for one more shield is a special action, any time you have priority (CR 116.2c).
+  for (const ps of payableShields(s, HUMAN)) if (planPayShield(s, HUMAN, ps.id)) return true;
   // Turning a face-down permanent face up is a special action, any time you have priority (CR 702.37e).
   for (const id of s.battlefield) {
     const o = obj(s, id);

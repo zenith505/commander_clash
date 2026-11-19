@@ -20,8 +20,12 @@ import {
   planUnlock,
   planEndEffect,
   planPayDelayed,
+  planPayShield,
   payableDelayed,
   payDelayedProblem,
+  payableShields,
+  payShieldName,
+  payShieldProblem,
   endableEffect,
   endEffectProblem,
   planIgnoreEffect,
@@ -4746,7 +4750,7 @@ function LibrarySearch({
                 : pending.fromHand && pending.swap
                 ? `${pending.source}: you may exchange it with ${pending.what} from your hand (aura swap)`
                 : pending.fromHand
-                ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
+                ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield${pending.blocking && s.objects[pending.blocking] ? ` blocking ${cardOf(s, pending.blocking).name}` : ""}`
                 : pending.fromGraveyard === "exile" && pending.copiedBy !== undefined
                   ? `${pending.source}: exile ${pending.what} from your graveyard. ${pending.copiedBy === pending.player ? "You copy it and may cast the copy" : `${s.players[pending.copiedBy]!.name} copies it and may cast the copy`} without paying its mana cost`
                 : pending.fromGraveyard === "exile"
@@ -6623,6 +6627,18 @@ function Controls({
           onClick={() => dispatch(planPayDelayed(s, HUMAN, d.unlessPaid!.id) ?? [{ type: "payDelayed", player: HUMAN, id: d.unlessPaid!.id }])}
         >
           Pay {d.unlessPaid!.cost} for {d.unlessPaid!.source}
+        </button>
+      ))}
+      {/* Guardian Angel (round B263): pay for one more shield on its target, a special action (CR 116.2c). */}
+      {payableShields(s, HUMAN).map((ps) => (
+        <button
+          key={`shield-${ps.id}`}
+          data-pay-shield={ps.id}
+          disabled={!planPayShield(s, HUMAN, ps.id)}
+          title={payShieldProblem(s, HUMAN, ps.id) ?? `Prevent the next ${ps.n} more damage to ${payShieldName(s, ps)} this turn (${ps.source}). A special action: it doesn't use the stack.`}
+          onClick={() => dispatch(planPayShield(s, HUMAN, ps.id) ?? [{ type: "payShield", player: HUMAN, id: ps.id }])}
+        >
+          Pay {ps.cost}: prevent {ps.n} more to {payShieldName(s, ps)}
         </button>
       ))}
     </div>

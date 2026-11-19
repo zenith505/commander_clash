@@ -1028,7 +1028,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
-    if (pend.kind === "divideDamage" && pend.combat) return [{ type: "divideDamage", player: pid, parts: chooseCombatDivision(s, pend.by, pend.toPlayer, pend.options, pend.total) }];
+    if (pend.kind === "divideDamage" && pend.combat) return [{ type: "divideDamage", player: pid, parts: pend.toPlayer === pid ? chooseDefendingDivision(s, pend.by, pid, pend.options, pend.total) : chooseCombatDivision(s, pend.by, pend.toPlayer, pend.options, pend.total) }];
     if (pend.kind === "divideDamage") return [{ type: "divideDamage", player: pid, parts: chooseDamageDivision(s, pid, pend.by, pend.options, pend.total) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.remove ? chooseCounterRemoval(s, pid, pend.options, pend.total, pend.has ?? {}) : pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter, !!pend.upTo) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
@@ -1149,6 +1149,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const c = s.creatureDamageChoice;
       const at = c?.current ? s.objects[c.current] : undefined;
       const n = at ? combatDamageOf(s, at) : 0;
+      // Defensive Formation (round B266): the defending player chooses; a creature of theirs that survives it, else none
+      // unless the damage would finish them.
+      if (at && at.attacking === pid) return [{ type: "pickPermanents", player: pid, ids: defendingSoak(s, at, pid, pend.options, n) }];
       const finishes = !!at && at.attacking !== undefined && !at.attackingPermanent && player(s, at.attacking).life <= n;
       const kills = pend.options.map((id) => obj(s, id)).filter((x) => !objHasKeyword(s, x, "Indestructible") && (objHasKeyword(s, at!, "Deathtouch") || toughness(s, x) - (x.damage ?? 0) <= n));
       const best = finishes ? undefined : kills.sort((a, b) => power(s, b) + toughness(s, b) - (power(s, a) + toughness(s, a)))[0];
@@ -1940,6 +1943,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     // Hostile Negotiations: turn the pile worth less face up (the opponent choosing sees only the other's size).
+    // Phyrexian Portal (round B265): both piles face down, so only their sizes to go by: exile the smaller, keeping more
+    // cards to search.
+    if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles && pend.pileMode === "blindExile") return [{ type: "chooseOption", player: pid, choice: pend.piles[0].length <= pend.piles[1].length ? "0" : "1" }];
+    // Raging River (round B265): the label whose pile could block this attacker least: the untapped creatures in it
+    // (those with flying can block it anyway), weighed by their power and toughness.
+    if (pend.kind === "chooseOption" && pend.what === "riverSide" && pend.about && s.objects[pend.about]) {
+      const a = obj(s, pend.about);
+      const pile = (side: "left" | "right") => {
+        const theirs = s.resolving?.scratch?.river?.creatures[a.attacking ?? -1] ?? [];
+        const left = s.resolving?.scratch?.chosen?.[a.attacking ?? -1] ?? [];
+        return theirs.filter((id) => (side === "left") === left.includes(id) && s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
+      };
+      const weight = (ids: string[]) => ids.reduce((n, id) => n + Math.max(0, power(s, obj(s, id))) + Math.max(0, toughness(s, obj(s, id))), 0);
+      return [{ type: "chooseOption", player: pid, choice: weight(pile("left")) <= weight(pile("right")) ? "left" : "right" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles && pend.pileMode === "turnFaceUp") {
       const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + handWorth(s, id), 0));
       return [{ type: "chooseOption", player: pid, choice: a! <= b! ? "0" : "1" }];
@@ -5778,6 +5796,39 @@ function chooseDamageDivision(s: GameState, pid: PlayerId, by: ObjectId, options
  * valuable of their creatures it can kill (indestructible ones and those with 1 power or less skipped), the rest to the
  * player. Nothing to kill: the usual way while unblocked (none given), else all to the player rather than the blockers.
  */
+/**
+ * Defensive Formation (round B266): a creature of ours to take an attacker's combat damage (Cunning Giant): one that
+ * survives it, else none unless the damage would finish us, then the least valuable.
+ */
+function defendingSoak(s: GameState, at: GameObject, pid: PlayerId, options: ObjectId[], n: number): ObjectId[] {
+  const deathtouch = objHasKeyword(s, at, "Deathtouch");
+  const survives = options.map((id) => obj(s, id)).filter((o) => objHasKeyword(s, o, "Indestructible") || (!deathtouch && toughness(s, o) - o.damage > n));
+  if (survives.length) return [survives[0]!.id];
+  if (player(s, pid).life > n || !options.length) return [];
+  return [[...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0]!];
+}
+
+/**
+ * Defensive Formation (round B266): Butcher Orgg's damage divided by the defending player: all to us with life to spare;
+ * otherwise what our creatures survive on them (all of it on an indestructible one) and the rest to us.
+ */
+function chooseDefendingDivision(s: GameState, by: ObjectId, pid: PlayerId, options: ObjectId[], total: number): Record<string, number> {
+  const at = s.objects[by];
+  const me = `p${pid}`;
+  if (!at || player(s, pid).life > total + 5) return { [me]: total };
+  const deathtouch = objHasKeyword(s, at, "Deathtouch");
+  const parts: Record<string, number> = {};
+  let left = total;
+  for (const o of options.map((id) => obj(s, id))) {
+    if (left <= 0) break;
+    const room = objHasKeyword(s, o, "Indestructible") ? left : deathtouch ? 0 : Math.max(0, toughness(s, o) - o.damage - 1);
+    const n = Math.min(left, room);
+    if (n > 0) (parts[o.id] = n), (left -= n);
+  }
+  if (left > 0) parts[me] = left;
+  return parts;
+}
+
 function chooseCombatDivision(s: GameState, by: ObjectId, defender: PlayerId | undefined, options: ObjectId[], total: number): Record<string, number> {
   const at = s.objects[by];
   if (!at || defender === undefined) return {};
@@ -7511,6 +7562,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Immortal Coil (round B262): no exiling our own graveyard down to fewer than five cards while we'd lose with none.
       const exiles = (ab.costs ?? []).reduce((n, c) => n + (c.kind === "exileFromGraveyard" ? c.n || 1 : 0), 0);
       if (exiles && player(s, pid).graveyard.length - exiles < 5 && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && graveyardLifeline(abilitiesOf(s, obj(s, b))))) continue;
+      // Phyrexian Portal (round B265): a pile of our library exiled for one card: once a turn, in our second main phase,
+      // and only with a library that can spare it.
+      if (ab.body.effects.some((e) => e.type === "portalPiles") && (o.activatedThisTurn?.includes(i) || s.activePlayer !== pid || s.step !== "main2" || s.stack.length > 0 || player(s, pid).library.length < 25)) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;

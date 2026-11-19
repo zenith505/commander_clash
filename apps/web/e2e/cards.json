@@ -11977,6 +11977,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9386f4d3-aa72-4849-8921-83740762dc0e",
+  "name": "Defensive Formation",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Rather than the attacking player, you assign the combat damage of each creature attacking you. You can divide that creature's combat damage as you choose among any of the creatures blocking it.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0a1dc797-7531-4494-afe6-add6ac3f74c0",
   "name": "Defiler of Vigor",
   "manaCost": "{3}{G}{G}",
@@ -16825,6 +16851,40 @@
   "commanderLegal": "legal",
   "set": "dsk",
   "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f055a941-8b83-464e-a57f-8f188dc69aaa",
+  "name": "Fearless Skald",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Dwarf Berserker",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf",
+   "Berserker"
+  ],
+  "oracleText": "Backup 1 (When this creature enters, put a +1/+1 counter on target creature. If that's another creature, it gains the following ability until end of turn.)\nDouble strike",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Backup",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -30958,6 +31018,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23f01235-b5a5-4b2e-a90b-b49fc0c7b18d",
+  "name": "Mirror-Shield Hoplite",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "Vigilance\nWhenever a creature you control becomes the target of a backup ability, copy that ability. You may choose new targets for the copy. This ability triggers only once each turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "30e3e48c-98dc-4d27-b7ea-e81d39f7d24e",
   "name": "Mischievous Quanar",
   "manaCost": "{4}{U}",
@@ -35739,6 +35834,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1a3ce329-ee48-4abc-b820-b43e9e68eae9",
+  "name": "Phyrexian Portal",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}: If your library has ten or more cards in it, target opponent looks at the top ten cards of your library and separates them into two face-down piles. Exile one of those piles. Search the other pile for a card, put it into your hand, then shuffle the rest of that pile into your library.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "11173ad3-c007-478f-bce0-d756eac07ccb",
   "name": "Phyrexian Scriptures",
   "manaCost": "{2}{B}{B}",
@@ -36322,6 +36439,50 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2026-02-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3d5c98ff-fcf1-42bd-9533-2648791a4f45",
+  "name": "Power Pack",
+  "manaCost": "{1}{R}{G}{W}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Flying, vigilance, trample, haste\nWhenever Power Pack deals combat damage to a player, exile target instant or sorcery card from your graveyard chosen at random. At the beginning of your next upkeep, you may cast that card without paying its mana cost. If that spell would be put into your graveyard, exile it instead.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance",
+   "Haste",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -37580,6 +37741,32 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a2310312-6e1e-4e34-a351-9aef499a810f",
+  "name": "Raging River",
+  "manaCost": "{R}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever one or more creatures you control attack, each defending player divides all creatures without flying they control into a \"left\" pile and a \"right\" pile. Then, for each attacking creature you control, choose \"left\" or \"right.\" That creature can't be blocked this combat except by creatures with flying and creatures in a pile with the chosen label.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -38895,6 +39082,32 @@
   "commanderLegal": "legal",
   "set": "stx",
   "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "938ba053-35f6-4424-a978-bf915709572c",
+  "name": "Reversal of Fortune",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You may copy an instant or sorcery card in it. If you do, you may cast the copy without paying its mana cost.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

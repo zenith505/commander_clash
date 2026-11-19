@@ -194,6 +194,7 @@ export function backupTriggers(ns: number[], below: string[]): TriggeredAbility[
   if (!mods.length) return null;
   return ns.map((n) => ({
     event: "selfEnters",
+    backup: true as const,
     body: {
       targets: [{ kind: "object", types: ["Creature"], text: "target creature" }],
       effects: [

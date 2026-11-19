@@ -57,6 +57,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const ids = [...(sc.forced ?? []), ...sc.found].filter((id) => obj(s, id).owner === pid && ["graveyard", "hand", "library"].includes(obj(s, id).zone));
       const fromHand = ids.filter((id) => obj(s, id).zone === "hand").length;
       for (const id of ids) moveObject(s, id, "exile");
+      // Kotose, the Silent Spider (round 420): "the exiled cards", the ones still in exile.
+      for (const id of ids) if (obj(s, id).zone === "exile") (r.namedExiled ??= []).push(id);
       r.exiledFromHand = fromHand;
       log(s, `${player(s, ctx.controller).name} searches ${p.name}'s graveyard, hand and library${named ? ` for cards named ${named}` : ""} and exiles ${ids.length || "none"}${ids.length ? ` (${fromHand} from their hand)` : ""}.`);
       shuffleLibrary(s, p);

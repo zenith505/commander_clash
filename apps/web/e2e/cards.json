@@ -1132,6 +1132,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "252d9b25-45a1-40ca-b563-4cdefc791a44",
+  "name": "Allure of the Unknown",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top six cards of your library. An opponent exiles a nonland card from among them, then you put the rest into your hand. That opponent may cast the exiled card without paying its mana cost.",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ed43f1f9-ef96-47bc-8a54-e59154319f9d",
   "name": "Alpharael, Stonechosen",
   "manaCost": "{3}{B}{B}",
@@ -3862,6 +3890,43 @@
   "set": "cn2",
   "releasedAt": "2016-08-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "570cb560-c246-4652-b230-ab34f966c78a",
+  "name": "Balthier and Fran",
+  "manaCost": "{1}{R}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Rabbit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rabbit"
+  ],
+  "oracleText": "Reach\nVehicles you control get +1/+1 and have reach and vigilance.\nWhenever a Vehicle crewed by Balthier and Fran this turn attacks, if it's the first combat phase of the turn, you may pay {1}{R}{G}. If you do, after this phase, there is an additional combat phase.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8869,6 +8934,72 @@
   "set": "leg",
   "releasedAt": "1994-06-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "73ca14bb-0586-4716-8d4c-738a93950ed5",
+  "name": "Cloak and Dagger",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Kindred Artifact — Rogue Equipment",
+  "supertypes": [],
+  "types": [
+   "Kindred",
+   "Artifact"
+  ],
+  "subtypes": [
+   "Rogue",
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +2/+0 and has shroud. (It can't be the target of spells or abilities.)\nWhenever a Rogue creature enters, you may attach this Equipment to it.\nEquip {3}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "64132f93-66ac-4794-8c07-a88f9ed0e22b",
+  "name": "Cloak and Dagger, Entwined",
+  "manaCost": "{1}{W}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Deathtouch, lifelink\nWhen Cloak and Dagger enter, choose target opponent and up to one target creature they control. They reveal their hand. You may exile a nonland card from their hand or the chosen creature until Cloak and Dagger leave the battlefield.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -18215,6 +18346,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cca15007-2faf-4696-a4c5-2d7b6c1ec5b5",
+  "name": "Gale, Waterdeep Prodigy",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Whenever you cast an instant or sorcery spell from your hand, you may cast up to one target card of the other type from your graveyard. If a spell cast from your graveyard this way would be put into your graveyard, exile it instead.\nChoose a Background (You can have a Background as a second commander.)",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Choose a background"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3561cd52-961f-4098-9287-58ee43970f0f",
   "name": "Galloping Lizrog",
   "manaCost": "{3}{G}{U}",
@@ -26632,6 +26798,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bfef4daa-b950-46ce-8c08-11f9983741cf",
+  "name": "Kotose, the Silent Spider",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "When Kotose enters, exile target card other than a basic land card from an opponent's graveyard. Search that player's graveyard, hand, and library for any number of cards with the same name as that card and exile them. Then that player shuffles. For as long as you control Kotose, you may play one of the exiled cards, and you may spend mana as though it were mana of any color to cast it.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "39f4bf0e-47d5-4ae8-a504-71acda849850",
   "name": "Kozilek, the Broken Reality",
   "manaCost": "{9}",
@@ -30956,6 +31157,43 @@
   "commanderLegal": "legal",
   "set": "grn",
   "releasedAt": "2018-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "905610cd-1461-4f5a-b9c8-19b193b9d513",
+  "name": "Missy",
+  "manaCost": "{3}{U}{B}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Time Lord Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Rogue"
+  ],
+  "oracleText": "Whenever another nonartifact creature dies, return it to the battlefield under your control face down and tapped. It's a 2/2 Cyberman artifact creature.\nAt the beginning of your end step, each opponent faces a villainous choice — Each artifact creature you control deals 1 damage to that opponent, or you draw a card and chaos ensues.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -41719,6 +41957,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "564b1253-2e1f-46c5-b5ae-3932127ca614",
+  "name": "Shifting Shadow",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has haste and \"At the beginning of your upkeep, destroy this creature. Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and attach Shifting Shadow to it, then put all other cards revealed this way on the bottom of your library in a random order.\"",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f557fb2c-581b-4a8d-8766-1e46e92224fa",
   "name": "Shimmer",
   "manaCost": "{2}{U}{U}",
@@ -42507,6 +42775,35 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f2c43b85-8c42-4b23-84c2-bec8d6230039",
+  "name": "Sky Skiff",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -45535,6 +45832,32 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/0/c/0cccd328-457a-48ab-97fb-4bc319db2e60.jpg?1783911225"
    }
   ]
+ },
+ {
+  "oracleId": "8ea414c1-88cf-46d4-9a54-6dee9847c537",
+  "name": "Surge to Victory",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target instant or sorcery card from your graveyard. Creatures you control get +X/+0 until end of turn, where X is that card's mana value. Whenever a creature you control deals combat damage to a player this turn, copy the exiled card. You may cast the copy without paying its mana cost.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "8b4715b0-63d9-4ff8-a667-21a762518687",
@@ -54511,6 +54834,43 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/b/6/b65ffce4-bb58-418a-9bad-81533a5f2ba2.jpg?1783906617"
    }
   ]
+ },
+ {
+  "oracleId": "ac136d46-32b7-4222-a840-b8be011c1872",
+  "name": "Zethi, Arcane Blademaster",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "Multikicker {W/U}\nWhen Zethi, Arcane Blademaster enters, exile up to X target instant cards from your graveyard, where X is the number of times Zethi was kicked. Put a kick counter on each of them.\nWhenever Zethi attacks, copy each exiled card you own with a kick counter on it. You may cast the copies.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Multikicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2023-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "0c85a577-db82-4a36-bc42-49644eba1cf2",

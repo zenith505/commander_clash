@@ -112,6 +112,7 @@ import {
   pairedWith,
   hauntedBy,
   cardIdOf,
+  isCopy,
   realDefOf,
   legalTargets,
   characteristics,
@@ -3579,7 +3580,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
   const paired = pairedWith(s, o);
   const haunts = hauntedBy(s, o);
   // A copy (CR 707): it looks like what it copies, so say what it really is.
-  const copying = !o.faceDown && cardIdOf(o) !== o.cardId ? cardOf(s, o.id) : undefined;
+  const copying = isCopy(o) ? cardOf(s, o.id) : undefined;
   const copyEnds = o.copyEffects?.[o.copyEffects.length - 1]?.until;
   const chosen = chosenText(s, o);
   return (
@@ -4862,7 +4863,7 @@ function LibrarySearch({
           )}
           {dig && (
             <>
-              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand${pending.handYard ? " and graveyard" : ""}` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : (() => {
+              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand${pending.handYard ? " and graveyard" : dig.looked.some((id) => s.objects[id]?.zone === "battlefield") ? " and the chosen creature" : ""}` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : (() => {
                 const o = dig.looked.length ? s.objects[dig.looked[0]!]?.owner : undefined;
                 return o !== undefined && o !== pending.player ? `The top of ${s.players[o]!.name}'s library` : "The top of your library";
               })()}</h4>
@@ -4885,6 +4886,8 @@ function LibrarySearch({
                         <CardFace d={d} />
                         {/* Never Happened: the graveyard's cards after the hand's. */}
                         {pending.handYard && <span className="zone-label">{s.objects[id]!.zone === "graveyard" ? "graveyard" : "hand"}</span>}
+                        {/* Cloak and Dagger, Entwined (round 420): the chosen creature, on the battlefield, beside the hand's cards. */}
+                        {pending.hand !== undefined && !pending.handYard && s.objects[id]!.zone === "battlefield" && <span className="zone-label">battlefield</span>}
                       </div>
                     );
                   })}
@@ -5560,7 +5563,9 @@ function Controls({
               {/* Chandra, Torch of Defiance: the card just exiled, cast now or not at all. */}
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={(madnessCastOf(s, HUMAN, pending.objectId) ?? "") + (pending.addedMana ?? "")} size="sm" />
               {/* Ogre Battlecaster (round 401): its mana cost and {R}{R} more, an additional cost (CR 601.2f). */}
-              {pending.addedMana ? <> (its mana cost and <ManaCost cost={pending.addedMana} size="sm" />)</> : null}? Only now{o.zone === "exile" || pending.addedMana ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
+              {pending.addedMana ? <> (its mana cost and <ManaCost cost={pending.addedMana} size="sm" />)</> : null}? Only now{pending.thenNoMore ? <>, and then you can&apos;t cast other spells this turn.</> : "."}
+              {/* Gale, Waterdeep Prodigy, Harness the Storm's kin (round 418): said only when the ability says so. */}
+              {pending.exileAfter ? " If it would go to your graveyard, it's exiled instead." : null}
             </>
           ) : pending.how === "discover" ? (
             <>

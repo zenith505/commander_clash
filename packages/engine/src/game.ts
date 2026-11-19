@@ -9004,7 +9004,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   const kickedNow = !!item.kicked?.length && isRealKicker(compileCard(d).kicker);
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, ...(o.faceDown ? {} : { name: d.name }), colors: [...characteristics(s, o).colors], types: [...characteristics(s, o).types], from: castFrom === "hand" && o.owner !== p.id ? undefined : castFrom, ...(castFrom === "graveyard" && o.owner === p.id ? { ownYard: true as const } : {}), ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv, ...(kickedNow ? { kicked: true as const } : {}), ...(o.faceDown ? { faceDown: true as const } : {}) });
-  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.colorsSpent?.length ? { castColorsSpent: o.colorsSpent.length } : {}), ...(o.faceDown ? {} : { castName: d.name }) };
+  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors], ...(o.colorsSpent?.length ? { castColorsSpent: o.colorsSpent.length } : {}), ...(o.faceDown ? {} : { castName: d.name }), castTypes: [...characteristics(s, o).types] };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
   // Expend (CR 700.14): the mana this player spent to cast spells this turn, before and after paying this cost (the

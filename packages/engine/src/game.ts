@@ -6964,6 +6964,12 @@ function runCast(s: GameState, p: Player, action: Extract<Action, { type: "castS
   s.passedInSuccession = [];
 }
 
+/** Lodestone Bauble (round 417): the owner of the first card targeted, or else the player chosen as it was activated. */
+function yardPlayerOf(s: GameState, targets: TargetChoice[] | undefined, costs: CostChoices | undefined): PlayerId | undefined {
+  const t = targets?.find((x) => x.kind === "object");
+  return t?.kind === "object" && s.objects[t.id] ? s.objects[t.id]!.owner : costs?.yardPlayer;
+}
+
 /** Activating an ability; whether it was a mana ability, which has resolved (CR 605.3b). */
 function runActivate(s: GameState, p: Player, action: Extract<Action, { type: "activateAbility" }>): boolean {
   // A mana ability can be activated wherever mana abilities can (CR 605.3a); abilityProblem says which it is.
@@ -11538,6 +11544,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const x = x0 ?? (ab && definedX(s, o, ab, costs, targets)) ?? undefined;
   if (ab?.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && costs?.xOpponent === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose an opponent: X is the number of cards in their hand");
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
+  // Lodestone Bauble (round 417): "from a player's graveyard": with no target chosen, a player is still chosen as it's
+  // activated (rulings), any player in the game; with targets, it's their owner (all from one graveyard).
+  if (ab?.choosesYardPlayer && !targets?.some((t) => t.kind === "object")) {
+    if (costs?.yardPlayer === undefined) throw new RulesError(abilityProblem(s, p.id, id, index, targets, modes, tapCreatures, x, costs ?? {}) ?? "choose a player: that player draws a card at the beginning of the next turn's upkeep");
+    if (!s.players[costs.yardPlayer] || player(s, costs.yardPlayer).lost) throw new RulesError("choose a player in the game");
+  }
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures && costs?.crewLoyalty === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.tapPower ? "tap" : ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
@@ -11723,6 +11735,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     id: stackId,
     kind: "ability",
     ...(rolledCost !== undefined ? { rolled: rolledCost } : {}),
+    ...(ab.choosesYardPlayer ? { yardPlayer: yardPlayerOf(s, targets, costs) } : {}),
     sourceId: id,
     sourceCardId: cardIdOf(o),
     sourceZc,

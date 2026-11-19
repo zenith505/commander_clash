@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
-import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers } from "../counters";
+import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers, batchCountersPut } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { seatOrder, addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, damageDrawsMade, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
@@ -1166,6 +1166,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = gifteeOf(s, ctx);
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "yardPlayer": {
+      // Lodestone Bauble (round 417): the player chosen as it was activated, if still in the game.
+      const p = s.resolving?.item.yardPlayer;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "modeChooser": {
       // "That player" in a mode an opponent chose (Misfortune, CR 700.2e): them, as they were chosen as it was cast.
       const item = s.resolving?.item;
@@ -1244,8 +1249,8 @@ function sameDamageEvent(a: Effect, b: Effect | undefined): Effect | undefined {
 }
 
 export function runEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
-  // Counters an effect puts on are put by the ability's controller (Vorinclex rulings).
-  const result = withPutter(ctx.controller, () => runEffectInner(s, e, ctx));
+  // Counters an effect puts on are put by the ability's controller (Vorinclex rulings), all at once (round 416).
+  const result = withPutter(ctx.controller, () => batchCountersPut(s, () => runEffectInner(s, e, ctx)));
   invalidateCharacteristics(s);
   return result;
 }

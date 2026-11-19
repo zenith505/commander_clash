@@ -163,6 +163,8 @@ import { round412Line } from "./round412";
 import { round413Line } from "./round413";
 import { round414Line } from "./round414";
 import { round415Line } from "./round415";
+import { round416Line } from "./round416";
+import { round417Line } from "./round417";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1047,6 +1049,10 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Helm of Kaldra's sentences (round417Sentence), Lodestone Bauble (round 417): oracle/round417.ts.
+    if (round417Line(line, raw, out, isSpell)) continue;
+    // Vault 11: Voter's Dilemma's sentences (round416Sentence), Blim, Invisible Woman, Aragorn, Company Leader (round 416): oracle/round416.ts.
+    if (round416Line(line, raw, out, isSpell)) continue;
     // Mischievous Quanar, Radiate, Radiant Performer, Agrus Kos, Exterminator Magmarch (round 415): oracle/round415.ts.
     if (round415Line(line, raw, out, isSpell)) continue;
     // Elrond of the White Council, Boltbender, Confusion in the Ranks (round 414): oracle/round414.ts.
@@ -8693,7 +8699,8 @@ function checkX(d: CardDef, out: CompiledCard) {
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
     // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || tr.xLookBackSubtype || (tr.xKicked && out.kicker?.multi)) return true;
+    // Arcee, Acrobatic Coupe (round 417): "that many" of the spell's targets (TriggeredAbility.cast.targetsCount).
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || tr.xLookBackSubtype || (tr.xKicked && out.kicker?.multi) || tr.cast?.targetsCount) return true;
     bad(tr.body.text);
     return false;
   });

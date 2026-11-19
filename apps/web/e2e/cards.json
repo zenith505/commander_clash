@@ -1301,6 +1301,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fc8ee6e1-a2e1-4033-a164-7968fc79dd27",
+  "name": "Amateur Hero",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Hero",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "When this creature enters, you gain 2 life.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spe",
+  "releasedAt": "2025-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
   "name": "Aminatou's Augury",
   "manaCost": "{6}{U}{U}",
@@ -1973,6 +2004,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1b841e8f-9484-4737-bd37-dfa11bd06883",
+  "name": "Aragorn, Company Leader",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ranger",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ranger"
+  ],
+  "oracleText": "Whenever the Ring tempts you, if you chose a creature other than Aragorn as your Ring-bearer, put your choice of a counter from among first strike, vigilance, deathtouch, and lifelink on Aragorn.\nWhenever you put one or more counters on Aragorn, put one of each of those kinds of counters on up to one other target creature.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cb58055f-8190-4bc7-ad32-844ca66fd2b0",
   "name": "Arashin Sovereign",
   "manaCost": "{5}{G}{W}",
@@ -2207,6 +2276,99 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "9fba3097-d53f-4ea4-b5d2-8adddaa09524",
+  "name": "Arcee, Sharpshooter // Arcee, Acrobatic Coupe",
+  "manaCost": "{1}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {R}{W} (You may cast this card converted for {R}{W}.)\nFirst strike\n{1}, Remove one or more +1/+1 counters from Arcee: It deals that much damage to target creature. Convert Arcee.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Living metal",
+   "First strike",
+   "Convert",
+   "More Than Meets the Eye"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Arcee, Sharpshooter",
+    "manaCost": "{1}{R}{W}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {R}{W} (You may cast this card converted for {R}{W}.)\nFirst strike\n{1}, Remove one or more +1/+1 counters from Arcee: It deals that much damage to target creature. Convert Arcee.",
+    "power": "2",
+    "toughness": "2",
+    "colors": [
+     "R",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/2/1/21462db4-7739-4853-845f-0c2aa38fd2a6.jpg?1783919906",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/2/1/21462db4-7739-4853-845f-0c2aa38fd2a6.jpg?1783919906"
+   },
+   {
+    "name": "Arcee, Acrobatic Coupe",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nWhenever you cast a spell that targets one or more creatures or Vehicles you control, put that many +1/+1 counters on Arcee. Convert Arcee.",
+    "power": "2",
+    "toughness": "2",
+    "colors": [
+     "R",
+     "W"
+    ],
+    "colorIndicator": [
+     "R",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/2/1/21462db4-7739-4853-845f-0c2aa38fd2a6.jpg?1783919906",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/2/1/21462db4-7739-4853-845f-0c2aa38fd2a6.jpg?1783919906"
+   }
+  ]
  },
  {
   "oracleId": "19e302f8-6ddb-4a43-98bc-ee71a456ac5a",
@@ -4638,6 +4800,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4f958678-2a32-4a30-8fe7-47df9ada6b2f",
+  "name": "Birthday Escape",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw a card. The Ring tempts you.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "37a5ab64-12e4-4aad-9a09-46a26fe9953b",
   "name": "Birthing Ritual",
   "manaCost": "{1}{G}",
@@ -5111,6 +5299,42 @@
   "set": "2xm",
   "releasedAt": "2020-08-07",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c7cf9574-e2cf-4137-a224-73f76c5d11d7",
+  "name": "Blim, Comedic Genius",
+  "manaCost": "{2}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Imp",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Imp"
+  ],
+  "oracleText": "Flying\nWhenever Blim deals combat damage to a player, that player gains control of target permanent you control. Then each player loses life and discards cards equal to the number of permanents they control but don't own.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21512,6 +21736,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c9efec35-823f-4c78-be36-d1a57d8b6f44",
+  "name": "Hawkeye, Clint Barton",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Archer Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Archer",
+   "Hero"
+  ],
+  "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845b40b1-dc09-44fa-9910-22544c1424ba",
   "name": "Hazel of the Rootbloom",
   "manaCost": "{2}{B}{G}",
@@ -21799,6 +22059,34 @@
   "set": "iko",
   "releasedAt": "2020-04-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38a3c87f-006e-4fc2-8c67-77b5bbb0471f",
+  "name": "Helm of Kaldra",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has first strike, trample, and haste.\n{1}: If you control Equipment named Helm of Kaldra, Sword of Kaldra, and Shield of Kaldra, create Kaldra, a legendary 4/4 colorless Avatar creature token. Attach those Equipment to it.\nEquip {2}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -23294,6 +23582,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "96cf2810-35b8-437e-b609-f9765604b8cf",
+  "name": "Inspiring Roar",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Put a +1/+1 counter on each creature you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "554df866-3dbb-4811-8573-6033481591aa",
   "name": "Inspirit, Flagship Vessel",
   "manaCost": "{U}{R}{W}",
@@ -23714,6 +24028,41 @@
   "set": "slz",
   "releasedAt": "2026-09-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e9d20b6d-fa4f-473b-9866-230fd92a1319",
+  "name": "Invisible Woman, Sue Storm",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Lifelink\nWhenever you put one or more +1/+1 counters on one or more other Heroes you control, you may create a 0/4 colorless Wall creature token with defender.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -28059,6 +28408,28 @@
   "commanderLegal": "legal",
   "set": "fic",
   "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6048b9ac-7d5e-4486-a89a-30adb45aab27",
+  "name": "Lodestone Bauble",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}, {T}, Sacrifice this artifact: Put up to four target basic land cards from a player's graveyard on top of their library in any order. That player draws a card at the beginning of the next turn's upkeep.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -41107,6 +41478,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4fdd570f-dbe0-486f-9843-f77f80956307",
+  "name": "Shield of Kaldra",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipment named Sword of Kaldra, Shield of Kaldra, and Helm of Kaldra have indestructible.\nEquipped creature has indestructible. (Damage and effects that say \"destroy\" don't destroy it.)\nEquip {4}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "dst",
+  "releasedAt": "2004-02-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f557fb2c-581b-4a8d-8766-1e46e92224fa",
   "name": "Shimmer",
   "manaCost": "{2}{U}{U}",
@@ -45060,6 +45459,34 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "35f63c60-b0a1-459d-bf51-a8549fb06930",
+  "name": "Sword of Kaldra",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +5/+5.\nWhenever equipped creature deals damage to a creature, exile that creature. (Exile it only if it's still on the battlefield.)\nEquip {4} ({4}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -50277,6 +50704,36 @@
   "keywords": [
    "Food"
   ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e2c00aff-696c-4b20-acd4-95b71b5f8b10",
+  "name": "Vault 11: Voter's Dilemma",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — For each opponent, you create a 1/1 white Human Soldier creature token.\nII, III — Each player secretly votes for up to one creature, then those votes are revealed. If no creature got votes, each player draws a card. Otherwise, destroy each creature with the most votes or tied for most votes.",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
   "commanderLegal": "legal",
   "set": "pip",
   "releasedAt": "2024-03-08",

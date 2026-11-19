@@ -105,7 +105,7 @@ export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId
   if (o.castType) o.chosen = { ...o.chosen, type: o.castType };
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
-  const { castNth: _, castInMain: _main, kickedByControl: _byControl, ...rest } = structuredClone(orig);
+  const { castNth: _, castInMain: _main, kickedByControl: _byControl, spliced: _spliced, ...rest } = structuredClone(orig);
   if (_byControl) delete rest.kicked;
   s.stack.push({ ...rest, id, objectId: o.id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);

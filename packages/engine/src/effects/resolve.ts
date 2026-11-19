@@ -106,6 +106,8 @@ import { runLaneB254Effect } from "./run-laneb254";
 import { runLaneB255Effect } from "./run-laneb255";
 import { runLaneB256Effect } from "./run-laneb256";
 import { runLaneB258Effect } from "./run-laneb258";
+import { runLaneB259Effect } from "./run-laneb259";
+import { runLaneB260Effect } from "./run-laneb260";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -217,6 +219,8 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   if (body.targets.length && chose && !legal.some(Boolean) && !body.resolvesAnyway) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
   const spellObjects = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? null) : null));
+  // Round B260: Minamo's Meddling's "a card spliced onto that spell", after it's countered.
+  const spellSpliced = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.spliced ?? null) : null));
   // "If this is the second time this ability has resolved this turn": counted as it resolves, for this object's ability
   // only (a new object's start over, CR 400.7).
   const nth = item.kind === "ability" && item.sourceId && asksResolutions(body) ? countResolution(s, `${item.sourceId}@${item.sourceZc ?? 0}|${body.text ?? item.description}`) : undefined;
@@ -227,6 +231,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
     next: 0,
     ...(spellControllers.some((c) => c !== null) ? { spellControllers } : {}),
     ...(spellObjects.some((c) => c !== null) ? { spellObjects } : {}),
+    ...(spellSpliced.some((c) => c !== null) ? { spellSpliced } : {}),
     ...(nth !== undefined ? { nth } : {}),
     ...(item.countersRemoved !== undefined ? { countersRemoved: item.countersRemoved } : {}),
     ...(item.chosenNumber !== undefined ? { chosen: { number: item.chosenNumber } } : {}),
@@ -2147,6 +2152,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "swapBlockers":
     case "swapBlocked":
       return runLaneB258Effect(s, e, ctx, src);
+    case "gameIsDraw":
+      return runLaneB259Effect(s, e, ctx, src);
+    case "discardSplicedNames":
+      return runLaneB260Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

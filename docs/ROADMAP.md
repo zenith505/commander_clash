@@ -1,6 +1,6 @@
 # Roadmap
 
-31,718 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,724 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -3595,7 +3595,7 @@ line blocks.
    Out after round 397 (looked at, not done): Sentinel of Lost Lore (still out: targets in exile, "a card you own in exile
    that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown, Synthesis Pod,
    Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack, Medomai's Prophecy,
-   Monastery Raid, Winter's Chill, Divine Intervention, Kotose and the rest from rank 15,000 to 20,000 (still out, for the
+   Monastery Raid, Winter's Chill, Divine Intervention (done in round B259), Kotose and the rest from rank 15,000 to 20,000 (still out, for the
    reasons in their earlier lists).
    Round 398 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards of each card
    type (CR 205.2a), a card with several card types taken for any one of them (Atraxa, Grand Unifier's rulings, as for
@@ -4097,8 +4097,8 @@ line blocks.
    made unless every target is gone, CR 608.2b). The UI asks for the player with the opponent picker when no card is
    targeted; bots crack the Bauble at the end of the turn before an opponent's, on that opponent's basic lands (two or
    more). Browser tests click through the Bauble with no target (choose Ana, who draws at her upkeep) and with two of
-   Ana's lands, Arcee's X counters and target, Giant Growth on the Coupe, and Helm of Kaldra's Kaldra. +3, 31,718 of
-   31,936 on this stacked branch. The compiled text of every other card is unchanged.
+   Ana's lands, Arcee's X counters and target, Giant Growth on the Coupe, and Helm of Kaldra's Kaldra. +3, 31,724 of
+   31,936 with round 416 and main (B259, B260). The compiled text of every other card is unchanged.
    Out after round 417 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts once or twice), Lara Croft, Tomb Raider, Filigree Vector, Sunken Palace, Ulalek, Possibility Storm and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: a converted or transformed
@@ -5420,13 +5420,13 @@ line blocks.
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
    Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
-   (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (sacrifices added to costs);
+   (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
-   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (spliced
+   Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (done in round B260) (spliced
    cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
@@ -7218,7 +7218,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Oppressive Rays and Gloom (an activation tax that also applies to mana abilities);
   Gabriel Angelfire (rampage as a chosen ability); Goblin Sappers (one delayed trigger destroying two creatures);
   Nissa's Defeat (its Nissa rider); Martyrdom (done in round B210) (a granted ability with "Only you may activate"); Exalted Dragon,
-  Leviathan, Floodtide Serpent and Hollow Warrior (attack costs that aren't mana, which need a picker at declare
+  Leviathan, Floodtide Serpent and Hollow Warrior (done in round B259) (attack costs that aren't mana, which need a picker at declare
   attackers); Premature Burial ("a creature that entered since your last turn ended"); Whipgrass Entangler (done in round B122) and War
   Cadence (not attempted yet). Known limit: the world rule can't see a tie, since two World permanents that enter at
   once still get different timestamps (CR 704.5k puts both into the graveyard).
@@ -8066,7 +8066,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Umbilicus, and Blood Clock with the "unless" wording), "each creature that player controls with power greater than the
   number of cards in their hand" (Noetic Scales), "If the creature you control entered this turn, put a +1/+1 counter on
   it" (Malamet Battle Glyph). +19 (28,472 of 31,936).
-- Out after round B58 (looked at, not done): Divine Intervention (a trigger on removing counters), Soulgorger Orgg (the
+- Out after round B58 (looked at, not done): Divine Intervention (done in round B259) (a trigger on removing counters), Soulgorger Orgg (the
   life it took, returned as it leaves), Blood Sun ("except mana abilities", and lands entering under it), Archangel of
   Strife (done in round B148) (a new choice for each player as it enters), Haktos the Unscarred (done in round B148) (protection from each mana value but one), plus
   Summoning Trap, Moonlight Bargain, Wild Research, Random Encounter, Mordor on the March, Boneyard Mycodrax (done in round B198), Hibernation's
@@ -11267,6 +11267,54 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   if it's prevented (Vexing Devil's rulings), the sacrifice only with two lands. Browser tests for both swaps' two-target
   activations and Worms of the Earth's upkeep question. +3, 31,699 of 31,936 with main through round 411 and B255-B257. The
   compiled text of every other card is unchanged.
+- Round B259 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 412-414): Divine Intervention
+  ("When you remove the last intervention counter from ~, the game is a draw."): selfLastCounterRemoved `removedByYou`, only
+  when its controller removes it, with an effect or a cost they control (rulings: another player's Clockspinning doesn't
+  trigger it, and then nothing ever will); the event lastCounterRemoved now says who removed it (`by`: a cost's payer, an
+  entering permanent's controller for "as ~ enters, remove all counters", else the controller of the spell or ability
+  resolving, none for a rule); "the game is a draw" (Effect gameIsDraw, CR 104.4c) ends the whole game with no winner
+  (rulings: only the limited range of influence option, which Commander doesn't use, would end it for some players only).
+  Benthic Explorers ("{T}, Untap a tapped land an opponent controls: Add one mana of any type that land could produce."): a
+  mana ability (CR 605.1a) whose cost untaps a tapped land one of your opponents controls (AdditionalCost tap `opponents`;
+  rulings: not targeted, and with none it can't be activated); the types that land could produce as the cost is paid
+  (StackItem.untappedCouldProduce, landCouldProduce: its mana abilities' effects whatever their costs, replacement effects
+  such as Contamination's counted, CR 106.7, rulings), one chosen as it resolves (CR 605.3b). Hollow Warrior ("~ can't
+  attack or block unless you tap an untapped creature you control not declared as an attacking or blocking creature this
+  combat."): costs to attack and to block that aren't mana (CR 508.1g-h, 509.1d-f), paid with another untapped creature of
+  yours (rulings: not itself) that isn't attacking or blocking, a summoning-sick one too (CR 302.6); the attack cost joins
+  Exalted Dragon's (ownAttackCost `tap`), the block cost is new (ownBlockCost, GameState.blockCostsDue: after the blocks'
+  mana is paid, a pick for each, then the blocks are declared). Browser tests for Benthic Explorers' untap pick and mana
+  choice, Hollow Warrior's tap picks to attack and to block, and Divine Intervention's draw. +3, 31,706 of 31,936 with main
+  through round 413 and B255-B258. The compiled text of every other card is unchanged.
+- Round B260 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 414-415): Minamo's Meddling
+  ("Counter target spell. That spell's controller reveals their hand, then discards each card with the same name as a card
+  spliced onto that spell."): the names of the cards revealed to splice onto a spell are kept on it as it's cast
+  (StackItem.spliced, CR 702.47a; a copy has none, it wasn't cast), seen as the Meddling resolves (resolving.spellSpliced),
+  and every card in the hand with one of those names, the spliced cards themselves among them, is discarded at once
+  (Effect discardSplicedNames), whether or not the spell was countered. Brutal Suppression ("Activated abilities of nontoken
+  Rebels cost an additional "Sacrifice a land" to activate.") and Drought ("Spells cost an additional "Sacrifice a Swamp" to
+  cast for each black mana symbol in their mana costs." and the same for activation costs): costs other permanents' static
+  abilities add (CompiledCard.addedCosts, added-costs.ts, CR 601.2f, 602.2b), part of the total cost and paid with it (CR
+  601.2h), so a player who can't pay can't cast or activate; mana abilities too (CR 605.1a); a Rebel is a permanent (CR
+  109.2), changelings included (CR 702.73a); hybrid and Phyrexian symbols with black count (rulings), {X} and generic don't;
+  paid however the spell is cast, even without its mana cost (CR 118.9d), none for a face-down spell (CR 708.2). The
+  sacrifices are their own pick (CostChoices.addedSacrifice, activateMana `sacrifice`), all different permanents, none of
+  the spell's or ability's own sacrifices, one for each when a land and Swamps are both asked for. Browser tests for the
+  pick when casting, activating and using a mana ability. +3, 31,717 of 31,936 with main through round 415 and B259.
+  The compiled text of every other card is unchanged.
+- Out after round B260 (looked at, not done): the lists after round B259 stay out. Judgment calls and known gaps: a
+  spell's copy has no spliced cards, so Minamo's Meddling discards nothing for one; plans made without a pick (autopay,
+  the legal actions list) take the first permanents that fit, tapped ones first; bots never use a mana ability with an
+  added cost and sacrifice for one only when they'd keep at least four lands; Halo Fountain's untap through mana ignores
+  added costs.
+- Out after round B259 (looked at, not done): the lists after round B258 stay out. Judgment calls and known gaps: a
+  counter removed by a replacement effect of an untap (Freyalise's Winds, Bewitching Leechcraft) has no remover recorded
+  (only wind and +1/+1 counters, which no "you remove" card watches); a cost to block isn't one of the blocking
+  restrictions Sorrow's Path and General Jarkeld check (B258: never the costs to block); when another player declares the
+  blocks (Odric), the blocks' controller still picks what Hollow Warrior taps; bots cast Divine Intervention only at 10 life
+  or less and below every opponent, use Benthic Explorers only when its mana lets them cast a card they couldn't otherwise,
+  attack with Hollow Warrior whenever another creature can pay, block with it only when one can, and tap their least
+  valuable creature.
 - Out after round B258 (looked at, not done): the lists after round B257 stay out. Judgment calls and known gaps: General
   Jarkeld's "could be blocked by all creatures that the other is blocked by" is read as the group of blockers (no ruling says
   how menace applies); for both swaps, only attackers attacking the blockers' controller count as ones they could block (CR
@@ -11332,7 +11380,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
 - Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich (done in round B253) and Swans of
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done
-  after it merges), Divine Intervention (still out: who removed its last counter isn't recorded), Allure of the Unknown
+  after it merges), Divine Intervention (done in round B259) (still out: who removed its last counter isn't recorded), Allure of the Unknown
   (still out: another player casting one of the cards in the middle of the resolution), Medomai's Prophecy (still out: its
   rulings don't settle the "named card" check) and Immortal Coil (still out: a graveyard card chosen for each point of
   damage prevented, and its state trigger "when there are no cards in your graveyard"). Known gaps: bots choose the Safe's
@@ -11386,7 +11434,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Renewal counts the Renewals that already applied in a chain of draws, not which ones, as Blood Scrivener does.
 - Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star ("for one spell this turn":
   only the mana cost's symbols, not additional costs, and the player picks the spell), Sanctuary Blade (a choice in the middle
-  of every way an Equipment becomes attached), Hollow Warrior (attack and block costs that tap another creature), Blood of the
+  of every way an Equipment becomes attached), Hollow Warrior (done in round B259) (attack and block costs that tap another creature), Blood of the
   Martyr (an optional redirection asked for each damage event) and Guardian Angel (paying {1} any time you could cast an
   instant for a new shield). Known gaps: Blood Scrivener counts the Scriveners that already applied in a chain of draws, not
   which ones, so one leaving in the middle of a chain could leave another unapplied; its life is lost as the draw is
@@ -11400,7 +11448,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of spells or activated abilities" still needs targets checked by whether the ability was activated or triggered),
   Charmed Pendant (done in round B239) (mana from a mana ability whose amount and colors depend on the card its cost milled, with a color chosen
   for each hybrid symbol), Eye for an Eye (done in round B257) (a replacement that keeps the damage and adds the same amount from another source
-  to another player in one event), Benthic Explorers ("Untap a tapped land an opponent controls" as a cost) and Grime Gorger
+  to another player in one event), Benthic Explorers (done in round B259) ("Untap a tapped land an opponent controls" as a cost) and Grime Gorger
   (still out: "one card of each card type" for cards with two types). Known gaps: bots never activate A Killer Among Us and,
   as Oracle en-Vec's target, choose no creatures (so none of theirs attacks that turn); Memory Vampire's "defending player" is
   the player it dealt the combat damage to, as for every "deals combat damage to a player" trigger here, so combat damage
@@ -11422,16 +11470,16 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
   effects) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
-- Out after round B229 (looked at, not done): Divine Intervention (still out: who removed the last counter isn't kept on
+- Out after round B229 (looked at, not done): Divine Intervention (done in round B259) (still out: who removed the last counter isn't kept on
   the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel and Research // Development (nothing outside
   the game here), Golgothian Sylex, Apocalypse Chime and City in a Bottle (the set a name was originally printed in isn't in
   the card data). Known gaps: damage a spell deals through its own reflexive or delayed trigger (CR 603.7d, 603.12) counts for
   Suffocation but isn't counted as a cast spell's for Backdraft; bots activate Vodalian War Machine's abilities without
   weighing the Merfolk its death would destroy.
-- Out after round B228 (looked at, not done): Hollow Warrior (attack and block costs that tap another creature that
+- Out after round B228 (looked at, not done): Hollow Warrior (done in round B259) (attack and block costs that tap another creature that
   isn't attacking or blocking: attack costs that aren't mana only sacrifice or return, and no block cost asks for a pick), Reflecting Mirror (its {X} set by
   the target spell's mana value: definedX doesn't see an ability's targets yet), North Star ("for one spell this turn": the
-  player picks the spell the permission is used on), Brutal Suppression and Drought (a sacrifice added to other abilities'
+  player picks the spell the permission is used on), Brutal Suppression and Drought (done in round B260) (a sacrifice added to other abilities'
   costs). Known gap: with Rayami and another "exile it instead" effect (Rest in Peace), the creature's controller should
   choose which applies (CR 616.1), and so whether it gets a blood counter (rulings); the engine applies the first one it
   finds. Escaped Shapeshifter doesn't count "protection from everything" (CR 702.16j) as protection from a color.
@@ -11451,7 +11499,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   discard, once per event) and the lists after round B224 stay out.
 - Out after round B224 (looked at, not done): Peace Talks (activated abilities, not triggered ones, can't target: target
   legality doesn't yet know whether an ability was activated or triggered), False Dawn (mana from spells and abilities, not
-  only lands, turned white, and white mana spent as any color), Benthic Explorers (untapping an opponent's land as a mana
+  only lands, turned white, and white mana spent as any color), Benthic Explorers (done in round B259) (untapping an opponent's land as a mana
   ability's cost) and the lists after round B223 stay out.
 - Out after round B223 (looked at, not done): Eye for an Eye (done in round B257) (a replacement, not a prevention, that keeps the damage and
   adds Eye for an Eye's own; the affected player orders it with prevention shields and redirections, CR 616.1, and the
@@ -11513,7 +11561,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B210 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with no
   target, a new choice in activation), Light Up the Night (done in round B213) (a flashback cost removing X loyalty counters from among your
   planeswalkers), Duelist's Flame (done in round 402) (its granted trigger: "look at that many cards", then an exiled card cast for free or left in
-  exile), Elemental Resonance (done in round B252) (still out: what a {2/W} symbol adds) and Divine Intervention (still out: who removed the last
+  exile), Elemental Resonance (done in round B252) (still out: what a {2/W} symbol adds) and Divine Intervention (done in round B259) (still out: who removed the last
   counter) stay out.
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its
   mana cost": the activation's mana cost is set by the card the cost exiles, and activationCost doesn't see the cost's
@@ -11569,7 +11617,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of one target), Fishing Pole ("Tap Fishing Pole" as a cost of the ability it grants: no cost taps the permanent giving an
   ability yet), Cleansing (done in round B215) (each land's destruction paid off by any player) and Grime Gorger stay out for the reasons in
   the earlier lists.
-- Out after round B177 (looked at, not done): Divine Intervention (only its controller removing the last counter triggers it,
+- Out after round B177 (looked at, not done): Divine Intervention (done in round B259) (only its controller removing the last counter triggers it,
   rulings: who removes counters isn't tracked), Rain of Gore (whether lifelink damage from a spell is that spell causing its
   controller to gain life isn't settled by its rulings), Lich's Mirror, Blood Scrivener, Snowblind and Garruk, Curse Breaker (done in round B219)
   stay out for the reasons in the earlier lists.
@@ -11697,7 +11745,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B143 (looked at, not done): Preferred Selection (done in round B216) (the two cards looked at should be shown with the
   "sacrifice ~ and pay {2}{G}{G}" question, a look with no prompt yet, and that sacrifice-and-pay "you may" isn't parsed).
 - Out after round B142 (looked at, not done): Decaying Soil (done in round B234) (a dies trigger granted by threshold needs a look-back,
-  CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (untapping an
+  CR 603.10a), Nivmagus Elemental (a cost that exiles a spell from the stack), Benthic Explorers (done in round B259) (untapping an
   opponent's land as a mana ability's cost), Charmed Pendant (done in round B239) (mana by the milled card's mana symbols, instant-speed
   only), Grime Gorger (exiling cards that share a type is ambiguous for multi-type cards).
 - Out after round B141 (looked at, not done): Misfortune (done in round B142) and Fatal Lore (done in round B142) ("an opponent chooses one": the mode chosen by an
@@ -12197,7 +12245,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent", done in round B111).
 - Learn: nobody has a sideboard, so it's always "you may discard a card; if you do, draw a card". Retriever Phoenix (done in round B143).
 - "Mana a land could produce" for Gates (Gond Gate, Plaza of Harmony), "basic land" (Star Compass), "that land"
-  (Benthic Explorers), Incubation Druid's "three mana of that type instead".
+  (Benthic Explorers (done in round B259)), Incubation Druid's "three mana of that type instead".
 - "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze
   Glider, Glass of the Guildpact), "hexproof from monocolored", "for each of that spell's colors".
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each

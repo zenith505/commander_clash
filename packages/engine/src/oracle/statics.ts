@@ -3261,6 +3261,13 @@ function parseStaticLine(line: string): StaticAbility | null {
     const filter: TargetSpec = { ...spec, controller: "you", text: one };
     return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: ownCost[1] === "return" ? "bounce" : "sacrifice", filter, n }], text: line };
   }
+  // Hollow Warrior (round B259): "~ can't attack or block unless you tap an untapped creature you control not declared as an
+  // attacking or blocking creature this combat": a cost to attack and one to block, paid as attackers or blockers are
+  // declared (CR 508.1g-h, 509.1d-f), tapping a creature of yours that isn't ~ (rulings) and isn't being declared.
+  if (text === "~ can't attack or block unless you tap an untapped creature you control not declared as an attacking or blocking creature this combat") {
+    const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "untapped creature you control not declared as an attacking or blocking creature this combat" };
+    return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: "tap", filter, n: 1 }, { kind: "ownBlockCost", action: "tap", filter, n: 1 }], text: line };
+  }
   // Reclamation, Flooded Woodlands: "Black creatures can't attack unless their controller sacrifices a land of their choice
   // for each black creature they control that's attacking": each black creature declared as an attacker costs its
   // controller a land of theirs, paid as attackers are declared (CR 508.1g-i), its color as it's declared.

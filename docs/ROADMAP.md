@@ -4249,8 +4249,8 @@ line blocks.
    two untapped creatures you control: Until end of turn, ~ becomes a copy of the exiled card, except it's a Vehicle
    artifact in addition to its other types." (the card linked to it, as printed, CR 607.2a, 707.2; tapping isn't crewing,
    rulings; with that card gone from exile, nothing). Browser tests click through Dermotaxi's pick of Ana's Serra Angel and
-   its copy, Verrak's payment for Greed and Mirror of the Forebears becoming an Elvish Archdruid. +3, 31,754 of 31,936 on
-   this stacked branch; the compiled text of every other card is unchanged.
+   its copy, Verrak's payment for Greed and Mirror of the Forebears becoming an Elvish Archdruid. +3, 31,760 of 31,936 on
+   this stacked branch with main 4038d7f; the compiled text of every other card is unchanged.
    Out after round 423 (looked at, not done): Pulmonic Sliver (an optional "put it on top of its owner's library instead"
    for each Sliver about to go to a graveyard: the engine has no way to ask during a zone change), Nephalia Academy (an
    opponent-caused discard put on top instead: Library of Leng's prompt covers some discard paths, not punishers, ward,

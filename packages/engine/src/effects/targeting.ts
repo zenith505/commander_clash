@@ -1368,6 +1368,16 @@ export function saddledSource(s: GameState, id: ObjectId, sourceId: ObjectId | u
   return !!o && by.includes(`${id}@${o.zoneChanges ?? 0}`);
 }
 
+/**
+ * Balthier and Fran (round 419): was `vehicle`, as the object it is now, crewed this turn with `crewer`, as the object it
+ * is now, tapped for its crew cost (CR 702.122d; TurnLog.crewedBy)? Either one having left and come back is a new object
+ * (CR 400.7) that didn't.
+ */
+export function crewedWith(s: GameState, vehicle: GameObject, crewer: GameObject): boolean {
+  const by = s.turnLog?.crewedBy?.[`${vehicle.id}@${vehicle.zoneChanges ?? 0}`] ?? [];
+  return by.includes(`${crewer.id}@${crewer.zoneChanges ?? 0}`);
+}
+
 export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number, hostThen?: { id: ObjectId; zc: number }): boolean {
   // Giant Beaver: "target creature that saddled it this turn".
   if (spec.saddledSource && t.kind === "object" && !saddledSource(s, t.id, sourceId, sourceZc)) return false;

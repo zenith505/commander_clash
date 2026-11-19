@@ -4130,6 +4130,33 @@ line blocks.
    doubled for creatures dealt damage), Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: bots don't hold Surge to Victory for a
    big attack or pick the best card for it; Gale's bot use takes any legal card.
+   Round 419 went on down `npm run popular`, most played first, past cards left out before to three whose pieces the engine
+   has. Missy's "Whenever another nonartifact creature dies, return it to the battlefield under your control face down
+   and tapped. It's a 2/2 Cyberman artifact creature." (the card, if it's still in the graveyard, CR 400.7: never a token
+   or a commander sent to the command zone; a nameless, colorless 2/2 Cyberman artifact creature face down, CR 708.2a,
+   rulings; Effect putOntoBattlefield `faceDown` "cyberman" now also takes `tapped`; dying with Missy, the others still
+   return, CR 603.10a) and "At the beginning of your end step, each opponent faces a villainous choice — Each artifact
+   creature you control deals 1 damage to that opponent, or you draw a card and chaos ensues." (each opponent in turn
+   order, each choice carried out before the next, CR 701.55, rulings; each artifact creature its own source, CR 120.3;
+   "chaos ensues" only triggers plane cards' chaos abilities, CR 311.7, so outside Planechase it does nothing, as with
+   Will of the Planeswalkers). Shifting Shadow's granted 'At the beginning of your upkeep, destroy this creature. Reveal
+   cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and attach
+   Shifting Shadow to it, then put all other cards revealed this way on the bottom of your library in a random order.'
+   (the enchanted creature's controller's upkeep and library; no state-based actions while it resolves, CR 704.3, so the
+   Aura is still there to move, CR 701.3a; an indestructible creature stays and the Aura still moves; the Aura gone, or
+   no creature card found, nothing is attached and the Aura goes to the graveyard, CR 701.3b, 704.5m, rulings). Balthier
+   and Fran's "Whenever a Vehicle crewed by ~ this turn attacks, if it's the first combat phase of the turn, you may pay
+   {1}{R}{G}. If you do, after this phase, there is an additional combat phase." (TriggeredAbility.attacker
+   `crewedBySelf`: the Vehicle and this permanent each the object it was when it crewed, TurnLog.crewedBy, CR 702.122d,
+   400.7; an intervening if, CR 603.4; no main phase between the combats, rulings). Browser tests click through Missy's
+   villainous choice at Ana's end step and her Cyberman return after Lightning Bolt, Shifting Shadow cast on Grizzly Bears
+   and its upkeep trigger, and Balthier and Fran crewing Sky Skiff, attacking and paying for the extra combat. +3, 31,730
+   of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
+   Out after round 419 (looked at, not done): Supper for Spiders (still out: whether the cards are Food artifacts as they
+   enter), C.A.M.P. (the colors of the mana its land produced), Filigree Vector, Captain America, First Avenger, Jasmine
+   Boreal of the Seven, Wayta, Trainer Prodigy, Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular`
+   above rank 15,100 (still out, for the reasons in their earlier lists). Known gaps: bots don't save Shifting Shadow for
+   a weak creature or a creature-heavy library, nor crew with Balthier and Fran on purpose for its trigger.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

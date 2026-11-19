@@ -7335,6 +7335,8 @@ export interface TriggeredAbility {
      * too. "One of your opponents" (Genestealer Locus): one of their opponents; "or a planeswalker an opponent controls" (Gahiji).
      */
     attacksYou?: "player" | "orPlaneswalker" | "opponent" | "opponentOrPlaneswalker";
+    /** Balthier and Fran (round 419): "Whenever a Vehicle crewed by ~ this turn attacks": the attacker, as the object it is now, was crewed this turn with this permanent, as the object it is now, tapped for its crew cost (TurnLog.crewedBy, CR 702.122d). */
+    crewedBySelf?: true;
   };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;

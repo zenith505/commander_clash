@@ -12,7 +12,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { crewedWith, inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -1923,7 +1923,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
     const attackWatch = (w: GameObject, wc: PlayerId, triggers?: TriggeredAbility[]) => {
       const at = attackingYou(o, wc);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && (!t.attacker.crewedBySelf || crewedWith(s, o, w)) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems((w, wc) => attackWatch(w, wc));

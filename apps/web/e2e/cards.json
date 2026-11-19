@@ -3836,6 +3836,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "570cb560-c246-4652-b230-ab34f966c78a",
+  "name": "Balthier and Fran",
+  "manaCost": "{1}{R}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Rabbit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rabbit"
+  ],
+  "oracleText": "Reach\nVehicles you control get +1/+1 and have reach and vigilance.\nWhenever a Vehicle crewed by Balthier and Fran this turn attacks, if it's the first combat phase of the turn, you may pay {1}{R}{G}. If you do, after this phase, there is an additional combat phase.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4993e373-4b76-4582-a789-6a3123e7ca89",
   "name": "Bane Alley Broker",
   "manaCost": "{1}{U}{B}",
@@ -30635,6 +30672,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "905610cd-1461-4f5a-b9c8-19b193b9d513",
+  "name": "Missy",
+  "manaCost": "{3}{U}{B}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Time Lord Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Rogue"
+  ],
+  "oracleText": "Whenever another nonartifact creature dies, return it to the battlefield under your control face down and tapped. It's a 2/2 Cyberman artifact creature.\nAt the beginning of your end step, each opponent faces a villainous choice — Each artifact creature you control deals 1 damage to that opponent, or you draw a card and chaos ensues.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e78673c4-a969-443f-b1a4-0eb37b8111af",
   "name": "Mist of Stagnation",
   "manaCost": "{3}{U}{U}",
@@ -41275,6 +41349,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "564b1253-2e1f-46c5-b5ae-3932127ca614",
+  "name": "Shifting Shadow",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has haste and \"At the beginning of your upkeep, destroy this creature. Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and attach Shifting Shadow to it, then put all other cards revealed this way on the bottom of your library in a random order.\"",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f557fb2c-581b-4a8d-8766-1e46e92224fa",
   "name": "Shimmer",
   "manaCost": "{2}{U}{U}",
@@ -42063,6 +42167,35 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f2c43b85-8c42-4b23-84c2-bec8d6230039",
+  "name": "Sky Skiff",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

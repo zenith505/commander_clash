@@ -162,6 +162,7 @@ import { round415Line } from "./round415";
 import { round416Line } from "./round416";
 import { round417Line } from "./round417";
 import { round418Line } from "./round418";
+import { round419Line } from "./round419";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1046,6 +1047,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Missy, Shifting Shadow's granted trigger and Balthier and Fran (round 419): oracle/round419.ts.
+    if (round419Line(line, raw, out, isSpell)) continue;
     // Surge to Victory's sentences (round418Sentence), Gale, Waterdeep Prodigy and Zethi, Arcane Blademaster (round 418): oracle/round418.ts.
     if (round418Line(line, raw, out, isSpell)) continue;
     // Helm of Kaldra's sentences (round417Sentence), Lodestone Bauble (round 417): oracle/round417.ts.

@@ -1934,6 +1934,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     // Hostile Negotiations: turn the pile worth less face up (the opponent choosing sees only the other's size).
+    // Phyrexian Portal (round B265): both piles face down, so only their sizes to go by: exile the smaller, keeping more
+    // cards to search.
+    if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles && pend.pileMode === "blindExile") return [{ type: "chooseOption", player: pid, choice: pend.piles[0].length <= pend.piles[1].length ? "0" : "1" }];
+    // Raging River (round B265): the label whose pile could block this attacker least: the untapped creatures in it
+    // (those with flying can block it anyway), weighed by their power and toughness.
+    if (pend.kind === "chooseOption" && pend.what === "riverSide" && pend.about && s.objects[pend.about]) {
+      const a = obj(s, pend.about);
+      const pile = (side: "left" | "right") => {
+        const theirs = s.resolving?.scratch?.river?.creatures[a.attacking ?? -1] ?? [];
+        const left = s.resolving?.scratch?.chosen?.[a.attacking ?? -1] ?? [];
+        return theirs.filter((id) => (side === "left") === left.includes(id) && s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
+      };
+      const weight = (ids: string[]) => ids.reduce((n, id) => n + Math.max(0, power(s, obj(s, id))) + Math.max(0, toughness(s, obj(s, id))), 0);
+      return [{ type: "chooseOption", player: pid, choice: weight(pile("left")) <= weight(pile("right")) ? "left" : "right" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles && pend.pileMode === "turnFaceUp") {
       const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + handWorth(s, id), 0));
       return [{ type: "chooseOption", player: pid, choice: a! <= b! ? "0" : "1" }];
@@ -7481,6 +7496,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Immortal Coil (round B262): no exiling our own graveyard down to fewer than five cards while we'd lose with none.
       const exiles = (ab.costs ?? []).reduce((n, c) => n + (c.kind === "exileFromGraveyard" ? c.n || 1 : 0), 0);
       if (exiles && player(s, pid).graveyard.length - exiles < 5 && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && graveyardLifeline(abilitiesOf(s, obj(s, b))))) continue;
+      // Phyrexian Portal (round B265): a pile of our library exiled for one card: once a turn, in our second main phase,
+      // and only with a library that can spare it.
+      if (ab.body.effects.some((e) => e.type === "portalPiles") && (o.activatedThisTurn?.includes(i) || s.activePlayer !== pid || s.step !== "main2" || s.stack.length > 0 || player(s, pid).library.length < 25)) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;

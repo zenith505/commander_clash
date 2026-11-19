@@ -111,6 +111,7 @@ import { runLaneB260Effect } from "./run-laneb260";
 import { runLaneB262Effect } from "./run-laneb262";
 import { runLaneB263Effect } from "./run-laneb263";
 import { runLaneB264Effect } from "./run-laneb264";
+import { runLaneB265Effect } from "./run-laneb265";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -2165,6 +2166,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB263Effect(s, e, ctx, src);
     case "bendOrBreak":
       return runLaneB264Effect(s, e, ctx, src);
+    case "portalPiles":
+    case "ragingRiver":
+      return runLaneB265Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

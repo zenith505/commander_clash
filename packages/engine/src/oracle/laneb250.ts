@@ -1,5 +1,6 @@
 // Lane B round B250's whole spells, read after round B245's (roundB245Spell in oracle/laneb245.ts).
 import type { AbilityBody } from "../abilities";
+import { roundB262Spell } from "./laneb262";
 
 export function roundB250Spell(text: string): AbilityBody | null | undefined {
   // Gather Specimens: "If a creature would enter the battlefield under an opponent's control this turn, it enters under
@@ -7,5 +8,5 @@ export function roundB250Spell(text: string): AbilityBody | null | undefined {
   // a card, a creature as it would exist on the battlefield (CR 614.12), applied before the creature's other replacements
   // of how it enters (CR 616.1b, rulings). Effect gatherSpecimens; gather.ts.
   if (text === "If a creature would enter the battlefield under an opponent's control this turn, it enters under your control instead.") return { targets: [], effects: [{ type: "gatherSpecimens" }], text };
-  return undefined;
+  return roundB262Spell(text);
 }

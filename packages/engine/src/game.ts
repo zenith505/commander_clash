@@ -21,6 +21,7 @@ import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protect
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
+import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
@@ -532,6 +533,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "payDelayed":
       requireNoPending(s);
       payDelayed(s, p, action.id);
+      break;
+    case "payShield":
+      requireNoPending(s);
+      payShield(s, p, action.id);
       break;
     case "ignoreEffect":
       requireNoPending(s);
@@ -1405,6 +1410,7 @@ export function moveObject(
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
   o.encoded = undefined; // cards stay encoded only on the permanent as long as it's on the battlefield (CR 702.99c)
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
+  o.warpedZc = undefined; // a new object, no longer the warped card (CR 400.7, 702.185b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   // Caller of the Hunt (round B245): the type chosen as it was cast stays with the permanent it becomes (CR 400.7d, 607.2d).
@@ -5520,6 +5526,8 @@ function finishCleanup(s: GameState) {
     p.redirectNext = undefined;
   }
   s.preventCombatDamage = undefined;
+  // Guardian Angel's "until end of turn" permission (round B263, CR 514.2).
+  s.payShields = undefined;
   // Ascent of the Worthy's "until your next turn" ones stay until that turn begins (CR 611.2b).
   // Old Fat Spider Can't See Me's last while its source is on the battlefield (CR 611.2b).
   const lasting = s.damageRules?.filter((r) => r.untilYourNextTurn || whileSourceHolds(s, r));
@@ -7481,6 +7489,8 @@ export function castProblem(
   if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   // Open the Way: "X can't be greater than the number of players in the game" (a player who left isn't, CR 800.4a).
   if (compileCard(d).xMaxPlayers && (x ?? 0) > livingPlayers(s).length) return "X can't be greater than the number of players in the game";
+  // Winter's Chill (round B262): the snow lands its caster controls as X is announced (CR 601.2b).
+  if (compileCard(d).xMaxSnowLands && (x ?? 0) > s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Land") && characteristics(s, b).supertypes.includes("Snow")).length) return "X can't be greater than the number of snow lands you control";
   if (compileCard(d).xMaxGreatestToughness && (x ?? 0) > Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === pid && objIsType(s, b, "Creature")).map((b) => toughness(s, b))))
     return "X can't be greater than the greatest toughness among creatures you control";
   const kp = kickProblem(d, choices?.kicks);
@@ -10192,7 +10202,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "exileFromGraveyard" && c.process
           ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? (c.warped ? "choose" : "behold") : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
     const chosen = c.kind === "sacrifice" && c.added ? choices?.addedSacrifice : given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -10551,13 +10561,18 @@ export function craftSlotsFit(s: GameState, pid: PlayerId, c: Extract<Additional
 
 /** Behold (CR 701.4a): the matching cards in `pid`'s hand and the matching permanents they control, not `o` itself. */
 export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "reveal" }>): ObjectId[] {
-  const hand = player(s, pid).hand.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
+  // Close Encounter (round B264): a warped card in exile that the player owns (CR 702.185b), not a card in the hand.
+  const hand = c.warped ? player(s, pid).exile.filter((id) => id !== o.id && isWarped(obj(s, id)) && obj(s, id).owner === pid && printedMatches(c.filter, defOf(s, obj(s, id)))) : player(s, pid).hand.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
   const field = c.orControl ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.orControl!, obj(s, id), pid, false)) : [];
   return [...field, ...hand];
 }
 
+/** A warped card in exile (CR 702.185b): exiled by warp's delayed trigger, and still the object that was exiled (CR 400.7). */
+export const isWarped = (o: GameObject) => o.zone === "exile" && o.warpedZc !== undefined && o.warpedZc === (o.zoneChanges ?? 0);
+
 /** "An Elf" for "behold an Elf". */
 export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
+  if (c.warped) return "a creature you control or a warped creature card you own in exile";
   const kind = c.filter.subtypes?.[0] ? `${c.filter.subtypes[0]}${c.filter.types?.includes("Creature") ? " creature" : ""}` : c.filter.text;
   // "Three Elementals" (Kindle the Inner Flame, round 371).
   return c.n === 1 ? `${/^[AEIOU]/.test(kind) ? "an" : "a"} ${kind}` : `${["two", "three", "four", "five"][c.n - 2] ?? c.n} ${kind}s`;
@@ -10730,7 +10745,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.reveal ?? []) {
         const o = obj(s, id);
         const onField = o.zone === "battlefield";
-        log(s, `${p.name} beholds ${nameOf(s, id)}${onField ? "" : " from their hand"}${c.exile ? " and exiles it" : ""}.`);
+        log(s, c.warped ? `${p.name} chooses ${nameOf(s, id)}${onField ? "" : " (a warped card in exile)"}.` : `${p.name} beholds ${nameOf(s, id)}${onField ? "" : " from their hand"}${c.exile ? " and exiles it" : ""}.`);
         if (!c.exile) continue;
         moveObject(s, id, "exile");
         exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
@@ -17021,6 +17036,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
   for (const d of payableDelayed(s, pid)) if (payDelayedProblem(s, pid, d.unlessPaid!.id) === null) out.push({ type: "payDelayed", player: pid, id: d.unlessPaid!.id });
+  for (const ps of payableShields(s, pid)) if (payShieldProblem(s, pid, ps.id) === null) out.push({ type: "payShield", player: pid, id: ps.id });
   for (const id of s.battlefield) if (!ignorableBy(s, pid, id)?.costs && ignoreEffectProblem(s, pid, id) === null) out.push({ type: "ignoreEffect", player: pid, objectId: id });
   // "You may play lands from your graveyard" (Crucible of Worlds). Coram, the Undertaker (round 381): any graveyard's.
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))

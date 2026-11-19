@@ -2,11 +2,12 @@ import { bindBound, cardPT, isLegalTarget, linkedCards, playerProtectedFrom, pla
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
 import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
-import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type StaticCondition, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
-import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPayDelayed, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { payableShields, payShieldHolder } from "./pay-shields";
+import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planIgnoreEffect, planPayDelayed, planPayShield, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
@@ -325,8 +326,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
+    // Aetherplasm (round B261): back to the hand, always: the attacker stays blocked whatever is put in (rulings).
+    const plasmMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects : undefined;
+    if (pend.kind === "chooseMay" && plasmMay?.[s.resolving!.next]?.type === "may" && plasmMay.some((x) => x.type === "if" && x.effects.some((y) => y.type === "putFromHand" && y.blockingSubject))) return [{ type: "chooseMay", player: pid, yes: true }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    // Soul Echo (round B264): its controller doesn't lose for having 0 or less life while it's out, so with their life at 0
+    // or less, damage to them does nothing and spending the counters gets it sacrificed sooner; otherwise the damage counts.
+    // (The may is in the "otherwise" of the trigger's "if".)
+    if (pend.kind === "chooseMay" && s.resolving && s.resolving.item.controller !== pid && allEffects(s.resolving.body.effects).some((e) => e.type === "may" && !!e.decider && e.effects.length === 1 && e.effects[0]!.type === "damageMod" && e.effects[0]!.mod.op === "removeCounters"))
+      return [{ type: "chooseMay", player: pid, yes: player(s, s.resolving.item.controller).life <= 0 }];
     // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
     // Spirit-Sister's Call (round B220): only for a permanent sharing a card type that costs less than the card coming back (a
     // token nothing), never the card's own worth or more.
@@ -813,6 +822,21 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.fromHand && s.resolving?.body.effects[s.resolving.next]?.type === "exileFromHandOrYard") {
       const count = (id: ObjectId) => ((c) => c.activated.filter((a) => !a.zone && !a.equip && a.loyalty === undefined).length + c.mana.length)(compileCard(defOf(s, obj(s, id))));
       const best = [...pend.cards].filter((id) => count(id) > 0).sort((a, b) => count(b) - count(a) || mv(s, b) - mv(s, a))[0];
+      return [{ type: "searchLibrary", player: pid, found: best ? [best] : [] }];
+    }
+    // Aetherplasm (round B261): a creature card that survives the attacker's damage, one that also kills it first; none when
+    // no card would survive (the attacker stays blocked anyway, rulings). Powers and toughnesses as printed.
+    const plasmAt = pend.kind === "searchLibrary" && pend.fromHand ? s.resolving?.body.effects[s.resolving.next] : undefined;
+    const plasm = plasmAt?.type === "if" ? plasmAt.effects.find((x) => x.type === "putFromHand") : plasmAt;
+    if (pend.kind === "searchLibrary" && plasm?.type === "putFromHand" && plasm.blockingSubject) {
+      const sub = s.resolving?.item.subject;
+      const at = sub ? s.objects[sub.id] : undefined;
+      if (!at || at.zone !== "battlefield") return [{ type: "searchLibrary", player: pid, found: [] }];
+      const hit = power(s, at);
+      const tough = toughness(s, at) - at.damage;
+      const pt = (id: ObjectId) => ({ p: Number(defOf(s, obj(s, id)).power ?? 0) || 0, t: Number(defOf(s, obj(s, id)).toughness ?? 0) || 0 });
+      const lives = pend.cards.filter((id) => pt(id).t > hit && !objHasKeyword(s, at, "Deathtouch"));
+      const best = [...lives].sort((a, b) => Number(pt(b).p >= tough) - Number(pt(a).p >= tough) || mv(s, a) - mv(s, b))[0];
       return [{ type: "searchLibrary", player: pid, found: best ? [best] : [] }];
     }
     if (pend.kind === "searchLibrary" && pend.fromHand) {
@@ -2512,7 +2536,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid) ?? chooseSendAttackerAway(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? choosePayShield(s, pid) ?? chooseStackShield(s, pid) ?? chooseDamageShield(s, pid) ?? chooseGambit(s, pid) ?? chooseProtection(s, pid) ?? choosePhaseAway(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseGiftToActive(s, pid) ?? chooseTimed(s, pid) ?? choosePayDelayed(s, pid) ?? choosePayEnchantedCost(s, pid) ?? chooseSendAttackerAway(s, pid);
   if (regen) return regen;
   const silencer = chooseSilencerFaceUp(s, pid);
   if (silencer) return silencer;
@@ -3535,6 +3559,13 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     if (forced) return ours[0] ? [ours[0]] : all[0] ? [all[0]] : null;
     return attacked && ours[0] ? [ours[0]] : null;
   }
+  // Winter's Chill (round B262): only other players' creatures attacking us, the strongest first, exactly X of them.
+  if (printed.targets.length === 1 && printed.effects.some((e) => e.type === "payFullOrPart")) {
+    const all = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const at: typeof all = all.flatMap((t) => (t.kind === "object" && obj(s, t.id).attacking === pid && controllerOf(s, obj(s, t.id)) !== pid ? [t] : [])).sort((a, b) => (a.kind === "object" && b.kind === "object" ? power(s, obj(s, b.id)) - power(s, obj(s, a.id)) : 0));
+    if (forced) return x <= all.length ? [...at, ...all.filter((t) => !at.includes(t))].slice(0, Math.max(1, x)) : null;
+    return x > 0 && at.length >= x ? at.slice(0, x) : null;
+  }
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
@@ -4383,6 +4414,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const life = player(s, pid).life;
     if (life > 10 || opponents(s, pid).some((q) => player(s, q).life <= life)) return null;
   }
+  // Immortal Coil (round B262): its controller loses once their graveyard is empty, and damage to them eats it: only with a
+  // graveyard big enough to last a while.
+  if (graveyardLifeline(compileCard(d)) && player(s, pid).graveyard.length < 8) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -5526,9 +5560,17 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       // commander (a token exiled is gone for good, CR 111.7).
       const pool = beholdCandidates(s, pid, obj(s, id), c).filter((x) => !targeted.has(x));
       const field = pool.filter((x) => obj(s, x).zone === "battlefield" && !(c.exile && (obj(s, x).isToken || obj(s, x).isCommander))).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
-      const hand = pool.filter((x) => obj(s, x).zone === "hand").sort((a, b) => mv(s, a) - mv(s, b));
+      const hand = pool.filter((x) => obj(s, x).zone !== "battlefield").sort((a, b) => mv(s, a) - mv(s, b));
       const fits = c.exile ? [...hand, ...field] : [...field, ...hand];
       if (fits.length < c.n) return null;
+      // Close Encounter (round B264): the damage is the chosen one's power, so the strongest creature or warped card.
+      if (c.warped) {
+        const pw = (x: ObjectId) => (obj(s, x).zone === "battlefield" ? power(s, obj(s, x)) : cardPT(s, obj(s, x), "power"));
+        const best = [...fits].sort((a, b) => pw(b) - pw(a))[0]!;
+        if (pw(best) <= 0) return null;
+        out.reveal = [best];
+        continue;
+      }
       // Dragon's Fire: the strongest Dragon, and only when its power beats the damage dealt without one.
       const beheldIf = compileCard(defOf(s, obj(s, id))).spell?.effects.find((e) => e.type === "if" && JSON.stringify(e.effects).includes('"kind":"beheldPower"'));
       if (beheldIf?.type === "if") {
@@ -6556,6 +6598,8 @@ function choiceHurts(c: CompiledCard): boolean {
     for (const [k, x] of Object.entries(o)) if (k !== "chosen") visit(x, h);
   };
   visit([c.spell, c.triggers, c.activated, c.statics], false);
+  // Mangara's Equity (round B261): damage back to creatures of the chosen color, so the opponents' color.
+  if (c.triggers.some((t) => t.event === "creatureDamagesYouOrYours")) return true;
   return hurts && !own;
 }
 
@@ -7441,6 +7485,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Heroism (round B232): once a turn, after blockers are declared, against red attackers of another player's that would
       // deal us 4 or more combat damage in all.
       if (ab.body.effects.some((e) => e.type === "attackersPayOrPrevent") && (o.activatedThisTurn?.includes(i) || s.step !== "declareBlockers" || s.activePlayer === pid || s.battlefield.map((b) => obj(s, b)).filter((a) => a.attacking === pid && !a.attackingPermanent && characteristics(s, a).colors.includes("R")).reduce((n, a) => n + Math.max(0, power(s, a)), 0) < 4)) continue;
+      // Immortal Coil (round B262): no exiling our own graveyard down to fewer than five cards while we'd lose with none.
+      const exiles = (ab.costs ?? []).reduce((n, c) => n + (c.kind === "exileFromGraveyard" ? c.n || 1 : 0), 0);
+      if (exiles && player(s, pid).graveyard.length - exiles < 5 && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && graveyardLifeline(abilitiesOf(s, obj(s, b))))) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;
@@ -8971,6 +9018,94 @@ function chooseRedirect(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/**
+ * Damage the top of the stack would deal to this permanent or player as it resolves, estimated: its targets and "each
+ * creature" effects (Torrent of Lava), whoever controls it.
+ */
+function stackDamageTo(s: GameState, to: { kind: "object"; id: ObjectId } | { kind: "player"; id: PlayerId }): number {
+  const top = s.stack[s.stack.length - 1];
+  if (!top) return 0;
+  const spell = top.kind === "spell" && top.objectId ? s.objects[top.objectId] : undefined;
+  const body = top.body ?? (spell ? castingBody(defOf(s, spell)) : undefined);
+  if (!body) return 0;
+  let n = 0;
+  for (const e of allEffects(body.effects)) {
+    if (e.type !== "damage") continue;
+    const amount = estimate(e.amount, top.x ?? 0);
+    if (to.kind === "player" && (e.to.ref === "eachPlayer" || (e.to.ref === "eachOpponent" && top.controller !== to.id))) n += amount;
+    if (to.kind === "object" && e.to.ref === "each" && objectMatches(s, e.to.filter, obj(s, to.id), top.controller, false)) n += amount;
+    for (const [i, t] of (top.targets ?? []).entries()) {
+      if (!refCovers(e.to, i)) continue;
+      if ((t.kind === "player" && to.kind === "player" && t.id === to.id) || (t.kind === "object" && to.kind === "object" && t.id === to.id)) n += t.amount ?? amount;
+    }
+  }
+  return n;
+}
+
+/** Combat damage the permanent or player would be dealt once blockers are declared, before damage: blockers' or attackers' power. */
+function combatDamageTo(s: GameState, to: { kind: "object"; id: ObjectId } | { kind: "player"; id: PlayerId }): number {
+  if (s.step !== "declareBlockers" || s.stack.length) return 0;
+  if (to.kind === "player") return s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === to.id && !o.blockedBy?.length).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+  const c = obj(s, to.id);
+  const foes = c.blocking ? c.blocking : c.attacking !== undefined ? (c.blockedBy ?? []) : [];
+  return foes.reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? Math.max(0, power(s, obj(s, f))) : 0), 0);
+}
+
+/**
+ * Guardian Angel (round B263, GameState.payShields): a special action (CR 116.2c), {1} at a time, while damage about to be
+ * dealt (the top of the stack, or combat damage once blockers are declared) gets past the shields already there and would
+ * destroy the creature, or would leave the bot itself at 15 life or less.
+ */
+function choosePayShield(s: GameState, pid: PlayerId): Action[] | null {
+  for (const ps of payableShields(s, pid)) {
+    const h = payShieldHolder(s, ps);
+    if (!h) continue;
+    const coming = Math.max(stackDamageTo(s, h), combatDamageTo(s, h));
+    if (coming <= 0) continue;
+    let need: boolean;
+    if (h.kind === "object") {
+      const c = obj(s, h.id);
+      need = controllerOf(s, c) === pid && objIsType(s, c, "Creature") && !objHasKeyword(s, c, "Indestructible") && coming - (c.preventNext ?? 0) >= Math.max(1, lethalDamage(s, c));
+    } else {
+      const left = coming - (player(s, h.id).preventNext ?? 0);
+      need = h.id === pid && left > 0 && player(s, pid).life - left <= 15;
+    }
+    if (!need) continue;
+    const plan = planPayShield(s, pid, ps.id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Torrent of Lava's granted "{T}: Prevent the next 1 damage that would be dealt to this creature by Torrent of Lava this
+ * turn" (round B263): tap a creature of ours while that spell is on top of the stack when the 1 prevented is what lets it
+ * survive the spell's damage.
+ */
+function chooseStackShield(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  const so = top?.kind === "spell" && top.objectId ? s.objects[top.objectId] : undefined;
+  if (!so || !compileCard(defOf(s, so)).stackGrants?.length) return null;
+  for (const id of s.battlefield) {
+    const c = obj(s, id);
+    if (controllerOf(s, c) !== pid || c.tapped || !objIsType(s, c, "Creature")) continue;
+    const coming = stackDamageTo(s, { kind: "object", id }) - (c.preventNext ?? 0);
+    const lethal = Math.max(1, lethalDamage(s, c));
+    if (coming < lethal || coming - 1 >= lethal) continue;
+    const abilities = abilitiesOf(s, c).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const e = abilities[i]!.body.effects[0];
+      if (!abilities[i]!.tap || e?.type !== "damageRule" || e.rule.by?.target?.ref !== "grantSource" || e.rule.by.target.id !== so.id) continue;
+      if ((s.damageRules ?? []).some((r) => r.to?.object?.id === id && r.by?.chosen?.id === so.id)) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
 /** Damage about to be dealt to a bot or its creatures: an opponent's spell or ability on the stack, or unblocked attackers. */
 type DamageThreat =
   | { kind: "stack"; item: StackItem; def: CardDef; source?: GameObject; toMe: number; creatures: GameObject[] }
@@ -9070,6 +9205,11 @@ function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageTh
     // Redirections count when the damage can go to an opponent: any target, or back to the threat (Reverberation's spell's
     // controller, Aegis of Honor's, Turn the Tables' attacking creature).
     const back = (r.redirect?.ref === "targetController" && !!r.by?.target) || (r.redirect?.ref === "target" && t.kind === "combat" && r.combat === "only" && r.to?.players === "you" && !r.by);
+    // Blood of the Martyr (round B263): its own creatures' lethal damage taken instead, with life to spare (redirectBotWants).
+    if (r.redirectMay && r.redirect?.ref === "you") {
+      if (t.kind === "stack" && t.creatures.length && player(s, pid).life >= 25) best = Math.max(best, t.creatures.reduce((n, c) => n + worth(s, pid, c), 0));
+      continue;
+    }
     if (r.redirect && r.redirect.ref !== "anyTarget" && !back) continue;
     // Reflect Damage: a chosen attacker's damage goes back to its controller too.
     if (r.redirectToSourceController && t.kind !== "stack" && !r.by?.choose) continue;
@@ -10334,3 +10474,8 @@ function swapWorth(s: GameState, pid: PlayerId, kind: "swapBlockers" | "swapBloc
   return gain > 0 ? 2 + gain : -10;
 }
 
+
+/** Immortal Coil (round B262): "When there are no cards in your graveyard, you lose the game." (a state trigger). */
+function graveyardLifeline(c: { triggers?: readonly { event: string; state?: StaticCondition; body: AbilityBody }[] }): boolean {
+  return (c.triggers ?? []).some((tr) => tr.event === "state" && tr.state?.kind === "amount" && tr.state.max === 0 && typeof tr.state.amount === "object" && "count" in tr.state.amount && tr.state.amount.count.kind === "cardsInGraveyard" && tr.body.effects.some((e) => e.type === "loseGame"));
+}

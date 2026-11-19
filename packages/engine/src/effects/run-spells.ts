@@ -877,9 +877,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Codie, Vociferous Codex: less than the mana value of the spell that triggered it (none found without one).
         const causeSpell = e.lesserThanCause && ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") ?? s.castItems?.[ctx.cause]) : undefined;
         const lessThan = e.lesserThanCause ? (causeSpell ? spellManaValue(s, causeSpell) : 0) : undefined;
+        // Possibility Storm (round 422): the card types of the spell that triggered this, as it last existed on the stack
+        // (exileCause noted them as it exiled it; if something else exiled it first, as it was cast, rulings, CR 608.2h).
+        const causeTypes = e.untilSharesCauseType ? (s.resolving!.causeTypes ?? (ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castTypes : undefined) ?? []) : undefined;
+        const untilTypes = causeTypes ?? e.untilTypes;
         const fits = (id: ObjectId) =>
           (lessThan === undefined || defMv(defOf(s, obj(s, id))) < lessThan) &&
-          (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
+          (untilTypes ? untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
           (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) &&
           (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast) &&
           !(e.untilNonlegendary && defOf(s, obj(s, id)).supertypes?.includes("Legendary"));
@@ -912,7 +916,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${causeTypes ? `${causeTypes.map((x) => x.toLowerCase()).join(" or ") || "such"}` : e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;
@@ -954,7 +958,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             closeZoneBatch(s); // exiled one at a time (rulings on Laelia)
           }
         const caster = e.ownerCasts ? pid : ctx.controller;
-        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom || e.inPlace ? { seen } : {}) };
+        // Possibility Storm (round 422): "all cards exiled with ~" are these and the spell this resolution exiled.
+        const cause = e.withExiledCause ? s.resolving!.exiledFromStack : undefined;
+        const causeCard = cause && s.objects[cause.id]?.zone === "exile" && (s.objects[cause.id]!.zoneChanges ?? 0) === cause.zc ? [cause.id] : [];
+        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom || e.inPlace ? { seen: [...causeCard, ...seen] } : {}) };
         if (!hit) return e.restStays ? undefined : e.inPlace ? revealedToBottom(s, seen) : bottomRest(s, sc.untilNonland.seen);
         if (e.then === "suspend") {
           suspendExiled(s, obj(s, hit), e.suspend ?? 0);

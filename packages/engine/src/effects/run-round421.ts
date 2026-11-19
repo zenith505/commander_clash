@@ -3,6 +3,7 @@
 import type { Effect } from "../abilities";
 import { defOf } from "../cards";
 import { freeCastable, log } from "../game";
+import { characteristics } from "../layers";
 import type { GameState } from "../types";
 import type { ResolveCtx } from "./resolve";
 import { counterOnStack } from "./run-spells";
@@ -15,7 +16,12 @@ export function runRound421Effect(s: GameState, e: R421Effect, ctx: ResolveCtx, 
       // The spell whose casting triggered this, only while it's still that spell on the stack (CR 400.7): exiled, not
       // countered (so "can't be countered" doesn't stop it, CR 701.6a). Gone already (resolved, countered), nothing happens;
       // its mana value is still read as it last existed on the stack (amounts.ts castSpell, CR 608.2h).
-      if (ctx.cause === undefined || !s.stack.some((x) => x.id === ctx.cause && x.kind === "spell")) return;
+      const item = ctx.cause === undefined ? undefined : s.stack.find((x) => x.id === ctx.cause && x.kind === "spell");
+      if (!item) return;
+      // Round 422 (Possibility Storm): its card types as it last existed on the stack (CR 608.2h), for "a card that shares
+      // a card type with it" once it's in exile, a new object (CR 400.7).
+      const o = item.objectId ? s.objects[item.objectId] : undefined;
+      if (o && s.resolving) s.resolving.causeTypes = [...characteristics(s, o).types];
       return counterOnStack(s, ctx, ctx.cause, src, undefined, "exile", true);
     }
     case "castRevealedFree": {

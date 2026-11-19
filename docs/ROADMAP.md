@@ -64,7 +64,7 @@ line blocks.
    Osteoharmonist (the creature "has no abilities" as it enters, so its own enters-tapped, enters-with-counters and "as
    it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Out after round 161:
    Toralf, God of Fury // Toralf's Hammer (done in round 266). Out after round 162, each with a
-   piece of its own: Possibility Storm (the spell cast from a hand is exiled by its trigger, then cards until one that
+   piece of its own: Possibility Storm (done in round 422) (the spell cast from a hand is exiled by its trigger, then cards until one that
    shares a card type with it), Izzet Generatorium (an energy replacement and "if you've paid or lost four or more {E}
    this turn"), Triple Triad (every player's exiled top card, playable for free by mana value), Mm'menon, the Right Hand
    (done in round 271), Arvinox, the Mind Flail ("isn't a creature unless
@@ -1318,7 +1318,7 @@ line blocks.
    resolution); Lazav, Dimir Mastermind (done in round 406) and Valki, God of Lies (becoming a copy of a card outside the battlefield, "that
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
-   an additional counter"); River Song's Diary, Knowledge Pool, Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
+   an additional counter"); River Song's Diary, Knowledge Pool (done in round 422), Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
    the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan (done in round 315), Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
    mechanism).
@@ -4209,6 +4209,31 @@ line blocks.
    Selective Adaptation, Tahngarth, First Mate and the rest of `npm run popular` above rank 15,100 (still out, for the
    reasons in their earlier lists). Known gaps: bots cast into Lady Loki's trigger without weighing the spell they lose;
    Medomai's Prophecy's bot name may be a land card.
+   Round 422 went on down the "Out after round N" lists and `npm run popular`, most played first, to three cards whose
+   pieces round 421's Lady Loki brought (a spell exiled from the stack by its own cast trigger, cards exiled from the top,
+   one cast as the trigger resolves). Possibility Storm's "Whenever a player casts a spell from their hand, that player
+   exiles it, then exiles cards from the top of their library until they exile a card that shares a card type with it.
+   That player may cast that card without paying its mana cost. Then they put all cards exiled with ~ on the bottom of
+   their library in a random order." (any player's spell, that player doing it all; the spell's card types as it last
+   existed on the stack, CR 608.2h, ResolvingState.causeTypes, and a land shares them too: an artifact land stops an
+   artifact spell and can't be cast; if something else exiled the spell first, it still goes on, rulings; the original
+   spell and the card not cast go to the bottom with the rest, rulings; exileUntilNonland `untilSharesCauseType`,
+   `withExiledCause`). Knowledge Pool's imprint linked to it (CR 607.2a) and "Whenever a player casts a spell from their
+   hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with ~ without
+   paying its mana cost." (the spell exiled with it, not countered; nothing if it wasn't exiled, so a second Knowledge
+   Pool does nothing, rulings; any player's cards, timing ignored, X as 0, CR 608.2g; castFromAmong fromYard
+   `othersOnly`). Ashnod the Uncaring's "Whenever you activate an ability of an artifact or creature that isn't a mana
+   ability, if one or more permanents were sacrificed to activate it, you may copy that ability." (a sacrifice its costs
+   made, the permanent itself or another, counted as they're paid; not a Treasure sacrificed for the mana, rulings;
+   TriggeredAbility.activates `costSacrificed`). Browser tests click through Possibility Storm's free cast, Knowledge
+   Pool's pick of Ana's Lightning Bolt and Ashnod's copy of a Mogg Fanatic's ability. +3, 31,751 of 31,936 on this
+   stacked branch with main ba0e12b; the compiled text of every other card is unchanged.
+   Out after round 422 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability; the targeting code, the browser's target picker and the bots all assume one), Verrak, Warped Sengir (the
+   same trigger as Ashnod's on the life paid to activate it, then that much life paid again: looked at, not started), The Seventh Doctor (a card chosen face down
+   from the hand and the defending player's guess) and the rest of `npm run popular` above rank 17,500 (still out, for
+   the reasons in their earlier lists). Known gaps: bots cast spells from their hands into Possibility Storm and
+   Knowledge Pool without weighing what they lose.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

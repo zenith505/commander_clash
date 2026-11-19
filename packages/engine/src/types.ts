@@ -3094,6 +3094,8 @@ export interface Resolving {
   counteredExiled?: { id: ObjectId; zc: number };
   /** Gale's Redirection: the card a spell this resolution exiled from the stack without countering it was (counterSpell `exileSpell`), as it is in exile. */
   exiledFromStack?: { id: ObjectId; zc: number };
+  /** Effect exileCause (round 422): the card types of the spell it exiled as that spell last existed on the stack (CR 608.2h), for Possibility Storm's "a card that shares a card type with it". */
+  causeTypes?: string[];
   /** Psychic Rebuttal: the spell a counterSpell `copyCountered` countered, as it last was on the stack, its card's object then too (CR 707.10: a copy copies its choices). */
   counteredCopy?: { item: StackItem; card: GameObject };
   /** Counterlash: the card types of the spell a counterSpell with noteTypes targeted, as it was on the stack just before. */

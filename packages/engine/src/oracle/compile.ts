@@ -169,6 +169,7 @@ import { round418Line } from "./round418";
 import { round419Line } from "./round419";
 import { round420Line } from "./round420";
 import { round421Line } from "./round421";
+import { round422Line } from "./round422";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1053,6 +1054,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Possibility Storm, Knowledge Pool and Ashnod the Uncaring (round 422): oracle/round422.ts.
+    if (round422Line(line, raw, out, isSpell)) continue;
     // Lady Loki, Agent of Chaos (round 421): oracle/round421.ts.
     if (round421Line(line, raw, out, isSpell)) continue;
     // Kotose, the Silent Spider, Allure of the Unknown and Cloak and Dagger, Entwined (round 420): oracle/round420.ts.

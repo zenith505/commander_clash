@@ -1614,14 +1614,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // countered; then every card still exiled with Eye of the Storm, whoever owns it (rulings).
         const item = ctx.cause ? s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") : undefined;
         const o = item?.objectId ? s.objects[item.objectId] : undefined;
+        let exiledIt: { id: ObjectId; zc: number } | undefined;
         if (item && o && !o.spellCopy && !item.copy && o.zone === "stack") {
           s.stack.splice(s.stack.indexOf(item), 1);
           moveObject(s, o.id, "exile");
           log(s, `${src} exiles ${defOf(s, o).name} from the stack.`);
           const gone = obj(s, o.id);
+          if (gone.zone === "exile") exiledIt = { id: gone.id, zc: gone.zoneChanges ?? 0 };
           if (gone.zone === "exile" && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id: gone.id, zc: gone.zoneChanges ?? 0 });
         }
-        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0).filter((x) => !e.fromYard!.filter || printedMatches(e.fromYard!.filter, defOf(s, obj(s, x.id)))), declined: [] };
+        // Knowledge Pool (round 422): "If the player does": only once this exiled the spell (gone already, countered or
+        // exiled by another Knowledge Pool, nothing, rulings); then "other cards", not that one.
+        if (e.fromYard.othersOnly && !exiledIt) {
+          log(s, `${src}: the spell wasn't exiled this way, so nothing is cast.`);
+          sc.castAmong = { ids: [], declined: [], done: true };
+          return;
+        }
+        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0).filter((x) => !(exiledIt && e.fromYard!.othersOnly && x.id === exiledIt.id) && (!e.fromYard!.filter || printedMatches(e.fromYard!.filter, defOf(s, obj(s, x.id))))), declined: [] };
       }
       if (!sc.castAmong && e.fromYard?.randomLinked) {
         // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.

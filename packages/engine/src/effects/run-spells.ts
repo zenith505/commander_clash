@@ -761,6 +761,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const exiledCard = e.bindExiled !== undefined ? objects(s, { ref: "target", index: e.bindExiled }, ctx)[0] : undefined;
       if (e.bindExiled !== undefined && exiledCard?.zone !== "exile") return;
       const trigger0 = exiledCard ? bindCipherCard(e.trigger, exiledCard.id, exiledCard.zoneChanges ?? 0) : e.trigger;
+      // Medomai's Prophecy (round 421): the name chosen for its Saga, as it is now or as it last existed on the battlefield
+      // (CR 608.2h); none chosen, the delayed trigger couldn't trigger, so it isn't made (rulings).
+      const lkName = e.needsName && ctx.chosen?.name === undefined && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+      const named = e.needsName ? (ctx.chosen?.name ?? (lkName && lkName.zc === ctx.sourceZc ? lkName.chosenName : undefined)) : undefined;
+      if (e.needsName && named === undefined) return;
+      const chosenNow = named !== undefined ? { ...ctx.chosen, name: named } : ctx.chosen;
       for (const about of e.each || e.aboutGroup ? abouts : abouts.slice(0, 1)) {
         (s.floatingTriggers ??= []).push({
           ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
@@ -775,7 +781,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           // The Clone Saga: "a creature with the chosen name" is the name chosen as this resolved, kept with the delayed
           // trigger (its source may be gone by the time it triggers).
           // Zombie Boa: "a creature of that color", the color chosen as this resolved, likewise.
-          trigger: e.bound ? bindMilledCounts(s, ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(trigger0, ctx.chosen) : trigger0, ctx) : ctx.chosen?.name !== undefined || ctx.chosen?.color !== undefined || ctx.chosen?.planeswalkerType !== undefined ? bindChosenName(trigger0, ctx.chosen) : trigger0,
+          trigger: e.bound ? bindMilledCounts(s, chosenNow?.name !== undefined || chosenNow?.color !== undefined || chosenNow?.planeswalkerType !== undefined ? bindChosenName(trigger0, chosenNow) : trigger0, ctx) : chosenNow?.name !== undefined || chosenNow?.color !== undefined || chosenNow?.planeswalkerType !== undefined ? bindChosenName(trigger0, chosenNow) : trigger0,
           until: e.until,
           turn: s.turn,
           ...(e.once ? { once: true as const } : {}),
@@ -871,9 +877,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Codie, Vociferous Codex: less than the mana value of the spell that triggered it (none found without one).
         const causeSpell = e.lesserThanCause && ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") ?? s.castItems?.[ctx.cause]) : undefined;
         const lessThan = e.lesserThanCause ? (causeSpell ? spellManaValue(s, causeSpell) : 0) : undefined;
+        // Possibility Storm (round 422): the card types of the spell that triggered this, as it last existed on the stack
+        // (exileCause noted them as it exiled it; if something else exiled it first, as it was cast, rulings, CR 608.2h).
+        const causeTypes = e.untilSharesCauseType ? (s.resolving!.causeTypes ?? (ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castTypes : undefined) ?? []) : undefined;
+        const untilTypes = causeTypes ?? e.untilTypes;
         const fits = (id: ObjectId) =>
           (lessThan === undefined || defMv(defOf(s, obj(s, id))) < lessThan) &&
-          (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
+          (untilTypes ? untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
           (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) &&
           (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast) &&
           !(e.untilNonlegendary && defOf(s, obj(s, id)).supertypes?.includes("Legendary"));
@@ -906,7 +916,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${causeTypes ? `${causeTypes.map((x) => x.toLowerCase()).join(" or ") || "such"}` : e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;
@@ -948,7 +958,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             closeZoneBatch(s); // exiled one at a time (rulings on Laelia)
           }
         const caster = e.ownerCasts ? pid : ctx.controller;
-        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom || e.inPlace ? { seen } : {}) };
+        // Possibility Storm (round 422): "all cards exiled with ~" are these and the spell this resolution exiled.
+        const cause = e.withExiledCause ? s.resolving!.exiledFromStack : undefined;
+        const causeCard = cause && s.objects[cause.id]?.zone === "exile" && (s.objects[cause.id]!.zoneChanges ?? 0) === cause.zc ? [cause.id] : [];
+        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom || e.inPlace ? { seen: [...causeCard, ...seen] } : {}) };
         if (!hit) return e.restStays ? undefined : e.inPlace ? revealedToBottom(s, seen) : bottomRest(s, sc.untilNonland.seen);
         if (e.then === "suspend") {
           suspendExiled(s, obj(s, hit), e.suspend ?? 0);

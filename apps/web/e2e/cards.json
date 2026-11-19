@@ -3002,6 +3002,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dcd5ab1b-adc5-486e-a1e0-636af6ee9470",
+  "name": "Ashnod the Uncaring",
+  "manaCost": "{2}{U}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Artificer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Artificer"
+  ],
+  "oracleText": "Deathtouch\nWhenever you activate an ability of an artifact or creature that isn't a mana ability, if one or more permanents were sacrificed to activate it, you may copy that ability. You may choose new targets for the copy. (Sacrificing an artifact for mana to activate an ability doesn't count.)",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "brc",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d18bcba-a346-445e-a182-6cc30b7e066d",
   "name": "Ashnod's Altar",
   "manaCost": "{3}",
@@ -26749,6 +26788,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cb53bd72-dee8-46fa-b0f9-1eee3a99379a",
+  "name": "Knowledge Pool",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — When this artifact enters, each player exiles the top three cards of their library.\nWhenever a player casts a spell from their hand, that player exiles it. If the player does, they may cast a spell from among other cards exiled with this artifact without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "mbs",
+  "releasedAt": "2011-02-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "88188cc1-3211-4bf8-a591-613b66192695",
   "name": "Kodama of the Center Tree",
   "manaCost": "{4}{G}",
@@ -31454,6 +31517,36 @@
   "set": "sld",
   "releasedAt": "2026-02-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7efd5d62-6da2-428a-98e3-5b842f668656",
+  "name": "Mogg Fanatic",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goblin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin"
+  ],
+  "oracleText": "Sacrifice this creature: It deals 1 damage to any target.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -36400,6 +36493,32 @@
   "commanderLegal": "legal",
   "set": "blb",
   "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8586169f-cb8c-4424-ba64-a7c1cc00680e",
+  "name": "Possibility Storm",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a player casts a spell from their hand, that player exiles it, then exiles cards from the top of their library until they exile a card that shares a card type with it. That player may cast that card without paying its mana cost. Then they put all cards exiled with this enchantment on the bottom of their library in a random order.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-02-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

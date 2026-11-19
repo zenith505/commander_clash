@@ -8777,7 +8777,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     closeZoneBatch(s);
   }
   // Sen Triplets (round 412): cast from another player's hand, not "from your hand" (Effect handTurn).
-  o.castFrom = castFrom === "hand" && o.owner !== p.id ? "anotherHand" : castFrom;
+  // Reversal of Fortune (round B265): a copy of a card in another player's hand, cast from there (made in exile here).
+  o.castFrom = o.copyCastFrom ?? (castFrom === "hand" && o.owner !== p.id ? "anotherHand" : castFrom);
   o.castBy = p.id;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
@@ -12821,6 +12822,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "riverSide") {
+    // Raging River (round B265): the label for the attacking creature `about` (Effect ragingRiver).
+    (r.scratch ??= {}).riverSide = choice === "right" ? "right" : "left";
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "pileCard") {
     (r.scratch ??= {}).pileCard = choice;
     continueResolution(s);
@@ -14770,6 +14777,7 @@ const hasFirstOrDouble = (s: GameState, o: GameObject) =>
 
 export function clearCombat(o: GameObject) {
   o.attacking = undefined;
+  o.riverOnly = undefined;
   o.attackingPermanent = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
@@ -15961,6 +15969,11 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
     if (whose !== attacker.owner) return `${a.name} can't be blocked unless it's attacking its owner or a permanent its owner controls`;
   }
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
+  // Raging River (round B265): "can't be blocked this combat except by creatures with flying and creatures in a pile with
+  // the chosen label" (CR 509.1b), each pile creature as the object it was (CR 400.7).
+  for (const r of attacker.riverOnly ?? [])
+    if (r.turn === s.turn && r.combat === (s.combatsThisTurn ?? 0) && r.selfZc === (attacker.zoneChanges ?? 0) && !has(b, "Flying") && !r.allowed.some((x) => x.id === blocker.id && x.zc === (blocker.zoneChanges ?? 0)))
+      return `${a.name} can't be blocked this combat except by creatures with flying and creatures in the pile with its label`;
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (blocker.cantBlockThis?.some((x) => x.turn === s.turn && x.selfZc === (blocker.zoneChanges ?? 0) && x.id === attacker.id && x.zc === (attacker.zoneChanges ?? 0))) return `${b.name} can't block ${a.name} this turn`; // CR 509.1b
   // Landwalk (CR 702.14c): not while the defending player controls such a land, unless it can be blocked as though it
@@ -15980,8 +15993,20 @@ function dealsDamageThisStep(s: GameState, o: GameObject, firstStrikeStep: boole
 }
 
 /**
+ * Defensive Formation (round B266): "Rather than the attacking player, you assign the combat damage of each creature
+ * attacking you": the player it's attacking (not a planeswalker or battle they control, CR 506.3) if they control a
+ * permanent with that ability as the damage is assigned; otherwise the attacking creature's controller (CR 510.1).
+ */
+export function combatDamageAssigner(s: GameState, at: GameObject): PlayerId {
+  const you = at.attacking;
+  if (you !== undefined && !at.attackingPermanent && !player(s, you).lost && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === you && !!abilitiesOf(s, obj(s, id)).assignsAttackersDamage)) return you;
+  return controllerOf(s, at);
+}
+
+/**
  * Blocked creatures that may assign their combat damage as though they weren't blocked, by who decides: their
- * controller, the active player (CR 510.1), or the defending player if a creature with banding blocks it (CR 702.22k).
+ * controller, the active player (CR 510.1), or the defending player if a creature with banding blocks it (CR 702.22k)
+ * or they control Defensive Formation (round B266, rulings: the choices of other ways to assign it are theirs too).
  */
 export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   const out = new Map<PlayerId, ObjectId[]>();
@@ -15989,7 +16014,7 @@ export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   for (const at of attackers(s)) {
     if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || at.unblockedDamageTurn === s.turn || unblockedByTurnChoice(s, at) || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
     const banded = bandingAmong(s, at.blockedBy.flatMap((id) => s.objects[id] ?? []));
-    const who = banded ? at.attacking : controllerOf(s, at);
+    const who = banded ? at.attacking : combatDamageAssigner(s, at);
     out.set(who, [...(out.get(who) ?? []), at.id]);
   }
   return out;
@@ -16036,7 +16061,8 @@ function askDamageToCreature(s: GameState): boolean {
     const options = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === defender);
     if (!options.length) continue;
     c.current = at.id;
-    s.pending = { kind: "pickPermanents", player: controllerOf(s, at), source: nameOf(s, at.id), action: "damageCreature", what: `creature ${player(s, defender).name} controls for ${nameOf(s, at.id)} to assign its combat damage to`, options, count: 1, min: 0 };
+    // Defensive Formation (round B266): the defending player chooses (rulings).
+    s.pending = { kind: "pickPermanents", player: combatDamageAssigner(s, at), source: nameOf(s, at.id), action: "damageCreature", what: `creature ${player(s, defender).name} controls for ${nameOf(s, at.id)} to assign its combat damage to`, options, count: 1, min: 0 };
     return true;
   }
   return false;
@@ -16061,7 +16087,8 @@ function askDivideCombatDamage(s: GameState): boolean {
     const defender = at.attacking;
     if (player(s, defender).lost) continue;
     const options = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === defender);
-    s.pending = { kind: "divideDamage", player: controllerOf(s, at), source: nameOf(s, at.id), by: at.id, total: combatDamageOf(s, at), options, what: `creatures ${player(s, defender).name} controls`, combat: true, toPlayer: defender };
+    // Defensive Formation (round B266): the defending player divides it (rulings).
+    s.pending = { kind: "divideDamage", player: combatDamageAssigner(s, at), source: nameOf(s, at.id), by: at.id, total: combatDamageOf(s, at), options, what: `creatures ${player(s, defender).name} controls`, combat: true, toPlayer: defender };
     return true;
   }
   return false;
@@ -16159,7 +16186,10 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     }
     // Blocked by a creature with banding, or by two creatures of a quality one's "bands with other" names, the defending
     // player divides its damage among the blockers as they choose (CR 702.22j), none to themselves even with trample.
-    if (bandingAmong(s, blockers)) {
+    // Defensive Formation (round B266): the player it's attacking divides it the same way (CR 702.22j's rule, rulings: with
+    // trample too, since that player needn't assign lethal damage to the blockers and then can't assign any to themselves,
+    // CR 702.19b).
+    if (bandingAmong(s, blockers) || combatDamageAssigner(s, at) !== controllerOf(s, at)) {
       for (const [bl, amount] of bandSplit(s, at, blockers, dmg)) hits.push({ source: at, toObject: bl, amount });
       continue;
     }

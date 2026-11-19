@@ -1,6 +1,6 @@
 # Roadmap
 
-31,736 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,748 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -2353,8 +2353,8 @@ line blocks.
    Caller of the Hunt (done in round B245), Enigmatic Incarnation (how it was cast); Don't Blink (done in round B252) (entering from exile replaced by a shuffle);
    Cloak and Dagger, Entwined (done in round 420) (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
-   target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River,
-   Defensive Formation, Sorrow's Path (done in round B258), Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
+   target); Next of Kin; Phyrexian Portal (done in round B265) (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River (done in round B265),
+   Defensive Formation (done in round B266), Sorrow's Path (done in round B258), Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
    don't control for mana); Aetherplasm (done in round B261) (put onto the battlefield blocking); Lightform (done in round B155) (manifest, then becoming an Aura);
    Cathedral of Serra and the other "bands with other" lands (done in round B161); Mangara's Tome (done in round 385) and Aladdin's Lamp (done in round 385) (a draw replaced); All
    Hallow's Eve (scream counters in exile); Land Equilibrium; Disciple of Caelus Nin (done in round B223) (permanents can't phase in);
@@ -3594,7 +3594,7 @@ line blocks.
    31,588 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
    Out after round 397 (looked at, not done): Sentinel of Lost Lore (still out: targets in exile, "a card you own in exile
    that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown (done in round 420), Synthesis Pod,
-   Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack, Medomai's Prophecy,
+   Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack (done in round B266), Medomai's Prophecy,
    Monastery Raid, Winter's Chill (done in round B262), Divine Intervention (done in round B259), Kotose (done in round 420) and the rest from rank 15,000 to 20,000 (still out, for the
    reasons in their earlier lists).
    Round 398 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards of each card
@@ -5488,7 +5488,7 @@ line blocks.
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
    for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
    Ogre Battlecaster (done in round 401) ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (done in round 401) (spells
-   from the cards its collect evidence exiled); Reversal of Fortune (a copy of a card in an opponent's hand, cast from
+   from the cards its collect evidence exiled); Reversal of Fortune (done in round B265) (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
    Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
@@ -7477,7 +7477,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   round B132), Taunt (a rule
   bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light (done in round B110), Dazzling Beauty (done in round B110) and
   Trap Runner (done in round B110) ("becomes blocked" by an effect), Kill-Suit Cultist (done in round B135) (a destroy-instead damage shield), Rock Jockey,
-  Explosion of Riches (done in round 383), Power Pack, Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
+  Explosion of Riches (done in round 383), Power Pack (done in round B266), Cinderheart Giant (done in round B116) (chosen at random as it resolves, not targeted), Juju Bubble ("play
   a card"), Curse Artifact, Erithizon (done in round B110) (a target chosen by the defending player), Selfless Exorcist (done in round B126), Cut the Tethers (done in round B136).
 - Round B32 (harder skipped cards, least played first): "you may pay ... If you do ... Otherwise, ..." (Spitting
   Slug), "each permanent with fading you control" (Parallax Inhibitor), "a land with a trap counter on it" as a
@@ -10294,7 +10294,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the exiled card. You may cast the copy without paying its mana cost. X is the mana value of the exiled card.": X defined,
   not chosen, a split card's combined mana value, rulings, CR 107.3c, 709.4; nothing exiled, it can't be activated). +6,
   31,192 of 31,936 with B189 to B194 and rounds 348 to 351.
-- Out after round B195 (looked at, not done): Reversal of Fortune (the copy is made and cast from the opponent's hand,
+- Out after round B195 (looked at, not done): Reversal of Fortune (done in round B265) (the copy is made and cast from the opponent's hand,
   rulings: copies of cards are made in exile here, so "cast from exile" would wrongly apply), Nyla, Shirshu Sleuth (done in round B203) ("If you
   do, you lose X life and create X Clue tokens, where X is that card's mana value" after an exile, and "return target card
   exiled with ~ to its owner's hand": neither form is read yet), Cemetery Desecrator (a reflexive modal trigger with the
@@ -11376,6 +11376,64 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B266 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 420-421): Mirror-Shield
+  Hoplite ("Whenever a creature you control becomes the target of a backup ability, copy that ability. You may choose new
+  targets for the copy. This ability triggers only once each turn."): any player's backup ability (CR 702.165a; a backup
+  trigger carries StackItem.backup, TriggeredAbility.targeted.backup), once each turn (CR 603.2h); the copy is yours (CR
+  707.10c), its source the original's, so aimed at the creature with backup it gets the counter and no abilities, and the
+  same creature targeted twice gets two counters (rulings). Defensive Formation ("Rather than the attacking player, you
+  assign the combat damage of each creature attacking you. You can divide that creature's combat damage as you choose
+  among any of the creatures blocking it."): banding's rule (CR 702.22j) for each creature attacking you, not a
+  planeswalker or battle you control (CR 506.3; game.ts combatDamageAssigner): its damage divided among its blockers as
+  banding's is (as few die as can, none to you even with trample: CR 702.19b lets the assigner give it all to blockers),
+  and the other choices of how it assigns its damage are yours (rulings): whether it assigns as though it weren't blocked
+  (Thorn Elemental), the creature an unblocked Cunning Giant damages, Butcher Orgg's division. Power Pack ("Whenever ~
+  deals combat damage to a player, exile target instant or sorcery card from your graveyard chosen at random. At the
+  beginning of your next upkeep, you may cast that card without paying its mana cost. If that spell would be put into your
+  graveyard, exile it instead."): the target picked at random among the legal ones as the trigger is put on the stack (as
+  Scab-Clan Giant's), none with no such card; a delayed trigger about the card in exile (CR 603.7c, 400.7, Effect
+  delayedCastExiledTarget), its source Power Pack (CR 603.7d), cast as it resolves if it's still there (CR 608.2g, X 0),
+  and exiled instead of going to your graveyard. Bots: as the defending player with Defensive Formation, a creature that
+  survives an unblocked Cunning Giant (else none, unless the damage would finish them) and all of Butcher Orgg's damage
+  to themselves with life to spare; they aim a copied backup ability like any other copy. Browser tests for the
+  Hoplite's copy target, Defensive Formation's Cunning Giant choice and Power Pack's free cast at the upkeep. +3, 31,751
+  of 31,936 with main through round 420 and B261-B265. The compiled text of every other card is unchanged.
+- Out after round B266 (looked at, not done): the lists after round B265 stay out. Judgment calls and known gaps:
+  Defensive Formation's division is made for its controller the way banding's is (the engine has no damage assignment
+  prompt for blocked attackers), so a human controller isn't asked how to divide it; bots don't attack around Defensive
+  Formation. North Star, Emblazoned Golem, Noxious Vapors, Snowblind, Land Equilibrium, Chorus of the Conclave and
+  Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
+- Round B265 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-420): Reversal of
+  Fortune ("Target opponent reveals their hand. You may copy an instant or sorcery card in it. If you do, you may cast the
+  copy without paying its mana cost."): a copy of the card made in that hand and cast from there as it resolves, or never
+  (CR 707.12, 608.2g; rulings: both optional, so one choice; a copy not cast ceases to exist, CR 704.5e), owned and
+  controlled by you (CR 112.2a), without its mana cost (X is 0, CR 118.9); only whether you can cast it matters (rulings).
+  It's cast from that hand, so never "from your hand" (GameObject.copyCastFrom "anotherHand"; the copy is made in exile, as
+  the engine's other card copies are). Phyrexian Portal ("{3}: If your library has ten or more cards in it, target opponent
+  looks at the top ten cards of your library and separates them into two face-down piles. Exile one of those piles. Search
+  the other pile for a card, put it into your hand, then shuffle the rest of that pile into your library."): the library's
+  size checked as it resolves; the opponent separates the cards while they're still in the library (CR 700.3, 700.3c),
+  either pile possibly empty (rulings); you exile one without seeing either (only their sizes are shown), then find a card
+  in the other (no stated quality, so one is found, CR 701.23d) and the library is shuffled (Effect portalPiles). Raging
+  River ("Whenever one or more creatures you control attack, each defending player divides all creatures without flying
+  they control into a "left" pile and a "right" pile. Then, for each attacking creature you control, choose "left" or
+  "right." That creature can't be blocked this combat except by creatures with flying and creatures in a pile with the
+  chosen label."): each defending player (CR 506.2) divides as it resolves, in APNAP order (CR 101.4); a label for each
+  of your attacking creatures, one question each; a blocking restriction (CR 509.1b) for this combat only, the piles'
+  creatures as the objects they were (CR 400.7), so a creature that enters later can't block those attackers unless it
+  has flying, and one put onto the battlefield attacking later has no restriction (rulings; GameObject.riverOnly, cleared
+  with combat). Bots cast the copy as any free spell, separate Portal piles evenly, exile the smaller face-down pile,
+  activate the Portal once a turn in their second main phase with 25 or more cards in their library, divide their
+  creatures evenly and label each attacker with the pile that could block it least. Browser tests for Reversal's pick,
+  both sides of the Portal's piles, and both sides of the River's piles and labels. +3, 31,748 of 31,936 with main through
+  round 420 and B261-B264. The compiled text of every other card is unchanged.
+- Out after round B265 (looked at, not done): the lists after round B264 stay out. Judgment calls and known gaps: searching
+  a Phyrexian Portal pile isn't a search of the library (no "whenever a player searches their library" trigger, and
+  Opposition Agent doesn't control it): the pile is searched, not the library; a Reversal of Fortune copy is made in exile
+  and only its spell records the hand it was cast from; Raging River's piles hold only the creatures without flying as it
+  resolves, so one that loses flying later is in no pile; bots attacking into Raging River don't weigh it before
+  attacking. Next of Kin, Lightning Storm, Spy Kit, Equinox and Camouflage were looked at again and stay out for the
+  reasons in the earlier lists.
 - Round B264 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-419): Soul Echo ("At the
   beginning of your upkeep, sacrifice ~ if there are no echo counters on it. Otherwise, target opponent may choose that for
   each 1 damage that would be dealt to you until your next upkeep, you remove an echo counter from ~ instead."): one
@@ -11397,7 +11455,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   502.4, so no damage can be dealt in between); a player with no lands isn't asked to choose an opponent for Bend or Break
   (both piles are empty); bots choose that opponent with the general opponent choice and cast Soul Echo through the general
   spell logic; Dimensional Breach (an effect lasting while its cards stay exiled, returning one at each player's upkeep),
-  Defensive Formation (the defending player assigning an attacker's combat damage), Takklemaggot (returned as a non-Aura
+  Defensive Formation (done in round B266) (the defending player assigning an attacker's combat damage), Takklemaggot (returned as a non-Aura
   enchantment that loses "enchant creature"), Pygmy Hippo (another player activating a mana ability of each of their lands)
   and North Star were looked at again and stay out for the reasons in the earlier lists.
 - Round B263 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-418): Guardian Angel
@@ -11872,7 +11930,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   hand), Kodama of the Center Tree (done in round B213), Reflecting Mirror.
 - Out after round B150 (looked at, not done): Boneyard Mycodrax (done in round B198) (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
-  Quay and the other banding grants, Cyclopean Tomb, False Orders (done in round B256), Mirror-Shield Hoplite, Chorus of the Conclave, Temporal
+  Quay and the other banding grants, Cyclopean Tomb, False Orders (done in round B256), Mirror-Shield Hoplite (done in round B266), Chorus of the Conclave, Temporal
   Aperture, All Hallow's Eve (done in round B214), Idris, The Master, Alhammarret, Tazri, Sasaya, Nathan Drake, Feather, Rosheen, Ore-Rich
   Stalactite, Zevlor, Kellan, Leori, Mavinda): each needs a mechanic of its own (outside-the-game cards, banding, copies of
   abilities, exile-zone upkeeps, mana spent only on {X} costs).

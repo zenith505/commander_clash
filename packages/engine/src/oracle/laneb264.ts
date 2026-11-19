@@ -2,6 +2,7 @@
 // Bend or Break. Soul Echo's line is roundB264Line in oracle/laneb264-lines.ts.
 import type { AbilityBody } from "../abilities";
 import { parseBody } from "./body";
+import { roundB265Spell } from "./laneb265";
 
 const ENCOUNTER = "~ deals damage equal to the power of the chosen creature or card to target creature.";
 const BEND = "Each player separates all nontoken lands they control into two piles. For each player, one of their piles is chosen by one of their opponents of their choice. Destroy all lands in the chosen piles. Tap all lands in the other piles.";
@@ -20,5 +21,5 @@ export function roundB264Spell(text: string): AbilityBody | null | undefined {
   // then for each player an opponent of their choice chooses one pile. Destroyed at once, then the rest tapped (Effect
   // bendOrBreak, effects/run-laneb264.ts).
   if (text === BEND) return { targets: [], effects: [{ type: "bendOrBreak" }], text };
-  return undefined;
+  return roundB265Spell(text);
 }

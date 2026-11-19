@@ -572,6 +572,8 @@ export interface GameObject {
    * for good the first time they don't (Lightning, Security Sergeant). "yourNextUpkeep": until that player's next upkeep
    * begins (Elkin Bottle), so during the rest of this turn and the turns before it.
    */
+  /** Close Encounter (round B264): the object's zone-change count as warp's delayed trigger exiled it (CR 702.185b, 400.7). */
+  warpedZc?: number;
   mayPlay?: {
     player: PlayerId;
     zc: number;
@@ -3532,6 +3534,8 @@ export interface Resolving {
     separating?: true;
     pileOne?: ObjectId[];
     pileChoice?: number;
+    /** Bend or Break (round B264): the player whose opponent or pile is being chosen. */
+    bendAsked?: PlayerId;
     /** Hostile Negotiations (effect faceDownPiles): the two piles exiled, and which one was turned face up. */
     facePiles?: [ObjectId[], ObjectId[]];
     /** Gollum, Scheming Guide (effect guessTopKind): whether the guess was right, once revealed, and the next of its effects to run. */
@@ -3751,6 +3755,12 @@ export interface Resolving {
     noteType?: string;
     /** Warp World (Effect warpWorld): each player's revealed cards, and the step: 1 artifacts, creatures and lands; 2 enchantments; 3 the rest to the bottom (`bottomAt`, by APNAP). */
     warp?: { revealed: Record<number, ObjectId[]>; stage: number; bottomAt?: number };
+    /**
+     * Bend or Break (Effect bendOrBreak, round B264): the players in APNAP order, each one's nontoken lands as it began, the
+     * opponent each chose to choose their pile, and the pile chosen ("0" the first, "1" the second; the first pile is
+     * `chosen[pid]`, the lands that player clicked).
+     */
+    bend?: { order: PlayerId[]; lands: Record<number, ObjectId[]>; chooser: Record<number, PlayerId>; pile: Record<number, number> };
     /** Glimpse of Tomorrow (Effect glimpseOfTomorrow, round 390): your revealed cards, and the step: 1 non-Aura permanent cards; 2 Auras; 3 the rest to the bottom. */
     glimpse?: { revealed: ObjectId[]; stage: number };
     /** Over the Top (Effect overTheTop, round 389): each player's revealed cards, and whether the permanent cards among them have entered. */

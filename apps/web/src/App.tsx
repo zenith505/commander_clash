@@ -1320,6 +1320,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "tap")
         return setCostPick({ draft: d, kind: "tap", label: card.name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.convoke?.includes(id)), chosen: [] });
       // Behold (CR 701.4a): a card from your hand or a permanent you control, picked from both together.
+      // Close Encounter (round B264): a creature you control or a warped creature card you own in exile.
+      if (c.kind === "reveal" && c.orControl && c.warped)
+        return setCostPick({ draft: d, kind: "reveal", label: card.name, what: `choose ${beholdWhat(c)}`, n: 1, candidates: beholdCandidates(s, HUMAN, s.objects[d.objectId]!, c), chosen: [] });
       if (c.kind === "reveal" && c.orControl) {
         const kind = beholdWhat(c);
         // "Behold three Elementals": Elementals you control or Elemental cards from your hand, in any mix (round 371).
@@ -2557,7 +2560,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "discardHand") return "discard your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
-  if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
+  if (c.kind === "reveal" && c.orControl) return `${c.warped ? "choose" : "behold"} ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return c.notEvidence && c.filter ? `exile ${c.filter.text}s with total mana value ${c.n} or more from your graveyard` : `collect evidence ${c.n}`;
   if (c.kind === "putCounter") return counterOnWhat(c);

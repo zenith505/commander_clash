@@ -2026,7 +2026,7 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill" | /** Dralnu, Lich Lord (round B253): none of it is dealt; the holder's controller sacrifices that many permanents (all of them, with fewer, rulings). */ "sacrifice" | /** Nefarious Lich (round B253): none of it is dealt; the player exiles that many cards from their graveyard, or with fewer there, none and loses the game (rulings on Egon, God of Death). */ "exileYard";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo" | /** "Put that many -1/-1 counters on it instead" (Lichenthrope, Phytohydra, CR 614.1a): none of it is dealt; `counter`s go on the holder. */ "counters" | /** "Destroy that creature instead" (Kill-Suit Cultist): none of it is dealt; the creature it would be dealt to is destroyed (rulings). */ "destroy" | /** Undead Alchemist: the damaged player mills that many cards instead. */ "mill" | /** Dralnu, Lich Lord (round B253): none of it is dealt; the holder's controller sacrifices that many permanents (all of them, with fewer, rulings). */ "sacrifice" | /** Nefarious Lich (round B253): none of it is dealt; the player exiles that many cards from their graveyard, or with fewer there, none and loses the game (rulings on Egon, God of Death). */ "exileYard" | /** Soul Echo (round B264): none of it is dealt; that many `counter`s are removed from `removeFrom` instead, as many as it has (rulings: once it has none, it still replaces the damage). */ "removeCounters";
   /** With op "counters": the kind put on the permanent instead of the damage (Force Bubble's depletion counters go on the holder, though the damage would be dealt to you). */
   counter?: CounterKind;
   /** With op "counters": "put that many -1/-1 counters on that creature instead" (Soul-Scar Mage): on the permanent the damage would be dealt to, not the holder. */
@@ -2079,6 +2079,8 @@ export interface DamageMod {
    * (rulings), never a loss.
    */
   upTo?: true;
+  /** With op "removeCounters" (Soul Echo, round B264): the permanent the counters come off, as the object it was as the effect began (CR 400.7). */
+  removeFrom?: { id: ObjectId; zc: number };
   text: string;
 }
 
@@ -4759,6 +4761,12 @@ export type Effect =
    */
   | { type: "pilesOnly"; who: PlayerRef; kind: "attack" | "block" }
   /**
+   * Bend or Break (round B264): each player separates all nontoken lands they control into two piles (CR 700.3), then, for
+   * each player, an opponent of that player's choice chooses one of the piles; the lands in the chosen piles are destroyed
+   * at once, then the lands in the other piles are tapped.
+   */
+  | { type: "bendOrBreak" }
+  /**
    * Whippoorwill (round B235): "Damage that would be dealt to that creature this turn can't be prevented or dealt instead to
    * another permanent or player" (CR 615.12, 614.9): GameObject.damageUnalterableTurn, while it's the object it is (CR 400.7).
    */
@@ -5742,7 +5750,7 @@ export type Effect =
    * would deal damage ... this turn" (Overblaze: `byTarget`), "until your next turn, if a source would deal damage to that
    * player or a permanent that player controls" (Lightning, Army of One: `toPlayer`). Its amounts are counted as it resolves.
    */
-  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true }
+  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; /** "Would be dealt to target creature" (Kill-Suit Cultist): this ability's target `toTarget`, as the object it is. */ toTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** With `choose`: only a permanent ("an unblocked creature of your choice", Forcefield), not a spell or a gone source. */ choosePermanent?: true; /** "That source" (Desperate Gambit): the source an earlier "chooseSourceNow" of this resolution chose (ResolvingInfo.chosenSource); nothing without one. */ chosenSource?: true; /** "That creature": the trigger's subject. */ bySubject?: true; /** Soul Echo (round B264): op "removeCounters" takes them off this ability's source, as the object it is now. */ fromSource?: true }
   /** Desperate Gambit: "Choose a source you control": a source of damage chosen as it resolves (CR 609.7a), before the rest of it, kept for "that source" (ResolvingInfo.chosenSource); `yours`: one its controller controls (a spell on the stack, or a source an ability refers to, too: rulings). */
   | { type: "chooseSourceNow"; choose: TargetSpec; yours?: true }
   /**
@@ -8385,7 +8393,7 @@ export type AdditionalCost =
    * (CR 701.4a): an Elf card from your hand or an Elf permanent you control. `exile`: "behold a Kithkin and exile it": the
    * card or permanent is exiled, linked to the permanent the spell becomes (CR 607.2q).
    */
-  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true; /** "Reveal two cards from your hand that share a color" (Illuminated Folio): all of them have one color in common; colorless isn't a color (rulings, CR 105.2c). */ shareColor?: true }
+  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** Close Encounter (round B264): "or a warped creature card you own in exile": `filter` is for a warped card in exile (CR 702.185b), not one in the hand. */ warped?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true; /** "Reveal two cards from your hand that share a color" (Illuminated Folio): all of them have one color in common; colorless isn't a color (rulings, CR 105.2c). */ shareColor?: true }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
   | {
       kind: "exileFromHand";

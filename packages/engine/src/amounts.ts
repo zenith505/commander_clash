@@ -1085,7 +1085,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = st && s.objects[st.id];
       if (!st) return 0;
       if (o && (o.zoneChanges ?? 0) === st.zc && o.zone === "battlefield") return characteristics(s, o).power;
-      if (o && (o.zoneChanges ?? 0) === st.zc && o.zone === "hand") return cardPT(s, o, "power");
+      // Close Encounter (round B264): a warped card still in exile, its power there (CR 604.3); gone, its last known
+      // information as it was chosen (CR 608.2h).
+      if (o && (o.zoneChanges ?? 0) === st.zc && (o.zone === "hand" || o.zone === "exile")) return cardPT(s, o, "power");
       const lk = s.lastKnown?.[st.id];
       return lk && lk.zc === st.zc ? lk.power : st.power;
     }

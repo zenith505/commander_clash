@@ -331,6 +331,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && plasmMay?.[s.resolving!.next]?.type === "may" && plasmMay.some((x) => x.type === "if" && x.effects.some((y) => y.type === "putFromHand" && y.blockingSubject))) return [{ type: "chooseMay", player: pid, yes: true }];
     // Pardic Dragon: "that player may put a time counter on ~": an opponent's suspended card, kept from being cast longer.
     const theirMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    // Soul Echo (round B264): its controller doesn't lose for having 0 or less life while it's out, so with their life at 0
+    // or less, damage to them does nothing and spending the counters gets it sacrificed sooner; otherwise the damage counts.
+    // (The may is in the "otherwise" of the trigger's "if".)
+    if (pend.kind === "chooseMay" && s.resolving && s.resolving.item.controller !== pid && allEffects(s.resolving.body.effects).some((e) => e.type === "may" && !!e.decider && e.effects.length === 1 && e.effects[0]!.type === "damageMod" && e.effects[0]!.mod.op === "removeCounters"))
+      return [{ type: "chooseMay", player: pid, yes: player(s, s.resolving.item.controller).life <= 0 }];
     // Disorienting Choice: our permanent exiled, or a land for its caster: only a token goes (a Treasure, a Clue).
     // Spirit-Sister's Call (round B220): only for a permanent sharing a card type that costs less than the card coming back (a
     // token nothing), never the card's own worth or more.
@@ -5539,9 +5544,17 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       // commander (a token exiled is gone for good, CR 111.7).
       const pool = beholdCandidates(s, pid, obj(s, id), c).filter((x) => !targeted.has(x));
       const field = pool.filter((x) => obj(s, x).zone === "battlefield" && !(c.exile && (obj(s, x).isToken || obj(s, x).isCommander))).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
-      const hand = pool.filter((x) => obj(s, x).zone === "hand").sort((a, b) => mv(s, a) - mv(s, b));
+      const hand = pool.filter((x) => obj(s, x).zone !== "battlefield").sort((a, b) => mv(s, a) - mv(s, b));
       const fits = c.exile ? [...hand, ...field] : [...field, ...hand];
       if (fits.length < c.n) return null;
+      // Close Encounter (round B264): the damage is the chosen one's power, so the strongest creature or warped card.
+      if (c.warped) {
+        const pw = (x: ObjectId) => (obj(s, x).zone === "battlefield" ? power(s, obj(s, x)) : cardPT(s, obj(s, x), "power"));
+        const best = [...fits].sort((a, b) => pw(b) - pw(a))[0]!;
+        if (pw(best) <= 0) return null;
+        out.reveal = [best];
+        continue;
+      }
       // Dragon's Fire: the strongest Dragon, and only when its power beats the damage dealt without one.
       const beheldIf = compileCard(defOf(s, obj(s, id))).spell?.effects.find((e) => e.type === "if" && JSON.stringify(e.effects).includes('"kind":"beheldPower"'));
       if (beheldIf?.type === "if") {

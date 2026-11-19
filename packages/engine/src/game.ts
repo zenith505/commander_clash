@@ -1410,6 +1410,7 @@ export function moveObject(
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
   o.encoded = undefined; // cards stay encoded only on the permanent as long as it's on the battlefield (CR 702.99c)
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
+  o.warpedZc = undefined; // a new object, no longer the warped card (CR 400.7, 702.185b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   // Caller of the Hunt (round B245): the type chosen as it was cast stays with the permanent it becomes (CR 400.7d, 607.2d).
@@ -10195,7 +10196,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "exileFromGraveyard" && c.process
           ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? (c.warped ? "choose" : "behold") : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
     const chosen = c.kind === "sacrifice" && c.added ? choices?.addedSacrifice : given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -10554,13 +10555,18 @@ export function craftSlotsFit(s: GameState, pid: PlayerId, c: Extract<Additional
 
 /** Behold (CR 701.4a): the matching cards in `pid`'s hand and the matching permanents they control, not `o` itself. */
 export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "reveal" }>): ObjectId[] {
-  const hand = player(s, pid).hand.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
+  // Close Encounter (round B264): a warped card in exile that the player owns (CR 702.185b), not a card in the hand.
+  const hand = c.warped ? player(s, pid).exile.filter((id) => id !== o.id && isWarped(obj(s, id)) && obj(s, id).owner === pid && printedMatches(c.filter, defOf(s, obj(s, id)))) : player(s, pid).hand.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
   const field = c.orControl ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.orControl!, obj(s, id), pid, false)) : [];
   return [...field, ...hand];
 }
 
+/** A warped card in exile (CR 702.185b): exiled by warp's delayed trigger, and still the object that was exiled (CR 400.7). */
+export const isWarped = (o: GameObject) => o.zone === "exile" && o.warpedZc !== undefined && o.warpedZc === (o.zoneChanges ?? 0);
+
 /** "An Elf" for "behold an Elf". */
 export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
+  if (c.warped) return "a creature you control or a warped creature card you own in exile";
   const kind = c.filter.subtypes?.[0] ? `${c.filter.subtypes[0]}${c.filter.types?.includes("Creature") ? " creature" : ""}` : c.filter.text;
   // "Three Elementals" (Kindle the Inner Flame, round 371).
   return c.n === 1 ? `${/^[AEIOU]/.test(kind) ? "an" : "a"} ${kind}` : `${["two", "three", "four", "five"][c.n - 2] ?? c.n} ${kind}s`;
@@ -10733,7 +10739,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.reveal ?? []) {
         const o = obj(s, id);
         const onField = o.zone === "battlefield";
-        log(s, `${p.name} beholds ${nameOf(s, id)}${onField ? "" : " from their hand"}${c.exile ? " and exiles it" : ""}.`);
+        log(s, c.warped ? `${p.name} chooses ${nameOf(s, id)}${onField ? "" : " (a warped card in exile)"}.` : `${p.name} beholds ${nameOf(s, id)}${onField ? "" : " from their hand"}${c.exile ? " and exiles it" : ""}.`);
         if (!c.exile) continue;
         moveObject(s, id, "exile");
         exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });

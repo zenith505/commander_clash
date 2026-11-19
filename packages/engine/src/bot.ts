@@ -11,6 +11,7 @@ import { cantSearch } from "./effects/run-library";
 import { GUESS_PROMPT } from "./effects/run-round319";
 import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
 import { redistributions } from "./effects/run-round362";
+import { addedAbilityCosts, addedSacrificeCandidates } from "./added-costs";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { activatedQuality, manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -669,6 +670,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
     // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
+    // Hollow Warrior (round B259): a cost to block, the same way.
+    if (pend.kind === "pickPermanents" && pend.blockCost) {
+      const rest = s.blockCostsDue?.costs.slice(1) ?? [];
+      const declared = [...new Set((s.blockCostsDue?.blocks ?? []).map((b) => b.blocker))];
+      const ids: ObjectId[] = [];
+      for (const id of [...pend.options].sort((a, b) => permanentWorth(s, pid, a) - permanentWorth(s, pid, b))) {
+        if (ids.length < pend.count && attackCostsPayable(s, pid, rest, [...ids, id], declared)) ids.push(id);
+      }
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     if (pend.kind === "pickPermanents" && pend.attackCost) {
       const rest = s.declaring?.costs?.slice(1) ?? [];
       const ids: ObjectId[] = [];
@@ -2554,7 +2565,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (expiring) return expiring.plan;
     if (options[0]) return cubeInstead(s, pid, options[0].plan) ?? options[0].plan;
     // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
-    const fed = chooseCreatureForMana(s, pid) ?? chooseForageForMana(s, pid);
+    const fed = chooseCreatureForMana(s, pid) ?? chooseForageForMana(s, pid) ?? chooseUntapForMana(s, pid);
     if (fed) return fed;
     // A loyalty ability of each planeswalker we control, once spells are cast (CR 606.3).
     const loyalty = chooseLoyalty(s, pid);
@@ -4359,6 +4370,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Shimmer (round B226): lands of the chosen type phase out every other turn, ours too; cast only with a land type that
   // hurts opponents more than us.
   if (/^Each land of the chosen type has phasing\./m.test(d.oracleText) && phasingLandTypeScore(s, pid).best <= 0) return null;
+  // Divine Intervention (round B259): a permanent that makes the game a draw, cast only when we're losing: 10 life or less
+  // and less than every opponent.
+  if (compileCard(d).triggers.some((tr) => allEffects(tr.body.effects).some((e) => e.type === "gameIsDraw"))) {
+    const life = player(s, pid).life;
+    if (life > 10 || opponents(s, pid).some((q) => player(s, q).life <= life)) return null;
+  }
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -5523,6 +5540,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
     else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
+    } else if (c.kind === "sacrifice" && c.added) {
+      // Round B260: Drought's Swamps, apart from the spell's own sacrifices.
+      const picked = addedSacrificePick(s, pid, undefined, c, new Set([...targeted, ...(out.sacrifice ?? []), ...(out.returnToHand ?? [])]));
+      if (!picked) return null;
+      out.addedSacrifice = picked;
     } else if (c.kind === "sacrifice" && c.oneOfEach) {
       // "A Swamp and a Forest" (Jarad): for each in turn, the cheapest that fits it and as few of the others as can be
       // (a plain Swamp before an Overgrown Tomb), each a different permanent.
@@ -5952,6 +5974,29 @@ function landsToSpare(s: GameState, pid: PlayerId, costs: AdditionalCost[]): boo
   return !n || lands(s, pid) - n >= 5;
 }
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
+
+/**
+ * Round B260: what to sacrifice for what Brutal Suppression and Drought add to a cost: tapped lands first (their mana may be
+ * paying for it), then the least valuable, never the commander, something it targets or another cost of it takes, and only
+ * with four lands left after. Null when that can't be done.
+ */
+export function addedSacrificePick(s: GameState, pid: PlayerId, src: GameObject | undefined, c: Extract<AdditionalCost, { kind: "sacrifice" }>, exclude: Set<string | number>): ObjectId[] | null {
+  const pool = addedSacrificeCandidates(s, pid, src, c)
+    .map((x) => obj(s, x))
+    .filter((o) => !o.isCommander && !exclude.has(o.id))
+    .sort((a, b) => Number(b.tapped) - Number(a.tapped) || worth(s, pid, a) - worth(s, pid, b));
+  const landsGone = pool.filter((o) => objIsType(s, o, "Land")).slice(0, c.n).length;
+  if (lands(s, pid) - landsGone < 4) return null;
+  const specs = c.oneOfEach ?? Array.from({ length: c.n }, () => c.filter);
+  const picked: ObjectId[] = [];
+  for (const [i, f] of specs.entries()) {
+    const later = (x: GameObject) => specs.slice(i + 1).filter((g) => objectMatches(s, g, x, pid, false)).length;
+    const o = pool.filter((x) => !picked.includes(x.id) && objectMatches(s, f, x, pid, false)).sort((a, b) => later(a) - later(b))[0];
+    if (!o) return null;
+    picked.push(o.id);
+  }
+  return picked;
+}
 
 /** Explore revealed a nonland card: keep it on top if we could cast it soon, otherwise mill it. */
 /**
@@ -7954,6 +7999,49 @@ function chooseForageForMana(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * Benthic Explorers (round B259): a mana ability whose cost untaps a tapped land an opponent controls, when nothing in our
+ * hand or command zone can be cast without it: each such land in turn, its mana chosen as we would, and only when a card
+ * can then be cast.
+ */
+function chooseUntapForMana(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const c = ab.costs?.length === 1 ? ab.costs[0]! : undefined;
+      if (!ab.mana || c?.kind !== "tap" || !c.untap || !c.opponents || ab.manaCost) continue;
+      if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      for (const land of tapCostCandidates(s, pid, o, c)) {
+        const action: Action = { type: "activateAbility", player: pid, objectId: id, index: i, costs: { tap: [land] } };
+        let after: GameState;
+        try {
+          after = applyAction(s, action);
+          if (after.pending?.kind === "chooseOption" && after.pending.player === pid) {
+            const pend = after.pending;
+            const choice = pend.options.find((opt) => {
+              try {
+                const x = applyAction(after, { type: "chooseOption", player: pid, choice: opt });
+                return !x.pending && castableNow(x, pid).length > 0;
+              } catch {
+                return false;
+              }
+            });
+            if (choice === undefined) continue;
+            return [action, { type: "chooseOption", player: pid, choice }];
+          }
+        } catch {
+          continue;
+        }
+        if (!after.pending && castableNow(after, pid).length) return [action];
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * X for an ability whose only X is "Discard X cards" (Gix, Yawgmoth Praetor), or undefined when we'd rather not: in our
  * main phase with an empty stack, every card in hand but the spells we could still cast after paying for it and a land
  * to play this turn. At least two cards, so it's worth seven mana.
@@ -8345,10 +8433,25 @@ function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility
  * Undefined when it costs none of that; null when we'd rather not pay.
  */
 export function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null | undefined {
-  if (!ab.costs?.length) return undefined;
+  // Round B260: what Brutal Suppression and Drought add, picked after its own costs.
+  const added = addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf);
+  if (!ab.costs?.length && !added.length) return undefined;
+  const out = ownAbilityCosts(s, pid, o, ab, targets, keep);
+  if (!out || !added.length) return out;
+  const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
+  for (const c of added) {
+    if (c.kind !== "sacrifice") return null;
+    const picked = addedSacrificePick(s, pid, o, c, new Set([...targeted, ...(keep ? [keep] : []), ...(out.sacrifice ?? []), ...(out.tap ?? []), ...(out.returnToHand ?? []), ...(out.craft ?? [])]));
+    if (!picked) return null;
+    out.addedSacrifice = picked;
+  }
+  return out;
+}
+
+function ownAbilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
-  for (const c0 of ab.costs) {
+  for (const c0 of ab.costs ?? []) {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
     // Ronin, Shadow Stalker: "an Equipment attached to ~", this permanent.
@@ -9661,10 +9764,17 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // costs can be paid together (CR 508.1i). Floodtide Serpent's returning an enchantment isn't weighed: it stays home.
   const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
   const costsOf = (a: { attacker: ObjectId }) => characteristics(s, obj(s, a.attacker)).ownAttackCosts;
-  const spare = (a: { attacker: ObjectId }) => costsOf(a).every((c) => c.action === "sacrifice" && attackCostOptions(s, pid, c).every((id) => objIsType(s, obj(s, id), "Land")));
+  // Hollow Warrior (round B259): tapping another creature that isn't attacking, as long as one is left to tap.
+  const spare = (a: { attacker: ObjectId }) => costsOf(a).every((c) => c.action === "tap" || (c.action === "sacrifice" && attackCostOptions(s, pid, c).every((id) => objIsType(s, obj(s, id), "Land"))));
   attacks = attacks.filter((a) => !costsOf(a).length || spare(a));
-  const landsPaid = attacks.reduce((n, a) => n + costsOf(a).reduce((t, c) => t + c.n, 0), 0);
-  if (landsPaid && (lands - landsPaid < 7 || !attackCostsPayable(s, pid, attacks.flatMap(costsOf)))) attacks = attacks.filter((a) => !costsOf(a).length);
+  const landsPaid = attacks.reduce((n, a) => n + costsOf(a).reduce((t, c) => t + (c.action === "sacrifice" ? c.n : 0), 0), 0);
+  const dues = () => attacks.flatMap((a) => costsOf(a).map((c) => ({ ...c, id: a.attacker })));
+  if (landsPaid && (lands - landsPaid < 7 || !attackCostsPayable(s, pid, dues(), [], attacks.map((a) => a.attacker)))) attacks = attacks.filter((a) => !costsOf(a).some((c) => c.action === "sacrifice"));
+  // Tap costs: the attackers needing them go home, one at a time, until the rest can be paid for together.
+  while (attacks.some((a) => costsOf(a).length) && !attackCostsPayable(s, pid, dues(), [], attacks.map((a) => a.attacker))) {
+    const drop = attacks.findIndex((a) => costsOf(a).length);
+    attacks = attacks.filter((_, i) => i !== drop);
+  }
   let declared = [...attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit), ...walkerBound];
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");
@@ -9738,7 +9848,8 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
  * Archangel of Tithes: the mana for blocking (CR 509.1d-f), tapped before the declaration. Blockers we can't pay for are
  * left out, the last chosen first (the chump blocks and extras), with any attacker then left with too few blockers.
  */
-function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
+function payForBlocks(s: GameState, pid: PlayerId, a0: Action): Action[] {
+  const a = a0.type === "declareBlockers" ? { ...a0, blocks: blocksWithTapCosts(s, pid, a0.blocks) } : a0;
   if (a.type !== "declareBlockers" || !(blocksMayCost(s, pid) || blocksMayCostLife(s))) return [a];
   let blocks = a.blocks;
   for (;;) {
@@ -9754,6 +9865,22 @@ function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
     blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
     if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks = [];
+    blocks = withCompany(s, blocks);
+  }
+}
+
+/**
+ * Hollow Warrior (round B259): blocks whose costs to tap other creatures can all be paid together; otherwise the last
+ * blocker with such a cost is left out, and so on (CR 509.1d).
+ */
+function blocksWithTapCosts<B extends { blocker: ObjectId; attacker: ObjectId }>(s: GameState, pid: PlayerId, blocks: B[]): B[] {
+  for (;;) {
+    const blockers = [...new Set(blocks.map((b) => b.blocker))];
+    const dues = blockers.flatMap((id) => characteristics(s, obj(s, id)).ownBlockCosts.map((c) => ({ ...c, id })));
+    if (!dues.length || attackCostsPayable(s, pid, dues, [], blockers)) return blocks;
+    const drop = [...blockers].reverse().find((b) => characteristics(s, obj(s, b)).ownBlockCosts.length)!;
+    blocks = blocks.filter((b) => b.blocker !== drop);
+    blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     blocks = withCompany(s, blocks);
   }
 }

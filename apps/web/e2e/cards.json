@@ -4479,6 +4479,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bc0518fc-d34b-474a-92c5-2cb013828396",
+  "name": "Benthic Explorers",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Merfolk Scout",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Scout"
+  ],
+  "oracleText": "{T}, Untap a tapped land an opponent controls: Add one mana of any type that land could produce.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5cd51d39-aebc-4367-9157-da70b8d9b1a3",
   "name": "Berserker's Frenzy",
   "manaCost": "{2}{R}",
@@ -6665,6 +6703,32 @@
   "set": "frf",
   "releasedAt": "2015-01-23",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b4971aa3-32d1-4bc7-8133-ed67763d2dc6",
+  "name": "Brutal Suppression",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Activated abilities of nontoken Rebels cost an additional \"Sacrifice a land\" to activate.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12373,6 +12437,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "77eafe49-b9c5-461d-89c5-cec217dd2974",
+  "name": "Disfigure",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature gets -2/-2 until end of turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "865a2194-fca0-446e-aae3-ca475cd66e00",
   "name": "Dismal Backwater",
   "manaCost": "",
@@ -12561,6 +12651,32 @@
   "set": "dom",
   "releasedAt": "2018-04-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0158a440-6573-4f12-958b-a5f0cf190d5b",
+  "name": "Divine Intervention",
+  "manaCost": "{6}{W}{W}",
+  "cmc": 8,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "This enchantment enters with two intervention counters on it.\nAt the beginning of your upkeep, remove an intervention counter from this enchantment.\nWhen you remove the last intervention counter from this enchantment, the game is a draw.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13226,6 +13342,32 @@
   "set": "arn",
   "releasedAt": "1993-12-17",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ecba74bd-850e-4cbe-9b1c-b0d4d6f27d1c",
+  "name": "Drought",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nSpells cost an additional \"Sacrifice a Swamp\" to cast for each black mana symbol in their mana costs.\nActivated abilities cost an additional \"Sacrifice a Swamp\" to activate for each black mana symbol in their activation costs.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -14618,6 +14760,37 @@
   "set": "otj",
   "releasedAt": "2024-04-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "82d4d70b-afb9-4ae7-8f30-16bc64dccf3e",
+  "name": "Errant Doomsayers",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Rebel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rebel"
+  ],
+  "oracleText": "{T}: Tap target creature with toughness 2 or less.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -19957,6 +20130,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5004b84a-33b7-4f6f-b2c2-7086b9087535",
+  "name": "Graven Cairns",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{B/R}, {T}: Add {B}{B}, {B}{R}, or {R}{R}.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "C",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "83c8a3a6-2e1a-4e26-8847-6d066f42d906",
   "name": "Gray Ogre",
   "manaCost": "{2}{R}",
@@ -22175,6 +22378,34 @@
   "releasedAt": "2018-04-27",
   "rarity": "mythic",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "18ca77d9-4740-4be4-913a-e21c9ed9e43f",
+  "name": "Hollow Warrior",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact Creature — Golem Warrior",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem",
+   "Warrior"
+  ],
+  "oracleText": "This creature can't attack or block unless you tap an untapped creature you control not declared as an attacking or blocking creature this combat. (This cost is paid as attackers or blockers are declared.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
+  "rarity": "uncommon",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -49228,6 +49459,38 @@
   "commanderLegal": "legal",
   "set": "fic",
   "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4b22be3a-8ce1-47d1-b82e-6c3ccfb0548b",
+  "name": "Underground Sea",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Island Swamp",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Island",
+   "Swamp"
+  ],
+  "oracleText": "({T}: Add {U} or {B}.)",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

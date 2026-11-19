@@ -288,7 +288,7 @@ export type TriggerSourceEvent =
   | { type: "combatDamagedPlaneswalker"; id: ObjectId; player: PlayerId }
   | { type: "creaturesDamagedPlayers"; controller: PlayerId; players: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
-  | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
+  | { type: "lastCounterRemoved"; id: ObjectId; counter: string; /** Divine Intervention (round B259): the player who removed it, the controller of the effect or cost that did (rulings); unset, the controller of the spell or ability resolving, none outside a resolution (a rule, CR 704.5q). */ by?: PlayerId }
   /** `n` counters of a kind were removed from it at the same time, for any reason (see countersRemoved in counters.ts). */
   | { type: "countersRemoved"; id: ObjectId; counter: string; n: number }
   | { type: "echoPaid"; id: ObjectId }
@@ -2159,8 +2159,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
-    // Orcish Mine: "When the last ore counter is removed from ~".
-    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e, t) => e === "selfLastCounterRemoved" && t.countersKind === ev.counter);
+    // Orcish Mine: "When the last ore counter is removed from ~". Divine Intervention: "When you remove the last
+    // intervention counter from ~": only if its controller removed it (rulings: with an effect or cost they control).
+    if (o?.zone === "battlefield") {
+      const ctrl = controllerOf(s, o);
+      const by = ev.by ?? s.resolving?.item.controller;
+      add(o, ctrl, (e, t) => e === "selfLastCounterRemoved" && t.countersKind === ev.counter && (!t.removedByYou || by === ctrl));
+    }
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.

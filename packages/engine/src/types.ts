@@ -1283,6 +1283,8 @@ export interface StackItem {
   stationed?: { id: ObjectId; zc: number; power: number; /** Tapped for a station ability (CR 702.184a), for Tapestry Warden. */ station?: true };
   /** Cryptic Gateway: the creatures tapped to pay its "Tap two untapped creatures you control" cost, and their creature types, as they last existed once they leave (CR 608.2h). */
   costTapped?: { id: ObjectId; zc: number; types: string[] | "all" }[];
+  /** Benthic Explorers (round B259): the types of mana the land its cost untapped could produce (CR 106.7), as the cost was paid. */
+  untappedCouldProduce?: ManaType[];
   /** "Target creature that's blocking equipped creature" (Plasma Caster): the creature the source was attached to as it was activated (rulings). */
   hostThen?: { id: ObjectId; zc: number };
   /** A crew ability: how many creatures were tapped to pay its crew cost (Mighty Servant of Leuk-o, CR 702.122a). */
@@ -1372,6 +1374,12 @@ export interface StackItem {
    * each (its zone-change count then) and the times it was paid, for that instance's own copy trigger.
    */
   replicated?: { source: ObjectId; zc: number; times: number }[];
+  /**
+   * Round B260: the names of the cards spliced onto this spell as it was cast (CR 702.47a-b), for Minamo's Meddling's
+   * "each card with the same name as a card spliced onto that spell". Not copied: a copy isn't cast, and no card is
+   * spliced onto it (its spliced text comes with the copy, CR 707.10).
+   */
+  spliced?: string[];
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
   /** For a spell: cast during its controller's main phase (addendum, "if you cast this spell during your main phase"). */
@@ -1638,6 +1646,8 @@ export interface CostChoices {
   face?: number;
   /** Permanents to sacrifice, cards to discard, cards to exile from your graveyard. */
   sacrifice?: ObjectId[];
+  /** Round B260: the permanents sacrificed for the sacrifices other permanents add to its cost (AdditionalCost sacrifice `added`: Brutal Suppression, Drought), none of them one of `sacrifice`. */
+  addedSacrifice?: ObjectId[];
   discard?: ObjectId[];
   exileCards?: ObjectId[];
   /**
@@ -1963,7 +1973,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** Raiding Party (round B256): the white creatures a player taps ("tap"), then the Plains they spare ("plains"). */ raid?: "tap" | "plains"; /** Whims of the Fates (round B255): separating into three piles, choosing the first pile (1) or the second from the rest (2), the rest forming the third. */ piles3?: 1 | 2; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "keep": the rest are tapped (Regna's Sanction). */ tap?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** Phyrexian Dreadnought: the permanents picked have at least this total power (see the "pick" effect). */ minTotalPower?: number; /** Thelon's Curse: this mana for each permanent picked, paid from the pool as they're chosen (pick `payEach`). */ payEach?: string; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true; /** Words of Wind (round 385): the permanent this player returns as a draw is replaced, not a resolving spell's pick. */ wind?: WindDraw }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** Raiding Party (round B256): the white creatures a player taps ("tap"), then the Plains they spare ("plains"). */ raid?: "tap" | "plains"; /** Whims of the Fates (round B255): separating into three piles, choosing the first pile (1) or the second from the rest (2), the rest forming the third. */ piles3?: 1 | 2; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ /** Krenko's Buzzcrusher (pick `youChoose`): the player this pick is for, whose permanents these are. */ pickFor?: PlayerId; /** Malik, Grim Manipulator: a secret choice (secretChoose), "theirs" among another player's permanents (to be sacrificed), "own" among this player's own. */ secret?: "own" | "theirs"; of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep" (Winnowing): those sharing a creature type with the one kept stay too. */ sparesKin?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "keep": the rest are tapped (Regna's Sanction). */ tap?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the life paid for each one kept (Killing Wave). */ payLife?: number; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** Phyrexian Dreadnought: the permanents picked have at least this total power (see the "pick" effect). */ minTotalPower?: number; /** Thelon's Curse: this mana for each permanent picked, paid from the pool as they're chosen (pick `payEach`). */ payEach?: string; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true; /** Hollow Warrior (round B259): paying `objectId`'s cost to block (CR 509.1d-f, GameState.blockCostsDue). */ blockCost?: true; /** Battle for Bretagard: no two of those chosen may share a name (pick `differentNames`). */ differentNames?: true; /** Sigarda's Vanguard: no two of those chosen may have the same power (pick `differentPowers`). */ differentPowers?: true; /** Words of Wind (round 385): the permanent this player returns as a draw is replaced, not a resolving spell's pick. */ wind?: WindDraw }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true; /** Remove up to `total` of them, no more from each than `has` (Sensational Spider-Man). */ remove?: true; has?: Record<ObjectId, number>; /** With `remove`: exactly `total` of them (Overseer of Vault 76). */ exact?: true; /** Up to `total` of them, none included (Stumpsquall Hydra gone before its ability resolves). */ upTo?: true }
@@ -2744,6 +2754,8 @@ export interface GameState {
   blockLimits?: { player: PlayerId; n: number }[];
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
   declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][]; /** Attackers that may still be exerted (CR 701.43d), and those that were. */ exert?: ObjectId[]; exerted?: ObjectId[]; /** Costs to attack that aren't mana still to pay (Exalted Dragon, CR 508.1g-i), attacker by attacker. */ costs?: AttackCostDue[] };
+  /** Hollow Warrior (round B259): blocks declared and paid for in mana, waiting on the creatures tapped for costs to block (CR 509.1d-f), cost by cost. */
+  blockCostsDue?: { chooser: PlayerId; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[]; costs: AttackCostDue[] };
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
   mulligans?: MulliganState | null;
@@ -2905,7 +2917,7 @@ export interface TurnRule {
 /** A cost to attack with `id` that isn't mana (Exalted Dragon's "sacrifice a land", CR 508.1g): `n` permanents of its controller's. */
 export interface AttackCostDue {
   id: ObjectId;
-  action: "sacrifice" | "bounce";
+  action: "sacrifice" | "bounce" | /** Hollow Warrior (round B259): another untapped creature of theirs tapped, one not attacking (or, to block, not blocking). */ "tap";
   filter: TargetSpec;
   n: number;
 }
@@ -2982,6 +2994,8 @@ export interface Resolving {
   spellControllers?: (PlayerId | null)[];
   /** The cards of targeted spells, for "its mana value" after it's countered (CR 608.2h). */
   spellObjects?: (ObjectId | null)[];
+  /** Round B260: the names of the cards spliced onto each targeted spell (StackItem.spliced), for after it's countered (CR 608.2h). */
+  spellSpliced?: (string[] | null)[];
   /** The tokens its last "create" made, for "put a counter on it". */
   created?: ObjectId[];
   /** Thorin, Mountain-king: the Aura and Equipment its "attach" effects attached (moved) this resolution, for "when one or more Equipment become attached to that creature this way". */
@@ -3771,7 +3785,7 @@ export type Action =
   /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
   /** `extra`: the mana picked for the triggered mana abilities tapping it triggers ("one mana of any color", CR 605.4a). */
   /** `combo`: for "Add {W}{W}, {W}{U}, or {U}{U}", which of them (ManaOption.combo). */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** The color chosen for a replacement that lets the player tapping it choose (ManaOption.instead, round B224). */ instead?: ManaType; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; /** Round B260: the permanents sacrificed for the sacrifices Brutal Suppression and Drought add to its cost. */ sacrifice?: ObjectId[]; extra?: ManaType[]; combo?: number; /** The color chosen for a replacement that lets the player tapping it choose (ManaOption.instead, round B224). */ instead?: ManaType; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */

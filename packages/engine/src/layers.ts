@@ -191,7 +191,9 @@ export interface Characteristics {
   /** Generic mana for each creature blocking this one (Awesome Presence, CR 509.1d). */
   blockedTax: number;
   /** Costs to attack with this creature that aren't mana (Exalted Dragon's "sacrifice a land", CR 508.1g). */
-  ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
+  ownAttackCosts: { action: "sacrifice" | "bounce" | "tap"; filter: TargetSpec; n: number }[];
+  /** Hollow Warrior (round B259): costs to block with it that aren't mana (CR 509.1d), tapping other creatures of its controller's. */
+  ownBlockCosts: { action: "tap"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** Galactus, Devourer of Worlds: "attacks an opponent with the most life among your opponents each combat if able" (those players worked out as attackers are declared, game.ts mustAttackPlayers). */
@@ -436,6 +438,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     ownBlockTaxVs: [],
     blockedTax: 0,
     ownAttackCosts: [],
+    ownBlockCosts: [],
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -2123,6 +2126,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "ownAttackCost":
       c.ownAttackCosts = [...c.ownAttackCosts, { action: m.action, filter: m.filter, n: m.n }];
+      return;
+    case "ownBlockCost":
+      c.ownBlockCosts = [...c.ownBlockCosts, { action: m.action, filter: m.filter, n: m.n }];
       return;
     case "ownBlockTaxVs":
       c.ownBlockTaxVs = [...c.ownBlockTaxVs, { n: m.n, minPower: m.minPower }];

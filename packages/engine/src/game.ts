@@ -1,6 +1,7 @@
 import { isRealKicker, kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { addedAbilityCosts, addedSpellCosts, anyAddedSacrifice } from "./added-costs";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { createEmblem, liveEmblems } from "./emblems";
@@ -416,7 +417,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to, action.instead);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to, action.instead, action.sacrifice);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -1768,7 +1769,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
       invalidateCharacteristics(s);
       log(s, `${characteristics(s, p).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}).`);
       for (const [k, n] of kinds) countersRemoved(s, p, k, n);
-      for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k });
+      for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k, by: controllerOf(s, o) });
     }
     if (stolen) withCounters = withCounters?.counter === "+1/+1" ? { ...withCounters, n: withCounters.n + stolen } : { counter: "+1/+1", n: stolen, ...(withCounters ? { also: { counter: withCounters.counter, n: withCounters.n } } : {}) };
   }
@@ -6580,13 +6581,14 @@ function noteExiledMv(s: GameState, card: GameObject) {
 }
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
-function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
+function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }, by: PlayerId) {
   if (rc.n <= 0) return;
   const left = (o.counters[rc.counter] ?? 0) - rc.n;
   o.counters[rc.counter] = left;
   invalidateCharacteristics(s);
   countersRemoved(s, o, rc.counter, rc.n);
-  if (left === 0) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: rc.counter });
+  // The player paying the cost removes them (Divine Intervention's rulings).
+  if (left === 0) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: rc.counter, by });
 }
 
 export function isSummoningSick(s: GameState, o: GameObject) {
@@ -6603,7 +6605,7 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
   return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType, sacrifice?: ObjectId[]) {
   const o = obj(s, id);
   // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
   const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
@@ -6611,7 +6613,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const i = index ?? pickManaAbility(s, p.id, o, mana);
   if (i === undefined) throw new RulesError(`${name} can't produce {${mana}} right now`);
   const ab = manaAbilitiesOn(s, o)[i]!;
-  const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
+  // Round B260: the sacrifices other permanents add (Brutal Suppression, Drought), as they are when it's activated.
+  const added = addedAbilityCosts(s, p.id, o, ab.manaCost, ab.sacrificeSelf)[0];
+  const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined), sacrifice ?? (added ? [] : undefined));
   if (problem) throw new RulesError(problem);
   // Piracy (round B238): mana from a land another player controls can be spent only to cast spells (CR 106.6), told as
   // it's activated, before its costs move it.
@@ -6666,10 +6670,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} mills ${card ? nameOf(s, card.id) : "no card"} for ${name}.`);
     if (ab.produces.kind === "milledSymbols") milledCombos = card && (card.zone === "graveyard" || (card.zone === "exile" && !card.faceDown)) ? milledSymbolCombos(s, card) : [[]];
   }
-  if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
+  if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters, p.id);
   if (ab.produces.kind === "removeX") {
     const n = combos![combo!]!.length - (ab.produces.base ?? 0);
-    removeCountersCost(s, o, { counter: ab.produces.counter, n });
+    removeCountersCost(s, o, { counter: ab.produces.counter, n }, p.id);
     log(s, `${p.name} removes ${n} ${ab.produces.counter} counter${n === 1 ? "" : "s"} from ${name}.`);
   }
   if (ab.produces.kind === "revealX") {
@@ -6685,6 +6689,13 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     addDelayed(s, "nextEndStep", p.id, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~" });
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
+  if (added && sacrifice?.length) {
+    for (const x of sacrifice) {
+      log(s, `${p.name} sacrifices ${nameOf(s, x)} for ${name}'s mana ability.`);
+      moveObject(s, x, "graveyard", { sacrificed: true, cost: true });
+    }
+    closeZoneBatch(s);
+  }
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
@@ -8808,6 +8819,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
   const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
   if (replicated.length) item.replicated = replicated;
+  // Round B260: the names of the cards spliced onto it (CR 702.47a), for Minamo's Meddling.
+  if (choices.splice?.length) item.spliced = choices.splice.map((c) => defOf(s, obj(s, c)).name);
   // Round 410: each instance of offspring a permanent gave it that was paid: the permanent it becomes has that instance's
   // enters trigger for the rest of the game, even once the giver is gone (CR 702.175a-b, 400.7b, 611.3d, rulings), as an
   // ability with the giver's timestamp (CR 613.7a). An unpaid instance's trigger would do nothing (its "if" is false).
@@ -9828,7 +9841,7 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice" | "faceDown"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -9860,7 +9873,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // 118.9), the mana value of what's cast (a split card's half, X as 0, CR 107.3b), for the card it lets be cast only.
   const payPend = s?.pending?.kind === "castFree" && s.pending.player === pid && s.pending.pay && s.pending.pay.kind !== "mana" && choices?.objectId === s.pending.objectId ? s.pending.pay : undefined;
   const payCosts: AdditionalCost[] = !payPend ? [] : payPend.kind === "discard" ? [{ kind: "discard", n: payPend.n }] : payPend.kind === "lifeMv" ? [{ kind: "payLife", n: manaValue(parseManaCost(d.manaCost)) }] : payPend.kind === "energyMv" ? [{ kind: "payEnergy", n: manaValue(parseManaCost(d.manaCost)) }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : []), ...(s && !choices?.faceDown ? addedSpellCosts(s, d.manaCost) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -9898,6 +9911,12 @@ export function clashingCosts(costs: AdditionalCost[]): boolean {
  */
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   if (s && pid !== undefined && src && freeCycling(s, pid, src, ab, x)) return [];
+  // Round B260: the sacrifices other permanents add (Brutal Suppression, Drought), after its own.
+  const added = s && pid !== undefined ? addedAbilityCosts(s, pid, src, ab.manaCost, ab.sacrificeSelf) : [];
+  return [...ownActivatedCosts(ab, x, src, s, pid), ...added];
+}
+
+function ownActivatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   return (ab.costs ?? []).map((c0) => {
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
@@ -9930,8 +9949,8 @@ export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
   c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random && !c.lastDrawn) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters" || c.kind === "putCounter";
-const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" | "counterOn" =>
-  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : c.kind === "putCounter" ? "counterOn" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
+const costPickKey = (c: AdditionalCost): "sacrifice" | "addedSacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" | "counterOn" =>
+  c.kind === "sacrifice" && c.added ? "addedSacrifice" : c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : c.kind === "putCounter" ? "counterOn" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
 
 /** What can get the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): ~ too. */
 export function counterOnCandidates(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>): ObjectId[] {
@@ -9964,9 +9983,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   const p = player(s, pid);
   const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal" | "exileFromHand") => choices?.[k];
   for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap", "reveal", "exileFromHand"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k) || (c.kind === "forage" && (k === "sacrifice" || k === "exileCards")))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
-  const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
+    if (given(k)?.length && !costs.some((c) => (c.kind === (k === "exileCards" ? "exileFromGraveyard" : k) && !(c.kind === "sacrifice" && c.added)) || (c.kind === "forage" && (k === "sacrifice" || k === "exileCards")))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
+  const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? []), ...(choices?.addedSacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
+  // Round B260: the sacrifices other permanents add (Brutal Suppression, Drought) take permanents no other cost of it takes.
+  if (choices?.addedSacrifice?.length) {
+    if (!costs.some((c) => c.kind === "sacrifice" && c.added)) return `${d.name} doesn't ask you to sacrifice anything more`;
+    const others = [...(choices.returnToHand ?? []), ...(choices.casualty !== undefined ? [choices.casualty] : []), ...(choices.casualtyMore ?? []), ...(choices.bargain !== undefined ? [choices.bargain] : []), ...(choices.offering !== undefined ? [choices.offering] : []), ...(choices.craft ?? [])];
+    if (choices.addedSacrifice.some((id) => others.includes(id))) return "one permanent can't pay two costs";
+  }
   if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
   if (choices?.craft?.length && !costs.some((c) => c.kind === "craft")) return `${d.name} doesn't ask you to exile materials`;
   if (choices?.counters?.length && !costs.some((c) => c.kind === "removeCounters")) return `${d.name} doesn't ask you to remove counters`;
@@ -10168,7 +10193,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
     const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : c.kind === "exileFromGraveyard" && c.toBottom ? "put on the bottom of your library" : "exile";
-    const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
+    const chosen = c.kind === "sacrifice" && c.added ? choices?.addedSacrifice : given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
       if (chosen?.length) return `${d.name}'s discard is at random`;
@@ -10357,7 +10382,9 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
     if (c.untap ? !x.tapped || (x.counters.stun ?? 0) > 0 : x.tapped) return false;
     // Templar Knight: "creatures you control named ~": with the source's name as it is now (CR 201.2).
     const filter = c.filter.named === "~" ? { ...c.filter, named: source.zone === "battlefield" ? characteristics(s, source).name : defOf(s, source).name } : c.filter;
-    return controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, filter, x, pid, false);
+    // Benthic Explorers: a permanent an opponent controls (round B259).
+    const whose = c.opponents ? controllerOf(s, x) !== pid && opponents(s, pid).includes(controllerOf(s, x)) : controllerOf(s, x) === pid;
+    return whose && !(c.other && id === source.id) && objectMatches(s, filter, x, pid, false);
   });
 }
 
@@ -10367,6 +10394,8 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
  * before costs are paid (CR 601.2g-h, 602.2b; rulings on Halo Fountain). Not one with a stun counter (CR 122.1d).
  */
 export function untapViaMana(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "tap" }>): ObjectId[] {
+  // Benthic Explorers: an opponent's land, which its controller taps, not you.
+  if (c.opponents) return [];
   return s.battlefield.filter((id) => {
     const x = obj(s, id);
     if (id === source.id || x.tapped || (x.counters.stun ?? 0) > 0 || controllerOf(s, x) !== pid || !objectMatches(s, c.filter, x, pid, false)) return false;
@@ -10622,7 +10651,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         t[x.kind] = (t[x.kind] ?? 0) + 1;
         done.set(x.id, t);
       }
-      for (const [id, kinds] of done) for (const [kind, n] of Object.entries(kinds)) removeCountersCost(s, obj(s, id), { counter: kind, n });
+      for (const [id, kinds] of done) for (const [kind, n] of Object.entries(kinds)) removeCountersCost(s, obj(s, id), { counter: kind, n }, p.id);
       log(s, `${p.name} removes ${[...done].map(([id, kinds]) => `${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(" and ")} counter${Object.values(kinds).reduce((a, b) => a + b, 0) === 1 ? "" : "s"} from ${nameOf(s, id)}`).join(", ")}.`);
     } else if (c.kind === "putCounter") {
       // Through the replacement effects on counters, as any counter put on a permanent (CR 122.6).
@@ -10663,6 +10692,13 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         moveObject(s, id, "exile");
         // "Cards exiled with ~" (Mechtitan Core): the cards it became in exile (CR 400.7); a token is gone (CR 704.5d).
         if (o.zone === "exile") exiled?.push({ id, zc: o.zoneChanges ?? 0 });
+      }
+    } else if (c.kind === "sacrifice" && c.added) {
+      // Round B260: what Brutal Suppression and Drought add (CR 601.2f, 602.2b): sacrificed as a cost, but not "the
+      // sacrificed creature" of the spell's or ability's own words, so not kept with them.
+      for (const id of choices.addedSacrifice ?? []) {
+        log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
+        moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
       }
     } else if (c.kind === "sacrifice") {
       for (const id of choices.sacrifice ?? []) {
@@ -11054,8 +11090,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const tp = targets ? (targetProblem(s, body.targets, targets, pid, src, id) ?? flagbearerProblem(s, body.targets, targets, pid, src, id, manySpecs)) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
-  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o, s, pid), costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
+  const allCosts = activatedCosts(ab, x, o, s, pid);
+  if (allCosts.length || costs?.sacrifice?.length || costs?.addedSacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
+    const cp = extraCostProblem(s, pid, o, allCosts, costs, `activate ${d.name}'s ability`, ab.mana ? "mana" : "costs");
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x, costs);
@@ -11502,7 +11539,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.crew !== undefined && !tapCreatures && costs?.crewLoyalty === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.tapPower ? "tap" : ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
-  if (ab && activatedCosts(ab, x, o, s, p.id).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  // Its costs beyond mana as they are when it's activated (CR 601.2f, 602.2b), before any of them is paid.
+  const extraCosts0 = ab ? activatedCosts(ab, x, o, s, p.id) : [];
+  if (ab && extraCosts0.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
   if (ab?.costs?.some((c) => c.kind === "exileSpell") && !costs?.exileSpell?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a spell you control to exile");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
@@ -11561,11 +11600,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const grantRemover = ab.grantSourceCost?.action === "removeAllCounters" && ab.grantSourceCost.id ? s.objects[ab.grantSourceCost.id] : undefined;
   const grantRemoved = grantRemover && grantRemover.zone === "battlefield" && (grantRemover.zoneChanges ?? 0) === ab.grantSourceCost!.zc ? Math.max(0, grantRemover.counters[ab.grantSourceCost!.counter!] ?? 0) : undefined;
   if (grantRemover && grantRemoved !== undefined) {
-    if (grantRemoved) removeCountersCost(s, grantRemover, { counter: ab.grantSourceCost!.counter!, n: grantRemoved });
+    if (grantRemoved) removeCountersCost(s, grantRemover, { counter: ab.grantSourceCost!.counter!, n: grantRemoved }, p.id);
     log(s, `${p.name} removes ${grantRemoved} ${ab.grantSourceCost!.counter} counter${grantRemoved === 1 ? "" : "s"} from ${nameOf(s, grantRemover.id)}.`);
   }
   const removedCount = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : grantRemoved;
-  if (ab.removeCounters) removeCountersCost(s, o, removedCount !== undefined ? { counter: ab.removeCounters.counter, n: removedCount } : ab.removeCounters);
+  if (ab.removeCounters) removeCountersCost(s, o, removedCount !== undefined ? { counter: ab.removeCounters.counter, n: removedCount } : ab.removeCounters, p.id);
   if (removedCount !== undefined && ab.removeCounters) log(s, `${p.name} removes ${removedCount} ${ab.removeCounters.counter} counter${removedCount === 1 ? "" : "s"} from ${d.name}.`);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).
   if (ab.putCounters) {
@@ -11635,7 +11674,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     if (ab.grantSourceCost?.action === "tap" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc && !granter.tapped) tapPermanent(s, granter);
     for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
     // Heart of Kiran: a loyalty counter removed instead (not a loyalty ability, rulings).
-    if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) removeCountersCost(s, obj(s, costs.crewLoyalty), { counter: "loyalty", n: 1 });
+    if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) removeCountersCost(s, obj(s, costs.crewLoyalty), { counter: "loyalty", n: 1 }, p.id);
   });
   if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} ${ab.bendCreaturesOnly ? "to pay for it" : "to waterbend"}.`);
   // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
@@ -11646,7 +11685,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costCardNames: string[] = [];
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const extraCosts = activatedCosts(ab, x, o, s, p.id);
+  const extraCosts = extraCosts0;
   const sacrificed = extraCosts.length ? payExtraCosts(s, p, extraCosts, costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   // Kylox's Voltstrider (round 401): the cards its collect evidence cost exiled are "exiled with it" (CR 607.2a), the
   // object it is now (CR 400.7).
@@ -11658,6 +11697,10 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     for (const t of costs.tap) if (s.objects[t] && !list.includes(`${t}@${s.objects[t]!.zoneChanges ?? 0}`)) list.push(`${t}@${s.objects[t]!.zoneChanges ?? 0}`);
   }
   const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
+  // Benthic Explorers (round B259): what the opponent's land it untapped could produce (rulings: its mana abilities' effects,
+  // whatever their costs, replacement effects included, CR 106.7); its mana ability resolves at once (CR 605.3a).
+  const untapped = extraCosts.some((c) => c.kind === "tap" && c.untap && c.opponents) && costs?.tap?.length === 1 ? s.objects[costs.tap[0]!] : undefined;
+  const untappedCould = untapped?.zone === "battlefield" ? landCouldProduce(s, untapped) : untapped ? [] : undefined;
   // Cryptic Gateway: the creatures its cost tapped, for "each creature tapped this way".
   const tappedKin = JSON.stringify(body.effects).includes('"kinOfCostTapped":true') ? (costs?.tap ?? []).flatMap((t) => (s.objects[t] ? [{ id: t, zc: s.objects[t]!.zoneChanges ?? 0, types: typesList(creatureTypesOf(s, s.objects[t]!)) }] : [])) : [];
   // A Killer Among Us (round B233): revealing the chosen type is part of the cost (CR 602.2b).
@@ -11698,6 +11741,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(scavengedPower !== undefined ? { scavengedPower } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(tappedKin.length ? { costTapped: tappedKin } : {}),
+    ...(untappedCould ? { untappedCouldProduce: untappedCould } : {}),
     ...(body.targets.some((t) => t.blockingEquipped) && o.attachedTo && s.objects[o.attachedTo] ? { hostThen: { id: o.attachedTo, zc: s.objects[o.attachedTo]!.zoneChanges ?? 0 } } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)), station: true as const } } : {}),
     // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
@@ -11990,6 +12034,10 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   if (pend.maxTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) > pend.maxTotalPower) throw new RulesError(`choose creatures with total power ${pend.maxTotalPower} or less`);
   // Phyrexian Dreadnought: at least that much total power, a negative power taking some off.
   if (pend.minTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) < pend.minTotalPower) throw new RulesError(`choose creatures with total power ${pend.minTotalPower} or greater`);
+  if (pend.blockCost) {
+    blockCostPaid(s, p, ids);
+    return;
+  }
   if (pend.attackCost) {
     attackCostPaid(s, p, ids);
     return;
@@ -13416,7 +13464,7 @@ function countersTakenAsEnters(s: GameState, o: GameObject, ids: ObjectId[], ent
     invalidateCharacteristics(s);
     log(s, `${characteristics(s, p).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}) as ${d.name} enters.`);
     for (const [k, n] of kinds) countersRemoved(s, p, k, n);
-    for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k });
+    for (const [k] of kinds) fireEvent(s, { type: "lastCounterRemoved", id: p.id, counter: k, by: controllerOf(s, o) });
   }
   if (removed && characteristics(s, o).hasPrintedAbilities) {
     const put = putCounters(s, o, "+1/+1", removed * per, true);
@@ -14061,7 +14109,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if (pend.pay?.mana && !paid) throw new RulesError(`blocking costs ${pend.pay.mana}: add the mana first`);
     payLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     log(s, `${p.name} pays ${describePay(pend.pay!)} to block.`);
-    blocksDeclared(s, chooser, p, bt.blocks, bt.remaining);
+    blocksPaying(s, chooser, p, bt.blocks, bt.remaining);
     return;
   }
   if (pend?.kind !== "chooseMay" || pend.player !== p.id || !r) throw new RulesError("nothing to decide");
@@ -14493,17 +14541,20 @@ export function attackCost(s: GameState, attacks: { attacker?: ObjectId; defende
 }
 
 /** The permanents of `pid`'s that could pay a cost to attack that isn't mana (Exalted Dragon's "sacrifice a land"). */
-export function attackCostOptions(s: GameState, pid: PlayerId, cost: { filter: TargetSpec }): ObjectId[] {
-  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, cost.filter, obj(s, id), pid, false));
+export function attackCostOptions(s: GameState, pid: PlayerId, cost: { filter: TargetSpec; action?: "sacrifice" | "bounce" | "tap"; id?: ObjectId }, declared: ObjectId[] = []): ObjectId[] {
+  // Hollow Warrior (round B259): an untapped creature that isn't the one paying (rulings), nor declared as an attacking or
+  // blocking creature this combat (`declared`: the ones being declared now).
+  const tapOk = (o: GameObject) => !o.tapped && o.id !== cost.id && o.attacking === undefined && !o.attackingPermanent && o.blocking === undefined && !declared.includes(o.id);
+  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, cost.filter, obj(s, id), pid, false) && (cost.action !== "tap" || tapOk(obj(s, id))));
 }
 
 /**
  * Can `pid` pay all these costs to attack at once (CR 508.1i): each permanent needed a different one of theirs that fits,
  * none of `taken`? A matching of the permanents needed to the permanents there, by augmenting paths.
  */
-export function attackCostsPayable(s: GameState, pid: PlayerId, costs: { filter: TargetSpec; n: number }[], taken: ObjectId[] = []): boolean {
+export function attackCostsPayable(s: GameState, pid: PlayerId, costs: { filter: TargetSpec; n: number; action?: "sacrifice" | "bounce" | "tap"; id?: ObjectId }[], taken: ObjectId[] = [], declared: ObjectId[] = []): boolean {
   const slots = costs.flatMap((c) => {
-    const options = attackCostOptions(s, pid, c).filter((id) => !taken.includes(id));
+    const options = attackCostOptions(s, pid, c, declared).filter((id) => !taken.includes(id));
     return Array.from({ length: c.n }, () => options);
   });
   const by = new Map<ObjectId, number>();
@@ -14523,8 +14574,9 @@ export function attackCostsPayable(s: GameState, pid: PlayerId, costs: { filter:
 }
 
 /** "Sacrifice a land", "return an enchantment you control to its owner's hand": a cost to attack, said. */
-export function describeAttackCost(c: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }): string {
+export function describeAttackCost(c: { action: "sacrifice" | "bounce" | "tap"; filter: TargetSpec; n: number }): string {
   const what = c.n === 1 ? `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}` : `${c.n} ${c.filter.text}s`;
+  if (c.action === "tap") return `tap ${what}`;
   return c.action === "sacrifice" ? `sacrifice ${what}` : `return ${what} you control to ${c.n === 1 ? "its owner's hand" : "their owners' hands"}`;
 }
 
@@ -14580,7 +14632,7 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
     if (atBattle || whose !== near) return `${c.name} can attack only the nearest opponent to its controller's ${side}${near !== undefined ? ` (${player(s, near).name})` : ""} and their planeswalkers`;
   }
   // Exalted Dragon: only if the cost can be paid (CR 508.1d, 508.1i).
-  if (c.ownAttackCosts.length && !attackCostsPayable(s, c.controller, c.ownAttackCosts)) return `${c.name} can't attack unless you ${c.ownAttackCosts.map(describeAttackCost).join(" and ")}`;
+  if (c.ownAttackCosts.length && !attackCostsPayable(s, c.controller, c.ownAttackCosts.map((x) => ({ ...x, id: o.id })))) return `${c.name} can't attack unless you ${c.ownAttackCosts.map(describeAttackCost).join(" and ")}`;
   // Weathered Sentinels: defender stops it attacking anyone but those players themselves (CR 702.3b).
   if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
@@ -15048,7 +15100,7 @@ export function attackDeclarationProblem(s: GameState, pid: PlayerId, attacks: {
   if (improve) return `${player(s, pid).name} must attack ${[...attackYouWithOneRequired(s, pid).keys()].map((t) => player(s, t).name).join(" and ")} or a planeswalker they control with at least one creature if able (${improve.why})`;
   // Costs to attack that aren't mana (Exalted Dragon): all of them together, a permanent paying only one (CR 508.1i).
   const costs: AttackCostDue[] = attacks.flatMap((a) => characteristics(s, obj(s, a.attacker)).ownAttackCosts.map((c) => ({ id: a.attacker, ...c })));
-  if (!attackCostsPayable(s, pid, costs)) return `you can't pay all the costs to attack with these creatures: ${costs.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`;
+  if (!attackCostsPayable(s, pid, costs, [], attacks.map((a) => a.attacker))) return `you can't pay all the costs to attack with these creatures: ${costs.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`;
   // Sivitri, Dragon Master: life, paid with the mana; only with that much life (CR 119.4).
   const lifeTax = attackLifeCost(s, attacks);
   if (lifeTax && payableLife(s, pid) < lifeTax) return `attacking with these creatures costs ${lifeTax} life, and ${player(s, pid).name} can't pay it`;
@@ -15420,6 +15472,10 @@ function attackCostPaid(s: GameState, p: Player, ids: ObjectId[]) {
     if (cost!.action === "sacrifice") {
       log(s, `${p.name} sacrifices ${nameOf(s, id)} to attack with ${nameOf(s, cost!.id)}.`);
       moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
+    } else if (cost!.action === "tap") {
+      // Hollow Warrior (round B259): tapped as the cost (CR 508.1h).
+      log(s, `${p.name} taps ${nameOf(s, id)} to attack with ${nameOf(s, cost!.id)}.`);
+      tapPermanent(s, obj(s, id));
     } else {
       log(s, `${p.name} returns ${nameOf(s, id)} to ${obj(s, id).owner === p.id ? "their" : "its owner's"} hand to attack with ${nameOf(s, cost!.id)}.`);
       moveObject(s, id, "hand");
@@ -15557,6 +15613,9 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   const taxed = !!blockCost(s, 1) || blocksMayCostLife(s);
   const req = taxed || ((earlier + seen.size >= limit || mineEarlier + seen.size >= mineLimit) && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
+  // Hollow Warrior (round B259): costs to block that aren't mana, all of them payable together by creatures not blocking.
+  const tapDues = blockTapCosts(s, [...seen.keys()]);
+  if (tapDues.length && !attackCostsPayable(s, p.id, tapDues, [], [...seen.keys()])) throw new RulesError(`you can't pay all the costs to block with these creatures: ${tapDues.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
   const tax = blockCost(s, seen.size, [...seen.keys()], blocks);
   // Heat Wave: life, paid with the mana (CR 509.1d-f); only with that much life (CR 119.4).
@@ -15583,7 +15642,44 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   }
   if (life) payLife(s, p.id, life);
   if (both) log(s, `${p.name} pays ${both} to block.`);
-  blocksDeclared(s, chooser, p, blocks, pend.remaining);
+  blocksPaying(s, chooser, p, blocks, pend.remaining);
+}
+
+/** Hollow Warrior (round B259): each blocker's costs to block that aren't mana (CR 509.1d), blocker by blocker. */
+function blockTapCosts(s: GameState, blockers: ObjectId[]): AttackCostDue[] {
+  return blockers.flatMap((id) => characteristics(s, obj(s, id)).ownBlockCosts.map((c) => ({ id, ...c })));
+}
+
+/**
+ * The blocks' costs that aren't mana (Hollow Warrior's tapping, round B259), paid now (CR 509.1f): a pick for each, by the
+ * blocks' controller, of creatures that keep the rest payable; then the blocks are declared.
+ */
+function blocksPaying(s: GameState, chooser: Player, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[], remaining: PlayerId[]) {
+  const due = s.blockCostsDue ?? { chooser: chooser.id, player: p.id, blocks, remaining, costs: blockTapCosts(s, [...new Set(blocks.map((b) => b.blocker))]) };
+  const cost = due.costs[0];
+  if (!cost) {
+    s.blockCostsDue = undefined;
+    blocksDeclared(s, chooser, p, blocks, remaining);
+    return;
+  }
+  s.blockCostsDue = due;
+  const declared = [...new Set(blocks.map((b) => b.blocker))];
+  s.pending = { kind: "pickPermanents", player: p.id, source: nameOf(s, cost.id), action: "tap", what: cost.filter.text, options: attackCostOptions(s, p.id, cost, declared), count: cost.n, objectId: cost.id, blockCost: true, prompt: `to block with it, ${describeAttackCost(cost)}: click ${cost.n === 1 ? "one" : `${cost.n} of them`}.` };
+}
+
+/** Hollow Warrior's cost to block, paid with these creatures (CR 509.1f), if the costs still to pay can be paid without them. */
+function blockCostPaid(s: GameState, p: Player, ids: ObjectId[]) {
+  const due = s.blockCostsDue!;
+  const [cost, ...rest] = due.costs;
+  const declared = [...new Set(due.blocks.map((b) => b.blocker))];
+  if (!attackCostsPayable(s, p.id, rest, ids, declared)) throw new RulesError(`those are needed for the other costs to block: ${rest.map((c) => `${nameOf(s, c.id)} needs you to ${describeAttackCost(c)}`).join("; ")}`);
+  due.costs = rest;
+  for (const id of ids) {
+    log(s, `${p.name} taps ${nameOf(s, id)} to block with ${nameOf(s, cost!.id)}.`);
+    tapPermanent(s, obj(s, id));
+  }
+  s.pending = null;
+  blocksPaying(s, player(s, due.chooser), player(s, due.player), due.blocks, due.remaining);
 }
 
 /** The two creatures' creature types and supertypes as a block is declared, kept only when someone could ask (a Zombie or a legendary creature in it). */
@@ -16937,7 +17033,11 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
       const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
-      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) });
+      // Round B260: a pick for the sacrifices Brutal Suppression and Drought add.
+      const added = addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf)[0];
+      const sacrifice = added?.kind === "sacrifice" ? anyAddedSacrifice(s, pid, o, added) : undefined;
+      if (sacrifice === null || (sacrifice && tap?.some((t) => sacrifice.includes(t)))) return;
+      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(sacrifice ? { sacrifice } : {}), ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}), ...(x.instead ? { instead: x.instead } : {}) });
     });
   }
   return out;

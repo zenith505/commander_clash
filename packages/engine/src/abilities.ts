@@ -5958,6 +5958,27 @@ export type Effect =
   | { type: "untilLeavesToBottom" }
   /** Gale's Redirection: "You may cast the exiled card for as long as it remains exiled": the card the spell this resolution exiled from the stack was (ResolvingState.exiledFromStack), for this ability's controller, with any color of mana (`anyColor`, CR 609.4b) or without paying its mana cost (`free`, CR 118.9; effects/run-round363.ts). */
   | { type: "mayCastExiledSpell"; anyColor?: true; free?: true }
+  /**
+   * Kotose, the Silent Spider (round 420): "For as long as you control ~, you may play one of the exiled cards, and you may
+   * spend mana as though it were mana of any color to cast it.": the cards this resolution exiled (the target card and the
+   * ones its exileNamed found, ResolvingState.exiledCards and namedExiled) that are still those cards in exile (CR 400.7),
+   * one of them only (a `oneOf` group, rulings), while this ability's controller controls its source (until
+   * "whileControlled": over for good once they don't, rulings), with any color of mana (CR 609.4b). Effects/run-round420.ts.
+   */
+  | { type: "mayPlayOneExiledThisWay" }
+  /**
+   * Allure of the Unknown (round 420): "Reveal the top six cards of your library. An opponent exiles a nonland card from
+   * among them, then you put the rest into your hand. That opponent may cast the exiled card without paying its mana
+   * cost.": the opponent chosen as it resolves (CR 608.2d), who picks; cast by them as this resolves or never (rulings,
+   * CR 608.2g). Effects/run-round420.ts.
+   */
+  | { type: "revealOpponentExilesCasts"; n: number; filter: TargetSpec }
+  /**
+   * Cloak and Dagger, Entwined (round 420): "You may exile a nonland card from their hand or the chosen creature until ~
+   * leave the battlefield.": one of the nonland cards in target `player`'s hand or the creature target `creature` (if
+   * still legal), or nothing, exiled until the source leaves (CR 610.3). Effects/run-round420.ts.
+   */
+  | { type: "exileFromHandOrTarget"; player: number; creature: number; filter: TargetSpec }
   /** Vaevictis Asmadi, the Dire: "Those players sacrifice those permanents. Each player who sacrificed a permanent this way
    * reveals the top card of their library, then puts it onto the battlefield if it's a permanent card." Each target still
    * legal is sacrificed by its controller, all at once; each player who sacrificed one reveals, and the permanent cards

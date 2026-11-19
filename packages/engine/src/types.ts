@@ -3051,6 +3051,8 @@ export interface Resolving {
   exiled?: { o: GameObject; ch: Characteristics; /** Who controlled it as it last existed ("its controller", CR 608.2h): Chaotic Transformation. */ controller?: PlayerId }[];
   /** The cards its exile instructions exiled from graveyards so far while this resolves (Count "cardsExiledThisWay"). */
   exiledCards?: ObjectId[];
+  /** The cards exileNamed exiled from a player's graveyard, hand and library so far while this resolves (Kotose, the Silent Spider, round 420: "the exiled cards"). */
+  namedExiled?: ObjectId[];
   /** The total toughness of what a returnExiled with `toughnessThisWay` returned (Count "returnedToughness"). */
   returnedToughness?: number;
   /** The cards exiled face down so far (exileFaceDown), for Duplicity's "all other cards you own exiled with ~". */
@@ -3256,6 +3258,10 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect "revealOpponentExilesCasts" (Allure of the Unknown, round 420): the cards revealed, the card the opponent exiled (null for none) and who that opponent is, and whether they were asked to cast it. */
+    allure?: { looked: ObjectId[]; exiled?: { id: ObjectId; zc: number } | null; caster?: PlayerId; asked?: true };
+    /** Effect "exileFromHandOrTarget" (Cloak and Dagger, Entwined, round 420): done. */
+    cloakDone?: true;
     /** Effect "reblock" (False Orders, Balduvian Warlord, round B256): the creature removed from combat, and the attacker it blocks once chosen ("none" for none). */
     reblock?: { id: ObjectId; zc: number; choice?: string };
     /** Effect "raidingParty" (round B256): the players still to choose in turn order, the step the first is at, how many creatures each chose to tap, those creatures, and the Plains chosen by anyone. */

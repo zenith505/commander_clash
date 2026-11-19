@@ -1102,6 +1102,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "252d9b25-45a1-40ca-b563-4cdefc791a44",
+  "name": "Allure of the Unknown",
+  "manaCost": "{3}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top six cards of your library. An opponent exiles a nonland card from among them, then you put the rest into your hand. That opponent may cast the exiled card without paying its mana cost.",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ed43f1f9-ef96-47bc-8a54-e59154319f9d",
   "name": "Alpharael, Stonechosen",
   "manaCost": "{3}{B}{B}",
@@ -8766,6 +8794,72 @@
   "set": "leg",
   "releasedAt": "1994-06-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "73ca14bb-0586-4716-8d4c-738a93950ed5",
+  "name": "Cloak and Dagger",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Kindred Artifact — Rogue Equipment",
+  "supertypes": [],
+  "types": [
+   "Kindred",
+   "Artifact"
+  ],
+  "subtypes": [
+   "Rogue",
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +2/+0 and has shroud. (It can't be the target of spells or abilities.)\nWhenever a Rogue creature enters, you may attach this Equipment to it.\nEquip {3}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "64132f93-66ac-4794-8c07-a88f9ed0e22b",
+  "name": "Cloak and Dagger, Entwined",
+  "manaCost": "{1}{W}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Deathtouch, lifelink\nWhen Cloak and Dagger enter, choose target opponent and up to one target creature they control. They reveal their hand. You may exile a nonland card from their hand or the chosen creature until Cloak and Dagger leave the battlefield.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -26422,6 +26516,41 @@
   "set": "tla",
   "releasedAt": "2025-11-21",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bfef4daa-b950-46ce-8c08-11f9983741cf",
+  "name": "Kotose, the Silent Spider",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "When Kotose enters, exile target card other than a basic land card from an opponent's graveyard. Search that player's graveyard, hand, and library for any number of cards with the same name as that card and exile them. Then that player shuffles. For as long as you control Kotose, you may play one of the exiled cards, and you may spend mana as though it were mana of any color to cast it.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

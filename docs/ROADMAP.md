@@ -2169,11 +2169,11 @@ line blocks.
    chosen as it resolves, with a browser test for the picker). +9, 29,980 of 31,936 with B113-B115.
    Out after round 283 (looked at, not done): Squall, Gunblade Duelist (an intervening if over the creatures attacking
    one opponent and a chosen number); Barroom Brawl (done in round 389) ("the opponent to your left", then that player may copy it with new
-   targets); Vault 11: Voter's Dilemma (done in round 416) (secret votes for up to one creature); Allure of the Unknown (an opponent exiles
+   targets); Vault 11: Voter's Dilemma (done in round 416) (secret votes for up to one creature); Allure of the Unknown (done in round 420) (an opponent exiles
    one of the revealed cards and may cast it free); Hew the Entwood (done in round B204) (sacrifice any number of lands as it resolves);
    Rory Williams and Sinister Concierge (exiling the spell or the dying card with time counters, gaining suspend);
    Aradesh, the Founder ("if it enlisted a creature this combat"); Tetsuo, Imperial Champion (done in round 397) (the greatest mana value
-   among attached Equipment); Kotose, the Silent Spider; The Toymaker's Trap; Expert-Level Safe (done in round B247) (secret numbers).
+   among attached Equipment); Kotose, the Silent Spider (done in round 420); The Toymaker's Trap; Expert-Level Safe (done in round B247) (secret numbers).
    Round 284 took the next names from the top that no earlier round looked at: "Each artifact creature card in your
    graveyard has encore. Its encore cost is equal to its mana cost." (Wire Surgeons: each card's own mana cost, none for a
    card without one, CR 118.6); "turn target creature with a morph ability face down" and "any number of target creatures
@@ -2351,7 +2351,7 @@ line blocks.
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (a redirection chosen for each
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
    Caller of the Hunt (done in round B245), Enigmatic Incarnation (how it was cast); Don't Blink (done in round B252) (entering from exile replaced by a shuffle);
-   Cloak and Dagger, Entwined (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
+   Cloak and Dagger, Entwined (done in round 420) (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
    target); Next of Kin; Phyrexian Portal (an opponent's face-down piles, chosen blind); Magnetic Web (done in round B242), Raging River,
    Defensive Formation, Sorrow's Path (done in round B258), Blaze of Glory (done in round B145) (block requirements and damage assignment); Piracy (done in round B238) (tapping lands you
@@ -3593,9 +3593,9 @@ line blocks.
    The Spot's two targets, both of Tetsuo's modes and Absorbing Man's target, and watch Jeskai Infiltrator manifest. +4,
    31,588 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
    Out after round 397 (looked at, not done): Sentinel of Lost Lore (still out: targets in exile, "a card you own in exile
-   that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown, Synthesis Pod,
+   that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown (done in round 420), Synthesis Pod,
    Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack, Medomai's Prophecy,
-   Monastery Raid, Winter's Chill, Divine Intervention (done in round B259), Kotose and the rest from rank 15,000 to 20,000 (still out, for the
+   Monastery Raid, Winter's Chill, Divine Intervention (done in round B259), Kotose (done in round 420) and the rest from rank 15,000 to 20,000 (still out, for the
    reasons in their earlier lists).
    Round 398 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards of each card
    type (CR 205.2a), a card with several card types taken for any one of them (Atraxa, Grand Unifier's rulings, as for
@@ -4157,6 +4157,31 @@ line blocks.
    Boreal of the Seven, Wayta, Trainer Prodigy, Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular`
    above rank 15,100 (still out, for the reasons in their earlier lists). Known gaps: bots don't save Shifting Shadow for
    a weak creature or a creature-heavy library, nor crew with Balthier and Fran on purpose for its trigger.
+   Round 420 went on down the "Out after round N" lists and `npm run popular`, most played first, to three cards left out
+   before whose pieces the engine now has. Kotose, the Silent Spider's "exile target card other than a basic land card
+   from an opponent's graveyard. Search that player's graveyard, hand, and library for any number of cards with the same
+   name as that card and exile them. Then that player shuffles. For as long as you control Kotose, you may play one of the
+   exiled cards, and you may spend mana as though it were mana of any color to cast it." (the target and the cards the
+   search found, ResolvingState.namedExiled, each still that card in exile, CR 400.7; one of them only, a `oneOf` group,
+   rulings; until "whileControlled": over for good once you don't control that Kotose, rulings, CR 611.2b; any color of
+   mana, CR 609.4b; Effect mayPlayOneExiledThisWay). Allure of the Unknown's "Reveal the top six cards of your library. An
+   opponent exiles a nonland card from among them, then you put the rest into your hand. That opponent may cast the
+   exiled card without paying its mana cost." (the opponent chosen as it resolves, CR 608.2d, who picks and may cast it
+   then or never, timing ignored, rulings, CR 608.2g, 118.9; all lands: nothing exiled, all six to your hand, rulings;
+   Effect revealOpponentExilesCasts; bots give it to the opponent with the least power on the battlefield). Cloak and
+   Dagger, Entwined's "choose target opponent and up to one target creature they control. They reveal their hand. You may
+   exile a nonland card from their hand or the chosen creature until Cloak and Dagger leave the battlefield." (one pick
+   among the hand's nonland cards and the creature if still legal, or none; nothing if it has left, CR 610.3c; Effect
+   exileFromHandOrTarget; the picker labels the creature "battlefield"). A bot fix found on the way: bots chose "target
+   creature that player controls" (TargetSpec.controlledByTarget) without looking at the player they had picked, an
+   illegal pair; now they keep to it. Browser tests click through Kotose's targets, search and a Bolt cast from Ana's
+   exile with Swamps, Allure as caster and as the chosen opponent, and Cloak and Dagger's picker. +3, 31,733 of 31,936 on
+   this stacked branch; the compiled text of every other card is unchanged.
+   Out after round 420 (looked at, not done): Lady Loki, Agent of Chaos (exiling the spell that triggered it, then damage
+   by the difference of two mana values; next in line), Parnesse, the Subtle Brush, Tahngarth, First Mate, Squall,
+   Gunblade Duelist, Supper for Spiders, C.A.M.P., Filigree Vector and the rest of `npm run popular` above rank 15,100
+   (still out, for the reasons in their earlier lists). Known gaps: bots exile the card with the highest mana value with
+   Cloak and Dagger and target the first opponent; Kotose's bot use takes any graveyard card.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -6255,7 +6280,7 @@ line blocks.
    - Still out: "if they can't" (Brain Pry), damage per revealed card (Thought Hemorrhage), "put all of them with that
      name into your hand" (Desperate Research, Wood Sage (done in round B137), Tamiyo), the chosen card
      from a revealed hand (Lobotomy, Shimian Specter, Pick the Brain, Reap Intellect (done in round B245)), Deadly Cover-Up (done in round B245), Deicide ("if the
-     exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
+     exiled card is a God card"), Invasive Surgery, Kotose (done in round 420), "look at an opponent's hand, then choose any card name"
      (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon (done in round B214), Skyseer's Chariot (done in round B187), Cheering Fanatic (done in round B158), Null Chamber, Booby
      Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
      cards from an opponent's hand (Dementia Sliver (done in round B127), Nebuchadnezzar), Mindblaze (done in round B129), Liar's Pendulum (done in round B201), Lammastide
@@ -11407,7 +11432,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   its trigger needs). Known gaps: bots weigh only their spare mana when paying replicate, not whether a copy is worth it.
 - Out after round B247 (looked at, not done): the lists after round B246 stay out, and Lich, Nefarious Lich (done in round B253) and Swans of
   Bryn Argoll (still out: draws in the middle of damage, which Lane A's open round 381 adds as GameState.damageDraws; done
-  after it merges), Divine Intervention (done in round B259) (still out: who removed its last counter isn't recorded), Allure of the Unknown
+  after it merges), Divine Intervention (done in round B259) (still out: who removed its last counter isn't recorded), Allure of the Unknown (done in round 420)
   (still out: another player casting one of the cards in the middle of the resolution), Medomai's Prophecy (still out: its
   rulings don't settle the "named card" check) and Immortal Coil (still out: a graveyard card chosen for each point of
   damage prevented, and its state trigger "when there are no cards in your graveyard"). Known gaps: bots choose the Safe's
@@ -11531,13 +11556,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B223 (looked at, not done): Eye for an Eye (done in round B257) (a replacement, not a prevention, that keeps the damage and
   adds Eye for an Eye's own; the affected player orders it with prevention shields and redirections, CR 616.1, and the
   result differs between orders), Oracle en-Vec (done in round B233) (chosen creatures that must attack during that player's next turn while
-  the others can't), and Noxious Vapors, Grime Gorger, Allure of the Unknown and Glimpse of Tomorrow (as after round
+  the others can't), and Noxious Vapors, Grime Gorger, Allure of the Unknown (done in round 420) and Glimpse of Tomorrow (as after round
   B222) stay out.
 - Out after round B222 (looked at, not done): Noxious Vapors (whether one multicolored card can be the card kept for each
   of its colors isn't settled by any ruling), Grime Gorger (the same for a card of several card types), Allure of the
   Unknown and Glimpse of Tomorrow (as after round B221) stay out. Bots cast Meeting of the Five even with no three-color
   card to cast (legal, not at their best).
-- Out after round B221 (looked at, not done): Allure of the Unknown (an opponent you choose exiles one of the revealed
+- Out after round B221 (looked at, not done): Allure of the Unknown (done in round 420) (an opponent you choose exiles one of the revealed
   cards and may cast it free as your spell resolves, rulings: a cast by another player in the middle of a resolution),
   Glimpse of Tomorrow (still waiting for Lane A's Warp World), Next of Kin, Lodestone Bauble and Sanctuary Blade stay out.
   Known gap: tokens one instruction creates several at a time enter one at a time here, so only the first enchantment

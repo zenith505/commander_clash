@@ -1,6 +1,6 @@
 # Roadmap
 
-31,733 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,736 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -11312,7 +11312,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   then chooses an opponent who chooses one of their piles; the chosen piles' lands are destroyed at once, then the others
   tapped (Effect bendOrBreak). Bots answer Soul Echo yes only while its controller's life is 0 or less, choose their
   strongest creature or warped card for Close Encounter, split their lands into even piles and destroy the pile worth more.
-  Browser tests for Soul Echo's question, Close Encounter's pick and Bend or Break's piles and opponent. +3, 31,729 of
+  Browser tests for Soul Echo's question, Close Encounter's pick and Bend or Break's piles and opponent. +3, 31,736 of
   31,936 with main through round 417 and B261-B263. The compiled text of every other card is unchanged.
 - Out after round B264 (looked at, not done): the lists after round B263 stay out. Judgment calls and known gaps: Soul Echo's
   effect ends as its controller's next turn begins rather than at that upkeep (no player gets priority in an untap step, CR

@@ -546,7 +546,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true; /** Crumbling Sanctuary: `player` exiles that many from the top of their library instead. */ exileTop?: true; /** Dralnu, Lich Lord (round B253): this player sacrifices that many permanents instead. */ sacrifice?: PlayerId; /** Nefarious Lich (round B253): `player` exiles that many cards from their graveyard instead, or loses the game. */ exileYard?: true; /** Immortal Coil (round B262): with `exileYard` and `prevent`, as many as there are, never a loss. */ upTo?: true }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string; /** Lichenthrope: the counters put on `id` instead, by `by`. */ counters?: { id: ObjectId; counter: string; by: PlayerId }; /** Kill-Suit Cultist: the creature destroyed instead. */ destroy?: ObjectId ; /** Undead Alchemist, Szadek: `player` mills `from - n` cards instead. */ mill?: true; /** Crumbling Sanctuary: `player` exiles that many from the top of their library instead. */ exileTop?: true; /** Dralnu, Lich Lord (round B253): this player sacrifices that many permanents instead. */ sacrifice?: PlayerId; /** Nefarious Lich (round B253): `player` exiles that many cards from their graveyard instead, or loses the game. */ exileYard?: true; /** Immortal Coil (round B262): with `exileYard` and `prevent`, as many as there are, never a loss. */ upTo?: true; /** Soul Echo (round B264): `from - n` of these counters removed from that permanent instead, as many as it has. */ removeCounters?: { id: ObjectId; zc: number; counter: string } }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true; /** Gloom Surgeon: `by` exiles that many from the top of their library instead (not a mill, CR 701.17a). */ exile?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -934,6 +934,7 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "sacrifice" ? "Sacrifice that many permanents instead"
     : d.op === "exileYard" && d.upTo ? "Prevent it and exile a card from your graveyard for each 1 damage prevented"
     : d.op === "exileYard" ? "Exile that many cards from your graveyard instead"
+    : d.op === "removeCounters" ? `Remove that many ${d.counter} counters from ${m.card} instead`
     : "Prevent it";
   return `${what} (${m.card})`;
 }
@@ -1285,7 +1286,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && (m.mod.onDamaged ? "object" in to : m.holder) ? { counters: { id: m.mod.onDamaged && "object" in to ? to.object : m.holder!.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}), ...(m.mod.op === "sacrifice" ? { sacrifice: m.mod.you } : {}), ...(m.mod.op === "exileYard" && "player" in to ? { exileYard: true as const, ...(m.mod.upTo ? { upTo: true as const } : {}) } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to), ...(m.mod.op === "counters" && (m.mod.onDamaged ? "object" in to : m.holder) ? { counters: { id: m.mod.onDamaged && "object" in to ? to.object : m.holder!.id, counter: m.mod.counter!, by: m.mod.you } } : {}), ...(m.mod.op === "destroy" && "object" in to ? { destroy: to.object } : {}), ...(m.mod.mill && "player" in to ? { mill: true as const, ...(m.mod.exileTop ? { exileTop: true as const } : {}) } : {}), ...(m.mod.op === "sacrifice" ? { sacrifice: m.mod.you } : {}), ...(m.mod.op === "exileYard" && "player" in to ? { exileYard: true as const, ...(m.mod.upTo ? { upTo: true as const } : {}) } : {}), ...(m.mod.op === "removeCounters" && m.mod.removeFrom && m.mod.counter ? { removeCounters: { ...m.mod.removeFrom, counter: m.mod.counter } } : {}) });
       }
     };
     // Battletide Alchemist: "you may prevent X of that damage": its controller chooses for each source's damage to each
@@ -1661,6 +1662,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const countersLater: { id: ObjectId; counter: string; by: PlayerId; card: string }[] = [];
   // Lichenthrope's and Phytohydra's counters, put instead of the damage.
   const swapLater: { id: ObjectId; counter: string; by: PlayerId; n: number }[] = [];
+  // Soul Echo (round B264): the counters removed instead of the damage, from the permanent as the object it was.
+  const removeLater: { id: ObjectId; zc: number; counter: string; n: number }[] = [];
   // Phyrexian Vindicator's reflexive triggers: one for each source permanent in this damage event, with all it prevented.
   const reflectLater = new Map<ObjectId, { n: number; by: PlayerId; body: AbilityBody }>();
   // Inkshield's tokens, one for each 1 damage each rule prevented, created together once the damage is prevented.
@@ -1700,7 +1703,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       } else if (op.counters) {
         swapLater.push({ ...op.counters, n: op.from - op.n });
         log(s, `${op.card}: ${op.from} damage from ${op.srcName}${op.mill ? ` to ${op.toName}` : ""} is replaced by ${op.from - op.n} ${op.counters.counter} counter${op.from - op.n === 1 ? "" : "s"}${op.mill ? " and a mill" : ""}.`);
-      } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by ${op.exileTop ? "exiling cards from the top of the library" : "a mill"}.`);
+      } else if (op.removeCounters) {
+        removeLater.push({ ...op.removeCounters, n: op.from - op.n });
+        log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; ${op.from - op.n} ${op.removeCounters.counter} counter${op.from - op.n === 1 ? " is" : "s are"} removed from ${op.card} instead.`);
+    } else if (op.mill) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} is replaced by ${op.exileTop ? "exiling cards from the top of the library" : "a mill"}.`);
       else if (op.sacrifice !== undefined) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; ${player(s, op.sacrifice).name} sacrifices that many permanents instead.`);
       else if (op.exileYard && op.upTo) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}); they exile a card from their graveyard for each 1 damage prevented.`);
       else if (op.exileYard) log(s, `${op.card}: ${op.from} damage from ${op.srcName} to ${op.toName} isn't dealt; they exile that many cards from their graveyard instead.`);
@@ -1796,6 +1802,17 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (n > 0 && o.zone === "battlefield") withPutter(by, () => putCounters(s, o, counter, n));
   }
   if (swapLater.length) invalidateCharacteristics(s);
+  // As many as it has: with none left, the damage is still replaced and nothing is removed (rulings on Soul Echo).
+  for (const { id, zc, counter, n } of removeLater) {
+    const o = s.objects[id];
+    if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== zc) continue;
+    const off = Math.min(n, o.counters[counter] ?? 0);
+    if (off <= 0) continue;
+    o.counters[counter] = (o.counters[counter] ?? 0) - off;
+    if (!o.counters[counter]) delete o.counters[counter];
+    countersRemoved(s, o, counter, off);
+    invalidateCharacteristics(s);
+  }
   for (const { id, counter, by, card } of countersLater) {
     const o = s.objects[id];
     if (!o || o.zone !== "battlefield") continue;

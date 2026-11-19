@@ -4443,6 +4443,32 @@
   ]
  },
  {
+  "oracleId": "4362efe4-339d-40e1-bd72-3cc9e41bf93f",
+  "name": "Bend or Break",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player separates all nontoken lands they control into two piles. For each player, one of their piles is chosen by one of their opponents of their choice. Destroy all lands in the chosen piles. Tap all lands in the other piles.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "12d91743-1ccb-4f2b-b2a9-1c2b34f7c8eb",
   "name": "Benevolent River Spirit",
   "manaCost": "{U}{U}",
@@ -7081,6 +7107,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1bd584d5-4e11-428c-b51e-462e4292b07f",
+  "name": "Bygone Colossus",
+  "manaCost": "{9}",
+  "cmc": 9,
+  "typeLine": "Artifact Creature — Robot Giant",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot",
+   "Giant"
+  ],
+  "oracleText": "Warp {3} (You may cast this card from your hand for its warp cost. Exile this creature at the beginning of the next end step, then you may cast it from exile on a later turn.)",
+  "power": "9",
+  "toughness": "9",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Warp"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2fa6f1b1-00af-433f-b8e1-36db99cd9bba",
   "name": "Bösium Strip",
   "manaCost": "{3}",
@@ -8869,6 +8925,32 @@
   "commanderLegal": "legal",
   "set": "som",
   "releasedAt": "2010-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "032fdd08-2ea7-442e-8162-0a8e5a585253",
+  "name": "Close Encounter",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, choose a creature you control or a warped creature card you own in exile.\nClose Encounter deals damage equal to the power of the chosen creature or card to target creature.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -42959,6 +43041,32 @@
   "commanderLegal": "legal",
   "set": "drk",
   "releasedAt": "1994-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8bc5546e-554f-430d-80b1-99578b5ea188",
+  "name": "Soul Echo",
+  "manaCost": "{X}{W}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "This enchantment enters with X echo counters on it.\nYou don't lose the game for having 0 or less life.\nAt the beginning of your upkeep, sacrifice this enchantment if there are no echo counters on it. Otherwise, target opponent may choose that for each 1 damage that would be dealt to you until your next upkeep, you remove an echo counter from this enchantment instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -564,6 +564,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (!o || o.zone !== "battlefield") return;
         mod.to = { ...mod.to, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
       }
+      // Soul Echo (round B264): the counters come off this source as the object it is (CR 400.7); gone, the effect still
+      // replaces the damage and removes nothing (rulings: "uselessly tries to remove counters").
+      if (e.fromSource && ctx.sourceId) mod.removeFrom = { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0 };
       // Desperate Gambit: "that source", chosen earlier in this resolution; none chosen, nothing happens.
       if (e.chosenSource) {
         const c = s.resolving?.chosenSource;

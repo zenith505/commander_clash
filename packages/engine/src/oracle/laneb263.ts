@@ -3,6 +3,7 @@
 // ability Torrent of Lava gives each creature (its line is roundB263Line in oracle/laneb263-lines.ts).
 import type { AbilityBody, Effect, TargetSpec } from "../abilities";
 import { parseBody, type Ctx } from "./body";
+import { roundB264Spell } from "./laneb264";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -24,7 +25,7 @@ export function roundB263Spell(text: string): AbilityBody | null | undefined {
   // controls it, from any source, combat or not; its controller chooses each time, for each source's damage to each
   // creature (DamageRule.redirectMay, damage.ts planShields). Redirected damage is still dealt by its source (CR 614.9).
   if (text === MARTYR) return { targets: [], effects: [{ type: "damageRule", rule: { to: { objects: CREATURE }, redirect: { ref: "you" }, redirectMay: true } }], text };
-  return undefined;
+  return roundB264Spell(text);
 }
 
 const plain = (s: string | undefined) => (s ?? "").replace(/\.$/, "");

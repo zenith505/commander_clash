@@ -1,6 +1,6 @@
 # Roadmap
 
-31,733 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,736 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,982 of 4,988 (99%), top 10,000: 9,935 of
 9,979 (99%).
 
@@ -11298,6 +11298,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B264 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-419): Soul Echo ("At the
+  beginning of your upkeep, sacrifice ~ if there are no echo counters on it. Otherwise, target opponent may choose that for
+  each 1 damage that would be dealt to you until your next upkeep, you remove an echo counter from ~ instead."): one
+  trigger with a target opponent, chosen anew each upkeep (rulings); as it resolves that opponent may create a replacement
+  effect (CR 614.1a, so damage that can't be prevented is replaced too, CR 615.12): none of the damage is dealt and that
+  many counters are removed, as many as it has, still replacing the damage with none left (rulings); several are ordered by
+  the player dealt the damage (CR 616.1; DamageMod op `removeCounters`, GameState.damageMods). Close Encounter ("As an
+  additional cost to cast this spell, choose a creature you control or a warped creature card you own in exile."): a choice
+  as it's cast (CR 601.2f), a warped card being one warp's delayed trigger exiled, still that object (CR 702.185b, 400.7;
+  GameObject.warpedZc), the damage that creature's power as it resolves or as it last existed (rulings, CR 608.2h), a card's
+  in exile. Bend or Break: each player separates their own nontoken lands into two piles in APNAP order (CR 700.3, 101.4),
+  then chooses an opponent who chooses one of their piles; the chosen piles' lands are destroyed at once, then the others
+  tapped (Effect bendOrBreak). Bots answer Soul Echo yes only while its controller's life is 0 or less, choose their
+  strongest creature or warped card for Close Encounter, split their lands into even piles and destroy the pile worth more.
+  Browser tests for Soul Echo's question, Close Encounter's pick and Bend or Break's piles and opponent. +3, 31,736 of
+  31,936 with main through round 417 and B261-B263. The compiled text of every other card is unchanged.
+- Out after round B264 (looked at, not done): the lists after round B263 stay out. Judgment calls and known gaps: Soul Echo's
+  effect ends as its controller's next turn begins rather than at that upkeep (no player gets priority in an untap step, CR
+  502.4, so no damage can be dealt in between); a player with no lands isn't asked to choose an opponent for Bend or Break
+  (both piles are empty); bots choose that opponent with the general opponent choice and cast Soul Echo through the general
+  spell logic; Dimensional Breach (an effect lasting while its cards stay exiled, returning one at each player's upkeep),
+  Defensive Formation (the defending player assigning an attacker's combat damage), Takklemaggot (returned as a non-Aura
+  enchantment that loses "enchant creature"), Pygmy Hippo (another player activating a mana ability of each of their lands)
+  and North Star were looked at again and stay out for the reasons in the earlier lists.
 - Round B263 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-418): Guardian Angel
   ("Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you
   could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this

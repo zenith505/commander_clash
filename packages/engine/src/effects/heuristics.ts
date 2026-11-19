@@ -60,6 +60,11 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // "Target creature becomes unprepared" (Biblioplex Tomekeeper, CR 722.3b): its prepare spell's copy is gone.
     if (e.type === "becomePrepared" && e.un && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
+    // Cloak and Dagger, Entwined (round 420): the target opponent's card or the chosen creature, exiled.
+    if (e.type === "exileFromHandOrTarget") {
+      mark(e.player);
+      mark(e.creature);
+    }
     // Kill-Suit Cultist: "the next time damage would be dealt to target creature this turn, destroy that creature instead".
     if (e.type === "damageMod" && e.toTarget !== undefined && e.mod.op === "destroy") mark(e.toTarget);
     // "Move a counter from target creature an opponent controls onto target creature you control" (Rikku): taken from them.

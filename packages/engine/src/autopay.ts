@@ -1,6 +1,7 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
+import { addedAbilityCosts, addedSpellCosts, anyAddedCosts, anyAddedSacrifice } from "./added-costs";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilityCostOf, withManaTax, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax, piracyTap, PIRACY_SPEND } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
@@ -63,6 +64,9 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
   const pirated = (o: GameObject, ab: ManaAbility) => !ab.anyPlayer && controllerOf(s, o) !== pid;
   // Current controller, types and mana abilities, after continuous effects (CR 613).
   const isCreature = (id: string) => objIsType(s, obj(s, id), "Creature");
+  // Round B260: mana abilities Brutal Suppression or Drought add a sacrifice to are activated by hand, never automatically.
+  const adding = anyAddedCosts(s);
+  const handOnly = (o: GameObject, ab: ManaAbility) => adding && addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf).length > 0;
   return s.battlefield
     .filter((id) => !exclude.includes(id))
     .map((id) => obj(s, id))
@@ -80,6 +84,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Battery gives its one mana without removing any.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
         // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
+        .filter((x) => !handOnly(o, abs[x.ability]!))
         .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && !abs[x.ability]!.unlessAnyPays && !abs[x.ability]!.returnSelf && !abs[x.ability]!.untapSelf && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use, cost)) && (!pirated(o, abs[x.ability]!) || spendAllows(s, pid, PIRACY_SPEND, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
@@ -327,6 +332,14 @@ export function planCast(
   const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(compileCard(d).basicLandManaOnly ? { basicLandOnly: true as const } : {}), ...spellHow(d, choices, o), ...(x ? { x } : {}) };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
+  // Round B260: the sacrifices other permanents add (Drought) are the caster's to pick; a plan made without a pick takes
+  // the first that pays them (tapped ones first), none of the spell's own costs' permanents.
+  const addedSpell = !choices.faceDown && !choices.addedSacrifice?.length ? addedSpellCosts(s, d.manaCost)[0] : undefined;
+  if (addedSpell?.kind === "sacrifice") {
+    const pick = anyAddedSacrifice(s, pid, undefined, addedSpell, [...(choices.sacrifice ?? []), ...(choices.returnToHand ?? []), ...(choices.bargain !== undefined ? [choices.bargain] : []), ...(choices.offering !== undefined ? [choices.offering] : []), ...(choices.casualty !== undefined ? [choices.casualty] : [])]);
+    if (!pick) return null;
+    choices = { ...choices, addedSacrifice: pick };
+  }
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets, modes });
   // Whether its total cost has {X} (CR 601.2f), for mana spent only on such costs.
   if (typeof use === "object" && "spell" in use) use.xCost = cost.hasX;
@@ -627,6 +640,13 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const ab = abilitiesOf(s, obj(s, objectId)).activated[index]!;
+  // Round B260: the same for the sacrifices Brutal Suppression and Drought add to an ability's cost.
+  const addedAb = !costs?.addedSacrifice?.length ? addedAbilityCosts(s, pid, obj(s, objectId), ab.manaCost, ab.sacrificeSelf)[0] : undefined;
+  if (addedAb?.kind === "sacrifice") {
+    const pick = anyAddedSacrifice(s, pid, obj(s, objectId), addedAb, [...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...(costs?.returnToHand ?? []), ...(costs?.craft ?? [])]);
+    if (!pick) return null;
+    costs = { ...costs, addedSacrifice: pick };
+  }
   const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x, costs);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
@@ -833,17 +853,23 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
 }
 
 /** The actions to activate one mana ability, paying any mana it costs first. */
-export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[], combo?: number, instead?: ManaType): Action[] | null {
+export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[], combo?: number, instead?: ManaType, /** Round B260: what's sacrificed for Brutal Suppression's or Drought's added cost. */ sacrifice?: ObjectId[]): Action[] | null {
   const o = obj(s, objectId);
-  if (manaAbilityProblem(s, pid, o, ability, true, tap)) return null;
+  if (manaAbilityProblem(s, pid, o, ability, true, tap, sacrifice)) return null;
   const ab = manaAbilitiesOn(s, o)[ability]!;
+  const addedMana = !sacrifice?.length ? addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf)[0] : undefined;
+  if (addedMana?.kind === "sacrifice") {
+    const pick = anyAddedSacrifice(s, pid, o, addedMana, tap ?? []);
+    if (!pick) return null;
+    sacrifice = pick;
+  }
   // "Tap an untapped creature you control": what's given, or the best to tap.
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
   // Doubling Cube doubles the pool, so its cost is paid from the pool as it is (ManaProduce "doublePool").
   if (ab.produces.kind === "doublePool") return manaAbilityProblem(s, pid, o, ability) || !manaCombos(s, o, ab)?.[combo ?? -1] ? null : [{ type: "activateMana", player: pid, objectId, mana, ability, combo: combo! }];
   const payCost = manaAbilityCostOf(s, pid, o, ab);
-  const taps = payCost ? planMana(s, pid, payCost, 0, objectId, tapped, { ability: o }) : [];
-  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}), ...(instead ? { instead } : {}) }] : null;
+  const taps = payCost ? planMana(s, pid, payCost, 0, objectId, [...(tapped ?? []), ...(sacrifice ?? [])], { ability: o }) : [];
+  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(sacrifice?.length ? { sacrifice } : {}), ...(extra?.length ? { extra } : {}), ...(instead ? { instead } : {}) }] : null;
 }
 
 /** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */

@@ -6,6 +6,7 @@ export * from "./faces";
 export { registerMeldResults, meldResultsFor, isMeldResult } from "./meld-results";
 export * from "./game";
 export * from "./autopay";
+export * from "./added-costs";
 export * from "./deck";
 export * from "./bot";
 export * from "./rng";

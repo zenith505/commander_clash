@@ -640,6 +640,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const ranked = [...pend.cards].sort((a, b) => handWorth(s, b) - handWorth(s, a));
       return [{ type: "searchLibrary", player: pid, found: [pid === s.resolving.item.controller ? ranked[1]! : ranked[0]!] }];
     }
+    // Cass, Hand of Vengeance (round B272): onto a creature of ours, the Auras that help it; onto another player's, the
+    // others.
+    const deadAuras = pend.kind === "searchLibrary" && pend.fromGraveyard === "battlefield" ? s.resolving?.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "searchLibrary" && deadAuras?.type === "deadAurasOnto") {
+      const t = s.resolving!.item.targets?.[deadAuras.host];
+      const host = t && !Array.isArray(t) && t.kind === "object" ? s.objects[t.id] : undefined;
+      const ours = !!host && controllerOf(s, host) === pid;
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => auraHelps(defOf(s, obj(s, id))) === ours).slice(0, pend.max) }];
+    }
+    // Bruna, Light of Alabaster (round B272): only the Aura cards that help it.
+    const ontoMe = pend.kind === "searchLibrary" && pend.fromHand ? s.resolving?.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "searchLibrary" && ontoMe?.type === "putFromHand" && ontoMe.couldEnchantSelf) return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => auraHelps(defOf(s, obj(s, id)))).slice(0, pend.max) }];
     // Storm Herald (round B208): only the Auras that help the creature of ours they'll enchant (they're exiled later anyway).
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "battlefield" && s.resolving?.body.effects[s.resolving.next]?.type === "aurasFromYardToYourCreatures")
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => auraHelps(defOf(s, obj(s, id)))).slice(0, pend.max) }];
@@ -1336,6 +1348,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Armed and Armored: the Equipment to put on the Dwarf just chosen.
     const toChosen = pend.kind === "pickPermanents" && pend.action === "attach" ? s.resolving?.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && toChosen?.type === "attachAny" && toChosen.toChosen) return [{ type: "pickPermanents", player: pid, ids: attachPicks(s, pid, pend.options) }];
+    // Bruna, Light of Alabaster, Cass, Hand of Vengeance (round B272): the Auras that help our creature, from whoever's
+    // permanent they're on but ours; the Equipment that were on the creature that died.
+    if (pend.kind === "pickPermanents" && toChosen?.type === "attachAny" && (toChosen.anyAura || toChosen.deadEquipment)) return [{ type: "pickPermanents", player: pid, ids: attachPicks(s, pid, pend.options) }];
     // Godsend: "you may exile one of those creatures": an opponent's, the one worth the most; never our own.
     if (pend.kind === "pickPermanents" && pend.action === "exile" && pend.min === 0 && pend.count === 1 && allEffects(s.resolving?.body.effects ?? []).some((e) => e.type === "pick" && e.fromGroup && e.action === "exile")) {
       const theirs = pend.options.filter((id) => opponents(s, pid).includes(controllerOf(s, obj(s, id)))).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
@@ -3834,6 +3849,16 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       return t;
     }
     return null;
+  }
+  // Cass, Hand of Vengeance (round B272): our best creature, for the Auras and Equipment; with none, another player's
+  // worth the least (it must target), where nothing that helps is put.
+  if (body.targets.length === 1 && body.effects[0]?.type === "deadAurasOnto") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter((t) => t.kind === "object" && s.objects[t.id]);
+    const w = (t: TargetChoice) => worth(s, pid, obj(s, (t as { id: string }).id));
+    const ours = all.filter((t) => controllerOf(s, obj(s, (t as { id: string }).id)) === pid).sort((a, b) => w(b) - w(a));
+    const theirs = all.filter((t) => controllerOf(s, obj(s, (t as { id: string }).id)) !== pid).sort((a, b) => w(a) - w(b));
+    const pick = ours[0] ?? (forced ? theirs[0] : undefined);
+    return pick ? [pick] : null;
   }
   // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {

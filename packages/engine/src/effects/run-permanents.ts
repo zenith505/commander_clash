@@ -2451,9 +2451,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (t.kind === "object" && host?.zone !== "battlefield") return;
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.queue) {
-        const options = s.battlefield.filter((id) => {
+        // Cass, Hand of Vengeance (round B272): the Equipment attached to the trigger's creature as it last existed, still
+        // those objects (CR 400.7), whoever controls them now.
+        const dead = e.deadEquipment ? (ctx.lki?.equipment ?? []).filter((x) => s.objects[x.id]?.zone === "battlefield" && (s.objects[x.id]!.zoneChanges ?? 0) === x.zc).map((x) => x.id) : undefined;
+        const options = (dead ?? s.battlefield).filter((id) => {
           const o = obj(s, id);
-          return controllerOf(s, o) === ctx.controller && (!e.equipment || characteristics(s, o).subtypes.includes("Equipment")) && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
+          // Bruna, Light of Alabaster (round B272): any player's Auras.
+          if (e.anyAura) return characteristics(s, o).subtypes.includes("Aura") && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
+          return (dead ? characteristics(s, o).subtypes.includes("Equipment") : controllerOf(s, o) === ctx.controller) && (!e.equipment || characteristics(s, o).subtypes.includes("Equipment")) && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
         });
         if (!options.length) return;
         sc.queue = [ctx.controller];
@@ -2461,7 +2466,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const to = host ? defOf(s, host).name : player(s, (t as { id: PlayerId }).id).name;
         s.pending = e.one
           ? { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: 1, min: 0, prompt: `you may click one of your Equipment to attach to ${to}, then attach it (or attach none).` }
-          : { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
+          : { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : e.anyAura ? { prompt: `you may click any number of Auras on the battlefield to attach to ${to}, then attach them (or attach none).` } : e.deadEquipment ? { prompt: `click any number of the Equipment that were attached to ${ctx.subject && s.objects[ctx.subject.id] ? defOf(s, s.objects[ctx.subject.id]!).name : "the creature that died"} to attach to ${to}, then attach them (or attach none).` } : {}) };
         return "paused";
       }
       const chosen = sc.chosen?.[ctx.controller] ?? [];

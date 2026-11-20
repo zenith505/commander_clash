@@ -4471,7 +4471,8 @@ line blocks.
    out, for the reasons in their earlier lists). Judgment calls: Hama's X is the exiled card's mana value as it is in exile,
    fixed as it's exiled (a split card's both halves, CR 709.4); "X can't be 0" in a "Suspend X" line holds for The Face of
    Boe's cast too. Known gaps: Skyway Robber's ability is read as its own with "if it escaped", so if it later becomes a
-   copy of something else it loses it (the escape's layer 6 effect would keep it, CR 613.1f); bots pick for Hama the dearest
+   copy of something else it loses it (the escape's layer 6 effect would keep it, CR 613.1f), and escaping with an escape
+   another permanent gives it (Underworld Breach) links no cards to it, so nothing can be cast; bots pick for Hama the dearest
    card their lands, artifacts and creatures could pay for, and activate The Face of Boe only with a suspend card in hand.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals

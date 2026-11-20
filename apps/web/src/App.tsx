@@ -5602,6 +5602,12 @@ function Controls({
             <>
               <strong>{pending.source}:</strong> it&apos;s defeated. Cast <strong>{s.cards[registerFace(s, o, 1)]!.name}</strong> transformed without paying its mana cost? If you don&apos;t, it stays in exile.
             </>
+          ) : pending.hasteEot ? (
+            <>
+              {/* Alaundo the Seer (round B279): the trigger the exiled card gained from it. */}
+              <strong>{d.name}:</strong> the last time counter is gone. Cast it without paying its mana cost?
+              {isType(d, "Creature") ? " It gains haste until end of turn." : ""} If you don&apos;t, it stays in exile.
+            </>
           ) : pending.how === "suspend" ? (
             <>
               <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.

@@ -2207,6 +2207,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
+    // Alaundo the Seer (round B279): the trigger the card gained in exile, whatever removed the counter, with an intervening
+    // "if it's exiled" (CR 603.4); its owner controls it (CR 113.8). Beside suspend's own if it has that too (rulings).
+    if (o?.zone === "exile" && ev.counter === "time" && o.alaundoCast === (o.zoneChanges ?? 0))
+      s.triggerQueue.push({
+        sourceId: o.id,
+        sourceCardId: cardIdOf(o),
+        controller: o.owner,
+        index: -1,
+        subject: { id: o.id, zc: o.zoneChanges ?? 0 },
+        body: { targets: [], effects: [{ type: "alaundoCast" }], text: "When the last time counter is removed from ~, if it's exiled, you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn." },
+      });
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
     if (o?.zone === "exile" && ev.counter === "time" && hasSuspend(s, o))
       s.triggerQueue.push({

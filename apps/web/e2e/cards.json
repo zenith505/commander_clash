@@ -1067,6 +1067,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1e048c15-50d6-4313-880a-e04348952a51",
+  "name": "Alaundo the Seer",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Shaman"
+  ],
+  "oracleText": "{T}: Draw a card, then exile a card from your hand and put a number of time counters on it equal to its mana value. It gains \"When the last time counter is removed from this card, if it's exiled, you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn.\" Then remove a time counter from each other card you own in exile.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d5c4d36c-54b3-4149-906b-a57a670260fc",
   "name": "Alhammarret's Archive",
   "manaCost": "{5}",
@@ -15234,6 +15269,35 @@
   "set": "mir",
   "releasedAt": "1996-10-08",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fbeafc81-1ddb-4b54-8f86-e6afd5f81db8",
+  "name": "Emblazoned Golem",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "Kicker {X} (You may pay an additional {X} as you cast this spell.)\nSpend only colored mana on X. No more than one mana of each color may be spent this way.\nIf this creature was kicked, it enters with X +1/+1 counters on it.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Kicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -415,6 +415,9 @@ export function planCast(
   let taps: Action[] | null = null;
   for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, avoid, wantSnow))) break;
   if (!taps) for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, undefined, wantSnow))) break;
+  // Emblazoned Golem (round B279): its kicker's X one mana of each of that many colors: each choice of those colors asked
+  // for as colored mana, so the lands tapped make them (payFromPool pays the distinct symbols the same way).
+  if (!taps) for (const r of distinctCosts(cost, pool)) if ((taps = planMana(s, pid, r, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, avoid, wantSnow))) break;
   taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, avoid, wantSnow);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
@@ -457,6 +460,23 @@ function rainbowCosts(cost: ParsedCost, extra: number, pool: ManaPool): { cost: 
     }
   const inPool = (c: ParsedCost) => c.symbols.filter((sym) => sym.kind === "colored" && pool[sym.color] > 0).length;
   return out.sort((a, b) => a.extra - b.extra || inPool(b.cost) - inPool(a.cost));
+}
+
+/**
+ * Emblazoned Golem (round B279): a cost with `distinct` hybrid symbols as each choice of that many different colors among
+ * their options, as colored symbols; the choices using the mana already in the pool first. None without such symbols.
+ */
+function distinctCosts(cost: ParsedCost, pool: ManaPool): ParsedCost[] {
+  const distinct = cost.symbols.filter((y) => y.kind === "hybrid" && y.distinct);
+  if (!distinct.length) return [];
+  const options = COLORS.filter((c) => distinct.every((y) => y.kind === "hybrid" && y.options.includes(c)));
+  const rest = cost.symbols.filter((y) => !(y.kind === "hybrid" && y.distinct));
+  const out: { cost: ParsedCost; inPool: number }[] = [];
+  for (let mask = 0; mask < 1 << options.length; mask++) {
+    const pick = options.filter((_, i) => mask & (1 << i));
+    if (pick.length === distinct.length) out.push({ cost: { ...cost, symbols: [...rest, ...pick.map((color) => ({ kind: "colored" as const, color }))] }, inPool: pick.filter((c) => pool[c] > 0).length });
+  }
+  return out.sort((a, b) => b.inPool - a.inPool).map((r) => r.cost);
 }
 
 /**

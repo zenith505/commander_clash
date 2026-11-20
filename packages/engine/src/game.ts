@@ -7743,6 +7743,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
   // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
+  // Emblazoned Golem (round B279): "Spend only colored mana on X. No more than one mana of each color may be spent this way."
+  const golemKicked = !!compileCard(d).kickXOneOfEachColor && kicks.includes(0) && !how.faceDown && x > 0;
   const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate) + offspringMana(s, pid, d, how.offspring);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
@@ -7907,7 +7909,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const kx = x * xCount(kicked);
     // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
     const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o, d) : 0;
-    return costAtLeast(s, { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) });
+    const r = { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) };
+    // Emblazoned Golem (round B279): its kicker's X, paid as it's cast free, one mana of each of X colors.
+    return costAtLeast(s, golemKicked ? oneOfEachColorX(r, x) : r);
   }
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o, d) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
@@ -7979,7 +7983,20 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const xPaid = (onX || onXHybrid) && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
   if (xPaid && onXHybrid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "hybrid" as const, options: [...onXHybrid] }))] }, extra: extra - xPaid });
   if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
+  // Emblazoned Golem (round B279): X's part of the generic mana, less the reductions (which may take off X, as Drain Life's
+  // rulings say), paid one mana of each of that many colors (CR 601.2g-h). Mana that may be spent as though it were mana
+  // of any type or color pays only its own color here, a payment that's legal either way.
+  if (golemKicked) return costAtLeast(s, oneOfEachColorX({ cost: reducedCost, extra }, Math.max(0, x - less)));
   return costAtLeast(s, { cost: reducedCost, extra });
+}
+
+/**
+ * Emblazoned Golem (round B279): `n` of the total cost's generic mana (its kicker's X) as hybrid symbols of the five colors,
+ * no two paid with the same color (CostSymbol `distinct`, payFromPool); more than five can't be paid.
+ */
+function oneOfEachColorX(r: { cost: ParsedCost; extra: number }, n: number): { cost: ParsedCost; extra: number } {
+  const k = Math.min(r.extra, n);
+  return k > 0 ? { cost: { ...r.cost, symbols: [...r.cost.symbols, ...Array.from({ length: k }, () => ({ kind: "hybrid" as const, options: [...COLORS], distinct: true as const }))] }, extra: r.extra - k } : r;
 }
 
 /**
@@ -8815,6 +8832,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   const madness = madnessCastOf(s, p.id, id);
   const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
+  // Alaundo the Seer (round B279): a creature spell cast with its granted trigger gains haste until end of turn (CR 400.7a).
+  const hasteEot = s.pending?.kind === "castFree" && !!s.pending.hasteEot && s.pending.objectId === id;
   const d = defOf(s, o);
   const spell = compileCard(d).spell;
   // Modes first (CR 601.2b), then the targets they need (601.2c).
@@ -8966,6 +8985,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     // "If you cast a creature spell this way, that creature enters with an additional +1/+1 counter on it" (CR 614.1c).
     if (how?.creatureCounter && isType(d, "Creature")) o.extraCounters = { ...o.extraCounters, "+1/+1": (o.extraCounters?.["+1/+1"] ?? 0) + 1 };
   }
+  if (hasteEot && isType(d, "Creature") && o.hasteCast !== "game") o.hasteCast = "endOfTurn";
   const via = graveyardWay(s, o, choices.via, p.id);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
   if (via?.kind === "turnPermission") {

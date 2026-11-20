@@ -22,6 +22,7 @@ import { roundB263Line } from "./laneb263-lines";
 import { roundB264Line } from "./laneb264-lines";
 import { roundB265Line } from "./laneb265-lines";
 import { roundB266Line } from "./laneb266-lines";
+import { roundB267Line } from "./laneb267-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -1884,6 +1885,12 @@ export function compile(d: CardDef): CompiledCard {
     // "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (CR 712.20): instructions
     // with no targets, done as it transforms.
     const asTransforms = /^As ~ transforms into ~, (.+)$/.exec(line);
+    // Curse of Leeches (round B267): "attach it to a player", on an Aura face that enchants players (CR 702.5d).
+    if (asTransforms?.[1] === "attach it to a player." && !out.asTransformsAttachPlayer) {
+      if (!d.subtypes.includes("Aura") || !/^Enchant player$/m.test(d.oracleText)) out.unsupported.push(raw);
+      else out.asTransformsAttachPlayer = true;
+      continue;
+    }
     // Shinryu, Transcendent Rival: "As this creature transforms into Shinryu, choose an opponent.": chosen as it transforms
     // (CR 712.20), only by transforming (rulings: not if it enters with this face up); "the chosen player" its own.
     if (asTransforms?.[1] === "choose an opponent." && !out.asTransformsChoose) {
@@ -2420,6 +2427,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB265Line(line, out, isSpell)) continue;
     // Mirror-Shield Hoplite, Defensive Formation, Power Pack (round B266).
     if (roundB266Line(line, out, isSpell)) continue;
+    // Taster of Wares, Grip of Chaos, The Seventh Doctor (round B267).
+    if (roundB267Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

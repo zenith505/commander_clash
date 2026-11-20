@@ -10922,6 +10922,86 @@
   "gameChanger": false
  },
  {
+  "oracleId": "44eb0caa-ba16-49e4-915c-bd5e1ce770e6",
+  "name": "Curse of Leeches // Leeching Lurker",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura Curse // Creature — Leech Horror",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura",
+   "Curse"
+  ],
+  "oracleText": "Enchant player\nAs this permanent transforms into Curse of Leeches, attach it to a player.\nAt the beginning of enchanted player's upkeep, they lose 1 life and you gain 1 life.\nDaybound (If a player casts no spells during their own turn, it becomes night next turn.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Transform",
+   "Daybound",
+   "Enchant",
+   "Nightbound"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Curse of Leeches",
+    "manaCost": "{2}{B}",
+    "typeLine": "Enchantment — Aura Curse",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Aura",
+     "Curse"
+    ],
+    "oracleText": "Enchant player\nAs this permanent transforms into Curse of Leeches, attach it to a player.\nAt the beginning of enchanted player's upkeep, they lose 1 life and you gain 1 life.\nDaybound (If a player casts no spells during their own turn, it becomes night next turn.)",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/3/3/3327a287-a6db-49a4-9d25-315f3c93a930.jpg?1783924431",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/3/3/3327a287-a6db-49a4-9d25-315f3c93a930.jpg?1783924431"
+   },
+   {
+    "name": "Leeching Lurker",
+    "manaCost": "",
+    "typeLine": "Creature — Leech Horror",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Leech",
+     "Horror"
+    ],
+    "oracleText": "Lifelink\nNightbound (If a player casts at least two spells during their own turn, it becomes day next turn.)",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "B"
+    ],
+    "colorIndicator": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/3/3/3327a287-a6db-49a4-9d25-315f3c93a930.jpg?1783924431",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/3/3/3327a287-a6db-49a4-9d25-315f3c93a930.jpg?1783924431"
+   }
+  ]
+ },
+ {
   "oracleId": "b03c7c8d-8206-45cd-8ead-8f7b35c03a7a",
   "name": "Curse of Misfortunes",
   "manaCost": "{4}{B}",
@@ -46975,6 +47055,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "020aae46-cdba-4c37-9c54-283727c09994",
+  "name": "Taster of Wares",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warlock"
+  ],
+  "oracleText": "When this creature enters, target opponent reveals X cards from their hand, where X is the number of Goblins you control. You choose one of those cards. That player exiles it. If an instant or sorcery card is exiled this way, you may cast it for as long as you control this creature, and mana of any type can be spent to cast that spell.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f07f98bb-4190-4643-aeb9-c5eaf358c97c",
   "name": "Tawnos's Weaponry",
   "manaCost": "{2}",
@@ -48539,6 +48650,43 @@
   "commanderLegal": "legal",
   "set": "msh",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "43e1b053-2cb9-4b1d-9e38-100cfa7267b6",
+  "name": "The Seventh Doctor",
+  "manaCost": "{3}{W}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Time Lord Doctor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Doctor"
+  ],
+  "oracleText": "Whenever The Seventh Doctor attacks, choose a card in your hand. Defending player guesses whether that card's mana value is greater than the number of artifacts you control. If they guessed wrong, you may cast it without paying its mana cost. If you don't cast a spell this way, investigate. (Create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")",
+  "power": "3",
+  "toughness": "6",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Investigate"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

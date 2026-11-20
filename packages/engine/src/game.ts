@@ -22,7 +22,7 @@ import { blightOptions, countersBanned, countersRemoved, countersStay, putCounte
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
 import { payShield, payShieldProblem, payableShields } from "./pay-shields";
-import { attachTo, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
+import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
@@ -12622,6 +12622,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       sacrificedInstead(s, o, choice, entry?.enters);
       return;
     }
+    if (pend.what === "attachPlayer") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a player offered");
+      attachToPlayer(s, o, Number(choice));
+      return;
+    }
     if (pend.what === "attachHost") {
       if (!attachHostOptions(s, o).includes(choice)) throw new RulesError("choose a creature offered");
       enterAttachedTo(s, o, choice);
@@ -13398,6 +13403,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  // Curse of Leeches's player is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
+  if (pend.what === "attachPlayer") throw new RulesError("nothing to attach");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
@@ -13742,6 +13749,20 @@ function askEntersChoice(s: GameState): boolean {
       }
       const own = compileCard(defOf(s, o)).amplifyFilter;
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: own ? own.text : "card that shares a creature type with it", options, count: one ? 1 : options.length, min: 0, objectId: o.id, ...(one ? { prompt: `you may reveal ${/^[AEIOU]/.test(own!.text) ? "an" : "a"} ${own!.text} from your hand (a +1/+1 counter): click it, then reveal.` } : own ? { prompt: `reveal any number of other ${own.text}s from your hand (a +1/+1 counter for each): click them, then reveal.` } : {}) };
+      return true;
+    }
+    if (c.what === "attachPlayer") {
+      // Curse of Leeches (round B267): "As this permanent transforms into ~, attach it to a player" (CR 712.20): a player it
+      // could enchant (not targeted, so hexproof doesn't stop it, rulings), chosen by its controller before anyone gets
+      // priority; with none it stays unattached (and an Aura attached to nothing goes to the graveyard, CR 704.5m).
+      const you = controllerOf(s, o);
+      const options = livingPlayers(s).filter((pid) => canAttachTo(s, o, pid));
+      if (options.length <= 1) {
+        q.shift();
+        if (options.length) attachToPlayer(s, o, options[0]!);
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "attachPlayer", options: options.map(String), labels: options.map((pid) => player(s, pid).name), objectId: o.id, prompt: `choose a player to attach ${defOf(s, o).name} to as it transforms` };
       return true;
     }
     if (c.what === "attachHost") {
@@ -16594,6 +16615,9 @@ function attachmentSBAs(s: GameState): boolean {
     if (!o || o.zone !== "battlefield") continue;
     const c = characteristics(s, o);
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    // Curse of Leeches (round B267): its player is chosen as part of its transforming (CR 712.20), so while that's being
+    // asked it isn't an Aura attached to nothing.
+    if (s.entersChoices?.some((x) => x.id === id && x.what === "attachPlayer" && x.zc === (o.zoneChanges ?? 0))) continue;
     if (c.subtypes.includes("Aura") && compileCard(defOf(s, o)).enchant?.kind === "player") {
       // An Aura with "enchant player" stays only while attached to a player still in the game that it can enchant
       // (CR 303.4d, 704.5m): "enchant opponent" checks against its controller now, so a change of control can end it.

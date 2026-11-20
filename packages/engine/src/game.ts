@@ -889,6 +889,15 @@ export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard"
   return undefined;
 }
 
+/**
+ * Sacred Ground (round B277): the controller of the spell or ability that caused a permanent to leave the battlefield: the
+ * one paying a cost with it, which is its own controller's spell or ability (`cost`), or the one whose effect is resolving
+ * (CR 608.2); none for a state-based action, which happens only while nothing is resolving (CR 704.3), or a game rule.
+ */
+function leaveCause(s: GameState, opts: { cost?: true; destroyedBy?: PlayerId }, controller: PlayerId): PlayerId | undefined {
+  return opts.cost ? controller : (opts.destroyedBy ?? s.resolving?.item.controller);
+}
+
 export function moveObject(
   s: GameState,
   id: ObjectId,
@@ -1699,7 +1708,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.destroyed ? { destroyed: true as const } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, ...(borrowed ? { borrowed } : {}), counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(leaveCause(s, opts, lastController) !== undefined ? { cause: leaveCause(s, opts, lastController)! } : {}), ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), ...(opts.destroyed ? { destroyed: true as const } : {}), ...(opts.exploitedBy ? { exploitedBy: opts.exploitedBy } : {}), ...(opts.crafted ? { crafted: true as const } : {}), ...(opts.emerged ? { emerged: true as const } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, ...(borrowed ? { borrowed } : {}), counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
@@ -2842,6 +2851,10 @@ function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
   const by = o.damagedBy ?? [];
   // Etching of Kumano: who controlled each source as it dealt `o` damage this turn.
   const dealt = s.turnLog?.damageDealtTo?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? [];
+  // Runesword (round B276): "If a creature dealt damage by the targeted creature would die this turn, exile that creature
+  // instead" (CR 614.1a), damage from the target as that object (CR 400.7), whether or not Runesword is still around.
+  const marks = s.turnLog?.runesword ?? [];
+  if (marks.length && dealt.some((d) => (!!d.src && marks.includes(d.src)) || (!!d.srcWas && marks.includes(d.srcWas)))) return true;
   for (const id of s.battlefield) {
     const w = obj(s, id);
     const how = abilitiesOf(s, w).exileWhatItDamaged;
@@ -2988,6 +3001,11 @@ export function endWhileTapped(s: GameState): boolean {
 /** Whether a round 396 "for as long as" copy duration still holds (CR 611.2b; a phased-out permanent can't be seen, 702.26f). */
 export function copyWhileHolds(s: GameState, w: CopyWhile): boolean {
   if ("whileTapped" in w) return whileTappedHolds(s, w.whileTapped);
+  // Secret Invasion (round B276): until that permanent leaves the battlefield; phasing out isn't leaving it (CR 702.26d).
+  if ("untilLeaves" in w) {
+    const o = s.objects[w.untilLeaves.id];
+    return !!o && (o.zone === "battlefield" || o.zone === "phasedOut") && (o.zoneChanges ?? 0) === w.untilLeaves.zc;
+  }
   const { id, zc, host, hostZc } = w.whileAttached;
   const a = s.objects[id];
   const h = s.objects[host];
@@ -3114,10 +3132,12 @@ export function damagedNoRegen(s: GameState): Set<ObjectId> {
   const dealt = s.turnLog?.damageDealtTo;
   if (!dealt) return out;
   const shamans = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).damagedCantRegenerate).map((id) => `${id}@${obj(s, id).zoneChanges ?? 0}`));
-  if (!shamans.size) return out;
+  // Runesword (round B276): "the creature dealt damage can't be regenerated this turn", damage from the target as that object.
+  const marks = new Set(s.turnLog?.runesword ?? []);
+  if (!shamans.size && !marks.size) return out;
   for (const id of s.battlefield) {
     const o = obj(s, id);
-    if (objIsType(s, o, "Creature") && (dealt[`${id}@${o.zoneChanges ?? 0}`] ?? []).some((d) => !!d.src && shamans.has(d.src))) out.add(id);
+    if (objIsType(s, o, "Creature") && (dealt[`${id}@${o.zoneChanges ?? 0}`] ?? []).some((d) => (!!d.src && (shamans.has(d.src) || marks.has(d.src))) || (!!d.srcWas && marks.has(d.srcWas)))) out.add(id);
   }
   return out;
 }
@@ -11288,6 +11308,12 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (ab.zone === "command") {
     // Derevi: only from the command zone (rulings).
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
+  } else if (ab.zone === "stack") {
+    // Lightning Storm (round B277): an ability of a spell, only while it's on the stack (CR 113.6, 113.6b); any player may
+    // activate it (CR 602.2), otherwise only the spell's controller.
+    const spell = s.stack.find((x) => x.kind === "spell" && x.objectId === o.id);
+    if (o.zone !== "stack" || !spell) return `${d.name}'s ability works only while it's on the stack`;
+    if (!ab.anyPlayer && spell.controller !== pid) return `you don't control ${d.name}`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (ab.ownerOnly && o.owner !== pid) return `only ${d.name}'s owner may activate that ability`;
   else if (ab.opponentsOnly && !opponents(s, controllerOf(s, o)).includes(pid)) return `only ${d.name}'s controller's opponents may activate that ability`;

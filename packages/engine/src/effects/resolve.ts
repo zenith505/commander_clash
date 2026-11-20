@@ -122,6 +122,9 @@ import { runLaneB270Effect } from "./run-laneb270";
 import { runLaneB272Effect } from "./run-laneb272";
 import { runLaneB273Effect } from "./run-laneb273";
 import { runLaneB274Effect } from "./run-laneb274";
+import { runLaneB275Effect } from "./run-laneb275";
+import { runLaneB276Effect } from "./run-laneb276";
+import { runLaneB277Effect } from "./run-laneb277";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -2206,6 +2209,15 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "dimensionalBreach":
     case "breachReturn":
       return runLaneB274Effect(s, e, ctx, src);
+    case "coffinNote":
+    case "coffinWatch":
+    case "coffinReturn":
+    case "takklemaggot":
+      return runLaneB275Effect(s, e, ctx, src);
+    case "runeswordMark":
+      return runLaneB276Effect(s, e, ctx, src);
+    case "spellCounters":
+      return runLaneB277Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

@@ -2176,6 +2176,8 @@ export type Modification =
   /** Layer 6: Glittering Lion's "~ loses "Prevent all damage that would be dealt to ~."": the printed static ability with this text (CR 613.1f). */
   | { kind: "loseStatic"; text: string }
   /** Layer 6: "becomes an Aura enchantment with enchant creature" (a Licid): it has enchant creature (CR 702.5a). */
+  /** Takklemaggot (round B275): 'It loses "enchant creature"': no enchant ability, printed or gained before (layer 6). */
+  | { kind: "loseEnchant" }
   | { kind: "enchantCreature" }
   /** Bronzehide Lion, Old-Growth Troll: "It's an Aura enchantment with enchant creature you control": an enchant ability from an effect (CR 702.5a), what it can enchant (enchantOf). */
   | { kind: "enchant"; spec: TargetSpec }
@@ -4301,6 +4303,42 @@ export type Effect =
   | { type: "dimensionalBreach" }
   /** Its upkeep trigger: the upkeep's active player (the trigger's event player) returns one of those cards they own that could legally enter (rulings). */
   | { type: "breachReturn"; cards: { id: ObjectId; zc: number }[] }
+  /**
+   * Tawnos's Coffin (round B275): "Note the number and kind of counters that were on that creature": the target's counters
+   * and the Auras attached to it, as they are right before the exile that follows (kept in ResolvingState.scratch.coffin).
+   */
+  | { type: "coffinNote" }
+  /**
+   * Tawnos's Coffin: "When ~ leaves the battlefield or becomes untapped, return that exiled card ...": after the exile, one
+   * delayed trigger (CR 603.7) watching ~ as it is now, about the card the creature became in exile (Effect coffinReturn).
+   */
+  | { type: "coffinWatch" }
+  /**
+   * Tawnos's Coffin's delayed trigger: "return that exiled card to the battlefield under its owner's control tapped with the
+   * noted number and kind of counters on it. If you do, return the other exiled cards to the battlefield under their owner's
+   * control attached to that permanent." `cards`: the card the creature became in exile (a merged one's cards, CR 730.3c);
+   * `auras`: the Aura cards exiled with it; `counters`: the noted counters.
+   */
+  | { type: "coffinReturn"; cards: { id: ObjectId; zc: number }[]; auras: { id: ObjectId; zc: number }[]; counters: Record<string, number> }
+  /**
+   * Takklemaggot (round B275): "When enchanted creature dies, that creature's controller chooses a creature that ~ could
+   * enchant. If the player does, return ~ to the battlefield under your control attached to that creature. If they don't,
+   * return ~ to the battlefield under your control as a non-Aura enchantment. It loses "enchant creature" and gains ..."
+   */
+  | { type: "takklemaggot" }
+  /**
+   * Runesword (round B276): "If the creature deals damage to a creature this turn, the creature dealt damage can't be
+   * regenerated this turn. If a creature dealt damage by the targeted creature would die this turn, exile that creature
+   * instead.": for the rest of this turn, the target as the object it is now (CR 400.7) marks every creature it deals damage
+   * to this turn (TurnLog.runesword).
+   */
+  | { type: "runeswordMark" }
+  /**
+   * Lightning Storm (round B277): "Put two charge counters on ~" in an ability of the spell, activated while it's on the
+   * stack (CR 113.6b): the counters go on the spell (CR 122.1), if it's still there as the same object (CR 400.7); they
+   * go away when it leaves the stack (rulings, CR 122.2).
+   */
+  | { type: "spellCounters"; counter: CounterKind; n: number }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true; /** Helm of Kaldra (round 417): "Attach those Equipment to it": to the token just created (the first one), not the source. */ toCreated?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */
@@ -4381,7 +4419,7 @@ export type Effect =
    * remains tapped (Zygon Infiltrator); "whileSourceAttached", for as long as the source remains attached to `what`
    * (Blade of Shared Souls). Never begun if that isn't so as the effect would begin; over for good once it stops.
    */
-  | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" | "whileTargetTapped" | "whileSourceAttached" | /** Niko, Light of Hope (round 426): "until the next end step", over as it begins (CopyEffect.until nextEndStep). */ "nextEndStep" }
+  | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" | "whileTargetTapped" | "whileSourceAttached" | /** Niko, Light of Hope (round 426): "until the next end step", over as it begins (CopyEffect.until nextEndStep). */ "nextEndStep" | /** Secret Invasion (round B276): "until ~ leaves the battlefield", this ability's source as the object it is as this resolves (CopyEffect.until untilLeaves). */ "untilSourceLeaves" }
   /**
    * Assimilation Aegis (round 396): "that creature becomes a copy of a creature card exiled with ~" for as long as ~ remains
    * attached to it: one of the creature cards its linked exile ability exiled (CR 607.2a), as printed (CR 707.2, rulings),
@@ -5432,6 +5470,8 @@ export type Effect =
       changeAny?: true;
       /** Sudden Substitution (round 413): "Then the spell's controller may choose new targets for it": its controller as this resolves decides, not this ability's. */
       bySpellController?: true;
+      /** Lightning Storm (round B277): "You may choose a new target for it": the spell this ability is on, still on the stack as that object (CR 400.7); this ability's controller chooses (CR 115.7d). `index` is ignored. */
+      ofSource?: true;
     }
   /**
    * "Gain control of target spell" (Commandeer): its controller becomes this ability's controller; a permanent spell
@@ -7647,7 +7687,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Another creature dealt damage this turn by a Spider you controlled" (Shelob, Child of Ungoliant): by a source of this creature type controlled by the trigger's controller as it dealt the damage (GameObject.damagedByKinds). */ damagedByKindYours?: string; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; /** Diabolic Servitude (round B236): "When the creature put onto the battlefield with ~ dies": the one this object's enters ability returned (GameState.animated), as the objects they were (CR 603.10a). */ animatedBySelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true; /** Kraven the Hunter (round 404): "with the greatest power among creatures that player controls": its power as it last existed at least that of every other creature its controller controlled then, tied too (CR 603.10a). */ greatestPowerOfController?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; /** "Whenever enchanted creature or another modified creature you control dies" (One with the Kami): the creature it was attached to as it died, or one matching `filter`. */ orAttached?: true; damagedBySelf?: boolean; /** "A creature dealt damage by equipped creature this turn" (Unscythe). */ damagedByEquipped?: true; /** "Another creature dealt damage this turn by a Spider you controlled" (Shelob, Child of Ungoliant): by a source of this creature type controlled by the trigger's controller as it dealt the damage (GameObject.damagedByKinds). */ damagedByKindYours?: string; /** "Whenever a creature blocking ~ dies" (Baneclaw Marauder): one blocking the source as it last existed. */ blockingSelf?: true; /** "Whenever a token created with ~ leaves the battlefield" (Dance of Many): a token this object's abilities created (CR 607.2). */ createdWithSelf?: true; /** Diabolic Servitude (round B236): "When the creature put onto the battlefield with ~ dies": the one this object's enters ability returned (GameState.animated), as the objects they were (CR 603.10a). */ animatedBySelf?: true; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform; "is returned to its owner's hand", Justice, Vance Astrovik). */ toZones?: ("graveyard" | "exile" | "hand" | "command")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind; /** "If it wasn't sacrificed" (Urza's Miter): not when its controller sacrificed it (CR 701.21a). */ notSacrificed?: true; /** Sacred Ground (round B277): "Whenever a spell or ability an opponent controls causes a land to be put into your graveyard": only when an opponent's spell or ability, its cost or its effect, moved it there (the "dies" event's `cause`), not a state-based action. */ causedByOpponent?: true; /** "If it was attacking or blocking alone" (Thijarian Witness, CR 506.5): as it left the battlefield (LastKnown aloneIn). */ aloneInCombat?: true; /** Kraven the Hunter (round 404): "with the greatest power among creatures that player controls": its power as it last existed at least that of every other creature its controller controlled then, tied too (CR 603.10a). */ greatestPowerOfController?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -7960,7 +8000,7 @@ export interface ActivatedAbility {
   /** An equip ability (CR 702.6a), for "Equip abilities you activate cost {1} less to activate". */
   equip?: true;
   /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a), or the command zone (Derevi, CR 113.6k). Otherwise on the battlefield. */
-  zone?: "hand" | "graveyard" | "command";
+  zone?: "hand" | "graveyard" | "command" | /** Lightning Storm (round B277): "but only if ~ is on the stack": an ability of a spell, activated only while it's on the stack (CR 113.6, 113.6b). */ "stack";
   /** With `zone` "hand": from the command zone too (commander ninjutsu, CR 702.49d). */
   orCommand?: true;
   /** With `zone` "graveyard": from exile too, face up there (Mister Immortal, CR 113.6k, 406.3). */

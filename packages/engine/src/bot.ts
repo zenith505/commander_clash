@@ -1163,9 +1163,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       // Coffin Queen: kept tapped while the creature it returned would be exiled as it untaps.
       const guarding = (id: string) => (s.delayed ?? []).some((d) => d.when === "lostControl" && d.orUntaps && d.subject.id === id && !!d.about && s.objects[d.about.id]?.zone === "battlefield");
+      // Tawnos's Coffin (round B275): kept tapped while a card an opponent owns is exiled with it; one of ours comes back.
+      const coffining = (id: string) => (s.delayed ?? []).some((d) => d.when === "leaves" && d.orUntaps && d.subject.id === id && d.body.effects.some((x) => x.type === "coffinReturn" && x.cards.some((c) => s.objects[c.id]?.zone === "exile" && s.objects[c.id]!.owner !== pid)));
       // The Pandorica (round 389): kept tapped while an opponent's permanent it phased out can't phase in.
       const locking = (id: string) => (s.phasedOut ?? []).some((x) => s.objects[x]!.phased?.lockWhileTapped?.id === id && s.objects[x]!.phased!.by !== pid);
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id && !e.affected.includes(id)) || saving(id) || guarding(id) || locking(id)) }];
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id && !e.affected.includes(id)) || saving(id) || guarding(id) || locking(id) || coffining(id)) }];
     }
     // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
     if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
@@ -2197,6 +2199,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const least = pend.options.filter((x) => s.objects[x]?.zone === "battlefield").sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
         return [{ type: "chooseOption", player: pid, choice: least ?? pend.options[0]! }];
       }
+      // Takklemaggot (round B275): it slowly kills what it enchants, so on an opponent's most valuable creature, else our
+      // least valuable one (we must choose one if we can).
+      if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "takklemaggot")) {
+        const byWorth = pend.options.filter((x) => s.objects[x]?.zone === "battlefield").sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+        const theirs = byWorth.find((x) => controllerOf(s, obj(s, x)) !== pid);
+        return [{ type: "chooseOption", player: pid, choice: theirs ?? byWorth[byWorth.length - 1] ?? pend.options[0]! }];
+      }
       const waiting = s.untilReturns?.auras[0];
       const aura = waiting?.asking ? waiting.id : s.resolving?.scratch?.auraAsking;
       const best = aura && s.objects[aura] ? auraHostFor(s, s.objects[aura]!, pid, pend.options) : undefined;
@@ -2534,6 +2543,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (dialogue) return dialogue;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
+  const storm = chooseStormRedirect(s, pid);
+  if (storm) return storm;
   const echo = chooseCopyWithTaps(s, pid);
   if (echo) return echo;
   const radiate = chooseRadiate(s, pid);
@@ -4307,6 +4318,43 @@ function chooseDeflection(s: GameState, pid: PlayerId): Action[] | null {
     if (e.type === "changeTarget" && e.unless && canPayUnless(s, top.controller, e.unless, pid, id, 0)) continue;
     const plan = planCast(s, pid, id, [{ kind: "stack", id: top.id }], undefined, "auto");
     if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
+}
+
+/**
+ * Lightning Storm (round B277): an opponent's spell aimed at us or ours whose own ability, activated while it's on the
+ * stack (ActivatedAbility.zone "stack"), lets the activator choose a new target for it: discard a land card to send it at
+ * one of theirs, once while we have no such activation of ours waiting above it. A basic land card goes first.
+ */
+const landKeepRank = (s: GameState, id: ObjectId) => (defOf(s, obj(s, id)).supertypes.includes("Basic") ? 0 : 1);
+
+function chooseStormRedirect(s: GameState, pid: PlayerId): Action[] | null {
+  for (const item of [...s.stack].reverse()) {
+    if (item.kind !== "spell" || item.controller === pid || !item.objectId) continue;
+    const o = s.objects[item.objectId];
+    if (!o || o.zone !== "stack") continue;
+    const chosen = (item.targets ?? []).filter((t) => t.kind !== "none");
+    const j = (item.targets ?? []).findIndex((t) => t.kind !== "none");
+    const current = item.targets?.[j];
+    if (chosen.length !== 1 || !current || current.kind === "none" || !isMine(s, pid, current)) continue;
+    const body = item.body ?? castingBody(defOf(s, o));
+    const spec = body?.targets[j];
+    if (!body || !spec || !harmfulTargets(body)[j]) continue;
+    if (!changeTargetOptions(s, item, spec, current).some((t) => t.kind !== "none" && !isMine(s, pid, t))) continue;
+    // Already sent: one of our activations of its ability is still waiting above it.
+    if (s.stack.some((x) => x.kind === "ability" && x.controller === pid && x.sourceId === o.id)) continue;
+    const abs = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abs.length; i++) {
+      const ab = abs[i]!;
+      if (ab.zone !== "stack" || !ab.body.effects.some((e) => e.type === "newTargets" && e.ofSource)) continue;
+      const cost = ab.costs?.find((c) => c.kind === "discard");
+      if (!cost || cost.kind !== "discard") continue;
+      const cards = player(s, pid).hand.filter((h) => !cost.filter || printedMatches(cost.filter, defOf(s, obj(s, h)))).sort((a, b) => landKeepRank(s, a) - landKeepRank(s, b));
+      if (cards.length < cost.n) continue;
+      const plan = planActivate(s, pid, o.id, i, undefined, undefined, undefined, undefined, { discard: cards.slice(0, cost.n) });
+      if (plan) return plan;
+    }
   }
   return null;
 }

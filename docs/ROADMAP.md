@@ -1,6 +1,6 @@
 # Roadmap
 
-31,803 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,809 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
 9,979 (99%).
 
@@ -3572,7 +3572,7 @@ line blocks.
    main phase 2 on a creature at least as big). Never begun if the condition is already false as the effect would begin
    (CR 611.2b). Browser tests click through Zygon's ability, the Blade's target and "you may", and the Aegis's pick. +3,
    31,584 of 31,936. The compiled text of every other card is unchanged.
-   Out after round 396 (looked at, not done): Secret Invasion (still out: the enchanted creature a copy of the creature
+   Out after round 396 (looked at, not done): Secret Invasion (done in round B276) (still out: the enchanted creature a copy of the creature
    the Aura exiled, until the Aura leaves); Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility
    Storm, Arvinox and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 397 went on down `npm run popular` and the "Out after round N" lists, most played first, below rank 15,479:
@@ -4277,7 +4277,7 @@ line blocks.
    through Dack's picks, casting Ana's Serra Angel from her library after her Scheme counters your Hill Giant, and
    Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f (31,767 with main 4d75ae2,
    B267, merged in); the compiled text of every other card is unchanged.
-   Out after round 424 (looked at, not done): Secret Invasion (the enchanted creature a copy of the creature the Aura
+   Out after round 424 (looked at, not done): Secret Invasion (done in round B276) (the enchanted creature a copy of the creature the Aura
    exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (its
    back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
    other permanents while it's untapped), Redemptor Dreadnought (its Plasma Incinerator line compiles wrongly, review
@@ -4410,8 +4410,8 @@ line blocks.
    if it was exiled by an ability you controlled, and you may spend mana as though it were mana of any color to cast it."
    (a land as the turn's land play, a spell with the usual timing, CR 305.1, 601.3, 609.4b; one card each turn for each
    Evelyn object, CompiledCard.playExiledCounteredOnce). A browser test clicks through each. +3, 31,798 of 31,936
-   on this stacked branch (round 428 #705, with round 427's head 037bca2 and main 73cb89a in it); the compiled text of
-   every other card is unchanged.
+   on this stacked branch (round 428 #705, with round 427's head 037bca2 and main 73cb89a in it), 31,802 with main f60fd58
+   (Lane B B275-B276) merged in; the compiled text of every other card is unchanged.
    Out after round 429 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
    ability, only one per ability is modeled), the cards rounds 425-428 left out (still out, for their reasons), and the
    rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
@@ -4436,7 +4436,7 @@ line blocks.
    for its tapping, its colors against the creature's as it resolves, one of several enough, rulings; the tappedForMana
    event's `made`, TriggerEventInfo.manaMade, Condition targetSharesColorWithManaMade). Browser tests click through the
    Academy's question for an opponent's Chains (twice, the second prompt starting with nothing picked) and C.A.M.P.'s
-   trigger. +2, 31,800 of 31,936 on this stacked branch (round 429 #707); the compiled text of every other card is
+   trigger. +2, 31,804 of 31,936 on this stacked branch (round 429 #707, with main f60fd58, B275-B276, in it); the compiled text of every other card is
    unchanged.
    Out after round 430 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
    ability, only one per ability is modeled), Battlefield Thaumaturge (still out, as after round 386), the cards rounds
@@ -4462,7 +4462,8 @@ line blocks.
    waterbend cost an alternative cost, CR 118.9, up to X of it paid by tapping artifacts and creatures, summoning sick ones
    too, CR 701.67a, rulings; an X in the card's own cost is 0; GameObject.mayPlay `cost` with `waterbend`, `yourTurnOnly`;
    "whenever you waterbend" sees it). Browser tests click through each, Hama's twice (mana, then waterbending). +3, 31,803
-   of 31,936 on this stacked branch (round 430 #709); the compiled text of every other card is unchanged.
+   of 31,936 on this stacked branch (round 430 #709), 31,809 with round 430's head 7b21a52 (main 6388275, B277) merged in;
+   the compiled text of every other card is unchanged.
    Out after round 431 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
    430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
    that creature's, checked with its last known power), Drain Power (mana abilities another player activates for each land,
@@ -6585,7 +6586,7 @@ line blocks.
      enchanted creature or enchantment creature"), Seeds of Innocence-style "the controller of each of those".
    - "Can't be regenerated" still out: Purge ("artifact
      creature or black creature"), Mageta ("except for ~"), The Abyss (done in round B110) ("of their choice"), Scorching Lava (kicked
-     "that creature"), Whippoorwill, Runesword.
+     "that creature"), Whippoorwill, Runesword (done in round B276).
    - Equip still out: equip planeswalker, "Equip worthy"; bots never use an equip
      cost that sacrifices a creature (Demonmail Hauberk), only the human player does.
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
@@ -11668,6 +11669,96 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B277 (least played first, two of the three cards round B276 named next in line, neither in Lane A's rounds
+  428-429): Lightning Storm's "Discard a land card: Put two charge counters on Lightning Storm. You may choose a new target
+  for it. Any player may activate this ability but only if Lightning Storm is on the stack." (an ability of the spell that
+  works only while it's on the stack, CR 113.6, 113.6b, ActivatedAbility.zone `stack`; any player may activate it and
+  controls it, CR 602.2, 113.8; as it resolves the counters go on the spell if it's still there as that object, CR 122.1,
+  400.7, Effect spellCounters, and the activator may choose a new target, keeping the old one, legal or not, when there's
+  no other, CR 115.7d, rulings, newTargets `ofSource`; the damage counts the counters as the spell resolves, and they go
+  away when it leaves the stack, rulings; the active player gets priority after it resolves, as always). Sacred Ground's
+  "Whenever a spell or ability an opponent controls causes a land to be put into your graveyard from the battlefield,
+  return that card to the battlefield." (a land you own moved there by the cost or effect of an opponent's spell or
+  ability: a destruction, a sacrifice it makes you choose, or a cost they pay with a land of yours they control, as
+  Firesong and Sunspeaker's rulings read "causes"; not a state-based action, CR 704.3, nor your own spell or ability's
+  cost or effect, nor a land exiled instead; the "dies" event's `cause`, game.ts leaveCause, TriggeredAbility.dies
+  `causedByOpponent`; the card returns under your control, CR 110.2a, only if it's still in the graveyard as the object it
+  became there, CR 400.7). Bots discard a basic land card first to send an opponent's Lightning Storm aimed at them or
+  theirs at one of their opponents' things (bot.ts chooseStormRedirect), and choose its new target as for any "choose new
+  targets". The stack card shows the spell's counters and a button for its ability. Browser tests click through
+  discarding your Mountain to send Ana's Lightning Storm back at her, and Ana's Stone Rain on your Mountain coming back
+  with Sacred Ground. +2, 31,799 of 31,936 with main through B276. The compiled text of every
+  other card is unchanged.
+- Out after round B277 (looked at, not done): the lists after round B276 stay out. Spy Kit stays out (every nonlegendary
+  creature card's name at once: every check of a name in the engine, the legend rule's among them, would have to know).
+  Judgment calls and known gaps: a Lightning Storm copy has the ability too, with no counters of its own (counters aren't
+  copied, CR 707.2); bots never pump their own Lightning Storm, and the bot that cast it doesn't weigh discards others may
+  make; Sacred Ground counts a land put into your graveyard as part of an opponent's spell or ability resolving, its
+  "unless" payments included, as Sigarda, Host of Herons' rulings treat them. Next in line (not looked at closely yet):
+  Land Equilibrium, Word of Command, Swirl the Mists, from the earlier skip lists.
+- Round B276 (least played first, two of the three cards round B275 named next in line, none of them in Lane A's rounds
+  427-429): Secret Invasion's "When this Aura enters, exile up to one target creature other than enchanted creature until
+  this Aura leaves the battlefield. Enchanted creature becomes a copy of that creature until this Aura leaves the
+  battlefield." (the exile until ~ leaves, CR 610.3, nothing exiled if ~ has already left, 610.3b; then the creature ~
+  enchants as it resolves becomes a copy of the exiled creature's copiable values as it last existed on the battlefield,
+  since the effect moved it out of the zone it was expected to be in, CR 608.2h, 707.2, a token too; the copy lasts until
+  ~ leaves the battlefield, phasing out isn't leaving, CR 702.26d, and does nothing if ~ has already left, CR 610.3b,
+  611.2b; with no target chosen there's nothing to copy; becomeCopy duration `untilSourceLeaves`, CopyWhile
+  `untilLeaves`; the Copy chip reads "until Secret Invasion leaves the battlefield"). Runesword's "{3}, {T}: Target
+  attacking creature gets +2/+0 until end of turn. When that creature leaves the battlefield this turn, sacrifice this
+  artifact. If the creature deals damage to a creature this turn, the creature dealt damage can't be regenerated this
+  turn. If a creature dealt damage by the targeted creature would die this turn, exile that creature instead." (the
+  existing pump and leaves-this-turn delayed trigger, CR 603.7c; then for the rest of the turn the target as the object
+  it is now, CR 400.7, marks each creature it deals damage to: it can't be regenerated this turn, CR 701.19c, game.ts
+  damagedNoRegen, and is exiled instead if it would die this turn, a replacement effect, CR 614.1a, game.ts
+  exiledByWhatDamagedIt, whether or not Runesword is still there; damage from the creature's own ability as it leaves
+  counts, as the object it last was, CR 608.2h, damageDealtTo `srcWas`; Effect runeswordMark, TurnLog.runesword). Browser
+  tests click through casting Secret Invasion on your Grizzly Bears and exiling Ana's Serra Angel (the Copy chip's
+  title), and activating Runesword on your attacking Bears blocked by Ana's Drudge Skeletons, which is exiled. +2, 31,794
+  of 31,936 on B275's branch (with main through B274), 31,797 with main through round 427. The compiled text of every other card is unchanged.
+- Out after round B276 (looked at, not done): the lists after round B275 stay out. Equinox stays out ("counter target
+  spell if it would destroy a land you control": whether the spell would destroy a land if it resolved right then, not
+  by a choice, a random chance, damage or a sacrifice, rulings, needs a look ahead into everything the spell would do,
+  including what its earlier instructions change). Judgment calls and known gaps: Runesword's two marks both count
+  damage the creature dealt earlier in the turn, before Runesword's ability resolved, as "dealt damage by the targeted
+  creature ... this turn" reads (no ruling says otherwise); bots never activate Runesword (they activate abilities in
+  their second main phase only), and they choose Secret Invasion's target as for any "exile target creature" trigger,
+  an opponent's creature. Next in line (not looked at closely yet): Sacred Ground, Spy Kit and Lightning Storm, from the
+  earlier skip lists.
+- Round B275 (least played first, the two cards round B274 named next in line, neither in Lane A's rounds 427-428):
+  Tawnos's Coffin's "{3}, {T}: Exile target creature and all Auras attached to it. Note the number and kind of counters
+  that were on that creature. When ~ leaves the battlefield or becomes untapped, return that exiled card to the battlefield
+  under its owner's control tapped with the noted number and kind of counters on it. If you do, return the other exiled
+  cards to the battlefield under their owner's control attached to that permanent." (the target and every Aura on it
+  exiled at once, its counters noted just before, Effect coffinNote, CR 608.2c; then one delayed trigger watching ~ as it
+  is now, the first time it untaps or leaves for any zone, CR 603.7c, Effect coffinWatch, none if ~ left before the
+  ability resolved, so the cards stay exiled forever, rulings; the card comes back only if it's still in exile as that
+  object and is a permanent card, CR 400.7, 400.4a, tapped with the noted counters, CR 614.1c, 122.6, a new object,
+  rulings; then each Aura card still exiled that could enchant it comes back attached to it under its owner's control,
+  the rest stay exiled, rulings, CR 303.4f; a token ceases to exist, so its Auras stay exiled, rulings; Effect
+  coffinReturn in run-laneb275.ts). Takklemaggot's "When enchanted creature dies, that creature's controller chooses a
+  creature that ~ could enchant. If the player does, return ~ to the battlefield under your control attached to that
+  creature. If they don't, return ~ to the battlefield under your control as a non-Aura enchantment. It loses "enchant
+  creature" and gains "At the beginning of that player's upkeep, ~ deals 1 damage to that player."" (the creature's
+  controller as it last existed, CR 608.2h, chooses as it resolves among every creature ~ could legally enchant, not
+  targeted, so shroud doesn't matter and protection from black does, and must choose one if able, rulings; only if ~'s
+  card is still in the graveyard it went to, rulings, CR 400.7; with none, it enters as an enchantment without the Aura
+  subtype, CR 613.1d, without its enchant ability, Modification `loseEnchant`, CR 613.1f, and with the upkeep trigger
+  aimed at that player, GameObject.chosen.player, all from the moment it enters, CR 614.12; Effect takklemaggot). Bots keep
+  the Coffin tapped while it holds a card an opponent owns, aim it at opponents' creatures as they do any "exile target
+  creature" ability, and choose an opponent's most valuable
+  creature for Takklemaggot (their own least valuable one if there's no other). Browser tests click through exiling
+  Ana's Grizzly Bears with your Pacifism on it and untapping the Coffin in your untap step, and choosing Ana's Llanowar
+  Elves for Takklemaggot after your Bears dies. +2, 31,792 of 31,936 on B274's branch (with main through round 426), 31,795 with main
+  through round 427. The
+  compiled text of every other card is unchanged.
+- Out after round B275 (looked at, not done): the lists after round B274 stay out. Judgment calls and known gaps: a
+  merged permanent the Coffin exiles comes back as all its cards (CR 730.3c), each tapped with the noted counters, and
+  each Aura is attached to the one of them its owner chooses (the card's wording assumes one permanent); a Takklemaggot
+  whose chooser has left the game returns as a non-Aura enchantment whose upkeep trigger never triggers; the Coffin's
+  "you may choose not to untap" uses the existing untap-step prompt. Next in line (not looked at closely yet): the
+  remaining bottom cards are all in earlier skip lists (North Star, Golgothian Sylex, Ghostly Flame, the Wishes and other
+  "outside the game" cards stay out); Secret Invasion, Runesword and Equinox are the next to look at again.
 - Round B274 (least played first, from the Lane B skip lists, neither in Lane A's round 427): Dimensional Breach's "Exile
   all permanents. For as long as any of those cards remain exiled, at the beginning of each player's upkeep, that player
   returns one of the exiled cards they own to the battlefield." (every permanent, tokens ceasing to exist, CR 111.7,
@@ -12228,7 +12319,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
-  target whose legality depends on another target), Runesword, Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava (done in round B263)
+  target whose legality depends on another target), Runesword (done in round B276), Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava (done in round B263)
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
   effects; Aetherplasm done in round B261) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
@@ -12942,7 +13033,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   can't be blocked", "exile those tokens unless you have the city's blessing".
 - Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
   (Deepfathom Echo, Sakashima's Will; Cytoshape and Polymorphous Rush done in round B139); "for as long as" durations (Assimilation Aegis,
-  Blade of Shared Souls and Zygon Infiltrator done in round 396, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
+  Blade of Shared Souls and Zygon Infiltrator done in round 396, Secret Invasion done in round B276); copying an exiled card (Dimir Doppelganger (done in round 362), The
   Mimeoplasm, Dermotaxi (done in round 423), Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
   Forebears, done in round 423), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
@@ -13001,7 +13092,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   library instead" both apply, its owner would choose the order (CR 616.1); it's exiled. Rest in Peace, Leyline of
   the Void and Dryad Militant ("if a card would be put into a graveyard from anywhere, exile it instead").
 - "A creature dealt damage by ~ this turn" counts damage from an earlier object with the same card if it left the
-  battlefield and came back the same turn (should be a new object, CR 400.7); Krovikan Vampire, Runesword.
+  battlefield and came back the same turn (should be a new object, CR 400.7); Krovikan Vampire (Runesword, done in round B276, tracks the object as it was).
 - "Becomes tapped": "another ... becomes tapped", "during your turn", "for the first time each turn", "while it has a
   -1/-1 counter", granted ("Elves you control have \"Whenever this creature becomes tapped ...\""); filters with
   colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent", done in round B111).

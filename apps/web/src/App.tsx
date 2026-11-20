@@ -1752,6 +1752,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               canTarget={(id) => canTarget({ kind: "stack", id })}
               onPick={(id) => pickTarget({ kind: "stack", id })}
               onHover={setHover}
+              onAbility={(objectId, index) => useAbility(objectId, index)}
             />
           )}
         </div>
@@ -3721,7 +3722,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
-            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : ""}.`}
+            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : copyEnds && "untilLeaves" in copyEnds ? ` until ${s.objects[copyEnds.untilLeaves.id] ? characteristics(s, s.objects[copyEnds.untilLeaves.id]!).name : "its Aura"} leaves the battlefield` : ""}.`}
           >
             Copy
           </span>
@@ -6877,6 +6878,7 @@ function StackOverlay({
   canTarget,
   onPick,
   onHover,
+  onAbility,
 }: {
   s: GameState;
   hidden: boolean;
@@ -6884,6 +6886,7 @@ function StackOverlay({
   canTarget: (id: string) => boolean;
   onPick: (id: string) => void;
   onHover: (d: CardDef | null) => void;
+  onAbility: (objectId: string, index: number) => void;
 }) {
   const items = [...s.stack].reverse();
   if (hidden)
@@ -6903,7 +6906,7 @@ function StackOverlay({
       </header>
       <div className="stack-cards">
         {items.map((it, i) => (
-          <StackCard key={it.id} s={s} it={it} top={i === 0} targetable={canTarget(it.id)} onPick={() => onPick(it.id)} onHover={onHover} />
+          <StackCard key={it.id} s={s} it={it} top={i === 0} targetable={canTarget(it.id)} onPick={() => onPick(it.id)} onHover={onHover} onAbility={onAbility} />
         ))}
       </div>
     </div>
@@ -6917,6 +6920,7 @@ function StackCard({
   targetable,
   onPick,
   onHover,
+  onAbility,
 }: {
   s: GameState;
   it: StackItem;
@@ -6924,8 +6928,14 @@ function StackCard({
   targetable: boolean;
   onPick: () => void;
   onHover: (d: CardDef | null) => void;
+  onAbility: (objectId: string, index: number) => void;
 }) {
   const d = it.objectId ? cardOf(s, it.objectId) : it.sourceCardId ? s.cards[it.sourceCardId] : undefined;
+  // Lightning Storm (round B277): a spell's own abilities that work only while it's on the stack (CR 113.6b), any
+  // player's to activate if it says so (CR 602.2), and the counters on it.
+  const spellObj = it.kind === "spell" && it.objectId ? s.objects[it.objectId] : undefined;
+  const stackAbilities = spellObj?.zone === "stack" ? abilitiesOf(s, spellObj).activated.flatMap((ab, i) => (ab.zone === "stack" && (ab.anyPlayer || it.controller === HUMAN) ? [{ ab, i }] : [])) : [];
+  const spellCounters = spellObj?.zone === "stack" ? Object.entries(spellObj.counters).filter(([, n]) => n > 0) : [];
   const seen = it.objectId ? seenCardOf(s, it.objectId) : d;
   const who = s.players[it.controller]!;
   const targets = describeTargets(s, it.targets).replace(/^ targeting /, "");
@@ -6946,6 +6956,30 @@ function StackCard({
         {it.x !== undefined && <div className="stack-x">X = {it.x}</div>}
         {it.kind === "spell" && it.modes && it.body && <div className="stack-modes">{it.body.text.replace(/~/g, d?.name ?? "")}</div>}
         {targets && <div className="stack-targets">→ {targets}</div>}
+        {spellCounters.map(([k, n]) => (
+          <div key={k} className="stack-x" data-spell-counters={k}>
+            {n} {k} counter{n === 1 ? "" : "s"}
+          </div>
+        ))}
+        {stackAbilities.map(({ ab, i }) => {
+          const problem = abilityProblem(s, HUMAN, spellObj!.id, i);
+          const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, spellObj!.id, i) !== null);
+          return (
+            <button
+              key={i}
+              className="ghost small"
+              data-stack-ability={i}
+              disabled={!ok}
+              title={problem ?? "Activate this ability of the spell while it's on the stack; you control the ability."}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAbility(spellObj!.id, i);
+              }}
+            >
+              <RulesText text={ab.text.replace(/~/g, d?.name ?? "it").replace(/ Any player may activate this ability but only if [^.]+ is on the stack\.$/, "")} />
+            </button>
+          );
+        })}
         {top && <div className="muted small">resolves next</div>}
       </div>
     </div>

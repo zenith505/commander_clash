@@ -1201,6 +1201,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const of = (counters: Record<string, number> | undefined) => (c.kinds ? Object.values(counters ?? {}).filter((v) => (v ?? 0) > 0).length : c.counter === ANY_COUNTER ? Object.values(counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : (counters?.[c.counter] ?? 0));
       const o = refObjects(s, c.of, ctx)[0];
       if (o?.zone === "battlefield") return of(o.counters);
+      // Lightning Storm (round B277): "charge counters on ~" while ~ is a spell on the stack, as it resolves (CR 122.1).
+      const resolvingSpell = s.resolving?.item.kind === "spell" ? s.resolving.item.objectId : undefined;
+      const spell = c.of.ref === "self" && resolvingSpell && (ctx.sourceId ?? resolvingSpell) === resolvingSpell ? s.objects[resolvingSpell] : undefined;
+      if (spell?.zone === "stack") return of(spell.counters);
       // Parting Thoughts: "the number of counters on that creature" after an earlier part of this effect moved the target
       // permanent: as it last existed on the battlefield (CR 608.2h).
       const t = c.of.ref === "target" ? s.resolving?.item.targets?.[c.of.index] : undefined;

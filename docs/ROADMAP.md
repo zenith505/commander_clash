@@ -1,6 +1,6 @@
 # Roadmap
 
-31,770 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,773 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
@@ -11428,6 +11428,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B271 (least played first, from the cards round B270 named next in line, none of them in Lane A's rounds 424-425):
+  Ian Malcolm, Chaotician's "During each player's turn, that player may cast a spell from among the cards they don't own
+  exiled with ~, and mana of any type can be spent to cast it." (every player, its controller or not, on their own turn;
+  the cards its "Whenever a player draws their second card each turn, that player exiles the top card of their library"
+  exiled, linked in compile.ts, CR 607.2a; one spell each turn for that Ian, as Coram's and Muldrotha's "during each of
+  your turns" permissions, rulings, TurnLog.linkedSpellOnce; not a land card, it says "cast a spell"; the usual timing,
+  rulings; mana of any type, CR 609.4b; CompiledCard.castLinkedOthersTurn, game.ts othersTurnSource). Araumi of the Dead
+  Tide's "{T}, Exile cards from your graveyard equal to the number of opponents you have: Target creature card in your
+  graveyard gains encore until end of turn. The encore cost is equal to its mana cost." (as many cards as its controller
+  has opponents still in the game as it's activated, rulings, CR 602.2b, 800.4a; AdditionalCost `perOpponent`, bound in
+  game.ts bindPerOpponent; the grant is Cursecloth Wrappings', CR 702.141a). Haldan, Avid Arcanist's "You may play lands
+  and cast noncreature spells from among cards you exiled that have fetch counters on them, and you may spend mana as
+  though it were mana of any color to cast those spells." (a face-up card in exile with a fetch counter that its
+  controller exiled, Pako, Arcane Retriever's attack trigger recording who exiled each card, GameObject.exiledByPlayer,
+  cleared when it leaves exile, CR 400.7; lands as the land play and spells with their usual timing, rulings; a spell only
+  as a noncreature one, the face being cast deciding, so an Adventure of a creature card and a modal double-faced card's
+  land face too, rulings; cards exiled before Haldan arrived count, rulings; CompiledCard.playExiledCountered). Browser
+  tests click through casting Ana's Lightning Bolt exiled with Ian with a Forest, Araumi's activation (Hill Giant as the
+  target, three cards picked for three opponents) and encoring Hill Giant from the graveyard menu, and casting Ana's
+  fetched Lightning Bolt with an Island and playing her fetched Forest under Haldan. +3, 31,773 of 31,936 on this branch
+  (B270's, stacked on B269 and B268). The compiled text of every other card is unchanged.
+- Out after round B271 (looked at, not done): the lists after round B270 stay out. Judgment calls and known gaps: bots cast
+  from Ian's exile and Haldan's fetched cards like any other card they may cast from exile; they have no particular plan
+  for Araumi's encore grant (whether they use it is left to their generic choice of abilities). Cass, Hand of Vengeance
+  (returning the Auras and reattaching the Equipment that were attached to a creature as it died) and Bruna, Light of
+  Alabaster (attaching any number of Auras from the battlefield, graveyard and hand as it attacks or blocks) are next in
+  line (not looked at closely yet).
 - Round B270 (least played first, from the cards round B269 named next in line, none of them in Lane A's rounds 424-425):
   Draugr Necromancer's "If a nontoken creature an opponent controls would die, exile that card with an ice counter on it
   instead." (a replacement, CR 614.1a, as Ravenloft Adventurer's; a land that's become a creature too, rulings) and "You
@@ -11457,8 +11484,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   B268 and B267). The compiled text of every other card is unchanged.
 - Out after round B270 (looked at, not done): the lists after round B269 stay out. Judgment calls and known gaps: snow mana
   goes to a colored symbol under Draugr's permission only when no mana of the symbol's own color is left for it; bots cast
-  Spellweaver Helix's copy whenever it can be cast, choosing its targets as for any free spell. Ian Malcolm, Chaotician, Araumi of the Dead Tide, Haldan, Avid Arcanist, Cass, Hand of Vengeance and Bruna, Light
-  of Alabaster are next in line (not looked at yet).
+  Spellweaver Helix's copy whenever it can be cast, choosing its targets as for any free spell. Ian Malcolm, Chaotician
+  (done in round B271), Araumi of the Dead Tide (done in round B271), Haldan, Avid Arcanist (done in round B271), Cass,
+  Hand of Vengeance and Bruna, Light of Alabaster are next in line (not looked at yet).
 - Round B269 (least played first, from the cards round B268 named next in line; Dack Fayden, Helping Hand went to Lane A's
   round 424, and none of these is in Lane A's rounds 423-424): Prowl, Stoic Strategist's "Whenever a player plays a card
   exiled with ~, you draw a card and convert ~." (any player casting a spell or playing a land from among the cards its

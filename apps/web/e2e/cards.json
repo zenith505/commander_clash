@@ -2154,6 +2154,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1a62ba93-153c-4bed-9f6a-ff914df360c1",
+  "name": "Araumi of the Dead Tide",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Merfolk Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Wizard"
+  ],
+  "oracleText": "{T}, Exile cards from your graveyard equal to the number of opponents you have: Target creature card in your graveyard gains encore until end of turn. The encore cost is equal to its mana cost. (Exile the creature card and pay its mana cost: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a6cefecd-459e-439a-a62c-689c2919b689",
   "name": "Arbiter of the Ideal",
   "manaCost": "{4}{U}{U}",
@@ -21597,6 +21632,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6a0b78fb-3838-47d9-8d1a-b6b0c0e8927d",
+  "name": "Haldan, Avid Arcanist",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Partner with Pako, Arcane Retriever (When this creature enters, target player may put Pako into their hand from their library, then shuffle.)\nYou may play lands and cast noncreature spells from among cards you exiled that have fetch counters on them, and you may spend mana as though it were mana of any color to cast those spells.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Partner with",
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3da9fecc-064a-44e6-b88e-4b10194e367e",
   "name": "Hall of Gemstone",
   "manaCost": "{1}{G}{G}",
@@ -23291,6 +23362,41 @@
   "commanderLegal": "legal",
   "set": "bro",
   "releasedAt": "2022-11-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "57ff1665-0a7b-4d98-bd8f-cc07cf04f701",
+  "name": "Ian Malcolm, Chaotician",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Scientist",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scientist"
+  ],
+  "oracleText": "Whenever a player draws their second card each turn, that player exiles the top card of their library.\nDuring each player's turn, that player may cast a spell from among the cards they don't own exiled with Ian Malcolm, and mana of any type can be spent to cast it.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rex",
+  "releasedAt": "2023-11-17",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

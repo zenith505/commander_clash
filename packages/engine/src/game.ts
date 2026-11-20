@@ -1408,6 +1408,7 @@ export function moveObject(
   o.saddledTurn = undefined; // a new object (CR 400.7)
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
+  o.exiledByPlayer = undefined; // a new object (CR 400.7)
   o.encoded = undefined; // cards stay encoded only on the permanent as long as it's on the battlefield (CR 702.99c)
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.warpedZc = undefined; // a new object, no longer the warped card (CR 400.7, 702.185b)
@@ -5859,8 +5860,31 @@ export function checkAscend(s: GameState) {
  * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
-function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOthersTurn?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   if (o.zone !== "exile") return false;
+  const how = ownLinkedPlayPermission(s, o, pid);
+  // Ian Malcolm, Chaotician (round B271): anyone's Ian, with no other permission of `pid`'s for the card.
+  return how || notOthersTurn || !othersTurnSource(s, o, pid) ? how : "anyType";
+}
+
+/**
+ * Ian Malcolm, Chaotician (round B271): the Ian ("id@zoneChanges") whose permission lets `pid` cast this exiled card now:
+ * during `pid`'s turn, a card `pid` doesn't own that the Ian's exile ability exiled (CR 607.2a), whoever controls the Ian,
+ * not a land card (spells only), and no spell cast with that Ian's permission yet this turn (TurnLog.linkedSpellOnce).
+ */
+function othersTurnSource(s: GameState, o: GameObject, pid: PlayerId): string | undefined {
+  if (o.zone !== "exile" || !s.linkedExile || s.activePlayer !== pid || o.owner === pid || o.faceDown || isType(defOf(s, o), "Land")) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (!abilitiesOf(s, p).castLinkedOthersTurn) continue;
+    const key = `${id}@${p.zoneChanges ?? 0}`;
+    if ((s.turnLog?.linkedSpellOnce ?? []).includes(key)) continue;
+    if ((s.linkedExile[key] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) return key;
+  }
+  return undefined;
+}
+
+function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   let how: false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" = false;
   // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
   // now (rulings), mana of any color for the spells (CR 609.4b).
@@ -5879,6 +5903,10 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     // (rulings), cast as a spell (not played as a land, rulings) with the usual timing and costs, mana from snow sources
     // paying its colored symbols (CR 609.4b).
     if (a.castOpponentsCountered && o.owner !== pid && !o.faceDown && !o.hiddenExile && (o.counters[a.castOpponentsCountered] ?? 0) > 0 && !isType(defOf(s, o), "Land") && (!how || how === "plain")) how = "snowAny";
+    // Haldan, Avid Arcanist (round B271): a face-up card with a fetch counter on it that `pid` exiled (Pako's), played with
+    // the usual timing and costs (rulings): a land card as a land, any other only as a noncreature spell (the face being
+    // cast, so an Adventure of a creature card too, rulings), mana as though of any color (CR 609.4b).
+    if (a.playExiledCountered && o.exiledByPlayer === pid && !o.faceDown && !o.hiddenExile && (o.counters[a.playExiledCountered] ?? 0) > 0 && (isType(defOf(s, o), "Land") || !isType(defOf(s, o), "Creature")) && (!how || how === "plain")) how = "anyColor";
     if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
@@ -6071,6 +6099,12 @@ export function linkedPlayGrant(s: GameState, o: GameObject, pid: PlayerId): num
  */
 function useLinkedSpellOnce(s: GameState, o: GameObject, pid: PlayerId): void {
   if (o.zone !== "exile" || !s.linkedExile || isType(defOf(s, o), "Land") || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || linkedPlayGrant(s, o, pid) >= 0) return;
+  // Ian Malcolm, Chaotician (round B271): cast with its permission only, that Ian's spell for this turn is used up.
+  const ian = !linkedPlayPermission(s, o, pid, true) ? othersTurnSource(s, o, pid) : undefined;
+  if (ian) {
+    ((s.turnLog ??= {}).linkedSpellOnce ??= []).push(ian);
+    return;
+  }
   for (const id of s.battlefield) {
     const p = obj(s, id);
     if (controllerOf(s, p) !== pid || !abilitiesOf(s, p).playLinkedSpellOnce) continue;
@@ -9954,7 +9988,7 @@ function ownActivatedCosts(ab: ActivatedAbility, x: number | undefined, src?: Ga
     // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
     const c1 = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
     const c2 = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, src?.id, src?.attachedTo) } : c1;
-    const c = s && pid !== undefined ? bindLegendaryNames(s, pid, c2) : c2;
+    const c = s && pid !== undefined ? bindPerOpponent(s, pid, bindLegendaryNames(s, pid, c2)) : c2;
     // Fabrication Foundry (round 386): the total the exiled artifacts' mana values add up to.
     if (c.kind === "sacrifice" && c.totalMvX) return { ...c, totalMv: x ?? 0, filter: { ...c.filter, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } };
     return xCost(c) ? { ...c, n: x ?? 0 } : (c.kind === "discard" || c.kind === "sacrifice" || c.kind === "exileFromGraveyard") && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
@@ -9971,6 +10005,14 @@ export function bindLegendaryNames(s: GameState, pid: PlayerId, c: AdditionalCos
   const names = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && controllerOf(s, o) === pid && characteristics(s, o).supertypes.includes("Legendary")).map((o) => characteristics(s, o).name);
   const { namedAsYourLegendary: _, ...filter } = c.filter;
   return { ...c, filter: { ...filter, namedAny: [...new Set(names)] } };
+}
+
+/**
+ * Araumi of the Dead Tide (round B271): "Exile cards from your graveyard equal to the number of opponents you have": as
+ * many as `pid` has opponents still in the game as the cost is paid (CR 601.2h via 602.2b, 800.4a; rulings).
+ */
+export function bindPerOpponent(s: GameState, pid: PlayerId, c: AdditionalCost): AdditionalCost {
+  return c.kind === "exileFromGraveyard" && c.perOpponent ? { ...c, n: opponents(s, pid).length } : c;
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */

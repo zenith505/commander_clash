@@ -11535,6 +11535,39 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B275 (least played first, the two cards round B274 named next in line, neither in Lane A's rounds 427-428):
+  Tawnos's Coffin's "{3}, {T}: Exile target creature and all Auras attached to it. Note the number and kind of counters
+  that were on that creature. When ~ leaves the battlefield or becomes untapped, return that exiled card to the battlefield
+  under its owner's control tapped with the noted number and kind of counters on it. If you do, return the other exiled
+  cards to the battlefield under their owner's control attached to that permanent." (the target and every Aura on it
+  exiled at once, its counters noted just before, Effect coffinNote, CR 608.2c; then one delayed trigger watching ~ as it
+  is now, the first time it untaps or leaves for any zone, CR 603.7c, Effect coffinWatch, none if ~ left before the
+  ability resolved, so the cards stay exiled forever, rulings; the card comes back only if it's still in exile as that
+  object and is a permanent card, CR 400.7, 400.4a, tapped with the noted counters, CR 614.1c, 122.6, a new object,
+  rulings; then each Aura card still exiled that could enchant it comes back attached to it under its owner's control,
+  the rest stay exiled, rulings, CR 303.4f; a token ceases to exist, so its Auras stay exiled, rulings; Effect
+  coffinReturn in run-laneb275.ts). Takklemaggot's "When enchanted creature dies, that creature's controller chooses a
+  creature that ~ could enchant. If the player does, return ~ to the battlefield under your control attached to that
+  creature. If they don't, return ~ to the battlefield under your control as a non-Aura enchantment. It loses "enchant
+  creature" and gains "At the beginning of that player's upkeep, ~ deals 1 damage to that player."" (the creature's
+  controller as it last existed, CR 608.2h, chooses as it resolves among every creature ~ could legally enchant, not
+  targeted, so shroud doesn't matter and protection from black does, and must choose one if able, rulings; only if ~'s
+  card is still in the graveyard it went to, rulings, CR 400.7; with none, it enters as an enchantment without the Aura
+  subtype, CR 613.1d, without its enchant ability, Modification `loseEnchant`, CR 613.1f, and with the upkeep trigger
+  aimed at that player, GameObject.chosen.player, all from the moment it enters, CR 614.12; Effect takklemaggot). Bots keep
+  the Coffin tapped while it holds a card an opponent owns, aim it at opponents' creatures as they do any "exile target
+  creature" ability, and choose an opponent's most valuable
+  creature for Takklemaggot (their own least valuable one if there's no other). Browser tests click through exiling
+  Ana's Grizzly Bears with your Pacifism on it and untapping the Coffin in your untap step, and choosing Ana's Llanowar
+  Elves for Takklemaggot after your Bears dies. +2, 31,792 of 31,936 on B274's branch (with main through round 426). The
+  compiled text of every other card is unchanged.
+- Out after round B275 (looked at, not done): the lists after round B274 stay out. Judgment calls and known gaps: a
+  merged permanent the Coffin exiles comes back as all its cards (CR 730.3c), each tapped with the noted counters, and
+  each Aura is attached to the one of them its owner chooses (the card's wording assumes one permanent); a Takklemaggot
+  whose chooser has left the game returns as a non-Aura enchantment whose upkeep trigger never triggers; the Coffin's
+  "you may choose not to untap" uses the existing untap-step prompt. Next in line (not looked at closely yet): the
+  remaining bottom cards are all in earlier skip lists (North Star, Golgothian Sylex, Ghostly Flame, the Wishes and other
+  "outside the game" cards stay out); Secret Invasion, Runesword and Equinox are the next to look at again.
 - Round B274 (least played first, from the Lane B skip lists, neither in Lane A's round 427): Dimensional Breach's "Exile
   all permanents. For as long as any of those cards remain exiled, at the beginning of each player's upkeep, that player
   returns one of the exiled cards they own to the battlefield." (every permanent, tokens ceasing to exist, CR 111.7,

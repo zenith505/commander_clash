@@ -77,7 +77,8 @@ export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paus
   const base = copiedValues(s, e.of, ctx);
   if (!base) return;
   if (e.duration === "whileTargetTapped" || e.duration === "whileSourceAttached") return becomeCopyWhile(s, e, base, ctx);
-  const until = e.duration === "endOfTurn" ? "endOfTurn" : e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : undefined;
+  // Niko, Light of Hope (round 426): "until the next end step" (CopyEffect.until nextEndStep, game.ts endNextEndStepCopies).
+  const until = e.duration === "endOfTurn" ? "endOfTurn" : e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "nextEndStep" ? { nextEndStep: { turn: s.turn, endSteps: s.step === "end" ? (s.turnLog?.endSteps ?? 1) : 0 } } : undefined;
   const changing = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
   // Each copies the same values, worked out before any of them changes (CR 608.2h).
   const keys = changing.map((o) => copyKey(s, base, exceptFor(s, o, e.except, ctx.sourceDef.name)));
@@ -85,7 +86,7 @@ export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paus
     const was = defOf(s, o).name;
     setChosenTypeAside(o); // Mirror of the Forebears (round 423)
     addCopyEffect(s, o, keys[i]!, until);
-    log(s, `${was} becomes a copy of ${base.name}${until === "endOfTurn" ? " until end of turn" : until ? ` until ${player(s, ctx.controller).name}'s next turn` : ""}.`);
+    log(s, `${was} becomes a copy of ${base.name}${until === "endOfTurn" ? " until end of turn" : until && "nextEndStep" in until ? " until the next end step" : until ? ` until ${player(s, ctx.controller).name}'s next turn` : ""}.`);
   });
 }
 

@@ -5,7 +5,7 @@ import { addedAbilityCosts, addedSpellCosts, anyAddedCosts, anyAddedSacrifice } 
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilityCostOf, withManaTax, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax, piracyTap, PIRACY_SPEND } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { payableShields, payShieldProblem } from "./pay-shields";
-import { abilityProblem, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, beholdTypeFor, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -337,6 +337,12 @@ export function planCast(
 ): Action[] | null {
   const o = obj(s, objectId);
   choices = convertChoices(o, choices);
+  // Celestial Reunion (round 426): kicked without a creature type chosen yet, the one that beholds the most (beholdTypeFor).
+  const kickType = compileCard(defOf(s, o)).kickChooseType && choices.kicks?.includes(0) && choices.creatureType === undefined ? compileCard(defOf(s, o)).kicker?.extraCosts?.[0] : undefined;
+  if (kickType?.kind === "reveal") {
+    const type = beholdTypeFor(s, pid, o, kickType.n);
+    if (type) choices = { ...choices, creatureType: type };
+  }
   // Cast as one of its faces: that face's cost and text (CR 709.3a, 712.11c, 715.3a).
   if (choices.face !== undefined && o.face !== choices.face) return asFace(s, o, choices.face, () => planCast(s, pid, objectId, targets, modes, convoke, x, choices));
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);

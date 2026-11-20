@@ -1155,9 +1155,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       // Coffin Queen: kept tapped while the creature it returned would be exiled as it untaps.
       const guarding = (id: string) => (s.delayed ?? []).some((d) => d.when === "lostControl" && d.orUntaps && d.subject.id === id && !!d.about && s.objects[d.about.id]?.zone === "battlefield");
+      // Tawnos's Coffin (round B275): kept tapped while a card an opponent owns is exiled with it; one of ours comes back.
+      const coffining = (id: string) => (s.delayed ?? []).some((d) => d.when === "leaves" && d.orUntaps && d.subject.id === id && d.body.effects.some((x) => x.type === "coffinReturn" && x.cards.some((c) => s.objects[c.id]?.zone === "exile" && s.objects[c.id]!.owner !== pid)));
       // The Pandorica (round 389): kept tapped while an opponent's permanent it phased out can't phase in.
       const locking = (id: string) => (s.phasedOut ?? []).some((x) => s.objects[x]!.phased?.lockWhileTapped?.id === id && s.objects[x]!.phased!.by !== pid);
-      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id && !e.affected.includes(id)) || saving(id) || guarding(id) || locking(id)) }];
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id && !e.affected.includes(id)) || saving(id) || guarding(id) || locking(id) || coffining(id)) }];
     }
     // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
     if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
@@ -2180,6 +2182,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "attachToChosen" && e.source.ref === "grantSource")) {
         const least = pend.options.filter((x) => s.objects[x]?.zone === "battlefield").sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)))[0];
         return [{ type: "chooseOption", player: pid, choice: least ?? pend.options[0]! }];
+      }
+      // Takklemaggot (round B275): it slowly kills what it enchants, so on an opponent's most valuable creature, else our
+      // least valuable one (we must choose one if we can).
+      if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "takklemaggot")) {
+        const byWorth = pend.options.filter((x) => s.objects[x]?.zone === "battlefield").sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+        const theirs = byWorth.find((x) => controllerOf(s, obj(s, x)) !== pid);
+        return [{ type: "chooseOption", player: pid, choice: theirs ?? byWorth[byWorth.length - 1] ?? pend.options[0]! }];
       }
       const waiting = s.untilReturns?.auras[0];
       const aura = waiting?.asking ? waiting.id : s.resolving?.scratch?.auraAsking;

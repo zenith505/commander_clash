@@ -187,6 +187,7 @@ import { round426Line } from "./round426";
 import { round427Line } from "./round427";
 import { round428Line } from "./round428";
 import { round429Line } from "./round429";
+import { round430Line } from "./round430";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1072,6 +1073,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 430: oracle/round430.ts.
+    if (round430Line(line, raw, out, isSpell)) continue;
     // Round 429: oracle/round429.ts.
     if (round429Line(line, raw, out, isSpell)) continue;
     // Ninja Teen, Dynaheir, Invoker Adept (round 428): oracle/round428.ts.

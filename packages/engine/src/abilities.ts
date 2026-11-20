@@ -6651,6 +6651,8 @@ export type SpellCondition =
   | { kind: "targetsSameColors"; index: number; n: number }
   /** Jaded Response: "if it shares a color with a creature you control": the target's colors against those of the permanents matching `filter`, both as it resolves (rulings). */
   | { kind: "targetSharesColorWith"; index: number; filter: TargetSpec }
+  /** C.A.M.P. (round 430): "If that creature shares a color with the mana that land produced": target `index`'s colors as it resolves against the colors of the mana the tapped-for-mana event's permanent made (TriggerEventInfo.manaMade). */
+  | { kind: "targetSharesColorWithManaMade"; index: number }
   /** "If another permanent with the same name is on the battlefield" (Winnow): as target `index`, checked as it resolves. */
   | { kind: "targetSharesName"; index: number }
   /** "If it shares a card type with the card exiled this way" (Holistic Wisdom): target card `index` and the card the ability's "exile a card from your hand" cost exiled, their card types (CR 205.2a), checked as it resolves. */
@@ -7394,7 +7396,7 @@ export interface TriggeredAbility {
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
    */
-  manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
+  manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec; /** C.A.M.P. (round 430): "Whenever fortified land is tapped for mana": the permanent this is attached to, not ~. */ attached?: true };
   /**
    * For "permanentBecomesTapped", "permanentsBecomeTapped", "permanentBecomesUntapped", "permanentTurnedFaceUp" and "permanentTransformsInto": which permanent ("a Dwarf you control"); it's the subject
    * ("put a wind counter on it").
@@ -9836,6 +9838,13 @@ export interface CompiledCard {
    * instead of into your graveyard." (CR 614.1a). Never a discard as a cost (rulings).
    */
   discardToTop?: true;
+  /**
+   * Nephalia Academy (round 430): "If a spell or ability an opponent controls causes you to discard a card, you may reveal
+   * that card and put it on top of your library instead of putting it anywhere else." (CR 614.1a): a discard caused by
+   * another player's spell or ability, a discard they made you choose too, as a cost (rulings); the card is still
+   * discarded. See run-library.ts academyName.
+   */
+  discardToTopFromOpponents?: true;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
   controlsOpponentSearches?: true;
   /**

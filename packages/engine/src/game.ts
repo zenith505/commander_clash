@@ -15,7 +15,7 @@ import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDama
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
+import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -4434,7 +4434,7 @@ function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAft
     return;
   }
   if (p.hand.length === 1) {
-    chainsDiscard(s, pid, p.hand[0]!, src);
+    if (chainsDiscardOrAsk(s, pid, p.hand[0]!, src, { left, made: [entry, ...made], ...(after ? { after } : {}) }) === "paused") return "paused";
     made.unshift(entry);
     return;
   }
@@ -4443,15 +4443,29 @@ function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAft
 }
 
 /**
- * The card discarded for Chains of Mephistopheles: by its controller's effect (Obstinate Baloth's "an opponent" counts it), not
- * part of what's resolving ("discarded this way" means that spell's own discards).
+ * The card `pid` discards for Chains of Mephistopheles, once chosen: with a Library of Leng ("If an effect causes you to
+ * discard a card") or, for another player's Chains, a Nephalia Academy (round 430), first whether it goes on top of their
+ * library instead (CR 614.1a, 616.1): "paused" while they choose, `then` the draws to go on with after that.
  */
-function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string) {
+function chainsDiscardOrAsk(s: GameState, pid: PlayerId, id: ObjectId, src: string, then: { left: number; made: number[]; after?: DrawAfter }): "paused" | void {
+  const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
+  const by = toTopName(s, pid, chains ? controllerOf(s, obj(s, chains)) : undefined, false);
+  if (!by) return chainsDiscard(s, pid, id, src);
+  s.pending = { kind: "handToTop", player: pid, count: 1, source: src, upTo: true, discarding: [id], chains: then, ...(by !== lengName(s, pid) ? { revealing: by } : {}) };
+  return "paused";
+}
+
+/**
+ * The card discarded for Chains of Mephistopheles: by its controller's effect (Obstinate Baloth's "an opponent" counts it), not
+ * part of what's resolving ("discarded this way" means that spell's own discards). `toTop`: put on top of the library instead
+ * (see chainsDiscardOrAsk).
+ */
+function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string, toTop: ObjectId[] = []) {
   const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
   const r = s.resolving;
   s.resolving = null;
   try {
-    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined);
+    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined, undefined, toTop);
   } finally {
     s.resolving = r;
   }
@@ -6821,7 +6835,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     if (ab.untapSelf) untapPermanent(s, o); // {Q} (CR 107.6): untapped, not tapped for mana (rulings on Pili-Pala)
     // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
     // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
-    if (ab.tap && adds.length && !unless) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+    if (ab.tap && adds.length && !unless) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id, ...(!(ab.getterChooses && getter !== p.id) ? { made: [...adds] } : {}) });
     for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   }, true);
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
@@ -6894,7 +6908,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
       if (adds.length) addMana(s, getter, adds, { from });
       log(s, adds.length ? `${p.name} adds ${adds.map((m) => `{${m}}`).join("")} (${name}).` : `${name} adds no mana.`);
     } else adds = milledCombos[0]!;
-    if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+    if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id, made: [...adds] });
   }
   else if (unless) s.manaUnless = { player: p.id, id: o.id, zc: o.zoneChanges ?? 0, adds, from, picked, queue: turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost), cost: unless, source: name };
   else if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
@@ -6988,7 +7002,7 @@ function manaUnlessDone(s: GameState, paid: boolean): void {
     return;
   }
   if (player(s, m.player).lost) return;
-  if (here) fireEvent(s, { type: "tappedForMana", id: m.id, player: m.player });
+  if (here) fireEvent(s, { type: "tappedForMana", id: m.id, player: m.player, made: [...m.adds] });
   addMana(s, m.player, m.adds, { from: m.from });
   log(s, `${player(s, m.player).name} adds ${m.adds.map((x) => `{${x}}`).join("")} (${m.source}).`);
   if (here) fireEvent(s, { type: "manaAbilityResolved", id: m.id, amount: m.adds.length });
@@ -12307,7 +12321,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
     // Chains of Mephistopheles (round B237): the card discarded instead of a draw, then the draws go on.
     if (ids.length !== 1 || !p.hand.includes(ids[0]!)) throw new RulesError("choose a card from your hand");
     s.pending = null;
-    chainsDiscard(s, p.id, ids[0]!, pend.source);
+    if (chainsDiscardOrAsk(s, p.id, ids[0]!, pend.source, pend.thenDraw) === "paused") return;
     continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, [...pend.thenDraw.made]);
     return;
   }
@@ -12326,6 +12340,15 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind === "handToTop" && pend.waste) return chooseWasteToTop(s, p, ids);
+  if (pend?.kind === "handToTop" && pend.chains && pend.discarding && pend.player === p.id) {
+    // Chains of Mephistopheles (round 430): the card it makes them discard goes on top instead, or not; then the draws go on.
+    if (new Set(ids).size !== ids.length || ids.some((id) => !pend.discarding!.includes(id))) throw new RulesError("choose from the cards being discarded");
+    const then = pend.chains;
+    s.pending = null;
+    chainsDiscard(s, p.id, pend.discarding[0]!, pend.source, ids);
+    continueDraws(s, p.id, then.left, then.after, [...then.made]);
+    return;
+  }
   if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
   if (pend.discarding) {
     // Library of Leng: which of the cards being discarded go on top instead (see discardToTop).

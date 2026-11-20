@@ -7473,6 +7473,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9bf498ce-6d6d-462f-9ec3-b36a2184aff7",
+  "name": "C.A.M.P.",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Fortification",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Fortification"
+  ],
+  "oracleText": "Whenever fortified land is tapped for mana, put a +1/+1 counter on target creature you control. If that creature shares a color with the mana that land produced, create a Junk token. (It's an artifact with \"{T}, Sacrifice this token: Exile the top card of your library. You may play that card this turn. Activate only as a sorcery.\")\nFortify {3} ({3}: Attach to target land you control. Fortify only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Fortify"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fbb0f73b-5e30-4632-99c1-e49582e41f8d",
   "name": "Cadaverous Bloom",
   "manaCost": "{3}{B}{G}",
@@ -33802,6 +33828,31 @@
   "set": "ody",
   "releasedAt": "2001-10-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3b7e7a11-bf59-413d-8796-640d17c2c1c6",
+  "name": "Nephalia Academy",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "If a spell or ability an opponent controls causes you to discard a card, you may reveal that card and put it on top of your library instead of putting it anywhere else.\n{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

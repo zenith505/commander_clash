@@ -361,7 +361,7 @@ export type TriggerSourceEvent =
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number; /** The first card they draw in their draw step. */ firstInDrawStep?: true; /** The card drawn, in their hand. */ card?: ObjectId }
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
-  | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
+  | { type: "tappedForMana"; id: ObjectId; player: PlayerId; /** The mana its mana ability made (C.A.M.P., round 430). */ made?: ManaType[] }
   /** One of this permanent's mana abilities resolved (CR 605.3b), making this much mana (Tyvar the Bellicose). */
   | { type: "manaAbilityResolved"; id: ObjectId; amount: number }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
@@ -1682,18 +1682,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // land"; "that player" is who tapped it).
     const o = obj(s, ev.id);
     // Mana Web: what the land could produce as it was tapped (CR 106.7), for when it's gone by the time that resolves.
-    const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}) };
+    const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}), ...(ev.made ? { manaMade: [...ev.made] } : {}) };
     // Desolation: "each player who tapped a land for mana this turn" (CR 106.12), whatever was on the battlefield then (rulings).
     if (o.zone === "battlefield" && objIsType(s, o, "Land")) {
       const tl = ((s.turnLog ??= {}).tappedLandForMana ??= []);
       if (!tl.includes(ev.player)) tl.push(ev.player);
     }
     const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
-    add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && !t.manaTap?.attached && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "tappedForMana" && !!t.manaTap?.filter && byOk(t, ctrl) && objectMatches(s, t.manaTap.filter, o, ctrl, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      // C.A.M.P. (round 430): "fortified land", the one it's attached to as it's tapped.
+      add(w, ctrl, (e, t) => e === "tappedForMana" && (t.manaTap?.attached ? w.attachedTo === o.id : !!t.manaTap?.filter && objectMatches(s, t.manaTap.filter, o, ctrl, false)) && byOk(t, ctrl), undefined, undefined, o, undefined, undefined, undefined, info);
     }
   } else if (ev.type === "countersPut") {
     // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control": "that many" is how many.

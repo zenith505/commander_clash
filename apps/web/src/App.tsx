@@ -706,7 +706,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     else setTargeting((t) => (answering(t) ? null : t));
     // (Two identical triggers in a row, Lucy MacLean's for two tokens entering at once, round B269: the next one is asked
     // once the first is on the stack, so the stack's size tells them apart.)
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? `${pending.description}#${s?.stack.length ?? 0}#${s?.triggerQueue.length ?? 0}` : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : ""]);
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? `${pending.description}#${s?.stack.length ?? 0}#${s?.triggerQueue.length ?? 0}` : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : pending?.kind === "handToTop" && pending.discarding ? `${pending.discarding.join(",")}#${s?.log.length ?? 0}` : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
   // Who defends a permanent that can be attacked: a planeswalker's controller, a battle's protector (CR 506.2, 310.9b).
@@ -6581,8 +6581,9 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}: </strong>you discard {pending.discarding.map((id) => cardOf(s, id).name).join(", ")}. Click any of {pending.discarding.length === 1 ? "it" : "them"} to put on top of your
-          library instead of into your graveyard{discards.length > 1 ? " (first pick ends on top)" : ""}.
+          <strong>{pending.source}: </strong>you discard {pending.discarding.map((id) => cardOf(s, id).name).join(", ")}. Click {pending.discarding.length === 1 ? "it" : "any of them"} to{" "}
+          {pending.revealing ? `reveal and put on top of your library instead (${pending.revealing})` : "put on top of your library instead of into your graveyard"}
+          {discards.length > 1 ? " (first pick ends on top)" : ""}.
         </span>
         <button onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
           {discards.length ? `Put ${discards.length} on top` : "All to the graveyard"}

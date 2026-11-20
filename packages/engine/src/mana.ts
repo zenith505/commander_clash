@@ -5,8 +5,8 @@ export type CostSymbol =
   | { kind: "generic"; amount: number }
   | { kind: "colored"; color: ManaType } // includes {C}
   /** `life`: may be paid with 2 life instead, as {B} may with K'rrik (paying it as its black half). */
-  | { kind: "hybrid"; options: Color[]; life?: true; /** A hybrid Phyrexian symbol, {G/W/P} (CR 107.4f). */ phyrexian?: true; /** Abstruse Appropriation (round 408): colorless mana pays it too, as though it were one of `options` (CR 609.4b). */ orC?: true } // {W/U}
-  | { kind: "twoHybrid"; color: Color; life?: true; /** Sunglasses of Urza: one mana of this color pays it too, as though it were `color` (CR 609.4b). */ also?: Color; /** Abstruse Appropriation (round 408): one colorless mana pays it too, as though it were `color`. */ orC?: true } // {2/W}
+  | { kind: "hybrid"; options: Color[]; life?: true; /** A hybrid Phyrexian symbol, {G/W/P} (CR 107.4f). */ phyrexian?: true; /** Abstruse Appropriation (round 408): colorless mana pays it too, as though it were one of `options` (CR 609.4b). */ orC?: true; /** Draugr Necromancer (round B270): mana from a snow source pays it too, whatever its type, as though it were one of `options` (CR 609.4b, 107.4h). */ orSnow?: true } // {W/U}
+  | { kind: "twoHybrid"; color: Color; life?: true; /** Sunglasses of Urza: one mana of this color pays it too, as though it were `color` (CR 609.4b). */ also?: Color; /** Abstruse Appropriation (round 408): one colorless mana pays it too, as though it were `color`. */ orC?: true; /** Draugr Necromancer (round B270): one mana from a snow source pays it too, as though it were `color`. */ orSnow?: true } // {2/W}
   /**
    * {W/P}. `krrik`: a {B} that K'rrik lets be paid with 2 life, not a Phyrexian symbol (compleated doesn't count it).
    * `any`: any type of mana pays it (Chromatic Orrery's "as though it were mana of any color", CR 609.4b).
@@ -151,7 +151,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   };
   let generic = extraGeneric;
   let lifePaid = 0;
-  const hybrids: { options: Color[]; life?: true; phyrexian?: true; orC?: true }[] = [];
+  const hybrids: { options: Color[]; life?: true; phyrexian?: true; orC?: true; orSnow?: true }[] = [];
   const twoHybrids: Extract<CostSymbol, { kind: "twoHybrid" }>[] = [];
   const phyrexian: Extract<CostSymbol, { kind: "phyrexian" }>[] = [];
   let phyrexianLife = 0;
@@ -183,10 +183,23 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   // `avoid`: what spending each color would cost the caster (Rolling Spoil's "if {B} was spent", hurting them now): kept
   // for last, the least costly first.
   const harm = (c: ManaType) => (c === "C" ? 0 : (opts.avoid?.[c] ?? 0));
-  for (const { options: opts, life: orLife, phyrexian: phy, orC } of hybrids) {
+  // Draugr Necromancer (round B270): one mana from a snow source of any type, as though it were the symbol's color: the
+  // snow mana the rest of the cost needs least, {C} first, then the type there's most of to spare.
+  const snowAny = (): ManaType | undefined => (["C", ...COLORS] as ManaType[]).filter((c) => sn[c] > 0 && free(c) > 0).sort((a, b) => Number(b === "C") - Number(a === "C") || p[b] - named[b] - (p[a] - named[a]))[0];
+  const spendSnow = (c: ManaType) => {
+    takeSnow(c);
+    p[c]--;
+    if (pref[c] > 0) pref[c]--;
+  };
+  for (const { options: opts, life: orLife, phyrexian: phy, orC, orSnow } of hybrids) {
     // Abstruse Appropriation (round 408): colorless mana as though it were one of its colors, only when none of them is
     // there (colorless pays any of these symbols, so it's kept for the ones that need it, CR 601.2h).
     const best: ManaType | undefined = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || harm(a) - harm(b) || Number(co[b] > 0) - Number(co[a] > 0) || pref[b] - pref[a] || p[b] - p[a])[0] ?? (orC && p.C > 0 ? "C" : undefined);
+    const snowy = !best && orSnow ? snowAny() : undefined;
+    if (snowy) {
+      spendSnow(snowy);
+      continue;
+    }
     if (!best && orLife && life - lifePaid >= 2) {
       lifePaid += 2;
       if (phy) phyrexianLife++;
@@ -205,10 +218,12 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
       if (!krrik) phyrexianLife++;
     } else return null;
   }
-  for (const { color: c, also, orC } of twoHybrids) {
+  for (const { color: c, also, orC, orSnow } of twoHybrids) {
+    const snowy = orSnow && p[c] <= 0 ? snowAny() : undefined;
     if (p[c] > 0) spend(c, true);
     else if (also && p[also] > 0) spend(also, true);
     else if (orC && p.C > 0) spend("C", true);
+    else if (snowy) spendSnow(snowy);
     else generic += 2;
   }
   // Generic: spend colorless first, then whichever color we have most of. With `spreadColors` (sunburst, which counts

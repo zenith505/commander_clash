@@ -5575,7 +5575,7 @@ export type Effect =
    * cost." A copy of the card its linked imprint ability exiled (CR 607.2a), made in exile and cast as this resolves or
    * never (CR 707.12, rulings); not if that card has left exile.
    */
-  | { type: "castLinkedCopy"; /** Panoptic Mirror: "a card exiled with ~": one of several linked cards, chosen as it resolves (or none). */ choose?: true }
+  | { type: "castLinkedCopy"; /** Panoptic Mirror: "a card exiled with ~": one of several linked cards, chosen as it resolves (or none). */ choose?: true; /** Spellweaver Helix (round B270): "copy the other": of the two linked cards, the one other than a card with the name of the spell the trigger is about (either one when both have it); nothing with fewer than two. */ other?: true }
   /**
    * Beseech the Mirror: "If ~ was bargained, you may cast the exiled card without paying its mana cost if that spell's
    * mana value is 4 or less. Put the exiled card into your hand if it wasn't cast this way." The card this resolution
@@ -6005,6 +6005,8 @@ export type Effect =
    */
   /** Hostile Negotiations: two piles of `n` cards exiled face down from the top of your library, one turned face up by you, an opponent choosing the one for your hand (see runFaceDownPilesEffect). */
   | { type: "faceDownPiles"; n: number }
+  /** Abstract Performance (round B270): `n` cards exiled face down in a pile, then `n` face up in another; an opponent you choose picks one for your graveyard, and you look at the other (the cards a castFromAmong `fromDug` then casts from, ResolvingInfo.dugExiled; see effects/run-laneb270.ts). */
+  | { type: "abstractPiles"; n: number }
   /** Gollum, Scheming Guide: an opponent you choose guesses whether the top card of your library is of the kind chosen just
    * before (Chosen.landOrNonland), then it's revealed; `right` happens if they guessed right, `wrong` otherwise (an empty
    * library: never right, rulings). */
@@ -10442,6 +10444,8 @@ export interface CompiledCard {
   playCountered?: CounterKind;
   /** "You may play lands and cast spells from among cards you own in exile with croak counters on them" (Grolnok, the Omnivore): any time it's allowed, paying as usual. */
   playOwnCountered?: CounterKind;
+  /** Draugr Necromancer (round B270): "You may cast spells from among cards in exile your opponents own with ice counters on them, and you may spend mana from snow sources as though it were mana of any color to cast those spells": any face-up such card but a land, whatever exiled it (rulings), with the usual timing and costs (rulings); mana from snow sources pays its colored symbols as though it were that color (CR 609.4b, CostSymbol `orSnow`). */
+  castOpponentsCountered?: CounterKind;
   /**
    * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
    * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).

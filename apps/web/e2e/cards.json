@@ -213,6 +213,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3e0e3676-e634-4e64-bdfd-4aaa5885461f",
+  "name": "Abstract Performance",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile the top four cards of your library in a face-down pile, then exile the top four cards of your library in a face-up pile. An opponent chooses one of those piles. Put that pile into your graveyard. Look at the cards in the other pile. You may cast a spell from among them without paying its mana cost. Put the rest into your hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "61a23402-3244-4b5e-9134-98e1f82eda65",
   "name": "Abstruse Appropriation",
   "manaCost": "{2}{W}{B}",
@@ -13696,6 +13722,39 @@
   "commanderLegal": "legal",
   "set": "tsp",
   "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ccdf3399-b836-47ab-802d-af5a9c24d759",
+  "name": "Draugr Necromancer",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Snow Creature — Zombie Cleric",
+  "supertypes": [
+   "Snow"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Cleric"
+  ],
+  "oracleText": "If a nontoken creature an opponent controls would die, exile that card with an ice counter on it instead.\nYou may cast spells from among cards in exile your opponents own with ice counters on them, and you may spend mana from snow sources as though it were mana of any color to cast those spells.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -44442,6 +44501,30 @@
   "commanderLegal": "legal",
   "set": "m13",
   "releasedAt": "2012-07-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9aa8eef1-fc67-4d54-9783-4d0175a76741",
+  "name": "Spellweaver Helix",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — When this artifact enters, you may exile two target sorcery cards from a single graveyard.\nWhenever a player casts a card, if it has the same name as one of the cards exiled with this artifact, you may copy the other. If you do, you may cast the copy without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

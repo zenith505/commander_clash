@@ -275,6 +275,19 @@ function planFreeWith(cost: ParsedCost, extraGeneric: number, life: number, pool
       if (x) take(x);
       have = opts.filter((c) => reserved[c] > 0).sort((a, b) => harmOf(a) - harmOf(b))[0];
     }
+    // Draugr Necromancer (round B270): no source of its colors, so mana from a snow source of any type, as {S} takes it.
+    if (!have && sym.orSnow) {
+      if (!snowFrom()) {
+        const x = free((o) => !!o.snow?.length);
+        if (x) take(x);
+      }
+      const m = snowFrom();
+      if (m) {
+        snowReserved[m]--;
+        reserved[m]--;
+      }
+      continue;
+    }
     if (have) reserved[have]--;
   }
   for (let guard = 0; guard < 60 && !pays(); guard++) {

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,767 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,770 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
@@ -2345,7 +2345,7 @@ line blocks.
    named Fenric" (The Curse of Fenric); "exile target spell" linked to "Your opponents can't cast spells with the same name
    as the exiled card" and the return when it leaves (Ashiok's Erasure); "each player exiles X permanents they control
    and/or cards from their hand", you first (Descent into Madness, with a browser test of the pick). +10, 30,170 of 31,936 with B123.
-   Out after round 293 (looked at, not done): Spellweaver Helix (copying the other imprinted card when a card with one's
+   Out after round 293 (looked at, not done): Spellweaver Helix (done in round B270) (copying the other imprinted card when a card with one's
    name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
    activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (done in round B263) (a redirection chosen for each
@@ -4010,7 +4010,7 @@ line blocks.
    Lane B through B258, merged in). The compiled text of every other card is unchanged.
    Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
    the cost picks the Equipment whose mana value it divides, no ruling); Kefnet, Taskmaster, Niko, Mirror of the
-   Forebears, Wayta, Draugr Necromancer, Apple of Eden (done in round B269), Missy and the rest of `npm run popular` above rank 15,000 (still
+   Forebears, Wayta, Draugr Necromancer (done in round B270), Apple of Eden (done in round B269), Missy and the rest of `npm run popular` above rank 15,000 (still
    out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
    it face up; a bot voting with Elrond counts only creatures, not what the new controller can do with them.
    Round 415 went on down `npm run popular`, most played first, past cards left out before to five cards that copy a
@@ -5562,7 +5562,7 @@ line blocks.
    tokens for the amount); Volo, Itinerant Scholar and Long List of the Ents (noted creature types); Mavinda, Students'
    Advocate (a cost increase for a spell that doesn't target your creature); Eye of Duskmantle (cards surveilled this
    turn); Bruna, Light of Alabaster and Cass, Hand of Vengeance (Auras from several zones attached as it attacks or dies);
-   Draugr Necromancer (cards with ice counters, snow mana as any color); Apple of Eden, Isu Relic (done in round B269); Radiant Performer,
+   Draugr Necromancer (done in round B270) (cards with ice counters, snow mana as any color); Apple of Eden, Isu Relic (done in round B269); Radiant Performer,
    Agrus Kos, Eternal Soldier, Radiate, Exterminator Magmarch, Zevlor, Feather and Leori (a copy for each other legal
    target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (done in round B246) (any number of
    targets controlled by different players, counters when they return under your control); Metamorphic Alteration (an
@@ -5635,7 +5635,7 @@ line blocks.
    resolves); Oath of Druids (done in round B143) (a target chosen by the upkeep player among opponents with more creatures, then reveal until
    a creature); Fraying Line (done in round B199) (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
    piles of permanents and one chosen at random); Glimpse of Tomorrow (done in round 390) (non-Aura permanents first, then Auras attached as
-   they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
+   they enter); Abstract Performance (done in round B270) (a face-down pile exiled from the library, then a free cast from the other pile);
    Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (done in round B237) (a draw replacement that depends on which
    draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (done in round 298) (each next flip's stakes double and the winner or loser
@@ -11428,6 +11428,37 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B270 (least played first, from the cards round B269 named next in line, none of them in Lane A's rounds 424-425):
+  Draugr Necromancer's "If a nontoken creature an opponent controls would die, exile that card with an ice counter on it
+  instead." (a replacement, CR 614.1a, as Ravenloft Adventurer's; a land that's become a creature too, rulings) and "You
+  may cast spells from among cards in exile your opponents own with ice counters on them, and you may spend mana from snow
+  sources as though it were mana of any color to cast those spells." (any face-up such card, whatever exiled it, an
+  earlier Draugr's too, rulings; spells only, not lands, and not a card you own, rulings; the usual timing and costs,
+  rulings; mana from a snow source of any type pays a colored, hybrid, {2/W}-style or Phyrexian symbol as though it were that
+  color, CR 609.4b, CostSymbol `orSnow` in mana.ts and autopay.ts, while {C} still needs colorless mana and {S} snow mana:
+  snow isn't a type, rulings). Spellweaver Helix's "Whenever a player casts a card, if it has the same name as one of the
+  cards exiled with ~, you may copy the other. If you do, you may cast the copy without paying its mana cost." (any
+  player casting a card, not a copy, CR 707.12; the two sorcery cards its imprint ability exiled from a single graveyard,
+  linked in compile.ts, CR 607.2a; either name of a split card, rulings; checked again as it resolves, CR 603.4; with only
+  one of them left nothing happens, with both named like the spell one copy, rulings; it still copies after Helix leaves,
+  rulings; the copy cast as it resolves, free, timing ignored, additional costs paid, X 0, a copy not cast ceasing to
+  exist, CR 707.12, 118.9, 704.5e; castLinkedCopy `other`). Abstract Performance's "Exile the top four cards of your
+  library in a face-down pile, then exile the top four cards of your library in a face-up pile. An opponent chooses one of
+  those piles. Put that pile into your graveyard. Look at the cards in the other pile. You may cast a spell from among
+  them without paying its mana cost. Put the rest into your hand." (nobody may look at the face-down pile, rulings, CR
+  406.3; fewer cards make the face-up pile smaller or empty, rulings; an opponent you choose as it resolves picks the pile
+  for your graveyard, seeing only the face-down one's size, rulings; you look at the other and may cast one spell from it
+  as it resolves, free, timing ignored, CR 608.2g, 118.9; the rest go into your hand; effects/run-laneb270.ts
+  abstractPiles, then castFromAmong `fromDug`). Bots bin the pile worth more for the caster, guessing at the face-down one
+  by its size (pileMode "faceDownYard"). Browser tests click through Doom Blade exiling Ana's Hill Giant with an ice
+  counter and casting it from her exile with snow Islands, Helix's free copy of Divination when you cast Lava Axe,
+  casting Abstract Performance (choosing Ana, then casting Grizzly Bears from the pile she leaves you) and putting Ana's
+  face-down pile into her graveyard for her Abstract Performance. +3, 31,770 of 31,936 on this branch (B269's, stacked on
+  B268 and B267). The compiled text of every other card is unchanged.
+- Out after round B270 (looked at, not done): the lists after round B269 stay out. Judgment calls and known gaps: snow mana
+  goes to a colored symbol under Draugr's permission only when no mana of the symbol's own color is left for it; bots cast
+  Spellweaver Helix's copy whenever it can be cast, choosing its targets as for any free spell. Ian Malcolm, Chaotician, Araumi of the Dead Tide, Haldan, Avid Arcanist, Cass, Hand of Vengeance and Bruna, Light
+  of Alabaster are next in line (not looked at yet).
 - Round B269 (least played first, from the cards round B268 named next in line; Dack Fayden, Helping Hand went to Lane A's
   round 424, and none of these is in Lane A's rounds 423-424): Prowl, Stoic Strategist's "Whenever a player plays a card
   exiled with ~, you draw a card and convert ~." (any player casting a spell or playing a land from among the cards its
@@ -11456,8 +11487,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   take Lucy MacLean's copy for themselves whenever they're the target and give one to an opponent unless the token is a
   creature with power 3 or more, aiming the trigger with the usual target choice; bots use Apple of Eden like any other
   activated ability, without weighing the 4 life against what the opponent's hand holds. Ian Malcolm, Chaotician,
-  Spellweaver Helix, Araumi of the Dead Tide, Haldan, Avid Arcanist, Abstract Performance, Cass, Hand of Vengeance,
-  Draugr Necromancer and Bruna, Light of Alabaster are next in line (not looked at yet).
+  Spellweaver Helix (done in round B270), Araumi of the Dead Tide, Haldan, Avid Arcanist, Abstract Performance (done in
+  round B270), Cass, Hand of Vengeance, Draugr Necromancer (done in round B270) and Bruna, Light of Alabaster are next in
+  line (not looked at yet).
 - Round B268 (least played first, from the cards round B267 named next in line, none of them in Lane A's rounds 422-423):
   Selective Adaptation ("Reveal the top seven cards of your library. Choose from among them a card with flying, a card with
   first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample,

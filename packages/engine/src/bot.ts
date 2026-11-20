@@ -1986,9 +1986,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Fight or Flight, Stand or Fall: the creatures that may still attack (block), so our own pile worth more.
       const worth = pend.sacrificePile || pend.pileMode === "canAttack" || pend.pileMode === "canBlock" ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" || pend.pileMode === "exile" || pend.pileMode === "play" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
       // Atris: a face-down pile is guessed at by its size alone; Truth or Tale: a pile is worth its best card.
-      const [a, b] = pend.piles.map((pile, i) => (pend.pileMode === "faceDown" && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
+      // Abstract Performance (round B270): the face-down pile guessed at the same way, the chosen one going into `of`'s graveyard.
+      const [a, b] = pend.piles.map((pile, i) => ((pend.pileMode === "faceDown" || pend.pileMode === "faceDownYard") && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
       // Make an Example: another player's pile for them to sacrifice, so the one worth more.
-      const mine = pend.sacrificePile || pend.pileMode === "exile" ? pend.of !== pid : pend.of === pid;
+      const mine = pend.sacrificePile || pend.pileMode === "exile" || pend.pileMode === "faceDownYard" ? pend.of !== pid : pend.of === pid;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }
     // Mercurial Transformation: a 4/4 Octopus for our own permanent, a 1/1 Frog for anyone else's.

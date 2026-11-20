@@ -25,6 +25,7 @@ import { roundB266Line } from "./laneb266-lines";
 import { roundB267Line } from "./laneb267-lines";
 import { roundB268Line } from "./laneb268-lines";
 import { roundB269Line } from "./laneb269-lines";
+import { roundB270Line } from "./laneb270-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2426,6 +2427,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB268Line(line, out, isSpell)) continue;
     // Prowl, Stoic Strategist, Lucy MacLean, Positively Armed (round B269).
     if (roundB269Line(line, out, isSpell)) continue;
+    // Draugr Necromancer, Spellweaver Helix, Abstract Performance (round B270).
+    if (roundB270Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8043,7 +8046,15 @@ function linkExile(out: CompiledCard) {
   if (copies) {
     const entering = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     const imprints = entering.length ? entering : out.activated.flatMap((a) => allEffects(a.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
-    if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
+    // Spellweaver Helix (round B270): "copy the other" of the cards its one imprint ability exiled from a graveyard as it
+    // entered (CR 607.2a), its only exile instruction.
+    const helix = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy" && !!e.other));
+    const yardImprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until && e.what.ref === "target");
+    const anyExiles = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong", "search", "chooseFromGraveyard", "pick", "flicker"].includes(e.type));
+    if (helix) {
+      if (imprints.length || out.spell || yardImprints.length !== 1 || anyExiles.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
+      else yardImprints[0]!.linked = true;
+    } else if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
   // Agatha's Soul Cauldron: "creature cards exiled with ~" are the ones its one exile ability exiled (CR 607.2a).

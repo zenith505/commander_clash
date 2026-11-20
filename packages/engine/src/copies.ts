@@ -199,6 +199,26 @@ export function addCopyEffect(s: GameState, o: GameObject, key: string, until?: 
   invalidateCharacteristics(s);
 }
 
+/**
+ * Mirror of the Forebears (round 423): a permanent a resolving effect makes a copy of something else keeps the creature
+ * type chosen as it entered (CR 607.2a: its own linked ability chose it), but the copied abilities aren't linked to that
+ * choice, so they find no type chosen (CR 707.2, rulings: "You won't use the type chosen for Mirror of the Forebears"). Set
+ * aside until no copy effect is left (restoreChosenType).
+ */
+export function setChosenTypeAside(o: GameObject) {
+  if (o.chosen?.type === undefined || o.chosenTypeAside !== undefined) return;
+  o.chosenTypeAside = o.chosen.type;
+  const { type: _, ...rest } = o.chosen;
+  o.chosen = Object.keys(rest).length ? rest : undefined;
+}
+
+/** The type setChosenTypeAside set aside, back once `o` is no longer a copy of anything (its copy effects ended, CR 611.2a). */
+export function restoreChosenType(o: GameObject) {
+  if (o.chosenTypeAside === undefined || o.copyEffects?.length) return;
+  o.chosen = { ...o.chosen, type: o.chosenTypeAside };
+  o.chosenTypeAside = undefined;
+}
+
 /** End the copy effects `ends` says are over (their duration ran out). */
 export function endCopyEffects(s: GameState, ends: (e: CopyEffect) => boolean) {
   let changed = false;
@@ -207,6 +227,7 @@ export function endCopyEffects(s: GameState, ends: (e: CopyEffect) => boolean) {
     if (!o.copyEffects?.some(ends)) continue;
     const kept = o.copyEffects.filter((e) => !ends(e));
     o.copyEffects = kept.length ? kept : undefined;
+    restoreChosenType(o);
     changed = true;
   }
   if (changed) invalidateCharacteristics(s);

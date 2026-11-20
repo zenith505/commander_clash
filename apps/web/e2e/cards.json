@@ -11266,6 +11266,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3b21abb0-9a58-4e62-9650-4b04ce2bfb12",
+  "name": "Dack Fayden, Helping Hand",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "When Dack Fayden enters, reveal cards from the top of your library until you reveal X creature cards, where X is the number of opponents you have. Put those creature cards onto the battlefield, then shuffle. They're goaded for the rest of the game. For each of those permanents, choose a different opponent. Each opponent gains control of the permanent for which they were chosen.",
+  "power": "4",
+  "toughness": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "frc",
+  "releasedAt": "2026-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cdc4048a-73ec-4ec1-a179-2b36c397bf1a",
   "name": "Dakmor Salvage",
   "manaCost": "",
@@ -12472,6 +12505,34 @@
   "commanderLegal": "legal",
   "set": "lgn",
   "releasedAt": "2003-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b065ef1d-5cba-41f2-a4b4-a6ae479323d3",
+  "name": "Dermotaxi",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Imprint — As this Vehicle enters, exile a creature card from a graveyard.\nTap two untapped creatures you control: Until end of turn, this Vehicle becomes a copy of the exiled card, except it's a Vehicle artifact in addition to its other types.",
+  "power": "0",
+  "toughness": "0",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14654,6 +14715,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6e2c2423-d854-4478-99e6-64f29851f026",
+  "name": "Elvish Archdruid",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "Other Elf creatures you control get +1/+1.\n{T}: Add {G} for each Elf you control.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "ddu",
+  "releasedAt": "2018-04-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
   "name": "Elvish Mystic",
   "manaCost": "{G}",
@@ -14904,6 +14999,39 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/c/4/c470539a-9cc7-4175-8f7c-c982b6072b6d.jpg?1783929425"
    }
   ]
+ },
+ {
+  "oracleId": "b415684e-40f0-43c1-b8d5-1a90b75c5a47",
+  "name": "Emissary of Grudges",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Efreet",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Efreet"
+  ],
+  "oracleText": "Flying, haste\nAs this creature enters, secretly choose an opponent.\nReveal the player you chose: Choose new targets for target spell or ability if it's controlled by the chosen player and if it targets you or a permanent you control. Activate only once.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "99eb572b-85b1-4d78-aea8-4400a5b7e508",
@@ -20728,6 +20856,32 @@
   "commanderLegal": "legal",
   "set": "tsp",
   "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1ff62220-be95-4901-b8d8-812b9a1a1b0a",
+  "name": "Greed",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{B}, Pay 2 life: Draw a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-08-11",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -31094,6 +31248,28 @@
   "set": "m10",
   "releasedAt": "2009-07-17",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9eaeb54b-73a8-43cc-b4d8-ed8b5eb19646",
+  "name": "Mirror of the Forebears",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, choose a creature type.\n{1}: Until end of turn, this artifact becomes a copy of target creature you control of the chosen type, except it's an artifact in addition to its other types.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c17",
+  "releasedAt": "2017-08-25",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -46198,6 +46374,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e3ff6134-10dd-4565-afcb-0f41a2933d19",
+  "name": "Swindler's Scheme",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever an opponent casts a spell from their hand, you may reveal the top card of your library. If it shares a card type with that spell, counter that spell and that opponent may cast the revealed card without paying its mana cost.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "35f63c60-b0a1-459d-bf51-a8549fb06930",
   "name": "Sword of Kaldra",
   "manaCost": "{4}",
@@ -51732,6 +51934,44 @@
   "set": "kld",
   "releasedAt": "2016-09-30",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "04853f06-3fd2-445d-9b0d-d68d0f116635",
+  "name": "Verrak, Warped Sengir",
+  "manaCost": "{1}{W}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Vampire",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire"
+  ],
+  "oracleText": "Flying, deathtouch, lifelink\nWhenever you activate an ability that isn't a mana ability, if life was paid to activate it, you may pay that much life again. If you do, copy that ability. You may choose new targets for the copy.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Deathtouch",
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmc",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

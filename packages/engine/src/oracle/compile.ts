@@ -173,6 +173,8 @@ import { round419Line } from "./round419";
 import { round420Line } from "./round420";
 import { round421Line } from "./round421";
 import { round422Line } from "./round422";
+import { round423Line } from "./round423";
+import { round424Line } from "./round424";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1057,6 +1059,10 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Swindler's Scheme, Dack Fayden, Helping Hand (round 424): oracle/round424.ts.
+    if (round424Line(line, raw, out, isSpell)) continue;
+    // Verrak, Warped Sengir (round 423): oracle/round423.ts.
+    if (round423Line(line, raw, out, isSpell)) continue;
     // Possibility Storm, Knowledge Pool and Ashnod the Uncaring (round 422): oracle/round422.ts.
     if (round422Line(line, raw, out, isSpell)) continue;
     // Lady Loki, Agent of Chaos (round 421): oracle/round421.ts.
@@ -7765,13 +7771,13 @@ export function compile(d: CardDef): CompiledCard {
   nestedNotNamed([out.triggers, out.activated, out.spell]);
   // "Target ... of the chosen type": the creature type chosen as this permanent entered (CR 614.12), bound on its
   // abilities (cards.ts abilitiesOf). Not on a spell, nor with a choice made while it resolves (after its targets).
-  // Mirror of the Forebears: a copy of a creature whose own abilities read "the chosen type" has no type chosen for them
-  // (rulings), but the type chosen for the Mirror stays on the permanent, so it isn't done.
+  // Mirror of the Forebears (round 423): while it's a copy, its chosen type is set aside (copies.ts setChosenTypeAside), so
+  // a copied creature's abilities that read "the chosen type" find none (rulings); its own ability's target was bound to
+  // the type as it was activated (cards.ts withChosenType).
   const chosenTarget = (b: AbilityBody) => [...b.targets, ...(b.modal?.modes.flatMap((m) => m.targets) ?? [])].some((t) => t.chosen === "type");
   const choosesType = out.entersChoose?.some((c) => c.what === "creatureType");
   for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
     if (chosenTarget(b) && !(b === out.spell && out.castChooseType && !allEffects(b.effects).some((e) => e.type === "choose")) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
-    else if (chosenTarget(b) && allEffects(b.effects).some((e) => e.type === "becomeCopy")) out.unsupported.push(`${b.text} (a copy keeping the type chosen for its source)`);
   // Belbe's Portal: "put a creature card of the chosen type from your hand": the type chosen as this permanent entered,
   // so only with that choice, and not on a spell.
   for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
@@ -8323,9 +8329,11 @@ function linkExile(out: CompiledCard) {
     const imprintOnly = !exiles.length && imprints.length === 1 && !imprints[0]!.until && out.triggers.some((t) => t.event === "selfEnters" && allEffects(t.body.effects).includes(imprints[0]!)) && !all.some((e) => e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
     // The Aesir Escape Valhalla: its chapter I's exile from the graveyard, already linked (round345Chapter), its only exile.
     const yardLinked = !exiles.length && !others && !out.spell && aesirLinked(out);
+    // Dermotaxi (round 423): its "As ~ enters, exile ... from a graveyard" (linked as it enters, enters-yard.ts), its only exile.
+    const yardEnters = !exiles.length && !imprints.length && yardEntersLinkOnly(out, bodies);
     if (imprintOnly && !out.spell) imprints[0]!.linked = true;
-    else if (yardLinked) {
-      // Linked as its chapters were read.
+    else if (yardLinked || yardEnters) {
+      // Linked as its chapters were read, or as it entered.
     } else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }

@@ -142,7 +142,7 @@ describe("Round 430: Nephalia Academy", () => {
       s = act(s, { type: "handToTop", player: opp, objectIds: top ? [held[0]!] : [] });
       if (top) {
         expect(s.players[opp]!.library[0]).toBe(held[0]);
-        expect(s.triggerQueue.some((t) => t.body.text.startsWith("Madness"))).toBe(false);
+        expect(s.triggerQueue.some((t) => t.body?.text.startsWith("Madness"))).toBe(false);
       } else expect(zone(s, held[0]!)).toBe("exile");
     }
   });

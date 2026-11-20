@@ -1,7 +1,7 @@
 # Roadmap
 
-31,798 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,945 of
+31,800 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4419,6 +4419,32 @@ line blocks.
    ability the copy has that would trigger on the Aura's own entering doesn't; bots aim it at an opponent's creature and
    choose the least creature to copy; a card another permission could also play is played with that one, leaving
    Evelyn's play for the turn unused.
+   Round 430 went on down the "Out after round N" lists and `npm run popular`, most played first, to a discard replaced
+   when an opponent causes it and a trigger on a fortified land's mana. Nephalia Academy's "If a spell or ability an
+   opponent controls causes you to discard a card, you may reveal that card and put it on top of your library instead of
+   putting it anywhere else." (CR 614.1a: each card on its own, in the order chosen, the first ending on top, as for
+   Library of Leng; over madness's exile or Obstinate Baloth's, CR 616.1; still discarded, so discard triggers see it; a
+   discard chosen because of the opponent's spell or ability counts, rulings: "unless that player discards a card" and
+   ward's "Discard a card" too, which Leng's doesn't cover). Every path where another player's spell or ability makes you
+   discard asks it (run-library.ts academyName, toTopName, discardToTop with `cost`): discard and random discard effects,
+   Duress-like picks, connive, votes, punishers, "unless" and ward costs, Words of Waste, Chains of Mephistopheles (asked
+   before its discard, PendingDecision handToTop `chains`; Library of Leng now covers Chains' discard too, an effect,
+   its rulings), Nebuchadnezzar and Minamo's Meddling. C.A.M.P.'s "Whenever fortified land is tapped for mana, put a
+   +1/+1 counter on target creature you control. If that creature shares a color with the mana that land produced,
+   create a Junk token." (the land it's attached to, CR 301.6, tapped for mana by anyone, CR 106.12; a trigger that
+   targets uses the stack, CR 605.1b; the land's own mana as replacement effects made it, not mana another ability adds
+   for its tapping, its colors against the creature's as it resolves, one of several enough, rulings; the tappedForMana
+   event's `made`, TriggerEventInfo.manaMade, Condition targetSharesColorWithManaMade). Browser tests click through the
+   Academy's question for an opponent's Chains (twice, the second prompt starting with nothing picked) and C.A.M.P.'s
+   trigger. +2, 31,800 of 31,936 on this stacked branch (round 429 #707); the compiled text of every other card is
+   unchanged.
+   Out after round 430 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability, only one per ability is modeled), Battlefield Thaumaturge (still out, as after round 386), the cards rounds
+   425-429 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for
+   the reasons in their earlier lists). Known gaps: bots put back on top with the Academy what they would with Library
+   of Leng (spells, and lands while short of them); C.A.M.P.'s bot picks the creature for the counter without looking
+   at the mana's color; C.A.M.P. sees no color for mana whose color another player chooses (Spectral Searchlight's
+   kind, which no land has).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

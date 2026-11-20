@@ -4302,7 +4302,7 @@ line blocks.
    player, exile up to one target creature that player controls." (you choose every target, rulings; each other player
    an opponent in a free-for-all game, CR 102.3; TargetSpec perOpponent after the first target). Browser tests click
    through Redemptor Dreadnought's offered exile of Serra Angel, its attack as an 8/8, and Kaya's −2 on your Serra Angel
-   and Ana's Hill Giant with your token becoming a Serra Angel. +2, 31,765 of 31,936 on this stacked branch; the compiled
+   and Ana's Hill Giant with your token becoming a Serra Angel. +2, 31,769 of 31,936 on this stacked branch with main 4d75ae2 (B267) merged in; the compiled
    text of every other card is unchanged.
    Out after round 425 (looked at, not done): Ulalek, Fused Atrocity (copies of all spells and then of all other
    abilities you control put on the stack at once: their order is their controller's choice, CR 405.3, and nothing lets a

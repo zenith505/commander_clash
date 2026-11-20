@@ -76,7 +76,7 @@ export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paus
   if (e.type !== "becomeCopy") return;
   const base = copiedValues(s, e.of, ctx);
   if (!base) return;
-  if (e.duration === "whileTargetTapped" || e.duration === "whileSourceAttached") return becomeCopyWhile(s, e, base, ctx);
+  if (e.duration === "whileTargetTapped" || e.duration === "whileSourceAttached" || e.duration === "untilSourceLeaves") return becomeCopyWhile(s, e, base, ctx);
   // Niko, Light of Hope (round 426): "until the next end step" (CopyEffect.until nextEndStep, game.ts endNextEndStepCopies).
   const until = e.duration === "endOfTurn" ? "endOfTurn" : e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "nextEndStep" ? { nextEndStep: { turn: s.turn, endSteps: s.step === "end" ? (s.turnLog?.endSteps ?? 1) : 0 } } : undefined;
   const changing = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield");
@@ -103,14 +103,16 @@ export function becomeCopyWhile(s: GameState, e: Extract<Effect, { type: "become
     const w: CopyWhile =
       tracked
         ? { whileTapped: { id: tracked.id, zc: tracked.zoneChanges ?? 0, untaps: tracked.untaps ?? 0 } }
-        : { whileAttached: { id: ctx.sourceId ?? "", zc: ctx.sourceZc ?? 0, host: o.id, hostZc: o.zoneChanges ?? 0 } };
+        : e.duration === "untilSourceLeaves"
+          ? { untilLeaves: { id: ctx.sourceId ?? "", zc: ctx.sourceZc ?? 0 } }
+          : { whileAttached: { id: ctx.sourceId ?? "", zc: ctx.sourceZc ?? 0, host: o.id, hostZc: o.zoneChanges ?? 0 } };
     const was = defOf(s, o).name;
     if ((e.duration === "whileTargetTapped" && !tracked) || !copyWhileHolds(s, w)) {
-      log(s, `${was} doesn't become a copy of ${base.name}: ${e.duration === "whileTargetTapped" ? "that creature isn't tapped" : `${ctx.sourceDef.name} isn't attached to it`}.`);
+      log(s, `${was} doesn't become a copy of ${base.name}: ${e.duration === "whileTargetTapped" ? "that creature isn't tapped" : e.duration === "untilSourceLeaves" ? `${ctx.sourceDef.name} has left the battlefield` : `${ctx.sourceDef.name} isn't attached to it`}.`);
       return;
     }
     setChosenTypeAside(o);
     addCopyEffect(s, o, keys[i]!, w);
-    log(s, `${was} becomes a copy of ${base.name} for as long as ${e.duration === "whileTargetTapped" ? `${defOf(s, tracked!).name} remains tapped` : `${ctx.sourceDef.name} remains attached to it`}.`);
+    log(s, `${was} becomes a copy of ${base.name} ${e.duration === "untilSourceLeaves" ? `until ${ctx.sourceDef.name} leaves the battlefield` : `for as long as ${e.duration === "whileTargetTapped" ? `${defOf(s, tracked!).name} remains tapped` : `${ctx.sourceDef.name} remains attached to it`}`}.`);
   });
 }

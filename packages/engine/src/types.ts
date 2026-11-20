@@ -966,7 +966,7 @@ export interface CopyEffect {
  * (Zygon Infiltrator); `whileAttached`, while the Aura or Equipment `id` stays attached to `host`, each the same object
  * on the battlefield (Blade of Shared Souls, Assimilation Aegis). A phased-out permanent can't be seen (CR 702.26f).
  */
-export type CopyWhile = { whileTapped: { id: ObjectId; zc: number; untaps: number } } | { whileAttached: { id: ObjectId; zc: number; host: ObjectId; hostZc: number } };
+export type CopyWhile = { whileTapped: { id: ObjectId; zc: number; untaps: number } } | { whileAttached: { id: ObjectId; zc: number; host: ObjectId; hostZc: number } } | /** Secret Invasion (round B276): until the permanent `id` (as the object `zc`) leaves the battlefield; phasing out isn't leaving (CR 702.26d). */ { untilLeaves: { id: ObjectId; zc: number } };
 
 /**
  * What a mana's source was as it made the mana (CR 106.3): snow mana pays {S} (107.4h); "mana from a Treasure", "mana
@@ -2288,7 +2288,12 @@ export interface TurnLog {
    * controlled dealt damage to it this turn").
    */
   /** `amount`: how much (Burning-Eye Zubera: "if 4 or more damage was dealt to it this turn"). */
-  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[]; amount?: number; /** The source's name as it dealt the damage (Blazing Effigy). */ name?: string; /** The permanent that dealt it, "id@zoneChanges" (Brine Hag). */ src?: string }[]>;
+  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[]; amount?: number; /** The source's name as it dealt the damage (Blazing Effigy). */ name?: string; /** The permanent that dealt it, "id@zoneChanges" (Brine Hag). */ src?: string; /** Runesword (round B276): a permanent that had left the battlefield as its ability dealt the damage, as the object it last was there ("id@zoneChanges", CR 608.2h), when that isn't `src`. */ srcWas?: string }[]>;
+  /**
+   * Runesword (Effect runeswordMark, round B276): the creatures ("id@zoneChanges", CR 400.7) whose damage this turn marks the
+   * creatures dealt it: they can't be regenerated this turn, and they're exiled instead if they would die this turn.
+   */
+  runesword?: string[];
   /** How many times each permanent (by "id@zoneChanges") was dealt damage this turn, one for each damage event (Hercules, Olympian Hero's "for the first time each turn"). */
   timesDealtDamage?: Record<string, number>;
   /**

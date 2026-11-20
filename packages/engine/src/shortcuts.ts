@@ -459,6 +459,8 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     creatureCounterPutters: t.creatureCounterPutters,
     damagedCreature: t.damagedCreature && [...t.damagedCreature].sort(),
     combatDamagedCreature: t.combatDamagedCreature && [...t.combatDamagedCreature].sort(),
+    // Runesword (round B276): the creatures whose damage marks what they damage this turn.
+    runesword: t.runesword && [...new Set(t.runesword)].sort(),
   };
 }
 

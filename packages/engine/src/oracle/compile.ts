@@ -31,6 +31,7 @@ import { roundB272Line } from "./laneb272-lines";
 import { roundB273Line } from "./laneb273-lines";
 import { roundB274Line } from "./laneb274-lines";
 import { roundB275Line } from "./laneb275-lines";
+import { roundB276Line } from "./laneb276-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2456,6 +2457,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB274Line(line, out, isSpell)) continue;
     // Tawnos's Coffin, Takklemaggot (round B275).
     if (roundB275Line(line, out, isSpell)) continue;
+    // Secret Invasion, Runesword (round B276).
+    if (roundB276Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

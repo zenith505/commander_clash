@@ -120,6 +120,7 @@ import { runLaneB267Effect } from "./run-laneb267";
 import { runLaneB270Effect } from "./run-laneb270";
 import { runLaneB272Effect } from "./run-laneb272";
 import { runLaneB273Effect } from "./run-laneb273";
+import { runLaneB274Effect } from "./run-laneb274";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -2199,6 +2200,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB272Effect(s, e, ctx, src);
     case "copyEnchantedCard":
       return runLaneB273Effect(s, e, ctx, src);
+    case "dimensionalBreach":
+    case "breachReturn":
+      return runLaneB274Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

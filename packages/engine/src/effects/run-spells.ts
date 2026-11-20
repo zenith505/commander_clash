@@ -288,6 +288,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         for (const t of s.resolving?.attachedThisWay ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
         return;
       }
+      // Next of Kin (round B274): "If you do, return ~ to the battlefield attached to that creature at the beginning of the next
+      // end step": about the creature put this way, as the object it became (CR 400.7), and the Aura's card in the graveyard
+      // it went to, as Gift of Immortality's; nothing is set up if no creature was put.
+      if (e.each === "createdWithAura") {
+        const aura = objects(s, { ref: "selfCard", moved: true }, ctx)[0];
+        if (!aura) return;
+        for (const t of s.resolving?.created ?? [])
+          if (s.objects[t]?.zone === "battlefield") {
+            addDelayed(s, e.when, ctx.controller, s.objects[t]!, body, cardIdOf(aura));
+            s.delayed![s.delayed!.length - 1]!.source = { id: aura.id, zc: aura.zoneChanges ?? 0 };
+          }
+        return;
+      }
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? [])
           if (s.objects[t]?.zone === "battlefield") {

@@ -98,7 +98,8 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     return opps.length ? (n(pid) - opps.reduce((m, p) => m + n(p), 0) / opps.length) * 2 : 0;
   }
   // Thieves' Auction, Warp World: everything is shared out again, so only when we're behind the opponents on average.
-  if (body.effects.some((e) => e.type === "thievesAuction" || e.type === "warpWorld")) {
+  // Dimensional Breach (round B274): everyone's permanents are exiled and come back one a turn (tokens never), so the same.
+  if (body.effects.some((e) => e.type === "thievesAuction" || e.type === "warpWorld" || e.type === "dimensionalBreach")) {
     const sum = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);
     const opps = livingPlayers(s).filter((p) => p !== pid);
     return opps.length ? opps.reduce((n, p) => n + sum(p), 0) / opps.length - sum(pid) : 0;

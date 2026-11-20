@@ -347,6 +347,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const cheaper = !!c && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).types.some((ty) => c.types.includes(ty)) && (obj(s, id).isToken ? 0 : characteristics(s, obj(s, id)).manaValue) < c.manaValue);
       return [{ type: "chooseMay", player: pid, yes: cheaper }];
     }
+    // Lucy MacLean, Positively Armed (round B269): a copy of the token for ourselves is free; for an opponent it's worth
+    // the card drawn only if the token isn't a creature with power 3 or more (as it is now, or last was).
+    if (pend.kind === "chooseMay" && theirMay?.type === "may" && theirMay.effects[0]?.type === "createTokenCopy" && theirMay.effects.some((x) => x.type === "if" && x.cond.kind === "createdByOpponent")) {
+      const t = s.resolving!.item.targets?.[0];
+      const to = t?.kind === "player" ? t.id : undefined;
+      const sub = s.resolving!.item.subject;
+      const tok = sub ? s.objects[sub.id] : undefined;
+      const here = tok?.zone === "battlefield" && (tok.zoneChanges ?? 0) === sub!.zc;
+      const big = here ? objIsType(s, tok!, "Creature") && power(s, tok!) >= 3 : (s.lastKnown?.[sub?.id ?? ""]?.power ?? 0) >= 3;
+      return [{ type: "chooseMay", player: pid, yes: to === pid || !big }];
+    }
     if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
       const asked = s.resolving!.scratch?.mayExile?.queue[0];
       const o = asked ? s.objects[asked.id] : undefined;
@@ -1799,6 +1810,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "Search your library and/or graveyard": both, for the most to choose from.
     if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];
     if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Selective Adaptation (round B268): the chosen card worth most on the battlefield (the greatest mana value, the cheap
+    // ones are just as good in hand), a land only if there's nothing else.
+    if (pend.kind === "chooseOption" && pend.what === "oneOnto") {
+      const worth = (id: string) => (isType(defOf(s, obj(s, id)), "Land") ? -1 : mv(s, id));
+      return [{ type: "chooseOption", player: pid, choice: pend.options.reduce((a, b) => (worth(b) > worth(a) ? b : a)) }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "reselectAttack") {
       const o = pend.about ? s.objects[pend.about] : undefined;
       return [{ type: "chooseOption", player: pid, choice: (o && reselectPick(s, pid, o)) ?? (pend.options.includes("keep") ? "keep" : pend.options[0]!) }];
@@ -1971,14 +1988,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
       // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
-      // Boneyard Parley: creature cards to put onto the battlefield, worth their mana value.
+      // Boneyard Parley: creature cards to put onto the battlefield, worth their mana value; Brilliant Ultimatum's free casts too.
       // Death or Glory: the pile exiled, the other returning to the battlefield, so an opponent's bigger pile.
       // Fight or Flight, Stand or Fall: the creatures that may still attack (block), so our own pile worth more.
-      const worth = pend.sacrificePile || pend.pileMode === "canAttack" || pend.pileMode === "canBlock" ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" || pend.pileMode === "exile" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
+      const worth = pend.sacrificePile || pend.pileMode === "canAttack" || pend.pileMode === "canBlock" ? (id: string) => permanentWorth(s, pid, id) : pend.pileMode === "battlefield" || pend.pileMode === "exile" || pend.pileMode === "play" ? (id: string) => 1 + mv(s, id) : (id: string) => handWorth(s, id);
       // Atris: a face-down pile is guessed at by its size alone; Truth or Tale: a pile is worth its best card.
-      const [a, b] = pend.piles.map((pile, i) => (pend.pileMode === "faceDown" && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
+      // Abstract Performance (round B270): the face-down pile guessed at the same way, the chosen one going into `of`'s graveyard.
+      const [a, b] = pend.piles.map((pile, i) => ((pend.pileMode === "faceDown" || pend.pileMode === "faceDownYard") && i === 0 ? pile.length * 2 : pend.pileMode === "pickOne" ? Math.max(0, ...pile.map(worth)) : pile.reduce((n, id) => n + worth(id), 0)));
       // Make an Example: another player's pile for them to sacrifice, so the one worth more.
-      const mine = pend.sacrificePile || pend.pileMode === "exile" ? pend.of !== pid : pend.of === pid;
+      const mine = pend.sacrificePile || pend.pileMode === "exile" || pend.pileMode === "faceDownYard" ? pend.of !== pid : pend.of === pid;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }
     // Mercurial Transformation: a 4/4 Octopus for our own permanent, a 1/1 Frog for anyone else's.

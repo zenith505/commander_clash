@@ -213,6 +213,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3e0e3676-e634-4e64-bdfd-4aaa5885461f",
+  "name": "Abstract Performance",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile the top four cards of your library in a face-down pile, then exile the top four cards of your library in a face-up pile. An opponent chooses one of those piles. Put that pile into your graveyard. Look at the cards in the other pile. You may cast a spell from among them without paying its mana cost. Put the rest into your hand.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "61a23402-3244-4b5e-9134-98e1f82eda65",
   "name": "Abstruse Appropriation",
   "manaCost": "{2}{W}{B}",
@@ -1959,6 +1985,30 @@
   "commanderLegal": "legal",
   "set": "neo",
   "releasedAt": "2022-02-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7849426d-895d-4dfe-a94d-b8df634618a5",
+  "name": "Apple of Eden, Isu Relic",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Pay 4 life, Sacrifice Apple of Eden: Look at target opponent's hand and exile those cards face down. You may play those cards this turn, and mana of any type can be spent to cast them. Until end of turn, whenever you play a land or cast a spell this way, its owner draws a card. At the beginning of the next end step, return the exiled cards to their owner's hand. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -6756,6 +6806,36 @@
   "set": "cmm",
   "releasedAt": "2023-08-04",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a9d58cad-c1c2-4bd2-80f2-da9ce60801df",
+  "name": "Brilliant Ultimatum",
+  "manaCost": "{W}{W}{U}{U}{U}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile the top five cards of your library. An opponent separates those cards into two piles. You may play lands and cast spells from one of those piles. If you cast a spell this way, you cast it without paying its mana cost.",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13703,6 +13783,39 @@
   "commanderLegal": "legal",
   "set": "tsp",
   "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ccdf3399-b836-47ab-802d-af5a9c24d759",
+  "name": "Draugr Necromancer",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Snow Creature — Zombie Cleric",
+  "supertypes": [
+   "Snow"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Cleric"
+  ],
+  "oracleText": "If a nontoken creature an opponent controls would die, exile that card with an ice counter on it instead.\nYou may cast spells from among cards in exile your opponents own with ice counters on them, and you may spend mana from snow sources as though it were mana of any color to cast those spells.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -29341,6 +29454,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1196a4cb-544c-4e7b-91cd-f0820b21a80d",
+  "name": "Lucy MacLean, Positively Armed",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Survivor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Survivor"
+  ],
+  "oracleText": "Golden Rule — Whenever a token enters, you may have target player other than its controller create a token that's a copy of it, then you draw a card if an opponent created a token this way. Do this only once each turn.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Golden Rule"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-01-26",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1ca97394-4e8c-4698-bea1-554f9b10927b",
   "name": "Lukka, Coppercoat Outcast",
   "manaCost": "{3}{R}{R}",
@@ -37395,6 +37543,93 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8dfd9baf-c3cc-4d2f-a0b0-b323b6480562",
+  "name": "Prowl, Stoic Strategist // Prowl, Pursuit Vehicle",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {2}{W} (You may cast this card converted for {2}{W}.)\nWhenever Prowl attacks, exile up to one other target tapped creature or Vehicle. For as long as that card remains exiled, its owner may play it.\nWhenever a player plays a card exiled with Prowl, you draw a card and convert Prowl.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Living metal",
+   "Convert",
+   "More Than Meets the Eye"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Prowl, Stoic Strategist",
+    "manaCost": "{3}{W}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {2}{W} (You may cast this card converted for {2}{W}.)\nWhenever Prowl attacks, exile up to one other target tapped creature or Vehicle. For as long as that card remains exiled, its owner may play it.\nWhenever a player plays a card exiled with Prowl, you draw a card and convert Prowl.",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/f/0/f0a3dc50-a5c4-4073-8fec-2f68544bc2a1.jpg?1783919909",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/f/0/f0a3dc50-a5c4-4073-8fec-2f68544bc2a1.jpg?1783919909"
+   },
+   {
+    "name": "Prowl, Pursuit Vehicle",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nWhenever another creature or Vehicle you control enters, put a +1/+1 counter on Prowl. If this is the second time this ability has resolved this turn, convert Prowl.",
+    "power": "2",
+    "toughness": "3",
+    "colors": [
+     "W"
+    ],
+    "colorIndicator": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/f/0/f0a3dc50-a5c4-4073-8fec-2f68544bc2a1.jpg?1783919909",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/f/0/f0a3dc50-a5c4-4073-8fec-2f68544bc2a1.jpg?1783919909"
+   }
+  ]
+ },
+ {
   "oracleId": "e5128230-3535-4f77-8b97-20d0791e7b1d",
   "name": "Psychic Surgery",
   "manaCost": "{1}{U}",
@@ -41630,6 +41865,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b68df6d7-d69e-446f-9b1b-7a6ca56efbec",
+  "name": "Selective Adaptation",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top seven cards of your library. Choose from among them a card with flying, a card with first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample, and vigilance. Put one of the chosen cards onto the battlefield, the other chosen cards into your hand, and the rest into your graveyard.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9f95027a-5f04-48b4-99a0-8913be3a520a",
   "name": "Selective Obliteration",
   "manaCost": "{3}{C}{C}",
@@ -44483,6 +44744,30 @@
   "commanderLegal": "legal",
   "set": "m13",
   "releasedAt": "2012-07-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9aa8eef1-fc67-4d54-9783-4d0175a76741",
+  "name": "Spellweaver Helix",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — When this artifact enters, you may exile two target sorcery cards from a single graveyard.\nWhenever a player casts a card, if it has the same name as one of the cards exiled with this artifact, you may copy the other. If you do, you may cast the copy without paying its mana cost.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

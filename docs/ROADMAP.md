@@ -1,6 +1,6 @@
 # Roadmap
 
-31,761 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,778 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
@@ -285,7 +285,7 @@ line blocks.
    taking the easy ones.
    Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (both done in round 312) (returning as another type), Spellweaver
    Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden (done in round 314), The Nipton Lottery, Emergent
-   Sequence, The Seventh Doctor, Lucy MacLean, Treacherous Greed ("a creature that dealt damage this
+   Sequence, The Seventh Doctor, Lucy MacLean (done in round B269), Treacherous Greed ("a creature that dealt damage this
    turn"), Foggy Swamp Visions, Gate to the Afterlife (done in round B71), Galloping
    Lizrog, Dimir Machinations (done in round B108) (exiling some of target player's top cards), Read the Runes (done in round 320), Liege of the Tangle (done in round 358), Sunder
    the Gateway (transform an Incubator you control), Myriad Construct (done in round 320), Zaffai, Thunder Conductor (an opponent chosen at
@@ -322,7 +322,7 @@ line blocks.
    Pyromancer Ascension (done in round 367), Verdant Mastery (done in round 390), Primal Adversary, Planar Void (done in round 299), In Too Deep, Dollhouse of Horrors, Harald
    Unites the Elves (done in round 326), Exquisite Archangel (done in round 329), Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld (done in round 374), Seal of the Guildpact (done in round 299), Fear of Infinity (done in round 371), Elderscale Wurm (done in round 324), Cradle of
-   Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
+   Vitality, Helm of Kaldra, Brilliant Ultimatum (done in round B268), Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order (done in round 324),
    Scheming Fence (done in round 402), Oath of Lieges (done in round B143), Helm of Obedience (done in round 373), Concerted Effort, Belbe's Portal (done in round 324), Edgewall Innkeeper, Simic
    Manipulator, Endless Whispers, Burn from Within (done in round 325), Skyfire Phoenix (done in round 276), Contagion (done in round 325), Gutter Grime, Coffin Queen, Genesis
    Storm, Grim Return (done in round 326), Infernal Offering (done in round B204), Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom (done in round B210), Soul-Scar Mage,
@@ -2345,7 +2345,7 @@ line blocks.
    named Fenric" (The Curse of Fenric); "exile target spell" linked to "Your opponents can't cast spells with the same name
    as the exiled card" and the return when it leaves (Ashiok's Erasure); "each player exiles X permanents they control
    and/or cards from their hand", you first (Descent into Madness, with a browser test of the pick). +10, 30,170 of 31,936 with B123.
-   Out after round 293 (looked at, not done): Spellweaver Helix (copying the other imprinted card when a card with one's
+   Out after round 293 (looked at, not done): Spellweaver Helix (done in round B270) (copying the other imprinted card when a card with one's
    name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
    activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (done in round B263) (a redirection chosen for each
@@ -4010,7 +4010,7 @@ line blocks.
    Lane B through B258, merged in). The compiled text of every other card is unchanged.
    Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
    the cost picks the Equipment whose mana value it divides, no ruling); Kefnet, Taskmaster, Niko, Mirror of the
-   Forebears, Wayta, Draugr Necromancer, Apple of Eden, Missy and the rest of `npm run popular` above rank 15,000 (still
+   Forebears, Wayta, Draugr Necromancer (done in round B270), Apple of Eden (done in round B269), Missy and the rest of `npm run popular` above rank 15,000 (still
    out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
    it face up; a bot voting with Elrond counts only creatures, not what the new controller can do with them.
    Round 415 went on down `npm run popular`, most played first, past cards left out before to five cards that copy a
@@ -5630,8 +5630,8 @@ line blocks.
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
-   Prowl, Stoic Strategist and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
-   (cards from outside the game); Lucy MacLean, Positively Armed; Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
+   Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
+   (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
@@ -5642,7 +5642,7 @@ line blocks.
    tokens for the amount); Volo, Itinerant Scholar and Long List of the Ents (noted creature types); Mavinda, Students'
    Advocate (a cost increase for a spell that doesn't target your creature); Eye of Duskmantle (cards surveilled this
    turn); Bruna, Light of Alabaster and Cass, Hand of Vengeance (Auras from several zones attached as it attacks or dies);
-   Draugr Necromancer (cards with ice counters, snow mana as any color); Apple of Eden, Isu Relic; Radiant Performer,
+   Draugr Necromancer (done in round B270) (cards with ice counters, snow mana as any color); Apple of Eden, Isu Relic (done in round B269); Radiant Performer,
    Agrus Kos, Eternal Soldier, Radiate, Exterminator Magmarch, Zevlor, Feather and Leori (a copy for each other legal
    target); Gandalf, Westward Voyager (a copy if a revealed card shares a card type); Lagrella, the Magpie (done in round B246) (any number of
    targets controlled by different players, counters when they return under your control); Metamorphic Alteration (an
@@ -5715,7 +5715,7 @@ line blocks.
    resolves); Oath of Druids (done in round B143) (a target chosen by the upkeep player among opponents with more creatures, then reveal until
    a creature); Fraying Line (done in round B199) (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
    piles of permanents and one chosen at random); Glimpse of Tomorrow (done in round 390) (non-Aura permanents first, then Auras attached as
-   they enter); Abstract Performance (a face-down pile exiled from the library, then a free cast from the other pile);
+   they enter); Abstract Performance (done in round B270) (a face-down pile exiled from the library, then a free cast from the other pile);
    Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (done in round B237) (a draw replacement that depends on which
    draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (done in round 298) (each next flip's stakes double and the winner or loser
@@ -6591,7 +6591,7 @@ line blocks.
    - Face-down exile you may play works (Three Wishes, Outrageous Robbery, Intet, Gonti, Rev and 3 more); "mana of any
      type" doesn't cover Phyrexian symbols' life option (they still need their color or 2 life). Three Wishes' upkeep
      cleanup is one delayed trigger per card. Still out: Klaw ("whenever you play a card from exile"),
-     Blightwing Bandit, Edward Kenway, Apple of Eden, Predators' Hour, Bloodsoaked Insight.
+     Blightwing Bandit, Edward Kenway, Apple of Eden (done in round B269), Predators' Hour, Bloodsoaked Insight.
    - Main phase triggers work for "your first / precombat main phase", "each player's first main phase", "each of your
      postcombat main phases", "your second main phase" and "each of your main phases" (505.1), with mana for other
      players (Belbe, Eladamri's Vineyard, Blinkmoth Urn) and restricted mana (Abstract Paintmage); still out: Carpet of
@@ -11508,6 +11508,106 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B270 (least played first, from the cards round B269 named next in line, none of them in Lane A's rounds 424-425):
+  Draugr Necromancer's "If a nontoken creature an opponent controls would die, exile that card with an ice counter on it
+  instead." (a replacement, CR 614.1a, as Ravenloft Adventurer's; a land that's become a creature too, rulings) and "You
+  may cast spells from among cards in exile your opponents own with ice counters on them, and you may spend mana from snow
+  sources as though it were mana of any color to cast those spells." (any face-up such card, whatever exiled it, an
+  earlier Draugr's too, rulings; spells only, not lands, and not a card you own, rulings; the usual timing and costs,
+  rulings; mana from a snow source of any type pays a colored, hybrid, {2/W}-style or Phyrexian symbol as though it were that
+  color, CR 609.4b, CostSymbol `orSnow` in mana.ts and autopay.ts, while {C} still needs colorless mana and {S} snow mana:
+  snow isn't a type, rulings). Spellweaver Helix's "Whenever a player casts a card, if it has the same name as one of the
+  cards exiled with ~, you may copy the other. If you do, you may cast the copy without paying its mana cost." (any
+  player casting a card, not a copy, CR 707.12; the two sorcery cards its imprint ability exiled from a single graveyard,
+  linked in compile.ts, CR 607.2a; either name of a split card, rulings; checked again as it resolves, CR 603.4; with only
+  one of them left nothing happens, with both named like the spell one copy, rulings; it still copies after Helix leaves,
+  rulings; the copy cast as it resolves, free, timing ignored, additional costs paid, X 0, a copy not cast ceasing to
+  exist, CR 707.12, 118.9, 704.5e; castLinkedCopy `other`). Abstract Performance's "Exile the top four cards of your
+  library in a face-down pile, then exile the top four cards of your library in a face-up pile. An opponent chooses one of
+  those piles. Put that pile into your graveyard. Look at the cards in the other pile. You may cast a spell from among
+  them without paying its mana cost. Put the rest into your hand." (nobody may look at the face-down pile, rulings, CR
+  406.3; fewer cards make the face-up pile smaller or empty, rulings; an opponent you choose as it resolves picks the pile
+  for your graveyard, seeing only the face-down one's size, rulings; you look at the other and may cast one spell from it
+  as it resolves, free, timing ignored, CR 608.2g, 118.9; the rest go into your hand; effects/run-laneb270.ts
+  abstractPiles, then castFromAmong `fromDug`). Bots bin the pile worth more for the caster, guessing at the face-down one
+  by its size (pileMode "faceDownYard"). Browser tests click through Doom Blade exiling Ana's Hill Giant with an ice
+  counter and casting it from her exile with snow Islands, Helix's free copy of Divination when you cast Lava Axe,
+  casting Abstract Performance (choosing Ana, then casting Grizzly Bears from the pile she leaves you) and putting Ana's
+  face-down pile into her graveyard for her Abstract Performance. +3, 31,778 of 31,936 with B268-B269 and main through
+  round 425. The compiled text of every other card is unchanged.
+- Out after round B270 (looked at, not done): the lists after round B269 stay out. Judgment calls and known gaps: snow mana
+  goes to a colored symbol under Draugr's permission only when no mana of the symbol's own color is left for it; bots cast
+  Spellweaver Helix's copy whenever it can be cast, choosing its targets as for any free spell. Ian Malcolm, Chaotician, Araumi of the Dead Tide, Haldan, Avid Arcanist, Cass, Hand of Vengeance and Bruna, Light
+  of Alabaster are next in line (not looked at yet).
+- Round B269 (least played first, from the cards round B268 named next in line; Dack Fayden, Helping Hand went to Lane A's
+  round 424, and none of these is in Lane A's rounds 423-424): Prowl, Stoic Strategist's "Whenever a player plays a card
+  exiled with ~, you draw a card and convert ~." (any player casting a spell or playing a land from among the cards its
+  attack trigger exiled, CR 607.2a: the one "exile ... its owner may play it" linked to it in compile.ts; an ability of
+  the front face only, so it triggers only while it's Prowl, Stoic Strategist, rulings; converting is transforming, CR
+  701.28a, 701.27f). Lucy MacLean, Positively Armed's "Golden Rule — Whenever a token enters, you may have target player
+  other than its controller create a token that's a copy of it, then you draw a card if an opponent created a token this
+  way. Do this only once each turn." (anyone's token; the target a player other than the token's controller as the
+  trigger is put on the stack, TargetSpec.notSubjectController; the copy of the token as it is or last was, CR 707.2,
+  608.2h, created by that player, CR 111.2; you draw only if a token an opponent of yours created was made, SpellCondition
+  createdByOpponent; once you've chosen to do it this turn it doesn't trigger again, so its own copy doesn't, CR 603.2h; a
+  "no" lets it trigger again). Apple of Eden, Isu Relic's "{T}, Pay 4 life, Sacrifice ~: Look at target opponent's hand
+  and exile those cards face down. You may play those cards this turn, and mana of any type can be spent to cast them.
+  Until end of turn, whenever you play a land or cast a spell this way, its owner draws a card. At the beginning of the
+  next end step, return the exiled cards to their owner's hand. Activate only as a sorcery." (the cards in that hand as it
+  resolves, face down, CR 406.3, seen only by you; played with their usual timing and costs, a land as your land play,
+  rulings; mana of any type, CR 609.4b; each card played with the permission triggers a delayed ability, CR 603.7, and its
+  owner draws, FaceDownPlay `onPlay`; only the cards still exiled as the same objects return at the next end step, CR
+  400.7, rulings). UI fix: two identical triggers asking for a target one after the other (Lucy's for two tokens entering
+  at once) now each get their own target prompt (App.tsx keyed the prompt by its text only, so the second never opened).
+  Browser tests click through Prowl's exile of your attacking Grizzly Bears and casting them from exile, Lucy's two
+  targets and her "Yes" for a Soldier copy for Ana, and Apple of Eden's activation at Ana and casting her Grizzly Bears
+  from her exile pile. +3, 31,767 of 31,936 on this branch (B268's, stacked on B267). The compiled text of every other
+  card is unchanged.
+- Out after round B269 (looked at, not done): the lists after round B268 stay out. Judgment calls and known gaps: bots
+  take Lucy MacLean's copy for themselves whenever they're the target and give one to an opponent unless the token is a
+  creature with power 3 or more, aiming the trigger with the usual target choice; bots use Apple of Eden like any other
+  activated ability, without weighing the 4 life against what the opponent's hand holds. Ian Malcolm, Chaotician,
+  Spellweaver Helix (done in round B270), Araumi of the Dead Tide, Haldan, Avid Arcanist, Abstract Performance (done in
+  round B270), Cass, Hand of Vengeance, Draugr Necromancer (done in round B270) and Bruna, Light of Alabaster are next in
+  line (not looked at yet).
+- Round B268 (least played first, from the cards round B267 named next in line, none of them in Lane A's rounds 422-423):
+  Selective Adaptation ("Reveal the top seven cards of your library. Choose from among them a card with flying, a card with
+  first strike, and so on for double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, reach, trample,
+  and vigilance. Put one of the chosen cards onto the battlefield, the other chosen cards into your hand, and the rest into
+  your graveyard."): a card for each keyword there's a card with among them, a card with several chosen for any one of them
+  (rulings), so a card can be left over only if each of its keywords is one a chosen card is for (dig oneOfEach
+  `oneOfEachAll`, game.ts oneOfEachAllFits; the Done button waits for that); "hexproof from" is hexproof (CR 702.11e),
+  double strike isn't first strike; the cards' own printed keywords; then the chooser picks the one put onto the
+  battlefield (`oneOnto`, chooseOption "oneOnto"), the others into the hand, the rest into the graveyard. Supper for Spiders
+  ("Put onto the battlefield under your control all creature cards in your opponents' graveyards that were put there from
+  the battlefield this turn. They are Food artifacts with "{2}, {T}, Sacrifice ~: You gain 3 life.""): Cry of the
+  Carnarium's this-turn check, all at once under your control (CR 110.2a), each entering as only a Food artifact (layer 4,
+  CR 205.1a; supertypes, name, mana cost and abilities kept, rulings) with the Food's ability, for good (rulings, CR
+  611.2c). Round 419's question, whether they're Food artifacts as they enter: yes, as Tezzeret, Cruel Machinist's rulings
+  say of the same wording ("Put ... onto the battlefield ... They're 5/5 artifact creatures": they enter as that, not with
+  their own characteristics first), and as Grimoire of the Dead and Storm of Souls already work here (entersAs). Brilliant Ultimatum ("Exile the top five cards of your library. An opponent separates those cards into two
+  piles. You may play lands and cast spells from one of those piles. If you cast a spell this way, you cast it without
+  paying its mana cost."): exiled face up, an opponent you choose as it resolves separates them (CR 700.3; a pile may be
+  empty), and you play from the pile you choose as it resolves (castFromAmong `piles`, pileMode "play"): spells in any
+  order without paying their mana costs, timing ignored (rulings, CR 608.2g, 118.9), a land only on your turn with a land
+  play left (rulings, CR 305.2); the rest stay exiled. Bots: choose a card for every keyword they can and put the most
+  expensive nonland onto the battlefield; don't cast Supper for Spiders while nothing would come back (doesNothingNow);
+  split Brilliant Ultimatum's cards evenly and take the pile worth more free. Browser tests for Selective Adaptation's
+  choice (Done disabled until it's a full one) and battlefield pick, Brilliant Ultimatum's pile and free cast, and you
+  separating Ana's cards for her Brilliant Ultimatum. +3, 31,764 of 31,936 with B261-B267 and main through round 422. The
+  compiled text of every other card is unchanged.
+- Out after round B268 (looked at, not done): the lists after round B267 stay out. Judgment calls and known gaps:
+  Selective Adaptation reads a card's keywords from its printed keyword abilities (Scryfall's list), so a card whose text
+  only grants a keyword to others isn't "a card with" it, and one with a conditional keyword ("has flying as long as") is;
+  bots cast Brilliant Ultimatum without weighing the piles an opponent could make. Golgothian Sylex, Apocalypse Chime and
+  City in a Bottle: checked again (Nov 19): not a loader bug. tools/scryfall-extract.mjs keeps one printing per card (the
+  best-looking, usually a recent reprint: Mishra's Factory is from slc, Strip Mine from zne), so the set a name was first
+  printed in is only known for cards never reprinted; they need a first-printing set field added to the extract on Ken's
+  PC (the all-cards bulk file has every printing), then `npm run build:cards`. Apple of Eden, Isu Relic (done in round B269) ("whenever you play
+  a land or cast a spell this way, its owner draws a card"), Lucy MacLean, Positively Armed (done in round B269) ("do this only once each turn"
+  on an optional copy with a target player), Dack Fayden, Helping Hand (goaded for the rest of the game, then each opponent
+  gains control of a different one) and Prowl, Stoic Strategist (done in round B269) ("whenever a player plays a card exiled with ~") are next
+  in line.
 - Round B267 (least played first, from the cards left without a recorded reason, none of them in Lane A's rounds
   421-422): Taster of Wares ("When ~ enters, target opponent reveals X cards from their hand, where X is the number of
   Goblins you control. You choose one of those cards. That player exiles it. If an instant or sorcery card is exiled this
@@ -11541,9 +11641,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of Wares exiles aren't remembered as "exiled with" it for other cards. Golgothian Sylex, Apocalypse Chime and City in a
   Bottle stay out (the set a name was first printed in isn't in the card data: Scryfall's oracle-cards file keeps one
   recent printing per card); Verrak, Warped Sengir can now build on Lane A round 422's Ashnod the Uncaring (merged; copying an ability
-  by what paid its cost); Prowl, Stoic Strategist ("whenever a player plays a card exiled with ~"),
-  Apple of Eden, Isu Relic, Dermotaxi, Lucy MacLean, Dack Fayden, Helping Hand, Brilliant Ultimatum and Selective
-  Adaptation were looked at and are next in line.
+  by what paid its cost); Prowl, Stoic Strategist (done in round B269) ("whenever a player plays a card exiled with ~"),
+  Apple of Eden, Isu Relic (done in round B269), Dermotaxi, Lucy MacLean (done in round B269), Dack Fayden, Helping Hand, Brilliant Ultimatum (done in round B268) and Selective
+  Adaptation (done in round B268) were looked at and are next in line.
 - Round B266 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 420-421): Mirror-Shield
   Hoplite ("Whenever a creature you control becomes the target of a backup ability, copy that ability. You may choose new
   targets for the copy. This ability triggers only once each turn."): any player's backup ability (CR 702.165a; a backup

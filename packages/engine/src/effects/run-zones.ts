@@ -18,7 +18,7 @@ import { askWholeGraveyardOrder, topGraveyardCards } from "../graveyard";
 import { foundWith, newObjects } from "../mutate";
 import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
-import { toBottom } from "./run-library";
+import { chooseAnOpponent, toBottom } from "./run-library";
 import { attackDefault, closeZoneBatch, fireEvent, inCombat } from "./triggers";
 import { asFace, defMv, hasName, layoutOf, registerFace, sameName, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
@@ -1773,6 +1773,40 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const st = sc.castAmong;
       if (st.done) return;
+      // Brilliant Ultimatum (round B268): "An opponent separates those cards into two piles. You may play lands and cast
+      // spells from one of those piles.": an opponent you choose as it resolves (as Boneyard Parley's) separates the exiled
+      // cards (CR 700.3, face up; a pile may be empty, rulings), you choose a pile, and only its cards may be played; the
+      // others stay exiled (rulings).
+      if (e.piles && !st.pileDone) {
+        const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+        const looked = st.ids.filter((x) => s.objects[x.id]?.zone === "exile" && (s.objects[x.id]!.zoneChanges ?? 0) === x.zc).map((x) => x.id);
+        if (!looked.length) return;
+        const opp = chooseAnOpponent(s, ctx, src, "choose an opponent to separate the exiled cards into two piles");
+        if (opp === "paused") return "paused";
+        if (opp === undefined || player(s, opp).lost) return;
+        if (st.separating && sc.found) {
+          st.pileOne = sc.found.filter((id) => looked.includes(id));
+          st.separating = undefined;
+          sc.found = undefined;
+        }
+        if (!st.pileOne) {
+          st.separating = true;
+          s.pending = { kind: "searchLibrary", player: opp, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, exiled: true, dig: { looked, to: "for the first pile", rest: "form the second pile (played from)" }, piles: true, ...(opp !== you.id ? { forPlayer: you.id } : {}) };
+          return "paused";
+        }
+        const one = st.pileOne.filter((id) => looked.includes(id));
+        const two = looked.filter((id) => !one.includes(id));
+        if (sc.pileChoice === undefined) {
+          log(s, `${player(s, opp).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
+          const label = (pile: ObjectId[], i: number) => `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`;
+          s.pending = { kind: "chooseOption", player: you.id, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: you.id, pileMode: "play", prompt: "choose the pile to play lands and cast spells from (the other stays in exile)" };
+          return "paused";
+        }
+        const mine = sc.pileChoice === 0 ? one : two;
+        sc.pileChoice = undefined;
+        st.pileDone = true;
+        st.ids = st.ids.filter((x) => mine.includes(x.id));
+      }
       // Spell mastery (Talent of the Telepath): checked once, as it starts resolving (rulings).
       if (e.maxIfYard && st.max === undefined) st.max = you.graveyard.filter((id) => printedMatches(e.maxIfYard!.has, defOf(s, obj(s, id)))).length >= e.maxIfYard.min ? e.maxIfYard.max : (e.max ?? Number.MAX_SAFE_INTEGER);
       const maxCast = st.max ?? e.max;
@@ -2532,9 +2566,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // The permission belongs to this object only (CR 400.7), and to the player who exiled it, whoever controls the
         // source later (rulings on Gonti).
         if (e.play) {
-          const { until, ...how } = e.play;
+          const { until, onPlay, ...how } = e.play;
           const source = until === "source" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {};
-          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until, turn: s.turn, ...how, ...source };
+          // Apple of Eden (round B269): playing a land or casting a spell with this permission triggers (CR 603.2, 603.7).
+          const trig = onPlay && ctx.sourceId && s.objects[ctx.sourceId] ? { castTrigger: { body: onPlay, sourceId: ctx.sourceId, sourceZc: ctx.sourceZc ?? 0, sourceCardId: cardIdOf(obj(s, ctx.sourceId)), play: true as const } } : {};
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until, turn: s.turn, ...how, ...source, ...trig };
         }
         if (e.endStepHand)
           addDelayed(s, "yourNextEndStep", p.id, o, { targets: [], effects: [{ type: "bounce", what: { ref: "subjectCard" }, hidden: true }], text: "Put that card into your hand." }, ctx.sourceDef.oracleId);

@@ -5865,9 +5865,9 @@ export function checkAscend(s: GameState) {
  * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
-function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" {
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   if (o.zone !== "exile") return false;
-  let how: false | "anyType" | "anyColor" | "life" | "plain" = false;
+  let how: false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" = false;
   // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
   // now (rulings), mana of any color for the spells (CR 609.4b).
   for (const em of liveEmblems(s))
@@ -5881,6 +5881,10 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     // Grolnok, the Omnivore: any face-up card you own with a croak counter on it, whatever exiled it (rulings), paying as
     // usual, with the usual timing.
     if (a.playOwnCountered && o.owner === pid && !o.faceDown && !o.hiddenExile && (o.counters[a.playOwnCountered] ?? 0) > 0 && !how) how = "plain";
+    // Draugr Necromancer (round B270): a face-up card an opponent owns with an ice counter on it, whatever exiled it
+    // (rulings), cast as a spell (not played as a land, rulings) with the usual timing and costs, mana from snow sources
+    // paying its colored symbols (CR 609.4b).
+    if (a.castOpponentsCountered && o.owner !== pid && !o.faceDown && !o.hiddenExile && (o.counters[a.castOpponentsCountered] ?? 0) > 0 && !isType(defOf(s, o), "Land") && (!how || how === "plain")) how = "snowAny";
     if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
@@ -5936,10 +5940,10 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true; /** Draugr Necromancer (round B270): mana from snow sources as though it were mana of any color. */ snowAny?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
-  return how === "anyType" ? { anyType: true } : how === "anyColor" ? { anyColor: true } : how === "life" ? { life: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
+  return how === "anyType" ? { anyType: true } : how === "anyColor" ? { anyColor: true } : how === "life" ? { life: true } : how === "snowAny" ? { snowAny: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
 }
 
 /**
@@ -7730,10 +7734,17 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // spell" (CR 609.4b): colorless mana pays a colored symbol as though it were that color, a hybrid one's halves, a {2/W}'s
   // one mana and a Phyrexian one's mana (or its 2 life) too; colored mana still pays only its own (CostSymbol `orC`).
   const colorlessAnyNow = !anyTypeNow && !anyColorNow && !!exiled?.colorlessAny;
+  // Draugr Necromancer (round B270): "you may spend mana from snow sources as though it were mana of any color to cast those
+  // spells" (CR 609.4b): snow mana of any type pays a colored symbol as though it were that color, a hybrid one's halves, a
+  // {2/W}'s one mana and a Phyrexian one's mana; {C} still takes colorless mana, and other mana pays only what it could
+  // (CostSymbol `orSnow`). Snow isn't a type, so {S} still takes mana from a snow source (rulings).
+  const snowAnyNow = !anyTypeNow && !anyColorNow && !colorlessAnyNow && !!exiled?.snowAny;
+  const orSnow = (y: CostSymbol): CostSymbol =>
+    y.kind === "colored" && y.color !== "C" ? { kind: "hybrid", options: [y.color], orSnow: true } : y.kind === "hybrid" || y.kind === "twoHybrid" ? { ...y, orSnow: true } : y.kind === "phyrexian" && !y.krrik && !y.any ? { kind: "hybrid", options: [y.color], life: true, phyrexian: true, orSnow: true } : y;
   const orColorless = (y: CostSymbol): CostSymbol =>
     y.kind === "colored" && y.color !== "C" ? { kind: "hybrid", options: [y.color], orC: true } : y.kind === "hybrid" || y.kind === "twoHybrid" ? { ...y, orC: true } : y.kind === "phyrexian" && !y.krrik && !y.any ? { kind: "hybrid", options: [y.color], life: true, phyrexian: true, orC: true } : y;
   const anyType = (c: ParsedCost): ParsedCost =>
-    anyTypeNow || anyColorNow ? { ...c, symbols: c.symbols.map((y) => ((y.kind === "colored" && (anyTypeNow || y.color !== "C")) || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : colorlessAnyNow ? { ...c, symbols: c.symbols.map(orColorless) } : c;
+    anyTypeNow || anyColorNow ? { ...c, symbols: c.symbols.map((y) => ((y.kind === "colored" && (anyTypeNow || y.color !== "C")) || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : colorlessAnyNow ? { ...c, symbols: c.symbols.map(orColorless) } : snowAnyNow ? { ...c, symbols: c.symbols.map(orSnow) } : c;
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   // Prototyped isn't an alternative cost (CR 718.3): it's still free.
   const realAlt = how.alt && how.alt !== "prototype";
@@ -12372,6 +12383,8 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend.oneName && found.some((id) => !sameName(defOf(s, obj(s, id)).name, defOf(s, obj(s, found[0]!)).name))) throw new RulesError("choose cards with the same name");
   if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError(`find one card for each: ${pend.oneOfEach.map((f) => f.text).join(", ")}`);
+  if (pend.oneOfEach && pend.oneOfEachAll && !oneOfEachAllFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id))), pend.cards.filter((id) => !found.includes(id)).map((id) => defOf(s, obj(s, id)))))
+    throw new RulesError(`choose a card for each of ${pend.oneOfEach.map((f) => f.text).join(", ")} that there's one for`);
   r.scratch = { ...r.scratch, found };
   s.pending = null;
   continueResolution(s);
@@ -12383,6 +12396,20 @@ export function oneOfEachFits(specs: TargetSpec[], defs: CardDef[]): boolean {
   const [d, ...rest] = defs;
   if (!d) return true;
   return specs.some((f, i) => printedMatches(f, d) && oneOfEachFits(specs.filter((_, j) => j !== i), rest));
+}
+
+/**
+ * Selective Adaptation (round B268): "Choose from among them a card with flying, a card with first strike, and so on":
+ * the chosen cards are each for a different one of `specs` (a card with several is for any one of them, rulings), and
+ * every one of `specs` that a card left over (`others`) matches is one a chosen card is for: there was a card for it.
+ */
+export function oneOfEachAllFits(specs: TargetSpec[], chosen: CardDef[], others: CardDef[]): boolean {
+  const go = (left: TargetSpec[], cards: CardDef[]): boolean => {
+    const [d, ...rest] = cards;
+    if (!d) return left.every((f) => !others.some((o) => printedMatches(f, o)));
+    return left.some((f, i) => printedMatches(f, d) && go(left.filter((_, j) => j !== i), rest));
+  };
+  return chosen.length <= specs.length && go(specs, chosen);
 }
 
 /** A creature type or color named for a permanent entering (CR 614.12) or a resolving spell. */
@@ -12830,6 +12857,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "reselectAttack") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the players or permanents offered");
     (r.scratch ??= {}).reselect = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "oneOnto") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the chosen cards");
+    (r.scratch ??= {}).oneOnto = choice;
     continueResolution(s);
     return;
   }

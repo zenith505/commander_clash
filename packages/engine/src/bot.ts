@@ -2255,7 +2255,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "copyAmong") {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
       const best = pend.options.filter((o) => o !== "none").sort((a, b) => size(b) - size(a))[0];
-      const host = s.resolving ? s.objects[s.resolving.item.sourceId ?? ""] : undefined;
+      // Kaya, Spirits' Justice (round 425): its target token, not Kaya.
+      const host = s.resolving ? s.objects[s.resolving.scratch?.copyAmongHost ?? s.resolving.item.sourceId ?? ""] : undefined;
       const now = host && host.zone === "battlefield" ? defWorth(defOf(s, host)) : 0;
       return [{ type: "chooseOption", player: pid, choice: best !== undefined && size(best) > now ? best : "none" }];
     }

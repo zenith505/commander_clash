@@ -3359,6 +3359,8 @@ export interface Resolving {
     eachTakeAt?: number;
     /** Lazav, Wearer of Faces / Spirit of Resilience (round 405): the card chosen to become a copy of ("" while asked, "none"). */
     copyAmong?: string;
+    /** Round 425: the permanent becoming the copy, for the bot (Kaya, Spirits' Justice's target token, not its source). */
+    copyAmongHost?: ObjectId;
     /** Koh, the Face Stealer (Effect chooseLinkedCard, round 399): the exiled creature card chosen (an object id), "" while asked. */
     kohCard?: string;
     /** Ice Cave (Effect othersPaySpellCostToCounter, round B214): the players still to be asked, in turn order. */

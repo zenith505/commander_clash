@@ -26241,6 +26241,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0a094c5f-cefb-4ba1-90c8-dd78ae8efe95",
+  "name": "Kaya, Spirits' Justice",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Kaya",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Kaya"
+  ],
+  "oracleText": "Whenever one or more creatures you control and/or creature cards in your graveyard are put into exile, you may choose a creature card from among them. Until end of turn, target token you control becomes a copy of it, except it has flying.\n+2: Surveil 2, then exile a card from a graveyard.\n+1: Create a 1/1 white and black Spirit creature token with flying.\n−2: Exile target creature you control. For each other player, exile up to one target creature that player controls.",
+  "loyalty": "3",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "133f5d30-d883-493e-93a1-cf9583db460b",
   "name": "Kazandu Blademaster",
   "manaCost": "{W}{W}",
@@ -38628,6 +38663,38 @@
   "commanderLegal": "legal",
   "set": "afc",
   "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bcd48403-7c4b-4b57-8a28-4007b36fe4d7",
+  "name": "Redemptor Dreadnought",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Astartes Dreadnought",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Astartes",
+   "Dreadnought"
+  ],
+  "oracleText": "Fallen Warrior — As an additional cost to cast this spell, you may exile a creature card from your graveyard.\nTrample\nPlasma Incinerator — Whenever this creature attacks, if a card is exiled with it, it gets +X/+X until end of turn, where X is the power of the exiled card.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Trample",
+   "Plasma Incinerator",
+   "Fallen Warrior"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -4351,7 +4351,7 @@ export type Effect =
    * `eventGroup`, a batch trigger's cards): one matching `filter` as printed, chosen as it resolves (chooseOption
    * "copyAmong"), or none (effects/run-round405.ts).
    */
-  | { type: "becomeCopyOfAmong"; what: ObjRef; from: "linked" | "eventGroup"; filter: TargetSpec }
+  | { type: "becomeCopyOfAmong"; what: ObjRef; from: "linked" | "eventGroup"; filter: TargetSpec; /** Kaya, Spirits' Justice (round 425): only a card still in exile (rulings, CR 400.7). */ inExile?: true; /** Kaya: "except it has flying" (CR 707.9a). */ except?: CopyExcept }
   /**
    * Valki, God of Lies (round 408): "Choose a creature card exiled with ~ with mana value X. ~ becomes a copy of that card.":
    * one of the cards its enters ability exiled (linked, CR 607.2a) that's a creature card in exile now with mana value X
@@ -7812,7 +7812,7 @@ export interface BatchTrigger {
   /** `created`: "Whenever you create one or more creature tokens" (Staff of the Storyteller), tokens that player created (CR 111.2). */
   /** `exiledFromGraveyardsOrBattlefield`: "cards are put into exile from graveyards and/or the battlefield" (Ketramose): anyone's. */
   /** `exiled`: "Whenever one or more cards are put into exile" (Stonebinder's Familiar): cards from anywhere, anyone's, for any reason. */
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "exiled" | "created" | /** Wan Shi Tong, All-Knowing: "cards are put into a library from anywhere", not from a library (rulings). */ "toLibrary" | /** Hero of Bretagard, Ranar the Ever-Watchful (round 404): "cards are put into exile from your hand or a spell or ability you control exiles one or more permanents from the battlefield": cards from your hand for any reason, and permanents (tokens too) exiled from the battlefield by the effect of a spell or ability you control (ZoneMove.exiledBy, rulings). */ "exiledFromHandOrByYou";
+  what: "enters" | "leaves" | "leavesGraveyard" | /** Kaya, Spirits' Justice (round 425): "creatures you control and/or creature cards in your graveyard are put into exile": a creature `you` controlled as it left the battlefield (CR 603.10a), tokens too, or a creature card from your graveyard. */ "exiledYourCreatures" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "exiled" | "created" | /** Wan Shi Tong, All-Knowing: "cards are put into a library from anywhere", not from a library (rulings). */ "toLibrary" | /** Hero of Bretagard, Ranar the Ever-Watchful (round 404): "cards are put into exile from your hand or a spell or ability you control exiles one or more permanents from the battlefield": cards from your hand for any reason, and permanents (tokens too) exiled from the battlefield by the effect of a spell or ability you control (ZoneMove.exiledBy, rulings). */ "exiledFromHandOrByYou";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";

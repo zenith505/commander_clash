@@ -29,7 +29,7 @@ import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/ru
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
 import { pileDrawLabel } from "./effects/run-round386";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
-import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType } from "./copies";
+import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType, setChosenTypeAside } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
@@ -78,6 +78,7 @@ import {
   type DeferredAct,
   type DrawAfter,
   type CopyWhile,
+  type CopyEffect,
   type UntilLeavesLink,
 } from "./types";
 
@@ -2962,6 +2963,8 @@ export function endWhileTapped(s: GameState): boolean {
   // attached to it" (Blade of Shared Souls, Assimilation Aegis), over for good once that stops (CR 611.2b), a phased-out
   // copy too (CR 702.26f).
   if (endCopyWhile(s)) lost = true;
+  // Metamorphic Alteration (round 429): the copy effects of Auras' static abilities, on what they enchant now.
+  if (syncAuraCopies(s)) lost = true;
   const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || (e.whileAttached && !copyWhileHolds(s, { whileAttached: e.whileAttached })) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
@@ -3010,6 +3013,55 @@ export function endCopyWhile(s: GameState): boolean {
     ended = true;
   }
   return ended;
+}
+
+/**
+ * Metamorphic Alteration (round 429): "Enchanted creature is a copy of the chosen creature." A static ability's copy effect
+ * (CR 611.3a, 707.2) on the permanent the Aura is attached to, of the values locked in as the creature was chosen
+ * (Chosen.copyKey, rulings), with the Aura's timestamp (CR 613.7e: a new one each time it becomes attached), so the latest
+ * copy effect wins (613.2a, 613.7). It ends when the Aura is no longer attached to that permanent (endCopyWhile) or no
+ * longer has the ability (it became a copy of something else); one removed in layer 6 still applies (CR 613.6). The
+ * enchanted permanent becoming a copy of a noncreature makes the Aura illegally attached (rulings, CR 704.5m). True when
+ * one began or ended.
+ */
+export function syncAuraCopies(s: GameState): boolean {
+  let changed = false;
+  const holds = (e: CopyEffect, host: GameObject) => {
+    if (!e.aura || typeof e.until !== "object" || !("whileAttached" in e.until)) return true;
+    const a = s.objects[e.until.whileAttached.id];
+    return !!a && a.zone === "battlefield" && a.chosen?.copyKey === e.key && !!compileCard(defOf(s, a)).enchantedCopiesChosen && copyWhileHolds(s, e.until) && e.until.whileAttached.host === host.id;
+  };
+  for (const id of s.battlefield) {
+    const host = s.objects[id]!;
+    if (!host.copyEffects?.some((e) => e.aura)) continue;
+    const kept = host.copyEffects.filter((e) => holds(e, host));
+    if (kept.length === host.copyEffects.length) continue;
+    const was = defOf(s, host).name;
+    host.copyEffects = kept.length ? kept : undefined;
+    restoreChosenType(host);
+    invalidateCharacteristics(s);
+    log(s, `${was} stops being a copy and is ${defOf(s, host).name} again.`);
+    changed = true;
+  }
+  for (const id of s.battlefield) {
+    const a = s.objects[id]!;
+    const key = a.chosen?.copyKey;
+    if (!key || !a.attachedTo || !compileCard(defOf(s, a)).enchantedCopiesChosen) continue;
+    const host = s.objects[a.attachedTo];
+    if (!host || host.zone !== "battlefield") continue;
+    const until: CopyWhile = { whileAttached: { id: a.id, zc: a.zoneChanges ?? 0, host: host.id, hostZc: host.zoneChanges ?? 0 } };
+    if (host.copyEffects?.some((e) => e.aura && typeof e.until === "object" && "whileAttached" in e.until && e.until.whileAttached.id === a.id && e.until.whileAttached.zc === until.whileAttached.zc && e.until.whileAttached.hostZc === until.whileAttached.hostZc)) continue;
+    const was = defOf(s, host).name;
+    setChosenTypeAside(host);
+    // In timestamp order: the last one is the copiable values (cards.ts).
+    const list = [...(host.copyEffects ?? []), { key, timestamp: a.timestamp, until, aura: true as const }];
+    host.copyEffects = list.sort((x, y) => x.timestamp - y.timestamp);
+    lockIfRoom(s, host);
+    invalidateCharacteristics(s);
+    log(s, `${was} is a copy of ${s.cards[key]?.name ?? "the chosen creature"} (${defOf(s, a).name}).`);
+    changed = true;
+  }
+  return changed;
 }
 
 /** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
@@ -5907,7 +5959,36 @@ function othersTurnSource(s: GameState, o: GameObject, pid: PlayerId): string | 
   return undefined;
 }
 
-function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
+/**
+ * Evelyn, the Covetous (round 429): the permanent ("id@zoneChanges") whose once-each-turn permission (CompiledCard
+ * playExiledCounteredOnce) lets `pid` play this exiled card now: one `pid` controls, its play not used yet this turn
+ * (TurnLog.linkedSpellOnce), the card face up with its counter and exiled by an ability `pid` controlled
+ * (GameObject.exiledByPlayer). A land is played as the turn's land play, a spell cast with its usual timing.
+ */
+function exiledOnceSource(s: GameState, o: GameObject, pid: PlayerId): string | undefined {
+  if (o.zone !== "exile" || o.exiledByPlayer !== pid || o.faceDown || o.hiddenExile) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    const kind = abilitiesOf(s, p).playExiledCounteredOnce;
+    if (!kind || (o.counters[kind] ?? 0) <= 0) continue;
+    const key = `${id}@${p.zoneChanges ?? 0}`;
+    if (!(s.turnLog?.linkedSpellOnce ?? []).includes(key)) return key;
+  }
+  return undefined;
+}
+
+/**
+ * Evelyn, the Covetous (round 429): playing this exiled card with no other permission of `pid`'s that lets them (one that
+ * isn't used up by playing it) uses up an Evelyn's play for this turn ("once each turn": each Evelyn's own, CR 113.2c).
+ */
+function useExiledOnce(s: GameState, o: GameObject, pid: PlayerId): void {
+  const key = exiledOnceSource(s, o, pid);
+  if (!key || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || preparedCopyCastable(s, o, pid) || ownLinkedPlayPermission(s, o, pid, true)) return;
+  ((s.turnLog ??= {}).linkedSpellOnce ??= []).push(key);
+}
+
+function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOnce?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   let how: false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" = false;
   // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
   // now (rulings), mana of any color for the spells (CR 609.4b).
@@ -5930,6 +6011,9 @@ function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): fa
     // the usual timing and costs (rulings): a land card as a land, any other only as a noncreature spell (the face being
     // cast, so an Adventure of a creature card too, rulings), mana as though of any color (CR 609.4b).
     if (a.playExiledCountered && o.exiledByPlayer === pid && !o.faceDown && !o.hiddenExile && (o.counters[a.playExiledCountered] ?? 0) > 0 && (isType(defOf(s, o), "Land") || !isType(defOf(s, o), "Creature")) && (!how || how === "plain")) how = "anyColor";
+    // Evelyn, the Covetous (round 429): once each turn, a card with a collection counter exiled by an ability `pid`
+    // controlled (exiledOnceSource), mana as though of any color (CR 609.4b).
+    if (!notOnce && a.playExiledCounteredOnce && (!how || how === "plain") && exiledOnceSource(s, o, pid)) how = "anyColor";
     if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
@@ -6603,6 +6687,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const o = obj(s, id);
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
+  useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429), before any other permission is used up
   useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
@@ -8884,6 +8969,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // spell, and the permanent it becomes (CR 614.1c, 400.7a).
   const linkedRider = castFrom === "exile" && choices.alt !== "linkedFree" && isType(d, "Creature") ? linkedEntersWith(s, o, p.id) : undefined;
   if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
+  if (choices.alt !== "linkedFree") useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429)
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
   if (choices.alt !== "linkedFree") useLinkedSpellOnce(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
@@ -12914,7 +13000,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
         invalidateCharacteristics(s);
         return;
       }
-      o.chosen = { ...o.chosen, object: { id: c.id, zc: c.zoneChanges ?? 0 } };
+      // Metamorphic Alteration (round 429): its copiable values, locked in as it's chosen (rulings, CR 707.2).
+      const copyValues = compileCard(defOf(s, o)).enchantedCopiesChosen ? copyKey(s, copiableDef(s, c)) : undefined;
+      o.chosen = { ...o.chosen, object: { id: c.id, zc: c.zoneChanges ?? 0 }, ...(copyValues ? { copyKey: copyValues } : {}) };
       log(s, `${p.name} chooses ${characteristics(s, c).name} for ${pend.source}.`);
       invalidateCharacteristics(s);
       return;

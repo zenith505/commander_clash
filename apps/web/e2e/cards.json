@@ -5711,6 +5711,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3b943c3e-1f18-4997-b6d0-28ef75aed88e",
+  "name": "Bloodthirsty Adversary",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Vampire",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire"
+  ],
+  "oracleText": "Haste\nWhen this creature enters, you may pay {2}{R} any number of times. When you pay this cost one or more times, put that many +1/+1 counters on this creature, then exile up to that many target instant and/or sorcery cards with mana value 3 or less from your graveyard and copy them. You may cast any number of the copies without paying their mana costs.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "01ab7724-1967-4da6-aebd-3729983d6a0e",
   "name": "Bloodthorn Flail",
   "manaCost": "{B}",
@@ -16056,6 +16088,45 @@
   "commanderLegal": "legal",
   "set": "tsp",
   "releasedAt": "2006-10-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4ab6f615-1f04-4ed2-88b2-49faa8356dd0",
+  "name": "Evelyn, the Covetous",
+  "manaCost": "{2}{U/B}{B}{B/R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Vampire Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Rogue"
+  ],
+  "oracleText": "Flash\nWhenever Evelyn or another Vampire you control enters, exile the top card of each player's library with a collection counter on it.\nOnce each turn, you may play a card from exile with a collection counter on it if it was exiled by an ability you controlled, and you may spend mana as though it were mana of any color to cast it.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -31362,6 +31433,36 @@
   "commanderLegal": "legal",
   "set": "uds",
   "releasedAt": "1999-06-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2518a4f2-607f-41bb-9389-2009138d6b09",
+  "name": "Metamorphic Alteration",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAs this Aura enters, choose a creature.\nEnchanted creature is a copy of the chosen creature.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "m19",
+  "releasedAt": "2018-07-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -8808,6 +8808,20 @@ export interface Gift {
 
 export interface CompiledCard {
   /**
+   * Metamorphic Alteration (round 429): "As ~ enters, choose a creature. Enchanted creature is a copy of the chosen
+   * creature.": a static copy effect (CR 707.2, 611.3a) on the permanent this Aura enchants, of the chosen creature's
+   * copiable values as they were when chosen (Chosen.copyKey, rulings; game.ts syncAuraCopies).
+   */
+  enchantedCopiesChosen?: true;
+  /**
+   * Evelyn, the Covetous (round 429): "Once each turn, you may play a card from exile with a collection counter on it if it
+   * was exiled by an ability you controlled, and you may spend mana as though it were mana of any color to cast it.": a
+   * face-up card in exile with this counter that an ability its controller controlled exiled (GameObject.exiledByPlayer),
+   * a land as the turn's land play or a spell with the usual timing, mana as though of any color (CR 609.4b); one card
+   * each turn for this object (game.ts exiledOnceSource).
+   */
+  playExiledCounteredOnce?: CounterKind;
+  /**
    * "~ has all activated abilities of creatures you control that don't have the same name as ~" (Marvin), "... of each
    * other creature with a +1/+1 counter on it" (Experiment Kraj), "As long as ~ is on the battlefield, it has all
    * activated abilities of all creature cards in all graveyards" (Necrotic Ooze): while this is on the battlefield, it

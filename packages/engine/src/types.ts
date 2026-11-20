@@ -958,6 +958,12 @@ export interface CopyEffect {
    * during an end step lasts until the next turn's (as for a delayed trigger, CR 513.2) or that turn's next added end step.
    */
   until?: "endOfTurn" | { turnOf: PlayerId } | { nextEndStep: { turn: number; endSteps: number } } | CopyWhile;
+  /**
+   * Metamorphic Alteration (round 429): the copy effect of an Aura's static ability on the permanent it enchants (CR 611.3a,
+   * 707.2), with the Aura's timestamp (613.7e), kept while that Aura (`until` whileAttached) is attached to it and has the
+   * ability (game.ts syncAuraCopies), not one that began after the permanent entered.
+   */
+  aura?: true;
 }
 
 /**
@@ -2937,6 +2943,11 @@ export interface Chosen {
   object?: { id: ObjectId; zc: number };
   /** Koh, the Face Stealer (round 399): "Choose a creature card exiled with ~": that card, as the object it is in exile (CR 400.7). */
   card?: { id: ObjectId; zc: number };
+  /**
+   * Metamorphic Alteration (round 429): the chosen creature's copiable values as it was chosen (CR 707.2), a key into
+   * GameState.cards: locked in then, whatever happens to that creature later (rulings).
+   */
+  copyKey?: string;
 }
 
 export interface TurnRule {

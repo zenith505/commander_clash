@@ -1727,6 +1727,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const best = pend.options.filter((x) => x !== "none").sort((a, b) => score(b) - score(a))[0];
         return [{ type: "chooseOption", player: pid, choice: best && score(best) > 0 ? best : "none" }];
       }
+      // Metamorphic Alteration (round 429): what it enchants becomes a copy of the chosen creature: the best one for a
+      // creature of ours, the least for anyone else's.
+      const aura = pend.objectId ? s.objects[pend.objectId] : undefined;
+      const host = aura?.attachedTo ? s.objects[aura.attachedTo] : undefined;
+      if (aura && host && compileCard(defOf(s, aura)).enchantedCopiesChosen && controllerOf(s, host) !== pid) {
+        const size = (id: string) => power(s, obj(s, id)) + toughness(s, obj(s, id)) + mv(s, id);
+        return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(a) - size(b))[0]! }];
+      }
       const pick = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!;
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }

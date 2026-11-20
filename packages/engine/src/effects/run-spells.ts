@@ -450,6 +450,20 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Panoptic Mirror: "a card exiled with ~": with several, the one to copy is chosen as it resolves (or none: copying
       // is optional, rulings).
       let card = linked[0];
+      // Spellweaver Helix (round B270): "if it has the same name as one of the cards exiled with ~, you may copy the other":
+      // the intervening if again as it resolves (CR 603.4), face-up linked cards still exiled (CR 607.2a, 400.7); with only
+      // one of them left, nothing happens (rulings); with both named like the spell, one copy (rulings).
+      if (e.other) {
+        // The card cast (TriggerEventInfo.played), as it is on the stack, or as it was (its card's name) once it's gone.
+        const cast = ctx.event?.played;
+        const spell = cast ? s.objects[cast.id] : undefined;
+        const name = spell && spell.zone === "stack" && (spell.zoneChanges ?? 0) === cast!.zc ? characteristics(s, spell).name : spell ? defOf(s, spell).name : undefined;
+        const faceUp = linked.filter((o) => !o.faceDown && !o.hiddenExile);
+        const named = (o: GameObject) => sameName(defOf(s, o).name, name);
+        const match = faceUp.find(named);
+        card = match && faceUp.length >= 2 ? faceUp.find((o) => o !== match) : undefined;
+        if (!card) return void log(s, match ? `${src} has only one card exiled with it, so nothing happens.` : `No card exiled with ${src} has that spell's name now, so nothing happens.`);
+      }
       if (e.choose && linked.length > 1) {
         if (!sc.found) {
           const cards = linked.map((o) => o.id);

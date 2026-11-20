@@ -10011,6 +10011,12 @@ export interface CompiledCard {
    * total becomes equal to your starting life total" (40, CR 903.7).
    */
   loseGameExileSelf?: true | "startingLife";
+  /**
+   * Lich's Mirror (round B280): "If you would lose the game, instead shuffle your hand, your graveyard, and all permanents
+   * you own into your library, then draw seven cards and your life total becomes 20." A replacement effect (CR 614.1a), for
+   * any way of losing but conceding (rulings); see game.ts lichsMirror.
+   */
+  loseGameMirror?: true;
   /** Enduring Angel: "If your life total would be reduced to 0 or less, instead transform this creature and your life total becomes 3. Then if this creature didn't transform this way, you lose the game." (game.ts lifeZeroReplaced) */
   lifeZeroTransform?: true;
   /**

@@ -6,7 +6,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, printedManaAbilities, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, wasCastThisTurn, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, inCombatPhase, livingPlayers, nearestOpponent, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
-import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
+import { expandMany, expandPerOpponent, manySlot, manySlots, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, LAND_TYPE_LIST, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { BlockQualities, CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -1052,6 +1052,10 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
   const body = settleDivided(s, body0, { controller, ...(sourceId ? { sourceId } : {}), x });
   const i = manySlot(body.targets);
   if (i < 0) return body;
+  // Several of them (Filigree Vector, round B280): each one "up to" target for each object it could be, from the last
+  // entry to the first, so the earlier ones keep their places (fitManyGroups keeps the ones chosen).
+  const slots = manySlots(body.targets);
+  if (slots.length > 1) return slots.reduceRight((b, j) => expandMany(b, manyRoom(s, body.targets[j]!, controller, src, sourceId), true, j), body);
   const spec = body.targets[i]!;
   const room = spec.skip ? 0 : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => !(spec.notSource && t.kind === "object" && t.id === sourceId)).length;
   // Divided as you choose: no more targets than there is to divide (at least 1 each, CR 601.2d).
@@ -1060,6 +1064,21 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
   // "X target creatures": exactly X, each one required (as many as there are, if fewer: it can't be cast so).
   if (spec.many === "exactX") return expandMany(body, Math.min(x, most));
   return expandMany(body, spec.many === "x" ? Math.min(manyX(s, body.targets, controller, sourceId, x), most) : most, true);
+}
+
+/** How many objects or players an "any number of target ..." entry could be (CR 115.6: none is fine). */
+function manyRoom(s: GameState, spec: TargetSpec, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): number {
+  return spec.skip ? 0 : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => !(spec.notSource && t.kind === "object" && t.id === sourceId)).length;
+}
+
+/**
+ * With several "any number of target ..." entries (manySlots; Filigree Vector, round B280): how many entries offerMany
+ * offers for each, at least one (an unchosen one stays a single entry, cast as if it didn't have it, CR 115.6), so
+ * fitMany knows which chosen targets are for which. Undefined with fewer than two.
+ */
+export function manyOfferSizes(s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): number[] | undefined {
+  const slots = manySlots(body.targets);
+  return slots.length > 1 ? slots.map((j) => Math.max(1, manyRoom(s, body.targets[j]!, controller, src, sourceId))) : undefined;
 }
 
 /**

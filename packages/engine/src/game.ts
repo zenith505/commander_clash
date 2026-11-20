@@ -14,7 +14,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, discardShieldOf, opponentForbidsDiscard, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, cardPT, inRange, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
@@ -7593,7 +7593,7 @@ export function castProblem(
   const manySpecs = specs.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
-    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x, targets));
+    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x, targets), manyOfferSizes(s, { targets: specs, effects: [], text: "" }, pid, sq, id));
     if (typeof fit === "string") return fit;
     [specs, targets] = [fit.body.targets, fit.targets];
   }
@@ -8858,7 +8858,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (body && spell?.modal?.chooser) body = { ...body, targets: bindModeChooser(body.targets, choices.modeChooser) };
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
-    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x, targets)) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x, targets), manyOfferSizes(s, body, p.id, sourceQuality(s, id), id)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   // "Target creature of an opponent's choice they control" (Evangelize): the opponents' picks (askChoosers), its targets
@@ -11376,7 +11376,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const manySpecs = body.targets.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
-    const fit = fitMany(body, targets, manyX(s, body.targets, pid, id, x));
+    const fit = fitMany(body, targets, manyX(s, body.targets, pid, id, x), manyOfferSizes(s, body, pid, activatedQuality(s, id), id));
     if (typeof fit === "string") return fit;
     [body, targets] = [fit.body, fit.targets];
   }
@@ -11861,7 +11861,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   if (manySlot(body.targets) >= 0) {
-    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x), manyOfferSizes(s, body, p.id, activatedQuality(s, id), id)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   if (chooserSlots(body.targets).length) [body, targets] = withChosenTargets(body, targets, costs);
@@ -12279,7 +12279,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
   // Another player choosing the target for the ability's controller (TargetSpec.chosenBy): legal for the controller.
   const controller = pend.controller ?? p.id;
-  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, controller, t.sourceId, t.x ?? 0));
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, controller, t.sourceId, t.x ?? 0), manyOfferSizes(s, { targets: pend.specs, effects: [], text: "" }, controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId));
   if (typeof fit === "string") throw new RulesError(fit);
   const problem = targetProblem(s, fit.body.targets, fit.targets, controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
@@ -12338,6 +12338,7 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   if (pend?.kind === "pickPermanents" && pend.wind) return chooseWindPick(s, p, ids);
   if (pend?.kind === "pickPermanents" && pend.equilibrium) return chooseEquilibriumPick(s, p, ids);
+  if (pend?.kind === "pickPermanents" && pend.mirrorStay !== undefined) return chooseMirrorStay(s, p, ids);
   const r = s.resolving;
   if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "damageCreature" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
@@ -16748,7 +16749,7 @@ function afterAction(s: GameState, holdTriggers = false) {
   runStateBasedActions(s, holdTriggers);
 }
 
-export function runStateBasedActions(s: GameState, holdTriggers = false) {
+export function runStateBasedActions(s: GameState, holdTriggers = false, onePass = false) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
   // Temporal Aperture's grant, once its card isn't on top any more, never comes back (CR 611.2b).
   if (s.topFreePlays) endTopFreePlays(s);
@@ -16787,6 +16788,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       if (reason) changed = playerLoses(s, p.id, reason, false, true) || changed;
     }
     s.loseChoice = undefined;
+    s.mirrorStay = undefined;
     // Start your engines!: a player with no speed who controls a permanent with it gets speed 1 (704.5aa).
     for (const p of s.players)
       if (!p.lost && p.speed === undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).startYourEngines)) {
@@ -16900,9 +16902,12 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       delete s.objects[o.id];
       changed = true;
     }
-    if (!changed) break;
+    // `onePass`: one check's actions only (Lich's Mirror's look ahead, mirrorBound).
+    if (!changed || onePass) break;
   }
   s.leftTogether = undefined;
+  // These state-based actions are done with (Lich's Mirror's loop, playerLoses).
+  s.mirrorRepeat = undefined;
   checkGameOver(s);
   // Cards that went to a graveyard together are arranged as they get there, before triggers go on the stack (CR 404.3).
   if (!s.over && !s.pending && !holdTriggers && askGraveyardOrder(s)) return;
@@ -17183,7 +17188,7 @@ export function drawGame(s: GameState, reason: string) {
 }
 
 /** A replacement of `pid`'s game loss (CR 614.1a): `key` is the chooseOption answer, "loseReplacement". */
-type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /** It stays, to die as the same state-based actions are performed. */ graveyard?: true; reversal?: number };
+type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /** It stays, to die as the same state-based actions are performed. */ graveyard?: true; reversal?: number; /** Lich's Mirror's (round B280). */ mirror?: true };
 
 /**
  * Whether a permanent dies as the state-based actions now being performed are (CR 704.5f-h): zero toughness, lethal or
@@ -17207,6 +17212,9 @@ export function loseReplacements(s: GameState, pid: PlayerId, sba = false): Lose
   const out: LoseOption[] = [];
   for (const id of s.battlefield) {
     const o = obj(s, id);
+    // Lich's Mirror (round B280): shuffle, draw seven, life 20 (lichsMirror).
+    if (controllerOf(s, o) === pid && abilitiesOf(s, o).loseGameMirror)
+      out.push({ key: `mirror:${id}`, id, life: 20, mirror: true, label: `${nameOf(s, id)}: shuffle your hand, your graveyard and all permanents you own into your library, then draw seven cards and your life total becomes 20` });
     const how = controllerOf(s, o) === pid ? abilitiesOf(s, o).loseGameExileSelf : undefined;
     if (!how) continue;
     const life = how === "startingLife" ? STARTING_LIFE : 1;
@@ -17228,18 +17236,130 @@ function lossReasonNow(s: GameState, p: Player): string | undefined {
   return p.loseDeferred;
 }
 
+/**
+ * Lich's Mirror (round B280): "shuffle your hand, your graveyard, and all permanents you own into your library, then draw
+ * seven cards and your life total becomes 20" (the life total in playerLoses). All at once, whoever controls the permanents
+ * (rulings), as Sway of the Stars does: tokens cease to exist (CR 111.7, 704.5d), a commander may go to the command zone
+ * (CR 903.9b), spells, exiled cards and permanents others own stay; `stay`: those whose controllers chose the graveyard
+ * these state-based actions put them into (askMirrorStay). Fewer than seven cards to draw, the player loses at the next
+ * check (rulings). It isn't a restart: no mulligan.
+ */
+function lichsMirror(s: GameState, pid: PlayerId, src: string, reason: string, stay: Set<ObjectId>) {
+  const p = player(s, pid);
+  log(s, `${p.name} would lose the game (${reason}), but shuffles their hand, graveyard and permanents into their library instead, then draws seven cards and their life total becomes 20 (${src}).`);
+  const leaving = s.battlefield.filter((id) => obj(s, id).owner === pid && !stay.has(id));
+  for (const id of leaving) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "library");
+  for (const id of [...p.hand, ...p.graveyard]) moveObject(s, id, "library");
+  shuffleLibrary(s, p);
+  invalidateCharacteristics(s);
+  // A draw that pauses for a replacement choice finishes after it (as for Stunning Reversal).
+  draw(s, pid, 7);
+}
+
+/**
+ * Lich's Mirror (round B280): whether its replacement of `pid`'s loss in these state-based actions has left them just as
+ * the last one did: the same loss comes back at the next check and the Mirror (one they control but don't own, so it
+ * stayed) replaces it the same way, forever, a loop no one can stop: the game is a draw (CR 104.4b; rulings).
+ */
+function mirrorLoops(s: GameState, pid: PlayerId, mirror: ObjectId, reason: string): boolean {
+  const p = player(s, pid);
+  const key = JSON.stringify([mirror, reason, p.life, p.poison ?? 0, p.commanderDamage, p.hand.length, p.graveyard.length, p.library.length, s.battlefield.filter((id) => obj(s, id).owner === pid).length]);
+  const before = s.mirrorRepeat?.find((r) => r.player === pid);
+  if (before?.key === key) return true;
+  s.mirrorRepeat = [...(s.mirrorRepeat ?? []).filter((r) => r.player !== pid), { player: pid, key }];
+  return false;
+}
+
 /** Ask a player who would lose the game now which of several replacements applies (CR 616.1), before the state-based actions are performed. */
 function askLoseReplacement(s: GameState): boolean {
   for (const p of s.players) {
-    if (p.lost || s.loseChoice?.player === p.id) continue;
+    if (p.lost) continue;
     const reason = lossReasonNow(s, p);
     if (!reason || gameEndBlocked(s, p.id, "lose")) continue;
     const opts = loseReplacements(s, p.id, true);
-    if (opts.length < 2) continue;
-    s.pending = { kind: "chooseOption", player: p.id, source: "Losing the game", what: "loseReplacement", options: opts.map((o) => o.key), labels: opts.map((o) => o.label), prompt: `you would lose the game (${reason}). Which replacement applies?` };
+    const chosen = s.loseChoice?.player === p.id ? s.loseChoice.choice : undefined;
+    if (opts.length >= 2 && chosen === undefined) {
+      s.pending = { kind: "chooseOption", player: p.id, source: "Losing the game", what: "loseReplacement", options: opts.map((o) => o.key), labels: opts.map((o) => o.label), prompt: `you would lose the game (${reason}). Which replacement applies?` };
+      return true;
+    }
+    // Lich's Mirror (round B280): the permanents this player owns that these state-based actions put into a graveyard too.
+    const pick = opts.length === 1 ? opts[0] : opts.find((o) => o.key === chosen);
+    if (pick?.mirror && askMirrorStay(s, p.id, pick.id!)) return true;
+  }
+  return false;
+}
+
+/**
+ * Lich's Mirror (round B280): a player would lose the game as the state-based actions are performed, and the Mirror's
+ * replacement applies, while the same check would put some of the permanents they own into a graveyard (dying, the legend
+ * rule, ...): both can't happen, so each one's controller chooses which (rulings: "the creature's controller chooses"; one
+ * put into the graveyard isn't shuffled in, and its "dies" abilities trigger only then). Asked of each such controller in
+ * turn order from the active player (CR 101.4), before this check's actions are performed (CR 704.3).
+ */
+function askMirrorStay(s: GameState, pid: PlayerId, mirror: ObjectId): boolean {
+  let entry = s.mirrorStay?.find((e) => e.player === pid);
+  if (!entry) {
+    entry = { player: pid, bound: mirrorBound(s, pid), asked: [], stay: [] };
+    (s.mirrorStay ??= []).push(entry);
+  }
+  for (const c of turnOrderFrom(s, s.activePlayer)) {
+    if (entry.asked.includes(c) || player(s, c).lost) continue;
+    const mine = entry.bound.filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === c);
+    if (!mine.length) continue;
+    const loser = c === pid ? "you" : player(s, pid).name;
+    s.pending = {
+      kind: "pickPermanents",
+      player: c,
+      source: nameOf(s, mirror),
+      action: "choose",
+      what: "permanent",
+      options: mine,
+      count: mine.length,
+      min: 0,
+      mirrorStay: pid,
+      prompt: `${c === pid ? "you would lose the game" : `${loser} would lose the game`}, so ${c === pid ? "your" : "their"} hand, graveyard and permanents are shuffled into ${c === pid ? "your" : "their"} library instead. These ${c === pid ? "" : `permanents ${loser} owns that you control `}would also be put into a graveyard now: click the ones that go to the graveyard instead (the rest are shuffled in).`,
+    };
     return true;
   }
   return false;
+}
+
+/**
+ * The permanents `pid` owns that this check of the state-based actions would destroy or put into a graveyard (Lich's
+ * Mirror, round B280): those it would destroy (lethal damage or deathtouch, so regeneration could still apply) or with no
+ * toughness, and every one the rest of this pass moves off the battlefield (no loyalty, the legend and world rules,
+ * Auras, Sagas, battles, roles), found by performing one pass on a copy of the game in which no player loses.
+ */
+function mirrorBound(s: GameState, pid: PlayerId): ObjectId[] {
+  const owned = s.battlefield.filter((id) => obj(s, id).owner === pid);
+  const c = structuredClone(s);
+  c.pending = null;
+  c.loseChoice = undefined;
+  c.mirrorStay = undefined;
+  for (const q of c.players) {
+    if (q.lost) continue;
+    q.life = Math.max(q.life, 1);
+    q.poison = 0;
+    q.commanderDamage = {};
+    q.drewFromEmptyLibrary = false;
+    q.loseDeferred = undefined;
+  }
+  invalidateCharacteristics(c);
+  runStateBasedActions(c, true, true);
+  return owned.filter((id) => diesThisCheck(s, obj(s, id)) || c.objects[id]?.zone !== "battlefield" || (c.objects[id]!.zoneChanges ?? 0) !== (obj(s, id).zoneChanges ?? 0));
+}
+
+/** Lich's Mirror's answer (askMirrorStay): the permanents picked go to the graveyard with these state-based actions instead. */
+function chooseMirrorStay(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  if (pend?.kind !== "pickPermanents" || pend.mirrorStay === undefined || pend.player !== p.id) throw new RulesError("nothing to pick");
+  const entry = s.mirrorStay?.find((e) => e.player === pend.mirrorStay);
+  if (!entry) throw new RulesError("nothing to pick");
+  if (ids.some((id) => !pend.options.includes(id)) || new Set(ids).size !== ids.length) throw new RulesError("choose among the permanents offered");
+  entry.asked.push(p.id);
+  entry.stay.push(...ids);
+  log(s, ids.length ? `${p.name} has ${ids.map((id) => nameOf(s, id)).join(", ")} go to the graveyard instead (${pend.source}).` : `${p.name} has every one of them shuffled into the library (${pend.source}).`);
+  s.pending = null;
 }
 
 /**
@@ -17266,7 +17386,13 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   }
   if (pick) {
     const src = pick.reversal !== undefined ? p.loseInstead![pick.reversal]!.source : nameOf(s, pick.id!);
-    if (pick.reversal !== undefined) {
+    if (pick.mirror) {
+      // Lich's Mirror (round B280): the life total below.
+      const entry = sba ? s.mirrorStay?.find((e) => e.player === pid) : undefined;
+      s.mirrorStay = s.mirrorStay?.filter((e) => e.player !== pid);
+      if (!s.mirrorStay?.length) s.mirrorStay = undefined;
+      lichsMirror(s, pid, src, reason, new Set(entry?.stay ?? []));
+    } else if (pick.reversal !== undefined) {
       // Stunning Reversal: one shield used up; the seven draws, then the life total (with fewer than seven cards, the
       // player loses at the next check, rulings). A draw that pauses for a replacement choice finishes after it.
       p.loseInstead = p.loseInstead!.filter((_, i) => i !== pick.reversal);
@@ -17281,6 +17407,7 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
     if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life, { controller: pid });
     else if (p.life > pick.life && canLoseLife(s, pid)) loseLife(s, pid, p.life - pick.life);
     invalidateCharacteristics(s);
+    if (pick.mirror && sba && mirrorLoops(s, pid, pick.id!, reason)) drawGame(s, `${src} replaces ${p.name}'s loss again and again, and nothing can stop it`);
     return true;
   }
   p.lost = true;

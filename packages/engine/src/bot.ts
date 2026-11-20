@@ -15,8 +15,8 @@ import { redistributions } from "./effects/run-round362";
 import { addedAbilityCosts, addedSacrificeCandidates } from "./added-costs";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { activatedQuality, manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
+import { activatedQuality, manyX, manyOfferSizes, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { withModes, modeRange, manySlot, manySlots, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
   applyInPlace,
@@ -720,6 +720,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found }];
     }
     // Land Equilibrium (round B278): the land worth least to it, the one just put there too.
+    // Lich's Mirror (round B280): our own permanents are shuffled back in, to draw again; another player's go to the graveyard.
+    if (pend.kind === "pickPermanents" && pend.mirrorStay !== undefined) return [{ type: "pickPermanents", player: pid, ids: pend.mirrorStay === pid ? [] : pend.options }];
     if (pend.kind === "pickPermanents" && pend.equilibrium) return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "sacrifice") }];
     if (pend.kind === "pickPermanents" && pend.blockCost) {
       const rest = s.blockCostsDue?.costs.slice(1) ?? [];
@@ -1722,7 +1724,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // seven to draw, and a dying Exquisite Archangel to the graveyard rather than exile.
     if (pend.kind === "chooseOption" && pend.what === "loseReplacement") {
       const opts = loseReplacements(s, pid, true);
-      const score = (o: (typeof opts)[number]) => o.life + (o.reversal !== undefined ? (player(s, pid).library.length >= 7 ? 15 : -1000) : 0) + (o.graveyard ? 1 : 0);
+      // Lich's Mirror (round B280): 20 life, less what it costs us: our board, and the game with fewer than seven cards to draw.
+      const cards = player(s, pid).library.length + player(s, pid).hand.length + player(s, pid).graveyard.length + s.battlefield.filter((id) => obj(s, id).owner === pid && !obj(s, id).isToken).length;
+      const board = s.battlefield.filter((id) => obj(s, id).owner === pid && !objIsType(s, obj(s, id), "Land")).length;
+      const score = (o: (typeof opts)[number]) => o.life + (o.reversal !== undefined ? (player(s, pid).library.length >= 7 ? 15 : -1000) : 0) + (o.graveyard ? 1 : 0) + (o.mirror ? (cards >= 7 ? -board : -1000) : 0);
       const best = opts.filter((o) => pend.options.includes(o.key)).sort((a, b) => score(b) - score(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best?.key ?? pend.options[0]! }];
     }
@@ -3668,6 +3673,21 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
+  // Filigree Vector (round B280): several "any number of target" groups, laid out as offered (manyOfferSizes): +1/+1 and
+  // charge counters on each of our own permanents the group could be, never on another player's.
+  const groups = manySlots(printed.targets);
+  if (groups.length > 1) {
+    if (groups.length !== printed.targets.length) return null;
+    // As the trigger is put on the stack (pushTrigger), so the layout is the one it reads.
+    const src = sourceId ? sourceQuality(s, sourceId) : undefined;
+    const sizes = manyOfferSizes(s, printed, pid, src, sourceId)!;
+    return groups.flatMap((j, g) => {
+      const e = printed.effects.find((x) => x.type === "counters" && x.what.ref === "target" && x.what.index === j);
+      const good = e?.type === "counters" && (e.counter === "+1/+1" || e.counter === "charge");
+      const ours = good ? legalTargets(s, printed.targets[j]!, pid, undefined, src, sourceId).flatMap((t) => (t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid ? [t] : [])) : [];
+      return Array.from({ length: sizes[g]! }, (_, k): TargetChoice => ours[k] ?? { kind: "none" });
+    });
+  }
   if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
   // Command the Dreadhorde: the cards' total mana value is dealt to us first: the costliest cards that still leave us
   // more than 6 life, none if that's nothing worth it.

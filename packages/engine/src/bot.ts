@@ -2299,6 +2299,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
     }
+    // Dimensional Breach (round B274): the most valuable of its own exiled cards that can come back.
+    if (pend.kind === "chooseOption" && pend.what === "breachReturn") {
+      const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "mireLand") {
       const score = (id: string) => {
         const o = s.objects[id];

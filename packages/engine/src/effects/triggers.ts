@@ -3216,6 +3216,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
+      // Dimensional Breach (round B274): "for as long as any of those cards remain exiled": once none is, as the object it
+      // became there (CR 400.7), the effect is over (CR 610.3) and never triggers again.
+      const breach = d.when === "eachUpkeepWhileExiled" ? d.body.effects[0] : undefined;
+      if (breach?.type === "breachReturn" && !breach.cards.some((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc)) {
+        s.delayed = s.delayed!.filter((x) => x !== d);
+        continue;
+      }
       // Vivien's Stampede: "the next main phase this turn" never came: it never will.
       if (d.when === "nextMainThisTurn" && d.turn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);
@@ -3253,14 +3260,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? ev.step === "draw" && ev.active === d.player && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf("draw"))
               : d.when === "yourNextFirstMain"
               ? ev.step === "main1" && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
-              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === (d.when === "playersNextUpkeep" ? d.player : d.controller)) && d.turn < s.turn;
+              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || d.when === "eachUpkeepWhileExiled" || ev.active === (d.when === "playersNextUpkeep" ? d.player : d.controller)) && d.turn < s.turn;
       if (!due) continue;
-      if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain" && d.when !== "eachUpkeepWhileExiled") s.delayed = s.delayed!.filter((x) => x !== d);
       // "If any of those cards remain exiled" (Glimpse the Impossible): it triggers only if one does (CR 603.4).
       const lead = d.body.effects[0];
       if (lead?.type === "exiledToGraveyard" && !(lead.cards ?? []).some((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc)) continue;
       // "~" is the subject, or the source it remembers (Gift of Immortality's Aura card).
-      s.triggerQueue.push({ sourceId: d.source?.id ?? d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.source?.zc ?? d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.event ? { event: d.event } : {}) });
+      s.triggerQueue.push({ sourceId: d.source?.id ?? d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.source?.zc ?? d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.when === "eachUpkeepWhileExiled" ? { event: { player: ev.active } } : d.event ? { event: d.event } : {}) });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);

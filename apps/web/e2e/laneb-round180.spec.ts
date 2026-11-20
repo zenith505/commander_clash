@@ -2,7 +2,7 @@
 // before that draw step": your upkeep stops for it, and the "Pay {1} for Nafs Asp" button pays it (a special action).
 import { expect, test } from "@playwright/test";
 import { open, pageErrors, playUntil, scene, state } from "./scene";
-import { controls } from "./ui";
+import { controls, resolveUntil } from "./ui";
 import { applyAction, waitingOn } from "@cc/engine";
 
 test("Nafs Asp: Ana's Asp hits you; in your upkeep pay {1} with a Forest and lose no more life", async ({ page }) => {
@@ -18,15 +18,10 @@ test("Nafs Asp: Ana's Asp hits you; in your upkeep pay {1} with a Forest and los
   await pay.click();
   await expect.poll(async () => (await state(page)).delayed?.some((d) => d.unlessPaid) ?? false).toBe(false);
   await expect(pay).toHaveCount(0);
-  await controls(page).getByRole("button", { name: "Pass" }).click();
-  // The state the poll saw (it's your main phase now: the draw step passed with nothing to lose).
-  let after = await state(page);
-  await expect
-    .poll(async () => {
-      after = await state(page);
-      return after.step;
-    })
-    .toBe("main1");
+  // Pass until your first main phase of this turn: resolveUntil clicks Pass only once the game has settled on you, so a
+  // click can't land after the game has moved on by itself (it moved past main1 to main2 that way, follow-up 19). The
+  // state it saw there is the one checked.
+  const after = await resolveUntil(page, (st) => st.turn === s.turn && st.activePlayer === 0 && st.step === "main1" && !st.stack.length);
   expect(after.players[0]!.life).toBe(39);
   expect(pageErrors(page)).toEqual([]);
 });

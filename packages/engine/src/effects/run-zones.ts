@@ -21,6 +21,7 @@ import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { chooseAnOpponent, toBottom } from "./run-library";
 import { attackDefault, bent, closeZoneBatch, fireEvent, inCombat } from "./triggers";
 import { asFace, defMv, hasName, layoutOf, registerFace, sameName, transformedFace } from "../faces";
+import { subjectLastMv } from "./run-laneb274";
 import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -3202,7 +3203,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // the same object (CR 400.7), as it is now (CR 303.4f).
         const mine = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me : undefined;
         const couldEnchantMe = (id: ObjectId) => !!mine && defOf(s, obj(s, id)).subtypes.includes("Aura") && auraHostOptions(s, obj(s, id), p.id).some((h) => "attachTo" in h && h.attachTo === mine.id);
-        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id) && (!e.hostableAuras || !defOf(s, obj(s, id)).subtypes.includes("Aura") || auraHostOptions(s, obj(s, id), p.id).length > 0) && (!e.couldEnchantSelf || couldEnchantMe(id)));
+        // Next of Kin (round B274): "with lesser mana value" than the creature that died, as it last existed on the battlefield
+        // (CR 603.10a, 608.2h: its copiable values then, a face-down one's 0), and a card you own in the command zone too.
+        const deadMv = e.lesserMvThanSubject ? subjectLastMv(s, ctx) : undefined;
+        if (e.lesserMvThanSubject && deadMv === undefined) return void (s.resolving!.did = false);
+        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : []), ...(e.orCommand ? p.command.filter((id) => obj(s, id).owner === p.id) : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (deadMv === undefined || defMv(defOf(s, obj(s, id))) < deadMv) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id) && (!e.hostableAuras || !defOf(s, obj(s, id)).subtypes.includes("Aura") || auraHostOptions(s, obj(s, id), p.id).length > 0) && (!e.couldEnchantSelf || couldEnchantMe(id)));
         const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;
@@ -3216,12 +3221,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           else {
             // Aetherplasm (round B261): the attacker it would block, shown with the question.
             const blocking = e.blockingSubject ? objects(s, { ref: "subject" }, ctx)[0] : undefined;
-            s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(blocking ? { blocking: blocking.id } : {}), ...(e.couldEnchantSelf && mine ? { attachingTo: mine.id } : {}) };
+            s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(blocking ? { blocking: blocking.id } : {}), ...(e.couldEnchantSelf && mine ? { attachingTo: mine.id } : {}), ...(e.orCommand ? { orCommand: true as const } : {}) };
           }
           return "paused";
         }
       }
-      const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard")) && o.owner === from);
+      const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard") || (e.orCommand && o.zone === "command")) && o.owner === from);
       if (e.auraSwap) {
         // The exchange happens at once (rulings): the source to its owner's hand, the Aura card attached to what it enchanted.
         const card = cards.find((o) => swapFits(o.id));
@@ -3289,7 +3294,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const equip = e.attachToSelf && !d.subtypes.includes("Aura") && d.subtypes.includes("Equipment") && !isType(d, "Creature") && !!self && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, self, p.id, false, d) ? { attachTo: self.id } : undefined;
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature") && fits(o);
           const tapped = e.tapped && fits(o);
-          log(s, `${p.name} puts ${defOf(s, o).name} from ${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone} onto the battlefield${tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
+          log(s, `${p.name} puts ${defOf(s, o).name} from ${o.zone === "command" ? "the command zone" : `${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone}`} onto the battlefield${tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
           // The First Tyrannic War: the number counted now, as it resolves; the {X} judged as it enters (game.ts).
           const ifX = e.countersIfXCost ? { countersIfXCost: { [e.countersIfXCost.counter]: Math.max(0, amountNow(s, e.countersIfXCost.n, ctx)) } } : {};
           moveObject(s, o.id, "battlefield", { controller: p.id, ...(tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...ifX, ...host, ...equip });

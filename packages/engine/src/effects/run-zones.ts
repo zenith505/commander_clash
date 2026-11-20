@@ -3194,7 +3194,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           return now ?? (t.types === "all" ? "all" : new Set(t.types));
         });
         const kin = (id: ObjectId) => !e.kinOfCostTapped || (tapped.length > 0 && tapped.every((t) => shareCreatureType(t, creatureTypesOf(s, obj(s, id)))));
-        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id) && (!e.hostableAuras || !defOf(s, obj(s, id)).subtypes.includes("Aura") || auraHostOptions(s, obj(s, id), p.id).length > 0));
+        // Bruna, Light of Alabaster (round B272): "Aura cards that could enchant it": the source, still on the battlefield as
+        // the same object (CR 400.7), as it is now (CR 303.4f).
+        const mine = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me : undefined;
+        const couldEnchantMe = (id: ObjectId) => !!mine && defOf(s, obj(s, id)).subtypes.includes("Aura") && auraHostOptions(s, obj(s, id), p.id).some((h) => "attachTo" in h && h.attachTo === mine.id);
+        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most) && (!e.auraSwap || swapFits(id)) && kin(id) && (!e.hostableAuras || !defOf(s, obj(s, id)).subtypes.includes("Aura") || auraHostOptions(s, obj(s, id), p.id).length > 0) && (!e.couldEnchantSelf || couldEnchantMe(id)));
         const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;
@@ -3208,7 +3212,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           else {
             // Aetherplasm (round B261): the attacker it would block, shown with the question.
             const blocking = e.blockingSubject ? objects(s, { ref: "subject" }, ctx)[0] : undefined;
-            s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(blocking ? { blocking: blocking.id } : {}) };
+            s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true, ...(e.auraSwap ? { swap: true as const } : {}), ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(blocking ? { blocking: blocking.id } : {}), ...(e.couldEnchantSelf && mine ? { attachingTo: mine.id } : {}) };
           }
           return "paused";
         }

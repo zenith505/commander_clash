@@ -2035,12 +2035,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "enchant":
       c.enchantSpec = m.spec;
       return;
-    case "addAbility":
+    case "addAbility": {
       if (/^ward\b/i.test(m.text)) delete c.wardLost;
+      // Bludgeon Brawl (round B273): "where X is that artifact's mana value": the mana value of the one getting it, as it
+      // is now (CR 202.3; layer 1 is done).
+      const text = m.mvX ? m.text.replace(/\bX\b/g, String(c.manaValue)) : m.text;
       // An ability that names the permanent giving it ("Sacrifice Blazing Torch"): bound to that object (grants.ts).
-      c.grantedAbilities.push(m.text.includes(QUOTED_SOURCE_NAME) && e.sourceId && s.objects[e.sourceId] ? bindGrantSource(m.text, e.sourceId, s.objects[e.sourceId]!.zoneChanges ?? 0, e.sourceName) : m.text);
+      c.grantedAbilities.push(text.includes(QUOTED_SOURCE_NAME) && e.sourceId && s.objects[e.sourceId] ? bindGrantSource(text, e.sourceId, s.objects[e.sourceId]!.zoneChanges ?? 0, e.sourceName) : text);
       (c.grantedAt ??= []).push(e.timestamp);
       return;
+    }
     case "definePT":
       if (m.power !== undefined) c.power = num(m.power);
       if (m.toughness !== undefined) c.toughness = num(m.toughness);

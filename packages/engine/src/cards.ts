@@ -823,7 +823,8 @@ const ENCHANT_CREATURE: TargetSpec = { kind: "object", types: ["Creature"], text
 export function enchantOf(s: GameState, o: GameObject): TargetSpec | undefined {
   const c = characteristics(s, o);
   // One that lost all its abilities (Immovable Rod) has no enchant ability, so it can't legally enchant anything (rulings).
-  return (c.hasPrintedAbilities ? compileCard(defOf(s, o)).enchant : undefined) ?? c.enchantSpec ?? (c.enchantCreature ? ENCHANT_CREATURE : undefined);
+  // Takklemaggot (round B275): one that lost "enchant creature" has only an enchant ability gained after that.
+  return (c.hasPrintedAbilities && !c.enchantLost ? compileCard(defOf(s, o)).enchant : undefined) ?? c.enchantSpec ?? (c.enchantCreature ? ENCHANT_CREATURE : undefined);
 }
 /** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */
 export function withGranted(base: CompiledCard, granted: readonly string[]): CompiledCard {

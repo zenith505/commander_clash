@@ -3101,6 +3101,8 @@ export interface Resolving {
   exiled?: { o: GameObject; ch: Characteristics; /** Who controlled it as it last existed ("its controller", CR 608.2h): Chaotic Transformation. */ controller?: PlayerId }[];
   /** The cards its exile instructions exiled from graveyards so far while this resolves (Count "cardsExiledThisWay"). */
   exiledCards?: ObjectId[];
+  /** Tawnos's Coffin (Effects coffinNote and coffinWatch, round B275): the target's counters and the Auras attached to it just before the exile, as the objects they were. */
+  coffinNoted?: { counters: Record<string, number>; auras: { id: ObjectId; zc: number }[] };
   /** The cards exileNamed exiled from a player's graveyard, hand and library so far while this resolves (Kotose, the Silent Spider, round 420: "the exiled cards"). */
   namedExiled?: ObjectId[];
   /** The total toughness of what a returnExiled with `toughnessThisWay` returned (Count "returnedToughness"). */
@@ -3362,6 +3364,10 @@ export interface Resolving {
     mireLand?: { pick?: string };
     /** Dimensional Breach (Effect breachReturn, round B274): asked which exiled card; the card chosen (an object id). */
     breachReturn?: { pick?: string };
+    /** Tawnos's Coffin (Effect coffinReturn): the card is back; the permanents it became. */
+    coffinBack?: { id: ObjectId; zc: number }[];
+    /** Takklemaggot (Effect takklemaggot, round B275): the creature chosen for it ("" while asked, "none" if none could be). */
+    takkHost?: string;
     /** Lynde, Cheerful Tormentor (round 394): the Curse move chosen ("id>player" or "none"), "" while asked. */
     curseMove?: string;
     /** Assimilation Aegis (Effect becomeCopyOfLinked, round 396): the exiled creature card chosen to copy (an object id), "" while asked. */

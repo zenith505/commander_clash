@@ -62,6 +62,7 @@ export function layerOf(m: Modification): Layer {
     case "loseStatic":
     case "enchantCreature":
     case "enchant":
+    case "loseEnchant":
       return "6";
     case "definePT":
       return "7a";
@@ -244,6 +245,8 @@ export interface Characteristics {
   enchantCreature?: true;
   /** "It's an Aura enchantment with enchant creature you control" (Bronzehide Lion): an enchant ability from an effect (enchantOf). */
   enchantSpec?: TargetSpec;
+  /** Takklemaggot (round B275): it lost its printed enchant ability (Modification loseEnchant, enchantOf). */
+  enchantLost?: true;
   /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
@@ -2034,6 +2037,13 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "enchant":
       c.enchantSpec = m.spec;
+      return;
+    case "loseEnchant":
+      // Takklemaggot (round B275): 'It loses "enchant creature"': its printed enchant ability and any gained earlier (CR
+      // 613.1f, 613.7); one gained later still applies.
+      c.enchantLost = true;
+      c.enchantCreature = undefined;
+      c.enchantSpec = undefined;
       return;
     case "addAbility": {
       if (/^ward\b/i.test(m.text)) delete c.wardLost;

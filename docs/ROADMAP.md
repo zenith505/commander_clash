@@ -1,6 +1,6 @@
 # Roadmap
 
-31,793 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,798 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,945 of
 9,979 (99%).
 
@@ -4393,6 +4393,32 @@ line blocks.
    and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
    bots activate Dynaheir's ability only with an ability of four or more mana they could also pay for; bots sneak a card
    from their graveyard only for a token or a less valuable unblocked attacker, as from their hand.
+   Round 429 went on down the "Out after round N" lists and `npm run popular`, most played first, to an Aura's static copy
+   effect, copies of several graveyard cards cast as a reflexive trigger resolves, and a once-a-turn play from exile.
+   Bloodthirsty Adversary's "you may pay {2}{R} any number of times. When you pay this cost one or more times, put that
+   many +1/+1 counters on this creature, then exile up to that many target instant and/or sorcery cards with mana value 3
+   or less from your graveyard and copy them. You may cast any number of the copies without paying their mana costs." (a
+   reflexive trigger, CR 603.12, its targets chosen as it's put on the stack with X the times paid, rulings; the cards
+   still legal exiled and copied, the copies cast then or never, CR 608.2g, 707.12, the cards staying exiled, rulings;
+   castFromAmong `copies` from a `many` "x" slot). Metamorphic Alteration's "As this Aura enters, choose a creature." (CR
+   614.12, anyone's, the enchanted one too, not one entering with it, rulings) and "Enchanted creature is a copy of the
+   chosen creature." (a static copy effect, CR 707.2, 611.3a, of the values locked in as it was chosen, Chosen.copyKey,
+   rulings: not its counters or other effects, a token's original values without becoming a token; with the Aura's
+   timestamp, CR 613.7e; a copy of a noncreature makes the Aura fall off, rulings, CR 704.5m; CopyEffect `aura`, kept by
+   game.ts syncAuraCopies). Evelyn, the Covetous's "exile the top card of each player's library with a collection counter
+   on it" (GameObject.exiledByPlayer) and "Once each turn, you may play a card from exile with a collection counter on it
+   if it was exiled by an ability you controlled, and you may spend mana as though it were mana of any color to cast it."
+   (a land as the turn's land play, a spell with the usual timing, CR 305.1, 601.3, 609.4b; one card each turn for each
+   Evelyn object, CompiledCard.playExiledCounteredOnce). A browser test clicks through each. +3, 31,798 of 31,936
+   on this stacked branch (round 428 #705, with round 427's head 037bca2 and main 73cb89a in it); the compiled text of
+   every other card is unchanged.
+   Out after round 429 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability, only one per ability is modeled), the cards rounds 425-428 left out (still out, for their reasons), and the
+   rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
+   Metamorphic Alteration's copy effect begins at the next state-based action check after it becomes attached, so an
+   ability the copy has that would trigger on the Aura's own entering doesn't; bots aim it at an opponent's creature and
+   choose the least creature to copy; a card another permission could also play is played with that one, leaving
+   Evelyn's play for the turn unused.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

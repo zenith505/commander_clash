@@ -904,6 +904,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       for (const id of ranked) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
       return [{ type: "searchLibrary", player: pid, found }];
     }
+    // Hama, the Bloodbender (round 431): the card it may cast later by waterbending its mana value: the dearest one our
+    // lands, artifacts and creatures could pay for.
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && !!s.resolving?.body.effects.slice(s.resolving.next ?? 0).some((x) => x.type === "mayCastExiledWaterbend")) {
+      const payers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && ["Land", "Artifact", "Creature"].some((t) => objIsType(s, obj(s, id), t))).length;
+      const sorted = [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a));
+      const pick = sorted.find((id) => mv(s, id) <= payers) ?? sorted[0];
+      return [{ type: "searchLibrary", player: pid, found: pick && pend.max > 0 ? [pick] : [] }];
+    }
     // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
     // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.cards.some((id) => obj(s, id).owner !== pid)) {
@@ -7859,6 +7867,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (!best) continue;
         swapTargets = best;
       }
+      // The Face of Boe (round 431): only with a card with suspend in hand to cast for its suspend cost.
+      if (ab.body.effects.some((e) => e.type === "castFromAmong" && e.pay?.kind === "suspendCost") && !player(s, pid).hand.some((h) => !!compileCard(defOf(s, obj(s, h))).suspend)) continue;
       // Brutal Hordechief (round 378): once a turn, on our turn before attackers are declared with the stack empty, while we
       // have a creature that could attack and an opponent an untapped creature it makes block.
       if (ab.body.effects.some((e) => e.type === "chooseBlocks")) {

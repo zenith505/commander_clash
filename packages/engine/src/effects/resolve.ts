@@ -31,6 +31,7 @@ import { runKinCountersEffect } from "./run-round361";
 import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
 import { runRound420Effect } from "./run-round420";
+import { runMayCastExiledWaterbendEffect } from "./run-round431";
 import { runRound421Effect } from "./run-round421";
 import { runRound424Effect } from "./run-round424";
 import { runChooseSourceNowEffect } from "./run-round364";
@@ -2026,6 +2027,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runTapLandsSharingManaEffect(s, ctx, src);
     case "auraCopiesOnAttackers":
       return runAuraCopiesOnAttackersEffect(s, ctx, src);
+    case "mayCastExiledWaterbend":
+      return runMayCastExiledWaterbendEffect(s, ctx, src);
     case "mayPlayOneExiledThisWay":
     case "revealOpponentExilesCasts":
     case "exileFromHandOrTarget":

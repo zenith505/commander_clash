@@ -22185,6 +22185,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ef80e174-78e8-412d-a6fe-89c7af746669",
+  "name": "Hama, the Bloodbender",
+  "manaCost": "{2}{U/B}{U/B}{U/B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "When Hama enters, target opponent mills three cards. Exile up to one noncreature, nonland card from that player's graveyard. For as long as you control Hama, you may cast the exiled card during your turn by waterbending {X} rather than paying its mana cost, where X is its mana value. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Mill",
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7ac433a7-c107-46de-b36b-d7419c9ec565",
   "name": "Hana Kami",
   "manaCost": "{G}",
@@ -44109,6 +44147,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "58aac732-3f03-4551-a684-6cb0e3b31c09",
+  "name": "Skyway Robber",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Bird Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Rogue"
+  ],
+  "oracleText": "Flying\nEscape—{3}{U}, Exile five other cards from your graveyard. (You may cast this card from your graveyard for its escape cost.)\nThis creature escapes with \"Whenever this creature deals combat damage to a player, you may cast an artifact, instant, or sorcery spell from among cards exiled with this creature without paying its mana cost.\"",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Escape"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7a3569a0-a55f-40c9-9588-92db35e26567",
   "name": "Slaughter the Strong",
   "manaCost": "{1}{W}{W}",
@@ -48955,6 +49027,43 @@
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "acef7666-53b1-43c5-8107-236bea22a8b3",
+  "name": "The Face of Boe",
+  "manaCost": "{1}{U}{R}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Alien Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Alien",
+   "Advisor"
+  ],
+  "oracleText": "{T}: You may cast a spell with suspend from your hand. If you do, pay its suspend cost rather than its mana cost. Activate only as a sorcery.",
+  "power": "0",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

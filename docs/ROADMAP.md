@@ -1,6 +1,6 @@
 # Roadmap
 
-31,800 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,803 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
 9,979 (99%).
 
@@ -4445,6 +4445,34 @@ line blocks.
    of Leng (spells, and lands while short of them); C.A.M.P.'s bot picks the creature for the counter without looking
    at the mana's color; C.A.M.P. sees no color for mana whose color another player chooses (Spectral Searchlight's
    kind, which no land has).
+   Round 431 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card cast for its
+   suspend cost, a trigger an escaped creature enters with, and an exiled card cast by waterbending. The Face of Boe's "{T}:
+   You may cast a spell with suspend from your hand. If you do, pay its suspend cost rather than its mana cost. Activate
+   only as a sorcery." (one card with suspend, cast as the ability resolves, rulings, its timing ignored, CR 608.2g, for its
+   suspend cost as an alternative cost, CR 118.9, CastPay "suspendCost"; cast, not suspended, so no time counters or haste,
+   CR 702.62a; a card with no mana cost like Ancestral Vision can be cast this way, CR 118.6; a "Suspend X" card's X is
+   announced, CR 107.3a, and can't be 0). Skyway Robber's "This creature escapes with "Whenever this creature deals combat
+   damage to a player, you may cast an artifact, instant, or sorcery spell from among cards exiled with this creature
+   without paying its mana cost."" (CR 702.138c: it has the ability only if it escaped, TriggeredAbility.activeIf; the
+   cards are those its escape cost exiled, linked to the permanent the spell became, CR 607.2a, the last time it escaped
+   only, rulings). Hama, the Bloodbender's "When Hama enters, target opponent mills three cards. Exile up to one
+   noncreature, nonland card from that player's graveyard. For as long as you control Hama, you may cast the exiled card
+   during your turn by waterbending {X} rather than paying its mana cost, where X is its mana value." (the card chosen as
+   it resolves, after the mill; a permission ended if Hama has left or changed control, CR 611.2b; normal timing; the
+   waterbend cost an alternative cost, CR 118.9, up to X of it paid by tapping artifacts and creatures, summoning sick ones
+   too, CR 701.67a, rulings; an X in the card's own cost is 0; GameObject.mayPlay `cost` with `waterbend`, `yourTurnOnly`;
+   "whenever you waterbend" sees it). Browser tests click through each, Hama's twice (mana, then waterbending). +3, 31,803
+   of 31,936 on this stacked branch (round 430 #709); the compiled text of every other card is unchanged.
+   Out after round 431 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
+   430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
+   that creature's, checked with its last known power), Drain Power (mana abilities another player activates for each land,
+   then that mana moved), Ertai's Meddling (delay counters, then the card put onto the stack as a copy of the spell), the
+   cards rounds 425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still
+   out, for the reasons in their earlier lists). Judgment calls: Hama's X is the exiled card's mana value as it is in exile,
+   fixed as it's exiled (a split card's both halves, CR 709.4); "X can't be 0" in a "Suspend X" line holds for The Face of
+   Boe's cast too. Known gaps: Skyway Robber's ability is read as its own with "if it escaped", so if it later becomes a
+   copy of something else it loses it (the escape's layer 6 effect would keep it, CR 613.1f); bots pick for Hama the dearest
+   card their lands, artifacts and creatures could pay for, and activate The Face of Boe only with a suspend card in hand.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

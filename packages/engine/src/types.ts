@@ -667,6 +667,10 @@ export interface GameObject {
     castAnotherThisTurn?: true;
     /** Durnan of the Yawning Portal (round 380): "That spell has undaunted": {1} less for each opponent its caster has (CR 702.125a-b). */
     undaunted?: true;
+    /** Hama, the Bloodbender (round 431): with `cost`, "by waterbending {X} rather than paying its mana cost": the cost is a waterbend cost, so up to its generic mana may be paid by tapping artifacts and creatures (CR 701.67a). */
+    waterbend?: true;
+    /** Hama, the Bloodbender (round 431): "during your turn": only while `player` is the active player. */
+    yourTurnOnly?: true;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the

@@ -8,7 +8,7 @@ import { amountNow, apnap, players, runEffect, type ResolveCtx } from "./resolve
 import { characteristics } from "../layers";
 import { defMv, sameName } from "../faces";
 import { bindChosen, printedMatches } from "./targeting";
-import { discardCards } from "./run-library";
+import { discardCards, discardToTop } from "./run-library";
 
 type B160Effect = Extract<Effect, { type: "revealRandomDiscardNamed" | "counterCauseIfNamed" | "eachChoosesFromHand" }>;
 
@@ -18,20 +18,28 @@ export function runLaneB160Effect(s: GameState, e: B160Effect, ctx: ResolveCtx, 
       const pid = players(s, e.who, ctx)[0];
       if (pid === undefined) return;
       const p = player(s, pid);
-      // X cards of the hand at random, all of them with fewer (rulings: the name was chosen first, as it resolved).
-      const pool = [...p.hand];
-      const seen: ObjectId[] = [];
-      for (let n = Math.min(amountNow(s, e.n, ctx), pool.length); n > 0; n--) seen.push(...pool.splice(Math.floor(nextRandom(s) * pool.length), 1));
-      if (!seen.length) {
-        log(s, `${p.name} reveals no cards from their hand.`);
-        return;
+      // Revealed once: Nephalia Academy's question (round 430) below comes back here.
+      const sc = (s.resolving!.scratch ??= {});
+      let seen = sc.randomPicks?.[pid];
+      if (!seen) {
+        // X cards of the hand at random, all of them with fewer (rulings: the name was chosen first, as it resolved).
+        const pool = [...p.hand];
+        seen = [];
+        for (let n = Math.min(amountNow(s, e.n, ctx), pool.length); n > 0; n--) seen.push(...pool.splice(Math.floor(nextRandom(s) * pool.length), 1));
+        (sc.randomPicks ??= {})[pid] = seen;
+        if (!seen.length) {
+          log(s, `${p.name} reveals no cards from their hand.`);
+          return;
+        }
+        log(s, `${p.name} reveals ${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")} at random from their hand.`);
       }
-      log(s, `${p.name} reveals ${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")} at random from their hand.`);
       // No name chosen (none to choose from): nothing has it.
       if (ctx.chosen?.name === undefined) return;
       const named = bindChosen({ kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" }, ctx.chosen);
-      const hit = seen.filter((id) => printedMatches(named, defOf(s, obj(s, id))));
-      discardCards(s, pid, hit, "", false, false, ctx.controller);
+      const hit = seen.filter((id: ObjectId) => p.hand.includes(id) && printedMatches(named, defOf(s, obj(s, id))));
+      const tops = discardToTop(s, pid, hit, src, ctx);
+      if (tops === "paused") return "paused";
+      discardCards(s, pid, hit, "", false, false, ctx.controller, undefined, tops);
       return;
     }
     case "counterCauseIfNamed": {

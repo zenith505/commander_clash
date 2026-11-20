@@ -122,8 +122,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // cost"; Jeleva: "an instant or sorcery spell"; Shell of the Last Kappa: "a spell": one spell now, as this resolves
   // (CR 608.2g), from the cards linked to it (compile.ts links them, CR 607.2a). The spell as it's cast is checked
   // (an Adventure or a modal double-faced card's face, CR 715.3, 712.11c).
-  if ((m = /^[Yy]ou may cast an? (?:(instant or sorcery|instant|sorcery|creature|artifact|enchantment) )?spell( with mana value X)? from among cards exiled with ~ without paying its mana cost$/.exec(s)) && !ctx.spell) {
-    const types = m[1] ? m[1].split(" or ").map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
+  // Skyway Robber (round 431): "an artifact, instant, or sorcery spell": any one of the three.
+  if ((m = /^[Yy]ou may cast an? (?:(instant or sorcery|instant|sorcery|creature|artifact|enchantment|artifact, instant, or sorcery) )?spell( with mana value X)? from among cards exiled with ~ without paying its mana cost$/.exec(s)) && !ctx.spell) {
+    const types = m[1] ? m[1].split(/,? or |, /).map((x) => x[0]!.toUpperCase() + x.slice(1)) : undefined;
     return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, fromLinked: true, max: 1, ...(types ? { filter: { kind: "card", types, notTypes: [], notColors: [], text: `${m[1]} card` }, asSpell: true as const } : {}), ...(m[2] ? { exactMv: { count: { kind: "x" as const } } } : {}) }];
   }
   // Krang & Shredder (round 395): "you may cast a card exiled with ~ without paying its mana cost": the same, one spell now

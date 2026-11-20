@@ -15,7 +15,7 @@ import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDama
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
+import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -29,7 +29,7 @@ import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/ru
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
 import { pileDrawLabel } from "./effects/run-round386";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
-import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType } from "./copies";
+import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType, setChosenTypeAside } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
@@ -78,6 +78,7 @@ import {
   type DeferredAct,
   type DrawAfter,
   type CopyWhile,
+  type CopyEffect,
   type UntilLeavesLink,
 } from "./types";
 
@@ -645,7 +646,17 @@ export function log(s: GameState, text: string, to?: PlayerId) {
 
 /** What a CastPay has its caster pay, as the card says it: "by discarding a card", "by paying life equal to its mana value". */
 export function castPayText(pay: CastPay): string {
-  return pay.kind === "discard" ? `by discarding ${pay.n === 1 ? "a card" : `${pay.n} cards`}` : pay.kind === "lifeMv" ? "by paying life equal to its mana value" : pay.kind === "energyMv" ? "by paying {E} equal to its mana value" : `by paying ${pay.mana}`;
+  return pay.kind === "discard" ? `by discarding ${pay.n === 1 ? "a card" : `${pay.n} cards`}` : pay.kind === "lifeMv" ? "by paying life equal to its mana value" : pay.kind === "energyMv" ? "by paying {E} equal to its mana value" : pay.kind === "suspendCost" ? "by paying its suspend cost" : pay.suspend ? `by paying its suspend cost ${pay.mana}` : `by paying ${pay.mana}`;
+}
+
+/**
+ * The CastPay a castFree decision offers for this card: The Face of Boe's "pay its suspend cost rather than its mana cost"
+ * (round 431) is the card's own suspend cost (CompiledCard.suspend), its X at least 1 for a "Suspend X" card.
+ */
+export function castPayFor(s: GameState, pay: CastPay, id: ObjectId): CastPay {
+  if (pay.kind !== "suspendCost") return pay;
+  const sp = compileCard(defOf(s, obj(s, id))).suspend;
+  return sp ? { kind: "mana", mana: sp.cost, suspend: true, ...(sp.x ? { xMin: 1 } : {}) } : pay;
 }
 
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
@@ -3043,6 +3054,8 @@ export function endWhileTapped(s: GameState): boolean {
   // attached to it" (Blade of Shared Souls, Assimilation Aegis), over for good once that stops (CR 611.2b), a phased-out
   // copy too (CR 702.26f).
   if (endCopyWhile(s)) lost = true;
+  // Metamorphic Alteration (round 429): the copy effects of Auras' static abilities, on what they enchant now.
+  if (syncAuraCopies(s)) lost = true;
   const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileMonarch !== undefined && s.monarch !== e.whileMonarch) || (e.whileAttached && !copyWhileHolds(s, { whileAttached: e.whileAttached })) || ((e.whileCounter || e.whileEnchanted || e.powerAtMost) && !e.affected.length));
   if (!ended.length) {
     if (lost) invalidateCharacteristics(s);
@@ -3096,6 +3109,55 @@ export function endCopyWhile(s: GameState): boolean {
     ended = true;
   }
   return ended;
+}
+
+/**
+ * Metamorphic Alteration (round 429): "Enchanted creature is a copy of the chosen creature." A static ability's copy effect
+ * (CR 611.3a, 707.2) on the permanent the Aura is attached to, of the values locked in as the creature was chosen
+ * (Chosen.copyKey, rulings), with the Aura's timestamp (CR 613.7e: a new one each time it becomes attached), so the latest
+ * copy effect wins (613.2a, 613.7). It ends when the Aura is no longer attached to that permanent (endCopyWhile) or no
+ * longer has the ability (it became a copy of something else); one removed in layer 6 still applies (CR 613.6). The
+ * enchanted permanent becoming a copy of a noncreature makes the Aura illegally attached (rulings, CR 704.5m). True when
+ * one began or ended.
+ */
+export function syncAuraCopies(s: GameState): boolean {
+  let changed = false;
+  const holds = (e: CopyEffect, host: GameObject) => {
+    if (!e.aura || typeof e.until !== "object" || !("whileAttached" in e.until)) return true;
+    const a = s.objects[e.until.whileAttached.id];
+    return !!a && a.zone === "battlefield" && a.chosen?.copyKey === e.key && !!compileCard(defOf(s, a)).enchantedCopiesChosen && copyWhileHolds(s, e.until) && e.until.whileAttached.host === host.id;
+  };
+  for (const id of s.battlefield) {
+    const host = s.objects[id]!;
+    if (!host.copyEffects?.some((e) => e.aura)) continue;
+    const kept = host.copyEffects.filter((e) => holds(e, host));
+    if (kept.length === host.copyEffects.length) continue;
+    const was = defOf(s, host).name;
+    host.copyEffects = kept.length ? kept : undefined;
+    restoreChosenType(host);
+    invalidateCharacteristics(s);
+    log(s, `${was} stops being a copy and is ${defOf(s, host).name} again.`);
+    changed = true;
+  }
+  for (const id of s.battlefield) {
+    const a = s.objects[id]!;
+    const key = a.chosen?.copyKey;
+    if (!key || !a.attachedTo || !compileCard(defOf(s, a)).enchantedCopiesChosen) continue;
+    const host = s.objects[a.attachedTo];
+    if (!host || host.zone !== "battlefield") continue;
+    const until: CopyWhile = { whileAttached: { id: a.id, zc: a.zoneChanges ?? 0, host: host.id, hostZc: host.zoneChanges ?? 0 } };
+    if (host.copyEffects?.some((e) => e.aura && typeof e.until === "object" && "whileAttached" in e.until && e.until.whileAttached.id === a.id && e.until.whileAttached.zc === until.whileAttached.zc && e.until.whileAttached.hostZc === until.whileAttached.hostZc)) continue;
+    const was = defOf(s, host).name;
+    setChosenTypeAside(host);
+    // In timestamp order: the last one is the copiable values (cards.ts).
+    const list = [...(host.copyEffects ?? []), { key, timestamp: a.timestamp, until, aura: true as const }];
+    host.copyEffects = list.sort((x, y) => x.timestamp - y.timestamp);
+    lockIfRoom(s, host);
+    invalidateCharacteristics(s);
+    log(s, `${was} is a copy of ${s.cards[key]?.name ?? "the chosen creature"} (${defOf(s, a).name}).`);
+    changed = true;
+  }
+  return changed;
 }
 
 /** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
@@ -4470,7 +4532,7 @@ function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAft
     return;
   }
   if (p.hand.length === 1) {
-    chainsDiscard(s, pid, p.hand[0]!, src);
+    if (chainsDiscardOrAsk(s, pid, p.hand[0]!, src, { left, made: [entry, ...made], ...(after ? { after } : {}) }) === "paused") return "paused";
     made.unshift(entry);
     return;
   }
@@ -4479,15 +4541,29 @@ function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAft
 }
 
 /**
- * The card discarded for Chains of Mephistopheles: by its controller's effect (Obstinate Baloth's "an opponent" counts it), not
- * part of what's resolving ("discarded this way" means that spell's own discards).
+ * The card `pid` discards for Chains of Mephistopheles, once chosen: with a Library of Leng ("If an effect causes you to
+ * discard a card") or, for another player's Chains, a Nephalia Academy (round 430), first whether it goes on top of their
+ * library instead (CR 614.1a, 616.1): "paused" while they choose, `then` the draws to go on with after that.
  */
-function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string) {
+function chainsDiscardOrAsk(s: GameState, pid: PlayerId, id: ObjectId, src: string, then: { left: number; made: number[]; after?: DrawAfter }): "paused" | void {
+  const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
+  const by = toTopName(s, pid, chains ? controllerOf(s, obj(s, chains)) : undefined, false);
+  if (!by) return chainsDiscard(s, pid, id, src);
+  s.pending = { kind: "handToTop", player: pid, count: 1, source: src, upTo: true, discarding: [id], chains: then, ...(by !== lengName(s, pid) ? { revealing: by } : {}) };
+  return "paused";
+}
+
+/**
+ * The card discarded for Chains of Mephistopheles: by its controller's effect (Obstinate Baloth's "an opponent" counts it), not
+ * part of what's resolving ("discarded this way" means that spell's own discards). `toTop`: put on top of the library instead
+ * (see chainsDiscardOrAsk).
+ */
+function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string, toTop: ObjectId[] = []) {
   const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
   const r = s.resolving;
   s.resolving = null;
   try {
-    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined);
+    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined, undefined, toTop);
   } finally {
     s.resolving = r;
   }
@@ -5995,7 +6071,36 @@ function othersTurnSource(s: GameState, o: GameObject, pid: PlayerId): string | 
   return undefined;
 }
 
-function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
+/**
+ * Evelyn, the Covetous (round 429): the permanent ("id@zoneChanges") whose once-each-turn permission (CompiledCard
+ * playExiledCounteredOnce) lets `pid` play this exiled card now: one `pid` controls, its play not used yet this turn
+ * (TurnLog.linkedSpellOnce), the card face up with its counter and exiled by an ability `pid` controlled
+ * (GameObject.exiledByPlayer). A land is played as the turn's land play, a spell cast with its usual timing.
+ */
+function exiledOnceSource(s: GameState, o: GameObject, pid: PlayerId): string | undefined {
+  if (o.zone !== "exile" || o.exiledByPlayer !== pid || o.faceDown || o.hiddenExile) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    const kind = abilitiesOf(s, p).playExiledCounteredOnce;
+    if (!kind || (o.counters[kind] ?? 0) <= 0) continue;
+    const key = `${id}@${p.zoneChanges ?? 0}`;
+    if (!(s.turnLog?.linkedSpellOnce ?? []).includes(key)) return key;
+  }
+  return undefined;
+}
+
+/**
+ * Evelyn, the Covetous (round 429): playing this exiled card with no other permission of `pid`'s that lets them (one that
+ * isn't used up by playing it) uses up an Evelyn's play for this turn ("once each turn": each Evelyn's own, CR 113.2c).
+ */
+function useExiledOnce(s: GameState, o: GameObject, pid: PlayerId): void {
+  const key = exiledOnceSource(s, o, pid);
+  if (!key || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || preparedCopyCastable(s, o, pid) || ownLinkedPlayPermission(s, o, pid, true)) return;
+  ((s.turnLog ??= {}).linkedSpellOnce ??= []).push(key);
+}
+
+function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOnce?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   let how: false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" = false;
   // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
   // now (rulings), mana of any color for the spells (CR 609.4b).
@@ -6018,6 +6123,9 @@ function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): fa
     // the usual timing and costs (rulings): a land card as a land, any other only as a noncreature spell (the face being
     // cast, so an Adventure of a creature card too, rulings), mana as though of any color (CR 609.4b).
     if (a.playExiledCountered && o.exiledByPlayer === pid && !o.faceDown && !o.hiddenExile && (o.counters[a.playExiledCountered] ?? 0) > 0 && (isType(defOf(s, o), "Land") || !isType(defOf(s, o), "Creature")) && (!how || how === "plain")) how = "anyColor";
+    // Evelyn, the Covetous (round 429): once each turn, a card with a collection counter exiled by an ability `pid`
+    // controlled (exiledOnceSource), mana as though of any color (CR 609.4b).
+    if (!notOnce && a.playExiledCounteredOnce && (!how || how === "plain") && exiledOnceSource(s, o, pid)) how = "anyColor";
     if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
@@ -6073,7 +6181,7 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true; /** Draugr Necromancer (round B270): mana from snow sources as though it were mana of any color. */ snowAny?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted" | "waterbend"> & { life?: true; /** Draugr Necromancer (round B270): mana from snow sources as though it were mana of any color. */ snowAny?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
   return how === "anyType" ? { anyType: true } : how === "anyColor" ? { anyColor: true } : how === "life" ? { life: true } : how === "snowAny" ? { snowAny: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
@@ -6258,6 +6366,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // "During your next turn" (Galvanic Relay): not the turn it was exiled (rulings).
   if (m.until === "duringNextTurn" && !(s.activePlayer === pid && s.turn > m.turn)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
+  // Hama, the Bloodbender (round 431): "during your turn".
+  if (m.yourTurnOnly && s.activePlayer !== pid) return false;
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   if (m.attackedWithCommander && s.players[pid]?.commanderAttackedTurn !== s.turn) return false;
@@ -6691,6 +6801,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const o = obj(s, id);
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
+  useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429), before any other permission is used up
   useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
@@ -6770,7 +6881,11 @@ export function isSummoningSick(s: GameState, o: GameObject) {
 export function tapAbilitySick(s: GameState, o: GameObject) {
   if (!isSummoningSick(s, o)) return false;
   const you = controllerOf(s, o);
-  return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
+  // Dynaheir, Invoker Adept (round 428): "of other creatures you control": not its own.
+  return !s.battlefield.some((id) => {
+    const h = abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste;
+    return !!h && !(h === "others" && id === o.id) && controllerOf(s, obj(s, id)) === you;
+  });
 }
 
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType, sacrifice?: ObjectId[]) {
@@ -6820,7 +6935,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     if (ab.untapSelf) untapPermanent(s, o); // {Q} (CR 107.6): untapped, not tapped for mana (rulings on Pili-Pala)
     // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
     // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
-    if (ab.tap && adds.length && !unless) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+    if (ab.tap && adds.length && !unless) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id, ...(!(ab.getterChooses && getter !== p.id) ? { made: [...adds] } : {}) });
     for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   }, true);
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
@@ -6893,7 +7008,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
       if (adds.length) addMana(s, getter, adds, { from });
       log(s, adds.length ? `${p.name} adds ${adds.map((m) => `{${m}}`).join("")} (${name}).` : `${name} adds no mana.`);
     } else adds = milledCombos[0]!;
-    if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+    if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id, made: [...adds] });
   }
   else if (unless) s.manaUnless = { player: p.id, id: o.id, zc: o.zoneChanges ?? 0, adds, from, picked, queue: turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost), cost: unless, source: name };
   else if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
@@ -6987,7 +7102,7 @@ function manaUnlessDone(s: GameState, paid: boolean): void {
     return;
   }
   if (player(s, m.player).lost) return;
-  if (here) fireEvent(s, { type: "tappedForMana", id: m.id, player: m.player });
+  if (here) fireEvent(s, { type: "tappedForMana", id: m.id, player: m.player, made: [...m.adds] });
   addMana(s, m.player, m.adds, { from: m.from });
   log(s, `${player(s, m.player).name} adds ${m.adds.map((x) => `{${x}}`).join("")} (${m.source}).`);
   if (here) fireEvent(s, { type: "manaAbilityResolved", id: m.id, amount: m.adds.length });
@@ -7466,7 +7581,8 @@ export function castProblem(
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
     if ((choices.alt === "freerunning" || choices.alt === "grantedFreerunning") && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
     // Sneak (CR 702.190a): only during your declare blockers step, once blockers are declared (an unblocked attacker).
-    if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
+    // Round 428: sneak a permanent gives the card (Ninja Teen) the same way (rulings).
+    if ((choices.alt === "sneak" || choices.alt === "grantedSneak") && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
     // Only one alternative cost can be applied to a spell (CR 118.9a). A permission to cast it from the graveyard that
     // names no cost (Yawgmoth's Will, Muldrotha, Lurrus) allows one (rulings), except those that say where the card is.
     // Casting a prototype card prototyped isn't an alternative cost (CR 718.3): it may be cast so without paying its mana
@@ -7482,7 +7598,8 @@ export function castProblem(
     if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand" && !(via?.alt === "warp" && choices.alt === "warp")) return "warp works only from your hand"; // CR 702.185a
   }
   // Eye of Duskmantle (round 405): only for life equal to its mana value (rulings).
-  if (via?.alt && choices?.alt !== via.alt) return via.alt === "citadel" ? `${d.name} can be cast from your graveyard this way only by paying life equal to its mana value` : `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
+  // Ninja Teen (round 428): "using their sneak abilities": the card's own sneak or one given to it (rulings).
+  if (via?.alt && choices?.alt !== via.alt && !(via.alt === "sneak" && choices?.alt === "grantedSneak")) return via.alt === "citadel" ? `${d.name} can be cast from your graveyard this way only by paying life equal to its mana value` : `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
@@ -7558,7 +7675,7 @@ export function castProblem(
   // tapped (castSpell treats kicks left out as none).
   const tapFlash = beholdFlashCost?.kind === "tap" && (!!choices?.kicks?.includes(0) || (choices?.kicks === undefined && !!s.objects[id] && tapCostCandidates(s, pid, s.objects[id]!, beholdFlashCost).length >= beholdFlashCost.n));
   // Qasali Ambusher: "you may cast ~ without paying its mana cost and as though it had flash": only cast that way (CR 601.3).
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "alternative" && !!altCost(d, "alternative")?.flash) || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
+  const instantSpeed = choices?.alt === "sneak" || choices?.alt === "grantedSneak" || (choices?.alt === "alternative" && !!altCost(d, "alternative")?.flash) || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -7637,6 +7754,10 @@ export function castProblem(
   // Light Up the Night: "If you cast this spell this way, X can't be 0" (CastFromGraveyard.xMin). Without an X yet, the
   // question is whether it could be cast this way (castSpell holds a cast to it, X left out being 0).
   if (via?.xMin && x !== undefined && x < via.xMin) return "X can't be 0";
+  // The Face of Boe (round 431): a card cast for its suspend cost has to have one; "Suspend X—... X can't be 0." holds.
+  const suspendPay = free && s.pending?.kind === "castFree" ? s.pending.pay : undefined;
+  if (suspendPay?.kind === "suspendCost") return `${d.name} has no suspend cost`;
+  if (suspendPay?.kind === "mana" && suspendPay.xMin && x !== undefined && x < suspendPay.xMin) return "X can't be 0";
   // Mind Grind: "X can't be 0", so it can't be cast without paying its mana cost either (rulings, CR 107.3b).
   if (manaX && !costX && (x ?? 0) < (compileCard(d).xMin ?? 0)) return "X can't be 0";
   // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
@@ -8236,8 +8357,9 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
   }
   if (how.waterbend?.length) {
     // Waterbend as an additional cost (CR 701.67a): up to the waterbend cost's own generic mana, if it's being paid.
+    // Hama, the Bloodbender (round 431): or the waterbend cost paid rather than its mana cost, from exile.
     const k = compileCard(d).kicker;
-    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? (k.waterbend === "X" ? (x ?? 0) : k.waterbend) : 0;
+    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? (k.waterbend === "X" ? (x ?? 0) : k.waterbend) : exileWaterbendCap(s, pid, o, how);
     if (!cap) return `${d.name} has no waterbend cost being paid`;
     const problem = castWaterbendProblem(s, pid, how.waterbend, cap, [...(convoke ?? []), ...(improvise ?? []), ...(how.tap ?? []), ...(how.teamwork ?? []), ...(how.conspire ?? []), ...(how.harmonize !== undefined ? [how.harmonize] : []), ...(how.sacrifice ?? [])]);
     if (problem) return problem;
@@ -8261,6 +8383,23 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     ({ cost, extra } = reduced);
   }
   return { cost, extra };
+}
+
+/**
+ * Hama, the Bloodbender (round 431): cast from exile "by waterbending {X} rather than paying its mana cost": the generic
+ * mana in that waterbend cost, which is how many artifacts and creatures may be tapped for it (CR 701.67a; rulings: not
+ * more, whatever raises the total cost). 0 when the spell isn't being cast that way.
+ */
+export function exileWaterbendCap(s: GameState, pid: PlayerId, o: GameObject, how: CostChoices = {}): number {
+  const cost = exileWaterbendCost(s, pid, o, how);
+  return cost ? parseManaCost(cost).symbols.reduce((n, y) => n + (y.kind === "generic" ? y.amount : 0), 0) : 0;
+}
+
+/** The waterbend cost a spell is cast for from exile (Hama, the Bloodbender), or undefined when it isn't cast that way. */
+export function exileWaterbendCost(s: GameState, pid: PlayerId, o: GameObject, how: CostChoices = {}): string | undefined {
+  if (how.via || how.alt || how.faceDown || freeCastOf(s, pid) === o.id || o.zone !== "exile") return undefined;
+  const ex = exilePermission(s, o, pid);
+  return ex?.waterbend ? ex.cost : undefined;
 }
 
 /** Artifacts and creatures tapped to waterbend as a spell is cast: untapped ones you control, each once, no more than `cap` (CR 701.67a). */
@@ -8370,6 +8509,7 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "grantedFreerunning") return s && pid !== undefined ? grantedFreerunning(s, pid, d) : undefined;
   if (alt === "grantedWebSlinging") return s && pid !== undefined ? grantedWebSlinging(s, pid, d) : undefined;
   if (alt === "grantedBlitz") return s && pid !== undefined ? grantedBlitz(s, pid, d) : undefined;
+  if (alt === "grantedSneak") return s && pid !== undefined && o ? grantedSneak(s, pid, d, o) : undefined;
   if (alt === "grantedEmerge") return s && pid !== undefined ? grantedEmerge(s, pid, d) : undefined;
   if (alt === "grantedEvoke") return s && pid !== undefined ? grantedEvoke(s, pid, d, o) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
@@ -8439,6 +8579,29 @@ function grantedWebSlinging(s: GameState, pid: PlayerId, d: CardDef): NonNullabl
   return mana
     ? { kind: "grantedWebSlinging", mana, costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", tapped: true, text: "tapped creature you control" }, n: 1 }], text: "web-slinging: return a tapped creature you control to its owner's hand", webSlinging: true }
     : undefined;
+}
+
+/**
+ * Round 428: sneak a permanent `pid` controls gives this creature card in their graveyard (Ninja Teen's "Creature cards in
+ * your graveyard have sneak {3}{B}", CR 702.190a), while its condition holds (its class level), checked by the card's
+ * characteristics there; its cost is the sneak cost given, with an unblocked attacker you control returned to its owner's
+ * hand. Only a card in its owner's graveyard is "in your graveyard".
+ */
+/** Sneak's cost beyond mana (CR 702.190a): an unblocked attacker you control returned to its owner's hand. Also paid once the card is on the stack (castExtraCosts). */
+const GRANTED_SNEAK_COSTS: AdditionalCost[] = [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }];
+
+function grantedSneak(s: GameState, pid: PlayerId, d: CardDef, o: GameObject): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (o.zone !== "graveyard" || o.owner !== pid) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).sneakGrants ?? []) {
+      if (g.if && !staticConditionNow(s, g.if, p.id, pid)) continue;
+      if (!printedMatches(g.filter, d)) continue;
+      return { kind: "grantedSneak", mana: g.mana, costs: GRANTED_SNEAK_COSTS };
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -8643,7 +8806,8 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
   const evoke = grantedEvoke(s, pid, defOf(s, o), o);
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(evoke ? [evoke] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
+  const sneak = grantedSneak(s, pid, defOf(s, o), o);
+  return [...own, ...(sneak ? [sneak] : []), ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(evoke ? [evoke] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -8848,6 +9012,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Light Up the Night cast with its flashback: X left out is 0, which it can't be (CastFromGraveyard.xMin).
   const xMinVia = choices.via ? graveyardWay(s, o, choices.via, p.id)?.xMin : undefined;
   if (xMinVia && (x ?? 0) < xMinVia) throw new RulesError("X can't be 0");
+  // The Face of Boe (round 431): "Suspend X—... X can't be 0." for its suspend cost, X left out being 0.
+  const suspendPayX = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id && s.pending.pay?.kind === "mana" ? s.pending.pay.xMin : undefined;
+  if (suspendPayX && (x ?? 0) < suspendPayX) throw new RulesError("X can't be 0");
   // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
   // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
   const unpicked = castExtraCosts(d, { ...choices, objectId: id, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);
@@ -8901,6 +9068,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "Whenever you waterbend": its waterbend cost paid, however (Avatar Aang's rulings, CR 701.67a), round 427.
   const wk = compileCard(d).kicker;
   if (wk?.waterbend !== undefined && (wk.required || choices.kicks?.includes(0))) bent(s, p.id, "water");
+  // Hama, the Bloodbender (round 431): cast from exile by waterbending rather than paying its mana cost.
+  else if (exileWaterbendCost(s, p.id, o, choices) !== undefined) bent(s, p.id, "water");
   // The Dragons of Tarkir reveal cycle: controlling a Dragon as it's finished being cast counts the same as revealing one
   // (rulings), with nothing revealed; a copy doesn't get that (StackItem.kickedByControl).
   const ifControl = compileCard(d).kicker?.ifControl;
@@ -8960,6 +9129,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // spell, and the permanent it becomes (CR 614.1c, 400.7a).
   const linkedRider = castFrom === "exile" && choices.alt !== "linkedFree" && isType(d, "Creature") ? linkedEntersWith(s, o, p.id) : undefined;
   if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
+  if (choices.alt !== "linkedFree") useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429)
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
   if (choices.alt !== "linkedFree") useLinkedSpellOnce(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
@@ -9042,7 +9212,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
   const paidHow = s.pending?.kind === "castFree" ? s.pending.how : undefined;
-  o.castAlt = madness && paidHow !== "paid" ? (paidHow === "miracle" ? "miracle" : "madness") : choices.alt;
+  // Ninja Teen (round 428): a sneak cost given to the card is a sneak ability's (CR 702.190a): "if its sneak cost was paid".
+  o.castAlt = madness && paidHow !== "paid" ? (paidHow === "miracle" ? "miracle" : "madness") : choices.alt === "grantedSneak" ? "sneak" : choices.alt;
   if (choices.alt === "warp" || choices.alt === "grantedWarp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
@@ -9153,7 +9324,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (discarded.length) item.costDiscarded = discarded;
   // Dralnu's Pet: "the discarded card" its kicker discarded, for the permanent it becomes (CR 614.1c).
   if (discarded.length) o.costDiscarded = discarded;
-  if (choices.alt === "sneak") o.sneak = returned;
+  if (choices.alt === "sneak" || choices.alt === "grantedSneak") o.sneak = returned;
   // Cast using web-slinging (CR 702.188a): the creature it returned, for "the returned creature".
   // A web-slinging cost a permanent gave it (Amazing Spider-Man) is casting it using web-slinging too.
   if ((choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) || choices.alt === "grantedWebSlinging") o.webSlung = returned;
@@ -9474,7 +9645,8 @@ function targetsLike(s: GameState, targets: TargetChoice[] | undefined, filter: 
 
 // Eye of Duskmantle (round 405): a permission only for life rather than mana is the last its caster would keep; with a
 // plain one too, paying life stays an alternative cost of that one (yardCitadel).
-const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0) + (w.alt === "citadel" ? 4 : 0);
+// Ninja Teen (round 428): a permission only for a sneak cost too.
+const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0) + (w.alt === "citadel" ? 4 : w.alt === "sneak" ? 3 : 0);
 
 /**
  * Eye of Duskmantle (round 405): "You may ... cast spells from among cards in your graveyard you've surveilled this turn. If
@@ -9517,7 +9689,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.yourTurn && s.activePlayer !== holder) continue;
       if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
       // Eye of Duskmantle (round 405): life rather than the mana cost, which a card without one can pay too (CR 118.6a).
-      if (!d.manaCost && !g.way.mana && g.way.alt !== "citadel") continue;
+      // Ninja Teen (round 428): for a sneak cost, which has its own mana (CR 118.9, 702.190a).
+      if (!d.manaCost && !g.way.mana && g.way.alt !== "citadel" && g.way.alt !== "sneak") continue;
       if (!printedMatches(g.filter, d)) continue;
       if (g.arrived && !arrivedThisTurn(s, o, g.arrived)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
@@ -10157,7 +10330,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // 118.9), the mana value of what's cast (a split card's half, X as 0, CR 107.3b), for the card it lets be cast only.
   const payPend = s?.pending?.kind === "castFree" && s.pending.player === pid && s.pending.pay && s.pending.pay.kind !== "mana" && choices?.objectId === s.pending.objectId ? s.pending.pay : undefined;
   const payCosts: AdditionalCost[] = !payPend ? [] : payPend.kind === "discard" ? [{ kind: "discard", n: payPend.n }] : payPend.kind === "lifeMv" ? [{ kind: "payLife", n: manaValue(parseManaCost(d.manaCost)) }] : payPend.kind === "energyMv" ? [{ kind: "payEnergy", n: manaValue(parseManaCost(d.manaCost)) }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : []), ...(s && !choices?.faceDown ? addedSpellCosts(s, d.manaCost) : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(choices?.alt === "grantedSneak" ? GRANTED_SNEAK_COSTS : (altCost(d, choices?.alt, s, pid)?.costs ?? [])), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : []), ...(s && !choices?.faceDown ? addedSpellCosts(s, d.manaCost) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -12106,7 +12279,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(costLifePaid > 0 ? { costLifePaid } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
+  // Dynaheir, Invoker Adept (round 428): the mana spent on its costs.
+  const manaSpentOnCosts = Object.values(paid.spent).reduce((a, b) => a + b, 0);
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(manaSpentOnCosts > 0 ? { manaSpent: manaSpentOnCosts } : {}), ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(costLifePaid > 0 ? { costLifePaid } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -12299,7 +12474,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
     // Chains of Mephistopheles (round B237): the card discarded instead of a draw, then the draws go on.
     if (ids.length !== 1 || !p.hand.includes(ids[0]!)) throw new RulesError("choose a card from your hand");
     s.pending = null;
-    chainsDiscard(s, p.id, ids[0]!, pend.source);
+    if (chainsDiscardOrAsk(s, p.id, ids[0]!, pend.source, pend.thenDraw) === "paused") return;
     continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, [...pend.thenDraw.made]);
     return;
   }
@@ -12318,6 +12493,15 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind === "handToTop" && pend.waste) return chooseWasteToTop(s, p, ids);
+  if (pend?.kind === "handToTop" && pend.chains && pend.discarding && pend.player === p.id) {
+    // Chains of Mephistopheles (round 430): the card it makes them discard goes on top instead, or not; then the draws go on.
+    if (new Set(ids).size !== ids.length || ids.some((id) => !pend.discarding!.includes(id))) throw new RulesError("choose from the cards being discarded");
+    const then = pend.chains;
+    s.pending = null;
+    chainsDiscard(s, p.id, pend.discarding[0]!, pend.source, ids);
+    continueDraws(s, p.id, then.left, then.after, [...then.made]);
+    return;
+  }
   if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
   if (pend.discarding) {
     // Library of Leng: which of the cards being discarded go on top instead (see discardToTop).
@@ -12994,7 +13178,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
         invalidateCharacteristics(s);
         return;
       }
-      o.chosen = { ...o.chosen, object: { id: c.id, zc: c.zoneChanges ?? 0 } };
+      // Metamorphic Alteration (round 429): its copiable values, locked in as it's chosen (rulings, CR 707.2).
+      const copyValues = compileCard(defOf(s, o)).enchantedCopiesChosen ? copyKey(s, copiableDef(s, c)) : undefined;
+      o.chosen = { ...o.chosen, object: { id: c.id, zc: c.zoneChanges ?? 0 }, ...(copyValues ? { copyKey: copyValues } : {}) };
       log(s, `${p.name} chooses ${characteristics(s, c).name} for ${pend.source}.`);
       invalidateCharacteristics(s);
       return;

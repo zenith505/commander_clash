@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers, batchCountersPut } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { seatOrder, addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, damageDrawsMade, draw, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { seatOrder, addTriggeredMana, askAuraReturns, batchTaps, cloneState, creatureTypesOf, damageDrawsMade, draw, equilibriumSacrifices, endTheCombatPhase, endTheTurn, enterTogether, inCombatPhase, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { CAST_BY_SOURCE, casterMark, compileCard, SPELL_CONTROLLER, playerMark } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LANDWALK, SACRIFICED_LANDWALK, landwalkLand, CHOSEN_SNOW_LANDWALK, chosenLandwalk, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, TARGET_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION, CAST_SPELL_COLORS_PROTECTION, isLandwalk } from "../keywords";
@@ -328,6 +328,9 @@ export function continueResolution(s: GameState): Resolution {
     // Swans of Bryn Argoll (round B252): the draws its prevention calls for, made right after the damage event (CR 615.5),
     // before the next instruction. A draw replacement that stops to ask (dredge) carries on here (game.ts drawsDone).
     if (s.damageDraws?.length && damageDrawsMade(s)) return "paused";
+    // Land Equilibrium (round B278): the lands owed for one this instruction put onto the battlefield, sacrificed as part of
+    // that event, before the next instruction (CR 614.1a). Not inside a mana ability, which can't stop for a choice.
+    if (s.equilibriumDue?.length && !item.manaAbility && equilibriumSacrifices(s)) return "paused";
   }
   s.leftTogether = undefined;
   s.resolving = null;

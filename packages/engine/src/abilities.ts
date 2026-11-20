@@ -9806,6 +9806,12 @@ export interface CompiledCard {
    */
   landsCantEnter?: true;
   /**
+   * Land Equilibrium (round B278): "If an opponent who controls at least as many lands as you do would put a land onto the
+   * battlefield, that player instead puts that land onto the battlefield then sacrifices a land of their choice." (CR
+   * 614.1a; GameState.equilibriumDue).
+   */
+  landEquilibrium?: true;
+  /**
    * Round B260: sacrifices this permanent's static abilities add to the costs of other spells and abilities (Brutal
    * Suppression, Drought; added-costs.ts, CR 601.2f, 602.2b).
    */

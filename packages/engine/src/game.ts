@@ -883,8 +883,64 @@ export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard"
  * one paying a cost with it, which is its own controller's spell or ability (`cost`), or the one whose effect is resolving
  * (CR 608.2); none for a state-based action, which happens only while nothing is resolving (CR 704.3), or a game rule.
  */
-function leaveCause(s: GameState, opts: { cost?: true; destroyedBy?: PlayerId }, controller: PlayerId): PlayerId | undefined {
-  return opts.cost ? controller : (opts.destroyedBy ?? s.resolving?.item.controller);
+function leaveCause(s: GameState, opts: { cost?: true; destroyedBy?: PlayerId; causedBy?: PlayerId }, controller: PlayerId): PlayerId | undefined {
+  return opts.cost ? controller : (opts.causedBy ?? opts.destroyedBy ?? s.resolving?.item.controller);
+}
+
+/** Land Equilibrium (round B278): the sacrifices `o` entering the battlefield now owes (see moveObject). */
+function equilibriumOwed(s: GameState, o: GameObject, opts: { controller?: PlayerId; putBy?: PlayerId; faceDown?: FaceDownKind; entersAs?: Modification[]; becomes?: { types: string[]; subtypes: string[] }; face?: number }, fromZone: GameObject["zone"]) {
+  const scales = s.battlefield.filter((b) => abilitiesOf(s, obj(s, b)).landEquilibrium);
+  if (!scales.length) return;
+  const under = opts.controller ?? o.owner;
+  const putter = opts.putBy ?? under;
+  if (player(s, putter).lost) return;
+  const mods = [...(opts.entersAs ?? []), ...(opts.becomes ? [{ kind: "setTypes" as const, types: opts.becomes.types, subtypes: opts.becomes.subtypes }] : [])];
+  if (!asFace(s, o, fromZone === "stack" ? o.face : opts.face, () => entersAsCreature(s, o, under, opts.faceDown, mods.length ? mods : undefined, "Land"))) return;
+  const lands = (pid: PlayerId) => s.battlefield.filter((b) => b !== o.id && controllerOf(s, obj(s, b)) === pid && objIsType(s, obj(s, b), "Land")).length;
+  for (const b of scales) {
+    const you = controllerOf(s, obj(s, b));
+    if (!opponents(s, you).includes(putter) || lands(putter) < lands(you)) continue;
+    (s.equilibriumDue ??= []).push({ player: putter, source: characteristics(s, obj(s, b)).name, by: you });
+  }
+}
+
+/**
+ * Land Equilibrium (round B278): the sacrifices owed (GameState.equilibriumDue), in order, each of a land its player
+ * chooses among the lands they control now, the one just put there too (rulings). True when one waits on a choice.
+ */
+export function equilibriumSacrifices(s: GameState): boolean {
+  while (s.equilibriumDue?.length) {
+    const d = s.equilibriumDue[0]!;
+    const options = player(s, d.player).lost ? [] : s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === d.player && objIsType(s, obj(s, b), "Land") && canBeSacrificed(s, obj(s, b)));
+    if (options.length > 1) {
+      s.pending = { kind: "pickPermanents", player: d.player, source: d.source, action: "sacrifice", what: "land", options, count: 1, equilibrium: true, prompt: "you put a land onto the battlefield, so sacrifice a land (the new one too, if you like): click it, then sacrifice." };
+      return true;
+    }
+    s.equilibriumDue.shift();
+    if (!s.equilibriumDue.length) s.equilibriumDue = undefined;
+    if (options.length) equilibriumSacrifice(s, d, options[0]!);
+  }
+  return false;
+}
+
+function equilibriumSacrifice(s: GameState, d: { player: PlayerId; source: string; by: PlayerId }, id: ObjectId) {
+  log(s, `${player(s, d.player).name} sacrifices ${nameOf(s, id)} (${d.source}).`);
+  moveObject(s, id, "graveyard", { sacrificed: true, causedBy: d.by });
+  invalidateCharacteristics(s);
+}
+
+/** The land picked for a Land Equilibrium sacrifice (equilibriumSacrifices), then the rest owed and what was going on. */
+function chooseEquilibriumPick(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const d = s.equilibriumDue?.[0];
+  if (pend?.kind !== "pickPermanents" || !pend.equilibrium || pend.player !== p.id || !d) throw new RulesError("nothing to pick");
+  if (ids.length !== 1 || !pend.options.includes(ids[0]!)) throw new RulesError("choose one of the lands offered");
+  s.pending = null;
+  s.equilibriumDue!.shift();
+  if (!s.equilibriumDue!.length) s.equilibriumDue = undefined;
+  equilibriumSacrifice(s, d, ids[0]!);
+  if (equilibriumSacrifices(s)) return;
+  if (s.resolving) continueResolution(s);
 }
 
 export function moveObject(
@@ -918,6 +974,8 @@ export function moveObject(
     cost?: true;
     /** A spell or ability this player controls destroyed it (CR 701.8a), for Karmic Justice. */
     destroyedBy?: PlayerId;
+    /** Land Equilibrium (round B278): the player whose static ability made it leave (the "dies" event's `cause`, Sacred Ground). */
+    causedBy?: PlayerId;
     /** It was destroyed (CR 701.8a), by anything (a state-based action too, CR 704.5g-h), for Jaws, Relentless Predator. */
     destroyed?: true;
     /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
@@ -1075,6 +1133,13 @@ export function moveObject(
       to = "graveyard";
     }
   }
+  // Land Equilibrium (round B278): "If an opponent who controls at least as many lands as you do would put a land onto the
+  // battlefield, that player instead puts that land onto the battlefield then sacrifices a land of their choice" (CR
+  // 614.1a): a land as it would exist there (CR 614.12), put there by that player (GameObject.putter: playing it, or by a
+  // spell or ability, under anyone's control, rulings), the lands counted before it enters (entering with others, those
+  // aren't on the battlefield yet either). One sacrifice for each Land Equilibrium that applies (CR 614.5), made right after
+  // the instruction or action that put it there (equilibriumSacrifices).
+  if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged") equilibriumOwed(s, o, opts, fromZone);
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -12249,6 +12314,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   if (pend?.kind === "pickPermanents" && pend.wind) return chooseWindPick(s, p, ids);
+  if (pend?.kind === "pickPermanents" && pend.equilibrium) return chooseEquilibriumPick(s, p, ids);
   const r = s.resolving;
   if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "damageCreature" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
@@ -16787,6 +16853,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     }
     if (attachmentSBAs(s)) changed = true;
     if (battleSBAs(s)) changed = true; // 704.5v-y
+    // Land Equilibrium (round B278): a land put there by an action or outside a resolution (CR 614.1a).
+    if (!s.pending && s.equilibriumDue?.length && equilibriumSacrifices(s)) return;
     if (!s.pending && s.entersChoices?.length && askEntersChoice(s)) return;
     if (roleSBAs(s)) changed = true; // 704.5z
     if (sagaSBAs(s)) changed = true; // 704.5s

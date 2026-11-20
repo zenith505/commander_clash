@@ -28028,6 +28028,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a3711453-b17d-4b1c-b726-9b41f36d07ab",
+  "name": "Land Equilibrium",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If an opponent who controls at least as many lands as you do would put a land onto the battlefield, that player instead puts that land onto the battlefield then sacrifices a land of their choice.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e36f4649-934d-4e8a-bd5f-39f164ea6937",
   "name": "Land Grant",
   "manaCost": "{1}{G}",

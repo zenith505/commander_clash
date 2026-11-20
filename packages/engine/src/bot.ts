@@ -704,6 +704,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
     // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
     // Hollow Warrior (round B259): a cost to block, the same way.
+    // Land Equilibrium (round B278): the land worth least to it, the one just put there too.
+    if (pend.kind === "pickPermanents" && pend.equilibrium) return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "sacrifice") }];
     if (pend.kind === "pickPermanents" && pend.blockCost) {
       const rest = s.blockCostsDue?.costs.slice(1) ?? [];
       const declared = [...new Set((s.blockCostsDue?.blocks ?? []).map((b) => b.blocker))];

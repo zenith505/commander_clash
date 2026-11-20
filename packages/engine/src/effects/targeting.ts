@@ -146,6 +146,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.noAbilities && !hasNoAbilities(s, o, c)) return false;
+  // Jasmine Boreal of the Seven (round 426): "creatures with abilities".
+  if (spec.hasAbilities && hasNoAbilities(s, o, c)) return false;
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.hasAdventure && !(s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
@@ -595,6 +597,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Fang-Druid Summoner: "a creature card with no abilities": nothing in its rules text but reminder text (CR 113.1, 207.2a).
   // Dryad Arbor: a Forest has its intrinsic mana ability (CR 305.6).
   if (spec.noAbilities && (d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
+  if (spec.hasAbilities && !(d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
   if (spec.hasAdventure && d.layout !== "adventure") return false;
   if (spec.enchantCreature && !/^Enchant creature$/m.test(d.oracleText)) return false;

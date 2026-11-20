@@ -616,7 +616,7 @@ line blocks.
    (no "whenever you pay life" event: life is paid in many places), Callous Oppressor (an opponent chooses the type),
    Caustic Bronco (no "saddled" condition on a trigger's life loss), Sigarda's Splendor ("note your life total"), Back for Seconds (bargained: one of the
    returned cards onto the battlefield instead), Phyrexian Soulgorger (cumulative upkeep that sacrifices creatures), Mariposa Military Base
-   (rad counters as it enters tapped). Smaller gaps: bots never activate Grinning Ignus; Celestial Reunion, Countersculpt (done in round B179),
+   (rad counters as it enters tapped). Smaller gaps: bots never activate Grinning Ignus; Celestial Reunion (done in round 426), Countersculpt (done in round B179),
    Kindle the Inner Flame (done in round 371), Molten Exhale (done in round 299) and Theorist's Sanctum (done in round B179) (behold as a cost or a replacement) are still out.
    Round 199 went on from the top: "as long as you control an artifact creature or a Plan" (Doctor Doom; Plan is now a
    subtype, so The Masters of Evil's search works), "each creature you control that's a Food or a Golem" (Brenard,
@@ -2463,7 +2463,7 @@ line blocks.
    an X matching an instant or sorcery in their hand.
    Out after round 352 (looked at, not done): Fabrication Foundry ("Exile one or more other artifacts you control with
    total mana value X: Return target artifact card with mana value X or less": the target chosen before the cost that sets
-   X is paid, no ruling on how it's checked); Celestial Reunion ("choose a creature type and behold two creatures of that
+   X is paid, no ruling on how it's checked); Celestial Reunion (done in round 426) ("choose a creature type and behold two creatures of that
    type" as an optional additional cost: a type chosen as it's cast and two beheld, neither modeled yet); Stalking Leonin
    (an opponent chosen secretly, revealed as a cost); Bre of Clan Stoutarm (still out, as after round 345).
    Round 353 went on down `npm run popular` and the "Out after round N" lists, most played first, to copies of a spell
@@ -2629,7 +2629,7 @@ line blocks.
    compiled text of every other card is unchanged.
    Out after round 359 (looked at, not done): Arni Metalbrow ("Whenever a creature you control attacks or enters
    attacking": the many ways a creature is put onto the battlefield attacking set it attacking after its enters event
-   fires, so an "enters attacking" trigger would miss some); Jasmine Boreal of the Seven ("Spend this mana only to cast
+   fires, so an "enters attacking" trigger would miss some); Jasmine Boreal of the Seven (done in round 426) ("Spend this mana only to cast
    creature spells with no abilities": a spell given an ability by another permanent as it's cast can't use it, rulings,
    and every such grant with its conditions would have to be checked as the mana is spent); Archelos, Lagoon Mystic
    (permanents entering untapped while it's untapped: its controller orders it against other "enters tapped" replacement
@@ -2756,7 +2756,7 @@ line blocks.
    against an unblocked attacker dealing 2 or more. +5, 31,315 of 31,936. The compiled text of every other card is
    unchanged.
    Out after round 364 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) and Nephalia Academy (still out: who controls what
-   causes a discard or sacrifice, on every path); Stalking Leonin (still out: a secret choice); Celestial Reunion (still
+   causes a discard or sacrifice, on every path); Stalking Leonin (still out: a secret choice); Celestial Reunion (done in round 426) (still
    out: a type chosen and two creatures beheld as an optional cost); Rootpath Purifier ("land cards in your library are
    basic": searches read library cards' printed supertypes); Mysterious Stranger (done in round 411) (still out: one target per graveyard);
    Sala, Deck Boss (unranked, Lane B's range).
@@ -2892,8 +2892,8 @@ line blocks.
    Canonist lets a creature spell cast under Biotransference count as an artifact spell. No new prompts. +4, 31,382 of
    31,936 with Lane B's B209-B211. The compiled text of every other card is unchanged.
    Out after round 369 (looked at, not done): Hatchery Sliver (done in round B248) (still out: a second replicate cost beside the spell's own
-   kicker or replicate); Jasmine Boreal of the Seven, Archelos, Lagoon Mystic, Tamiyo, Collector of Tales (done in round B251), Nephalia Academy,
-   Celestial Reunion and Stalking Leonin (still out, as in their earlier lists).
+   kicker or replicate); Jasmine Boreal of the Seven (done in round 426), Archelos, Lagoon Mystic, Tamiyo, Collector of Tales (done in round B251), Nephalia Academy,
+   Celestial Reunion (done in round 426) and Stalking Leonin (still out, as in their earlier lists).
    Round 370 went on down `npm run popular`, most played first, to a free spell as big as the life gained this turn, spells
    from exile made cheaper by the players attacked, a look as deep as the creatures that convoked it and a search of
    graveyard and library: Bre of Clan Stoutarm's "At the beginning of your end step, if you gained life this turn, exile
@@ -3061,7 +3061,7 @@ line blocks.
    No new prompt kinds. +4, 31,430 of 31,936 with round 375. The compiled text of every other card is unchanged. Bots cast
    Thieves' Auction and Warp World only when the opponents' boards are worth more than theirs on average, take the
    exiled card worth most to them, and use Dream Halls only for a spell whose mana cost they can't pay.
-   Out after round 376 (looked at, not done): Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
+   Out after round 376 (looked at, not done): Celestial Reunion (done in round 426), Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
    Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: Thieves' Auction asks Ken for every one of his
    picks, even with dozens of cards exiled (no "take the rest for me").
    Round 377 went on down `npm run popular` and the "Out after round N" lists, most played first, to a search of another
@@ -3090,7 +3090,7 @@ line blocks.
    else Black Lotus).
    Out after round 377 (looked at, not done): Tamiyo, Collector of Tales (done in round B251) ("Spells and abilities your opponents control
    can't cause you to discard cards or sacrifice permanents." cuts across every discard and sacrifice path, and who controls
-   the effect isn't passed to all of them); Celestial Reunion, Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
+   the effect isn't passed to all of them); Celestial Reunion (done in round 426), Fabrication Foundry, Ziatora's Envoy, Arni Metalbrow and
    Archelos, Lagoon Mystic (still out, as in their earlier lists). Polish: the Garth copy's cast prompt says "from exile"
    (exile stands in for outside the game).
    Round 378 went on down `npm run popular`, most played first, to blocks declared by someone other than the defending
@@ -3115,7 +3115,7 @@ line blocks.
    Out after round 378 (looked at, not done): Master Warcraft (done in round 379) ("You choose which creatures attack this turn": another player
    picks the attackers, then the active player chooses what each one attacks and pays its costs, rulings; no such split of
    the attack declaration yet, nor its UI and bot); Melee (done in round 379) ("Whenever a creature attacks and isn't blocked this
-   combat, untap it and remove it from combat": a trigger on not being blocked, then removing it from combat); Tamiyo, Collector of Tales (done in round B251), Celestial Reunion, Fabrication Foundry,
+   combat, untap it and remove it from combat": a trigger on not being blocked, then removing it from combat); Tamiyo, Collector of Tales (done in round B251), Celestial Reunion (done in round 426), Fabrication Foundry,
    Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their earlier lists).
    Round 379 went on down the "Out after round N" lists and `npm run popular`, most played first, to attackers chosen by
    another player, unblocked attackers removed from combat, an Aura for a creature, a planeswalker or a Clue and two
@@ -3166,7 +3166,7 @@ line blocks.
    combat on their biggest creature card (power 2 or more), cast Judgment as a damage shield, cast Durnan's card like any
    card they may play from exile, and note the first type offered.
    Out after round 380 (looked at, not done): Long List of the Ents (done in round 381); Capricopian, Tamiyo, Collector of
-   Tales, Celestial Reunion, Fabrication Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their
+   Tales, Celestial Reunion (done in round 426), Fabrication Foundry, Ziatora's Envoy and Archelos, Lagoon Mystic (still out, as in their
    earlier lists).
    Polish: the Bullies' delayed exile logs as "Hill Giant's ability triggers (Exile Hill Giant)" (the source named is the
    creature, as for every "At the beginning of the next end step, exile it" of putOntoBattlefield); the page stops for an
@@ -3486,10 +3486,10 @@ line blocks.
    Envoy's land, life payment and free cast, and a creature cast from exile after Lukka's +1. +3, 31,561 of 31,936. The
    compiled text of every other card is unchanged. Known limit: a token creature exiled by Lukka's −2 is gone, so its
    mana value reads as 0.
-   Out after round 392 (looked at, not done): Jasmine Boreal of the Seven (every effect that gives spells abilities);
+   Out after round 392 (looked at, not done): Jasmine Boreal of the Seven (done in round 426) (every effect that gives spells abilities);
    Filigree Vector (two "any number of target" slots in one ability); Kraven the Hunter (the greatest power among
    creatures that died at once); Battlefield Thaumaturge (a creature targeted twice by one spell, rulings unclear for the
-   discount); Celestial Reunion (a creature type chosen as it's cast and behold two as an optional cost); Capricopian,
+   discount); Celestial Reunion (done in round 426) (a creature type chosen as it's cast and behold two as an optional cost); Capricopian,
    Wayta, Archelos, Metamorphic Alteration, Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
    their earlier lists).
    Round 393 went on down `npm run popular` and the "Out after round N" lists, most played first, to permanents changing
@@ -3735,7 +3735,7 @@ line blocks.
    other card is unchanged.
    Out after round 403 (looked at, not done): Pulmonic Sliver (still out: an optional "put it on top of its owner's library
    instead" asked in the middle of a zone change, and several Slivers dying at once ordered by their owner); Filigree Vector
-   (still out: two "any number of target" slots); Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion,
+   (still out: two "any number of target" slots); Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion (done in round 426),
    Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm
    run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 404 went on down `npm run popular`, most played first, to four cards not looked at before. Hero of Bretagard's
@@ -3759,10 +3759,10 @@ line blocks.
    that upkeep, as round 401's Jon Irenicus). +4, 31,644 of 31,936 on this stacked branch. The compiled text of
    every other card is unchanged. Main 2e13ed5 (Lane B B248 and B249) was merged in afterwards: 31,653 of 31,936, every
    card compiling as on main but the seven of rounds 403 and 404.
-   Out after round 404 (looked at, not done): Jasmine Boreal of the Seven ("Spend this mana only to cast creature spells
+   Out after round 404 (looked at, not done): Jasmine Boreal of the Seven (done in round 426) ("Spend this mana only to cast creature spells
    with no abilities": abilities given to a spell, such as a granted convoke, cascade or offspring, count, rulings, and the
    mana spending check sees only the card's printed text); Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales,
-   Wayta, Trainer Prodigy, Celestial Reunion, Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to
+   Wayta, Trainer Prodigy, Celestial Reunion (done in round 426), Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to
    Victory, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their
    earlier lists).
    Round 405 went on down `npm run popular`, most played first, to four cards left out before. Glorious Purpose's "When the
@@ -3789,8 +3789,8 @@ line blocks.
    (the mana-cost button disabled) and the copy choice of the Spirit and of Lazav. +4, 31,657 of 31,936 on this stacked
    branch (with round 404, B248 and B249). The compiled text of every other card is unchanged.
    Out after round 405 (looked at, not done): Spirit of Resilience copies a card judged by its printed types, not by an
-   effect that changed them in the graveyard (Encroaching Mycosynth; no ruling either way); Jasmine Boreal of the Seven,
-   Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion, Helm of Kaldra,
+   effect that changed them in the graveyard (Encroaching Mycosynth; no ruling either way); Jasmine Boreal of the Seven (done in round 426),
+   Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion (done in round 426), Helm of Kaldra,
    Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists).
    Round 406 went on down `npm run popular`, most played first, to three cards left out before. Lazav, Dimir Mastermind's
@@ -3814,7 +3814,7 @@ line blocks.
    unchanged.
    Out after round 406 (looked at, not done): Taskmaster, Mercenary Mimic ("up to one target creature on the battlefield or
    creature card in a graveyard" with "he's a legendary Human Mercenary Villain creature" and no rulings on which types it
-   keeps); Niko, Light of Hope ("until the next end step" copies); Abstruse Appropriation, Jasmine Boreal of the Seven,
+   keeps); Niko, Light of Hope (done in round 426) ("until the next end step" copies); Abstruse Appropriation, Jasmine Boreal of the Seven (done in round 426),
    Pulmonic Sliver, Filigree Vector, Wayta, Trainer Prodigy, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory,
    Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier
    lists).
@@ -4072,7 +4072,7 @@ line blocks.
    Ring-bearer, deathtouch counter and target, and Invisible Woman's one Yes for Inspiring Roar. +4, 31,715 of 31,936 on
    this stacked branch. The compiled text of every other card is unchanged.
    Out after round 416 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
-   ability), Jasmine Boreal of the Seven, Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
+   ability), Jasmine Boreal of the Seven (done in round 426), Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: counters put outside a resolving
    instruction are each their own event (a cost, combat damage with wither or infect, replacement-made counters as
    several permanents enter from different instructions), and an instruction that stops for a choice part way puts the
@@ -4125,7 +4125,7 @@ line blocks.
    Out after round 418 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
    ability; fitMany can't tell where the first group ends in the chosen targets), Captain America, First Avenger (its
    damage "divided as you choose" is announced before the cost that picks the Equipment, CR 601.2d, 601.2h, and no ruling
-   settles it), Jasmine Boreal of the Seven (a spell's abilities granted by effects, which its mana can't be spent on per
+   settles it), Jasmine Boreal of the Seven (done in round 426) (a spell's abilities granted by effects, which its mana can't be spent on per
    its rulings, aren't gathered in one place), Wayta, Trainer Prodigy (a cost reduction by its targets, and triggers
    doubled for creatures dealt damage), Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: bots don't hold Surge to Victory for a
@@ -4314,6 +4314,33 @@ line blocks.
    of those colors, you may exile a card of that color": whether one multicolored card can count for two colors isn't
    settled), Lara Croft, Tomb Raider (still out), and the rest of `npm run popular` above rank 17,500 (still out, for the
    reasons in their earlier lists). Known gaps: Kaya's bot copies the card worth the most, if worth more than the token.
+   Round 426 went on down the "Out after round N" lists and `npm run popular`, most played first, to abilities and costs
+   that care whether a creature has abilities, a copy until the next end step, and a creature type chosen with an
+   optional cost. Jasmine Boreal of the Seven's "Spend this mana only to cast creature spells with no abilities." (the
+   spell's printed text and any ability it's given as it's cast, such as convoke or cascade from another permanent,
+   rulings; a face-down spell has none, CR 708.2a; ManaSpend noAbilitySpells, game.ts spellGainsAbilities) and "Creatures
+   you control with no abilities can't be blocked by creatures with abilities." (CR 509.1b, checked as blockers are
+   declared; TargetSpec hasAbilities). Niko, Light of Hope's "{2}, {T}: Exile target nonlegendary creature you control.
+   Shards you control become copies of it until the next end step. Return it ..." (copies of it as it last existed, CR
+   707.2, 608.2h, until the next end step begins, CR 611.2a, the next turn's when activated during an end step, CR
+   513.2; CopyEffect until nextEndStep). Celestial Reunion's "As an additional cost to cast this spell, you may choose a
+   creature type and behold two creatures of that type." (an optional cost chosen like a kicker with no mana, CR 601.2b;
+   the type chosen as part of it, CR 205.3m, CompiledCard.kickChooseType; behold, CR 701.4a: two creature cards of that
+   type from your hand, two creatures of that type you control, or one of each) and its search, the card found put onto
+   the battlefield instead when the cost was paid and it has the chosen type (CR 614.1a; search mayInstead `must` and
+   `ifKicked`). Browser tests click through Celestial Reunion's offered cost, its type pick and behold pick, and the
+   declined cost. +3, 31,784 of 31,936 with main 06f3efa (B268-B271) merged in; the compiled text of every other card is
+   unchanged.
+   Out after round 426 (looked at, not done): Filigree Vector ("each of any number of target creatures and ... each of any
+   number of target artifacts": two any-number target groups in one ability, one permanent possibly in both, rulings),
+   Arvinox, the Mind Flail ("isn't a creature unless you control three or more permanents you don't own", and cards
+   exiled face down from the bottom of each opponent's library that you may look at and cast), Saruman of Many Colors
+   (ward with a discard of a card of given types, and a reflexive trigger comparing mana value with the spell that
+   triggered it), the cards round 425 left out (still out, for its reasons), and the rest of `npm run popular` above
+   rank 17,500 (still out, for the reasons in their earlier lists). Known gaps: spells given cascade only while Treasure
+   mana is spent on them are not counted as given an ability for Jasmine's mana; Celestial Reunion's bot (and the
+   planner) chooses the creature type with the most creatures to behold; Niko's bot use is untested beyond simulated
+   games.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5952,7 +5979,7 @@ line blocks.
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator (done in round 314), The Foretold Soldier, Radiant Scrollwielder (done in round 314), Become Anonymous (done in round 391), Night Soil, Overabundance, Avalanche of Sector
    7, Grappling Hook (done in round 278), Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained (done in round 278), Identity
    Thief, Mishra, Eminent One (done in round 337), Spell Queller (done in round 336), Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon (done in round 358), Grub, Storied Matriarch,
-   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship (done in round 358), Fisher's Talent (done in round 318), Niko, Light of Hope,
+   Taskmaster, Mercenary Mimic, Gideon Blackblade (done in round 296), Kolvori, God of Kinship (done in round 358), Fisher's Talent (done in round 318), Niko, Light of Hope (done in round 426),
    Stick Together (done in round 302), Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster (done in round 406), Quantum Riddler (done in round 296), Model of Unity (done in round 302), The Flood of Mars, Sigarda's Vanguard (done in round 302), Master of
    the Wild Hunt, Audacious Reshapers, Kiora, Sovereign of the Deep, Quest for
@@ -10408,7 +10435,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rescuer ("any number of other creature cards with total power X or less": a pick bounded by total power), Spiteful
   Repossession (Treasures "equal to the damage dealt this way", summed over opponents after prevention), Cultivator Drone
   ("or pay a cost that contains {C}": a cost paid as something resolves, Bearer of Silence's per its rulings, isn't known
-  to the mana's restriction yet) and Jasmine Boreal of the Seven ("creature spells with no abilities") stay out.
+  to the mana's restriction yet) and Jasmine Boreal of the Seven (done in round 426) ("creature spells with no abilities") stay out.
 - Round B195 (least played first, from the Lane B skip lists): Roving Actuator (void: "exile up to one target instant or
   sorcery card with mana value 2 or less from your graveyard. Copy it. You may cast the copy without paying its mana
   cost.": the copy cast as the trigger resolves or never, X as 0, rulings, CR 608.2g, 707.12). Keldon Flamesage ("look at
@@ -11903,7 +11930,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   their own creatures with Lagrella for the counters.
 - Out after round B245 (looked at, not done): the lists after round B244 stay out, and Battlefield Thaumaturge (still
   out: its ruling "{1} per target creature, even if the spell targets a creature more than once" against Hinata,
-  Dawn-Crowned's rulings, which count a twice-targeted object once), Jasmine Boreal of the Seven (still out: abilities
+  Dawn-Crowned's rulings, which count a twice-targeted object once), Jasmine Boreal of the Seven (done in round 426) (still out: abilities
   given to a spell as it's cast are granted in several places, not all read as the mana is spent) and Lodestone Bauble
   (still out: a player chosen as it's activated). Known gaps: bots cast Reap Intellect and Deadly Cover-Up by their usual
   worth, without weighing which names to take.
@@ -11998,7 +12025,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B227 (looked at, not done): the lists after round B226 stay out.
 - Out after round B226 (looked at, not done): Snowfall (its "may add" in a triggered mana ability, a choice that matters
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
-  would have to keep apart), Jasmine Boreal of the Seven (a creature spell with no abilities, counting abilities other
+  would have to keep apart), Jasmine Boreal of the Seven (done in round 426) (a creature spell with no abilities, counting abilities other
   permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth (done in round B258) ("Lands can't
   enter the battlefield" for every way a land is put onto it, a copy entering as a land too, rulings), The Prismatic Piper (done in round B249),
   Faceless One (done in round B249) and Clara Oswald (done in round B249) (a color chosen before the game that changes the commander's color identity for deck

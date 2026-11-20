@@ -547,6 +547,9 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   // Cultivator Drone (round B254): "... to cast a colorless spell, activate an ability of a colorless permanent, or pay a cost
   // that contains {C}" (CR 106.6, 105.2c, 107.4c): see spend.ts spendAllows.
   if (sentence === "Spend this mana only to cast a colorless spell, activate an ability of a colorless permanent, or pay a cost that contains {C}.") return { costsWithC: true, text: sentence };
+  // Jasmine Boreal of the Seven (round 426): "Spend this mana only to cast creature spells with no abilities" (CR 106.6,
+  // 113.1): see ManaSpend.noAbilitySpells and spend.ts spendAllows.
+  if (sentence === "Spend this mana only to cast creature spells with no abilities.") return { spells: { kind: "spell", types: ["Creature"], noAbilities: true, text: "creature spells with no abilities" }, noAbilitySpells: true, text: sentence };
   // Adarkar Unicorn: "Spend this mana only to pay cumulative upkeep costs" (CR 702.24a).
   if (sentence === "Spend this mana only to pay cumulative upkeep costs.") return { cumulativeUpkeep: true, text: sentence };
   // Quinjet Technician: "Spend this mana only to activate power-up abilities" (CR 702.193).

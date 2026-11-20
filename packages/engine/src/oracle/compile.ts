@@ -176,6 +176,7 @@ import { round422Line } from "./round422";
 import { round423Line } from "./round423";
 import { round424Line } from "./round424";
 import { round425Line } from "./round425";
+import { round426Line } from "./round426";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1060,6 +1061,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Jasmine Boreal of the Seven, Niko, Light of Hope, Celestial Reunion (round 426): oracle/round426.ts.
+    if (round426Line(line, raw, out, isSpell)) continue;
     // Redemptor Dreadnought, Kaya, Spirits' Justice (round 425): oracle/round425.ts.
     if (round425Line(line, raw, out, isSpell)) continue;
     // Swindler's Scheme, Dack Fayden, Helping Hand (round 424): oracle/round424.ts.
@@ -8532,6 +8535,8 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
   // Selective Snare: the creature type chosen as it's cast (CompiledCard.castChooseType) is its targets' type.
   if (out.castChooseType) choices.add("creatureType");
+  // Celestial Reunion (round 426): the type chosen with its optional additional cost (CompiledCard.kickChooseType).
+  if (out.kickChooseType) choices.add("creatureType");
   if (out.entersNamesWithOpponent) choices.add("cardName");
   // Sanctuary Blade (round 390): "the last chosen color" is the one chosen as it last became attached (askAttachColor).
   if (out.attachChooseColor) choices.add("color");

@@ -950,7 +950,12 @@ export interface GameObject {
 export interface CopyEffect {
   key: string;
   timestamp: number;
-  until?: "endOfTurn" | { turnOf: PlayerId } | CopyWhile;
+  /**
+   * `nextEndStep` (Niko, Light of Hope, round 426): "until the next end step", over as the first end step to begin after it
+   * was made begins (CR 611.2a): `turn` and how many end steps that turn had begun by then (TurnLog.endSteps), so one made
+   * during an end step lasts until the next turn's (as for a delayed trigger, CR 513.2) or that turn's next added end step.
+   */
+  until?: "endOfTurn" | { turnOf: PlayerId } | { nextEndStep: { turn: number; endSteps: number } } | CopyWhile;
 }
 
 /**

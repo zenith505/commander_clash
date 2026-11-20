@@ -1263,6 +1263,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // The spliced cards' targets come after the spell's own (CR 702.47b).
     // Selective Snare, Aphetto Dredging: the creature type is chosen before the targets (rulings, CR 601.2b-c).
     if (d.creatureType === undefined && compiled.castChooseType) return setCastTypePick({ draft: d, label: card.name });
+    // Celestial Reunion (round 426): the type is chosen as part of its optional additional cost, so only when that's paid.
+    if (d.creatureType === undefined && compiled.kickChooseType && d.kicks?.includes(0)) return setCastTypePick({ draft: d, label: `${card.name} (behold two creatures of that type)` });
     const own = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.creatureType ? { creatureType: d.creatureType } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
     // "Target ... of an opponent's choice" (Evangelize): that opponent chooses it, after you choose yours.
     const specs = forController(offerTargets(s, d.splice?.length ? withSplices({ targets: own, effects: [], text: "" }, splicedBodies(s, d.splice)).targets : own, HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId));

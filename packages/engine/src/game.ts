@@ -14,7 +14,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, discardShieldOf, opponentForbidsDiscard, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, cardPT, inRange, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
@@ -2978,13 +2978,26 @@ export function copyWhileHolds(s: GameState, w: CopyWhile): boolean {
   return !!a && !!h && a.zone === "battlefield" && h.zone === "battlefield" && (a.zoneChanges ?? 0) === zc && (h.zoneChanges ?? 0) === hostZc && a.attachedTo === host;
 }
 
+/**
+ * Niko, Light of Hope (round 426): end the copy effects lasting "until the next end step" as this end step begins (CR 611.2a):
+ * those made on an earlier turn, or this turn before this end step began (CopyEffect.until nextEndStep).
+ */
+function endNextEndStepCopies(s: GameState) {
+  const k = s.turnLog?.endSteps ?? 1;
+  const over = (e: NonNullable<GameObject["copyEffects"]>[number]) => typeof e.until === "object" && "nextEndStep" in e.until && (e.until.nextEndStep.turn < s.turn || e.until.nextEndStep.endSteps < k);
+  const names = s.battlefield.filter((id) => s.objects[id]!.copyEffects?.some(over)).map((id) => defOf(s, obj(s, id)).name);
+  if (!names.length) return;
+  endCopyEffects(s, over);
+  log(s, `${names.join(", ")} ${names.length === 1 ? "stops" : "stop"} being ${names.length === 1 ? "a copy" : "copies"} (until the next end step).`);
+}
+
 /** End the copy effects whose "for as long as" duration stopped (round 396); true when one ended. */
 export function endCopyWhile(s: GameState): boolean {
   let ended = false;
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
     const o = s.objects[id];
-    if (!o?.copyEffects?.some((e) => typeof e.until === "object" && !("turnOf" in e.until))) continue;
-    const kept = o.copyEffects.filter((e) => typeof e.until !== "object" || "turnOf" in e.until || copyWhileHolds(s, e.until));
+    if (!o?.copyEffects?.some((e) => typeof e.until === "object" && !("turnOf" in e.until) && !("nextEndStep" in e.until))) continue;
+    const kept = o.copyEffects.filter((e) => typeof e.until !== "object" || "turnOf" in e.until || "nextEndStep" in e.until || copyWhileHolds(s, e.until));
     if (kept.length === o.copyEffects.length) continue;
     const was = defOf(s, o).name;
     o.copyEffects = kept.length ? kept : undefined;
@@ -5314,6 +5327,8 @@ function beginStep(s: GameState, step: Step): void {
           if (m?.until === "yourNextEndStep" && (m.untilOf ?? m.player) === ap) obj(s, id).mayPlay = undefined;
         }
       (s.turnLog ??= {}).endSteps = (s.turnLog.endSteps ?? 0) + 1;
+      // Niko, Light of Hope (round 426): "until the next end step": over as it begins, before its triggers (CR 611.2a).
+      endNextEndStepCopies(s);
       fireEvent(s, { type: "step", step: "end", active: ap });
       // "At the beginning of that turn's end step, you lose the game" (Final Fortune): a delayed trigger (CR 603.7).
       if (s.extraTurn?.loseAtEnd) {
@@ -6856,7 +6871,7 @@ function manaUnlessDone(s: GameState, paid: boolean): void {
 export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices, o?: GameObject, x?: number): ManaUse => ({ spell: d, ...(x ? { x } : {}), ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(compileCard(d).creatureManaOnly ? { creatureOnly: true as const } : {}), ...(compileCard(d).basicLandManaOnly ? { basicLandOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices, o) });
 
 /** Kicked (CR 702.33d), cast for its disturb cost (CR 702.146a) or from a hand, for mana spent only on such spells or not on them (ManaUse). */
-export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; fromGraveyard?: true; flashbackFromGraveyard?: true; owner?: PlayerId; faceDown?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" ? { fromGraveyard: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}), ...(choices?.faceDown ? { faceDown: true as const } : {}) });
+export const spellHow = (d: CardDef, choices?: CostChoices, o?: GameObject): { kicked?: true; disturb?: true; fromHand?: true; fromExile?: true; fromGraveyard?: true; flashbackFromGraveyard?: true; owner?: PlayerId; faceDown?: true; castObject?: GameObject } => ({ ...(o ? { castObject: o } : {}), ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}), ...(o?.zone === "hand" ? { fromHand: true as const } : {}), ...(o?.zone === "exile" ? { fromExile: true as const } : {}), ...(o?.zone === "graveyard" ? { fromGraveyard: true as const } : {}), ...(o?.zone === "graveyard" && (d.keywords.includes("Flashback") || choices?.via === "grantedFlashback") ? { flashbackFromGraveyard: true as const } : {}), ...(o ? { owner: o.owner } : {}), ...(choices?.faceDown ? { faceDown: true as const } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -7191,7 +7206,9 @@ export function castProblem(
   if (castNumber && choices?.number !== undefined && (!Number.isInteger(choices.number) || choices.number < castNumber.min || choices.number > castNumber.max)) return `choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`;
   // Selective Snare: one existing creature type, not several or another kind of subtype (rulings, CR 205.3m).
   const typeChoice = compileCard(defOf(s, o)).castChooseType;
-  if (choices?.creatureType !== undefined && (!typeChoice || !CREATURE_TYPES.has(choices.creatureType))) return typeChoice ? `${choices.creatureType} isn't a creature type` : `${defOf(s, o).name} doesn't ask you to choose a creature type`;
+  // Celestial Reunion (round 426): only as part of its optional additional cost, paid (CompiledCard.kickChooseType).
+  const kickType = !!compileCard(defOf(s, o)).kickChooseType;
+  if (choices?.creatureType !== undefined && (!(typeChoice || (kickType && !!choices.kicks?.includes(0))) || !CREATURE_TYPES.has(choices.creatureType))) return typeChoice || kickType ? (CREATURE_TYPES.has(choices.creatureType) ? `${defOf(s, o).name} asks for a creature type only with its additional cost paid` : `${choices.creatureType} isn't a creature type`) : `${defOf(s, o).name} doesn't ask you to choose a creature type`;
   if (typeChoice && targets !== undefined && choices?.creatureType === undefined) return `choose a creature type for ${defOf(s, o).name} before its targets`;
   // Spoils of War: X is what its text says as it's cast (CR 107.3c), counted in the graveyard of the opponent chosen then,
   // before X (rulings); with none chosen yet, it can still be cast once one is.
@@ -8331,6 +8348,48 @@ function grantedProwl(s: GameState, pid: PlayerId, d: CardDef): NonNullable<Comp
   return undefined;
 }
 
+/**
+ * Jasmine Boreal of the Seven (round 426): does a spell `pid` casts gain an ability as it's cast, from what they control
+ * ("Some effects give spells a player controls an ability. In that case, mana from Jasmine Boreal of the Seven's mana
+ * ability can't be spent to cast that spell, even if it is a creature spell that normally has no abilities", rulings)?
+ * Every "spells you cast have ..." the engine knows (convoke, improvise, delve, freerunning, web-slinging, blitz, emerge,
+ * evoke, prowl, casualty, replicate, offspring, conspire, demonstrate, split second, rebound, lifelink, deathtouch, storm,
+ * cascade) and "the next spell you cast this turn has ..." (convoke, improvise, cascade, storm), each with its own limits,
+ * the spell as it is while it's paid for (CR 601.2a, 601.2g-h). `o`: the card being cast, where it is; without it, the
+ * limits that need it (where it's cast from, the first of its kind this turn) count as met.
+ */
+export function spellGainsAbilities(s: GameState, pid: PlayerId, d: CardDef, o?: GameObject): boolean {
+  if (o && (hasConvoke(s, pid, o) || hasImprovise(s, pid, o) || hasDelve(s, pid, o) || conspireGranted(s, pid, o) > 0)) return true;
+  if (grantedFreerunning(s, pid, d) || grantedWebSlinging(s, pid, d) || grantedBlitz(s, pid, d) || grantedEmerge(s, pid, d) || grantedEvoke(s, pid, d, o) || grantedProwl(s, pid, d)) return true;
+  if (casualtyGranted(s, pid, d, o).length || replicateGranted(s, pid, d).length || offspringGranted(s, pid, d).length) return true;
+  const from = o ? (o.zone === "stack" ? o.castFrom : o.zone) : undefined;
+  const firstNotFromHand = from !== "hand" && !(s.castThisTurn ?? []).some((c) => c.player === pid && c.from !== "hand");
+  const cast = (s.castThisTurn ?? []).filter((c) => c.player === pid);
+  const mine = [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)].filter((p) => controllerOf(s, p) === pid);
+  for (const p of mine) {
+    const a = abilitiesOf(s, p);
+    if (p.zone === "battlefield") {
+      if ((a.spellsHaveDemonstrate ?? []).some((g) => printedMatches(g.filter, d) && (!g.firstNotFromHand || !o || firstNotFromHand))) return true;
+      if ((a.spellsHaveSplitSecond ?? []).some((f) => printedMatches(f, d))) return true;
+      // Rebound is only for a spell cast from a hand (CR 702.88a): given to the others, it does nothing, but they have it.
+      if ((a.spellsHaveRebound ?? []).some((f) => printedMatches(f, d))) return true;
+      if ((a.spellsHaveKeywords ?? []).some((g) => printedMatches(g.filter, d))) return true;
+      for (const g of a.spellsHaveCascade ?? []) {
+        if (g.from && o && from !== g.from) continue;
+        if (g.commander && !o?.isCommander) continue;
+        if (g.yourTurn && s.activePlayer !== pid) continue;
+        if (g.maxMv !== undefined && defMv(d) > evalAmount(s, g.maxMv, { controller: pid, sourceId: p.id })) continue;
+        if (g.filter && !printedMatches(g.filter, d)) continue;
+        if (g.first && cast.some((c) => !g.from || c.from === g.from)) continue;
+        if (g.treasure) continue; // "if mana from a Treasure was spent to cast it": not known before the mana is spent
+        return true;
+      }
+    }
+    if ((a.spellsHaveStorm ?? []).some((g) => printedMatches(g.filter, d))) return true;
+  }
+  return (s.nextCast ?? []).some((n) => n.controller === pid && n.turn === s.turn && (n.cascade || n.storm) && !n.loyalty && !n.exhaust && !n.card && printedMatches({ ...n.filter, manaValue: undefined }, d) && (!n.filter.manaValue || inRange(defMv(d), n.filter.manaValue)) && (!n.fromHand || !o || from === "hand"));
+}
+
 const controlsPayWUBRG = (s: GameState, pid: PlayerId, what: "payWUBRG" | "castFromHandFree" = "payWUBRG") =>
   s.battlefield.some((id) => {
     const o = obj(s, id);
@@ -8546,6 +8605,27 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
 /** A modal spell's choices, if this card is one (CR 700.2). */
 export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, obj(s, id))).spell?.modal;
 
+/**
+ * Is a creature type chosen as this spell is cast (CostChoices.creatureType)? Selective Snare's always (castChooseType);
+ * Celestial Reunion's (round 426) as part of its optional additional cost, so only with that paid (kickChooseType).
+ */
+export const castTypeChosen = (d: CardDef, choices?: Pick<CostChoices, "kicks">) => !!compileCard(d).castChooseType || (!!compileCard(d).kickChooseType && !!choices?.kicks?.includes(0));
+
+/**
+ * Celestial Reunion (round 426): the creature type that lets `pid` behold the most creatures of it for this card's cost
+ * (creature cards of that type in their hand but this one, creatures of that type they control; a changeling has every
+ * type), at least `n` of them; with a tie, one their library has creature cards of, then alphabetically. Undefined with none.
+ */
+export function beholdTypeFor(s: GameState, pid: PlayerId, o: GameObject, n: number): string | undefined {
+  const hand = player(s, pid).hand.filter((id) => id !== o.id && isType(defOf(s, obj(s, id)), "Creature")).map((id) => ({ subtypes: defOf(s, obj(s, id)).subtypes, all: everyCreatureType(defOf(s, obj(s, id))) }));
+  const field = s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).types.includes("Creature")).map((id) => ({ subtypes: characteristics(s, obj(s, id)).subtypes, all: !!characteristics(s, obj(s, id)).allCreatureTypes }));
+  const all = [...hand, ...field];
+  const types = [...new Set(all.flatMap((c) => c.subtypes))].filter((t) => CREATURE_TYPES.has(t));
+  const count = (t: string) => all.filter((c) => c.all || c.subtypes.includes(t)).length;
+  const inLibrary = (t: string) => player(s, pid).library.some((id) => { const d = defOf(s, obj(s, id)); return isType(d, "Creature") && (d.subtypes.includes(t) || everyCreatureType(d)); });
+  return types.filter((t) => count(t) >= n).sort((a, b) => count(b) - count(a) || Number(inLibrary(b)) - Number(inLibrary(a)) || a.localeCompare(b))[0];
+}
+
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
   choices = convertChoices(o, choices);
@@ -8589,7 +8669,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Liquid Fire: the number is part of casting it (CR 601.2b).
   const castNumber = compileCard(defOf(s, o)).castNumber;
   if (castNumber && choices.number === undefined) throw new RulesError(`choose a number between ${castNumber.min} and ${castNumber.max} for ${defOf(s, o).name}`);
-  if (compileCard(defOf(s, o)).castChooseType && choices.creatureType === undefined) throw new RulesError(`choose a creature type for ${defOf(s, o).name}`);
+  if (castTypeChosen(defOf(s, o), choices) && choices.creatureType === undefined) throw new RulesError(`choose a creature type for ${defOf(s, o).name}`);
   if (compileCard(defOf(s, o)).castXIs) {
     if (choices.xOpponent === undefined) throw new RulesError(castProblem(s, p.id, id, undefined, modes, convoke, improvise, undefined, choices) ?? `choose an opponent for ${defOf(s, o).name}`);
     x ??= definedCastX(s, p.id, o, choices);
@@ -8827,13 +8907,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     kind: "spell",
     objectId: id,
     controller: p.id,
-    description: `${hasX ? `${d.name} (X=${x ?? 0})` : compileCard(d).castNumber && choices.number !== undefined ? `${d.name} (chose ${choices.number})` : d.name}${compileCard(d).castChooseType && choices.creatureType ? ` (${choices.creatureType})` : ""}`,
+    description: `${hasX ? `${d.name} (X=${x ?? 0})` : compileCard(d).castNumber && choices.number !== undefined ? `${d.name} (chose ${choices.number})` : d.name}${castTypeChosen(d, choices) && choices.creatureType ? ` (${choices.creatureType})` : ""}`,
     body,
     targets: specs.length ? stampTargets(s, targets) : undefined,
     modes: chosen,
     ...(hasX ? { x: x ?? 0 } : {}),
     ...(compileCard(d).castNumber && choices.number !== undefined ? { chosenNumber: choices.number } : {}),
-    ...(compileCard(d).castChooseType && choices.creatureType ? { chosenType: choices.creatureType } : {}),
+    ...(castTypeChosen(d, choices) && choices.creatureType ? { chosenType: choices.creatureType } : {}),
     ...(spell?.modal?.chooser && choices.modeChooser !== undefined ? { modeChooser: choices.modeChooser } : {}),
     ...(kicks ? { kicked: kicks } : {}),
     ...(byControl ? { kickedByControl: true as const } : {}),
@@ -8890,7 +8970,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${compileCard(d).castChooseType && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${castTypeChosen(d, choices) && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -9869,7 +9949,21 @@ function viaCosts(d: CardDef, choices: { via?: CastFromGraveyardKind; objectId?:
   return graveyardCast(d, choices?.via)?.costs;
 }
 
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice" | "faceDown"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+/**
+ * Celestial Reunion (round 426): a behold cost of "the chosen type" (TargetSpec `chosen` "type") bound to the creature type
+ * chosen as it's cast (CostChoices.creatureType), or before one's chosen, the one beholdTypeFor would pick (for planning);
+ * unbound, nothing can be beheld for it.
+ */
+function bindBeholdType(c: AdditionalCost, choices: { creatureType?: string; objectId?: ObjectId } | undefined, s?: GameState, pid?: PlayerId): AdditionalCost {
+  if (c.kind !== "reveal" || (c.filter.chosen !== "type" && c.orControl?.chosen !== "type")) return c;
+  const o = s && choices?.objectId !== undefined ? s.objects[choices.objectId] : undefined;
+  const type = choices?.creatureType ?? (s && pid !== undefined && o ? beholdTypeFor(s, pid, o, c.n) : undefined);
+  if (!type) return c;
+  const chosen = { type };
+  return { ...c, filter: bindChosen(c.filter, chosen), ...(c.orControl ? { orControl: bindChosen(c.orControl, chosen) } : {}) };
+}
+
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks" | "splice" | "faceDown" | "creatureType"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use (and Liesa's commander tax in life, from the command zone). */ /** Into the Pit: the costs of the permission it was cast from the top of a library with, kept as it moved to the stack. */ topCosts?: AdditionalCost[]; objectId?: ObjectId; /** Liesa's commander tax in life, worked out before the card left the command zone (castSpell). */ taxLife?: number; /** The way to cast it from a graveyard, found as it was cast (it's on the stack now). */ viaWay?: CastFromGraveyard }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -9906,9 +10000,10 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
   const targetCount = (choices?.targets ?? []).filter((t) => t.kind !== "none").length;
+  // Celestial Reunion (round 426): "behold two creatures of that type", of the type chosen with the cost (kickChooseType).
   return costs.map((c) =>
     xCost(c) ? { ...c, n: x } : c.kind === "payLife" && c.perTarget ? { kind: "payLife", n: c.n * targetCount } : c.kind === "sacrifice" && c.half && s && pid !== undefined ? { ...c, n: Math.ceil(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false)).length / 2) } : (c.kind === "exileFromHand" || c.kind === "sacrifice") && c.mvX && c.filter && x !== undefined ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
-  );
+  ).map((c) => bindBeholdType(c as AdditionalCost, choices, s, pid));
 }
 
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;

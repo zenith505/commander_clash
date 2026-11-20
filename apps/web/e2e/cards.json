@@ -7955,6 +7955,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ba0a815c-1dfe-47c1-890f-496c670124f3",
+  "name": "Celestial Reunion",
+  "manaCost": "{X}{G}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may choose a creature type and behold two creatures of that type.\nSearch your library for a creature card with mana value X or less, reveal it, put it into your hand, then shuffle. If this spell's additional cost was paid and the revealed card is the chosen type, put that card onto the battlefield instead of putting it into your hand.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "85e9a43e-5676-4d12-ac27-e8cf57307d5e",
   "name": "Cemetery Desecrator",
   "manaCost": "{4}{B}{B}",

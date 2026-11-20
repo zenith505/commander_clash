@@ -244,6 +244,8 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
     ...(nth !== undefined ? { nth } : {}),
     ...(item.countersRemoved !== undefined ? { countersRemoved: item.countersRemoved } : {}),
     ...(item.chosenNumber !== undefined ? { chosen: { number: item.chosenNumber } } : {}),
+    // Celestial Reunion (round 426): "the chosen type", chosen with its additional cost as it was cast (StackItem.chosenType).
+    ...(item.chosenType && item.kind === "spell" && item.objectId && s.objects[item.objectId] && compileCard(defOf(s, s.objects[item.objectId]!)).kickChooseType ? { chosen: { ...(item.chosenNumber !== undefined ? { number: item.chosenNumber } : {}), type: item.chosenType } } : {}),
   };
   return continueResolution(s);
 }

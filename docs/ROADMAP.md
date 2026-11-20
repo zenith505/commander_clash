@@ -1,6 +1,6 @@
 # Roadmap
 
-31,804 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,806 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
 9,979 (99%).
 
@@ -11639,6 +11639,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B277 (least played first, two of the three cards round B276 named next in line, neither in Lane A's rounds
+  428-429): Lightning Storm's "Discard a land card: Put two charge counters on Lightning Storm. You may choose a new target
+  for it. Any player may activate this ability but only if Lightning Storm is on the stack." (an ability of the spell that
+  works only while it's on the stack, CR 113.6, 113.6b, ActivatedAbility.zone `stack`; any player may activate it and
+  controls it, CR 602.2, 113.8; as it resolves the counters go on the spell if it's still there as that object, CR 122.1,
+  400.7, Effect spellCounters, and the activator may choose a new target, keeping the old one, legal or not, when there's
+  no other, CR 115.7d, rulings, newTargets `ofSource`; the damage counts the counters as the spell resolves, and they go
+  away when it leaves the stack, rulings; the active player gets priority after it resolves, as always). Sacred Ground's
+  "Whenever a spell or ability an opponent controls causes a land to be put into your graveyard from the battlefield,
+  return that card to the battlefield." (a land you own moved there by the cost or effect of an opponent's spell or
+  ability: a destruction, a sacrifice it makes you choose, or a cost they pay with a land of yours they control, as
+  Firesong and Sunspeaker's rulings read "causes"; not a state-based action, CR 704.3, nor your own spell or ability's
+  cost or effect, nor a land exiled instead; the "dies" event's `cause`, game.ts leaveCause, TriggeredAbility.dies
+  `causedByOpponent`; the card returns under your control, CR 110.2a, only if it's still in the graveyard as the object it
+  became there, CR 400.7). Bots discard a basic land card first to send an opponent's Lightning Storm aimed at them or
+  theirs at one of their opponents' things (bot.ts chooseStormRedirect), and choose its new target as for any "choose new
+  targets". The stack card shows the spell's counters and a button for its ability. Browser tests click through
+  discarding your Mountain to send Ana's Lightning Storm back at her, and Ana's Stone Rain on your Mountain coming back
+  with Sacred Ground. +2, 31,799 of 31,936 with main through B276. The compiled text of every
+  other card is unchanged.
+- Out after round B277 (looked at, not done): the lists after round B276 stay out. Spy Kit stays out (every nonlegendary
+  creature card's name at once: every check of a name in the engine, the legend rule's among them, would have to know).
+  Judgment calls and known gaps: a Lightning Storm copy has the ability too, with no counters of its own (counters aren't
+  copied, CR 707.2); bots never pump their own Lightning Storm, and the bot that cast it doesn't weigh discards others may
+  make; Sacred Ground counts a land put into your graveyard as part of an opponent's spell or ability resolving, its
+  "unless" payments included, as Sigarda, Host of Herons' rulings treat them. Next in line (not looked at closely yet):
+  Land Equilibrium, Word of Command, Swirl the Mists, from the earlier skip lists.
 - Round B276 (least played first, two of the three cards round B275 named next in line, none of them in Lane A's rounds
   427-429): Secret Invasion's "When this Aura enters, exile up to one target creature other than enchanted creature until
   this Aura leaves the battlefield. Enchanted creature becomes a copy of that creature until this Aura leaves the

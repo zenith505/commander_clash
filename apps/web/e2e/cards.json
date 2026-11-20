@@ -29179,6 +29179,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2c0fceb6-d92d-4f4a-85a2-0af5be5bba81",
+  "name": "Lightning Storm",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Lightning Storm deals X damage to any target, where X is 3 plus the number of charge counters on Lightning Storm.\nDiscard a land card: Put two charge counters on Lightning Storm. You may choose a new target for it. Any player may activate this ability but only if Lightning Storm is on the stack.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "92301066-8904-41bc-84bd-4aa286cbab9c",
   "name": "Liliana of the Dark Realms",
   "manaCost": "{2}{B}{B}",
@@ -41312,6 +41338,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b18e773c-611b-4c18-8b2d-8d3a7e5ddc93",
+  "name": "Sacred Ground",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a spell or ability an opponent controls causes a land to be put into your graveyard from the battlefield, return that card to the battlefield.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sth",
+  "releasedAt": "1998-03-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "068b3692-411b-44d4-a7e9-005262760cfc",
   "name": "Sacrifice",
   "manaCost": "{B}",
@@ -46428,6 +46480,32 @@
   "commanderLegal": "legal",
   "set": "trk",
   "releasedAt": "2026-11-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6e880df6-fc00-43d2-a9c8-f575f40b78c6",
+  "name": "Stone Rain",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target land.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sta",
+  "releasedAt": "2021-04-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -1170,6 +1170,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "newTargets": {
       // Speedball, New Warrior: the spell whose casting triggered this, if it's still on the stack.
       if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? newTargets(s, ctx, ctx.cause, src) : undefined;
+      // Lightning Storm (round B277): the spell this ability is on, if it's still on the stack as that object (CR 400.7).
+      if (e.ofSource) {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        const spell = me && me.zone === "stack" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? s.stack.find((x) => x.kind === "spell" && x.objectId === me.id) : undefined;
+        return spell ? newTargets(s, ctx, spell.id, src) : undefined;
+      }
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       // Sudden Substitution: the spell's controller as this resolves, after any exchange (rulings).

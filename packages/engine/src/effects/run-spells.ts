@@ -745,6 +745,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.alt ? { alt: e.alt } : {}),
           ...(e.loyalty ? { loyalty: e.loyalty } : {}),
           ...(e.exhaust ? { exhaust: true as const } : {}),
+          ...(e.minManaSpent ? { minManaSpent: e.minManaSpent } : {}),
           ...(ctx.x ? { x: ctx.x } : {}),
           // Loki Laufeyson: its power as each spell is cast, the source as the object that activated it (round B202), even if
           // it left the battlefield before this resolved.

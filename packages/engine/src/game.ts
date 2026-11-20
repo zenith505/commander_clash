@@ -6680,7 +6680,11 @@ export function isSummoningSick(s: GameState, o: GameObject) {
 export function tapAbilitySick(s: GameState, o: GameObject) {
   if (!isSummoningSick(s, o)) return false;
   const you = controllerOf(s, o);
-  return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
+  // Dynaheir, Invoker Adept (round 428): "of other creatures you control": not its own.
+  return !s.battlefield.some((id) => {
+    const h = abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste;
+    return !!h && !(h === "others" && id === o.id) && controllerOf(s, obj(s, id)) === you;
+  });
 }
 
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType, sacrifice?: ObjectId[]) {
@@ -7376,7 +7380,8 @@ export function castProblem(
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
     if ((choices.alt === "freerunning" || choices.alt === "grantedFreerunning") && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
     // Sneak (CR 702.190a): only during your declare blockers step, once blockers are declared (an unblocked attacker).
-    if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
+    // Round 428: sneak a permanent gives the card (Ninja Teen) the same way (rulings).
+    if ((choices.alt === "sneak" || choices.alt === "grantedSneak") && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
     // Only one alternative cost can be applied to a spell (CR 118.9a). A permission to cast it from the graveyard that
     // names no cost (Yawgmoth's Will, Muldrotha, Lurrus) allows one (rulings), except those that say where the card is.
     // Casting a prototype card prototyped isn't an alternative cost (CR 718.3): it may be cast so without paying its mana
@@ -7392,7 +7397,8 @@ export function castProblem(
     if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand" && !(via?.alt === "warp" && choices.alt === "warp")) return "warp works only from your hand"; // CR 702.185a
   }
   // Eye of Duskmantle (round 405): only for life equal to its mana value (rulings).
-  if (via?.alt && choices?.alt !== via.alt) return via.alt === "citadel" ? `${d.name} can be cast from your graveyard this way only by paying life equal to its mana value` : `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
+  // Ninja Teen (round 428): "using their sneak abilities": the card's own sneak or one given to it (rulings).
+  if (via?.alt && choices?.alt !== via.alt && !(via.alt === "sneak" && choices?.alt === "grantedSneak")) return via.alt === "citadel" ? `${d.name} can be cast from your graveyard this way only by paying life equal to its mana value` : `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
@@ -7468,7 +7474,7 @@ export function castProblem(
   // tapped (castSpell treats kicks left out as none).
   const tapFlash = beholdFlashCost?.kind === "tap" && (!!choices?.kicks?.includes(0) || (choices?.kicks === undefined && !!s.objects[id] && tapCostCandidates(s, pid, s.objects[id]!, beholdFlashCost).length >= beholdFlashCost.n));
   // Qasali Ambusher: "you may cast ~ without paying its mana cost and as though it had flash": only cast that way (CR 601.3).
-  const instantSpeed = choices?.alt === "sneak" || (choices?.alt === "alternative" && !!altCost(d, "alternative")?.flash) || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
+  const instantSpeed = choices?.alt === "sneak" || choices?.alt === "grantedSneak" || (choices?.alt === "alternative" && !!altCost(d, "alternative")?.flash) || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -8263,6 +8269,7 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "grantedFreerunning") return s && pid !== undefined ? grantedFreerunning(s, pid, d) : undefined;
   if (alt === "grantedWebSlinging") return s && pid !== undefined ? grantedWebSlinging(s, pid, d) : undefined;
   if (alt === "grantedBlitz") return s && pid !== undefined ? grantedBlitz(s, pid, d) : undefined;
+  if (alt === "grantedSneak") return s && pid !== undefined && o ? grantedSneak(s, pid, d, o) : undefined;
   if (alt === "grantedEmerge") return s && pid !== undefined ? grantedEmerge(s, pid, d) : undefined;
   if (alt === "grantedEvoke") return s && pid !== undefined ? grantedEvoke(s, pid, d, o) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
@@ -8332,6 +8339,29 @@ function grantedWebSlinging(s: GameState, pid: PlayerId, d: CardDef): NonNullabl
   return mana
     ? { kind: "grantedWebSlinging", mana, costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", tapped: true, text: "tapped creature you control" }, n: 1 }], text: "web-slinging: return a tapped creature you control to its owner's hand", webSlinging: true }
     : undefined;
+}
+
+/**
+ * Round 428: sneak a permanent `pid` controls gives this creature card in their graveyard (Ninja Teen's "Creature cards in
+ * your graveyard have sneak {3}{B}", CR 702.190a), while its condition holds (its class level), checked by the card's
+ * characteristics there; its cost is the sneak cost given, with an unblocked attacker you control returned to its owner's
+ * hand. Only a card in its owner's graveyard is "in your graveyard".
+ */
+/** Sneak's cost beyond mana (CR 702.190a): an unblocked attacker you control returned to its owner's hand. Also paid once the card is on the stack (castExtraCosts). */
+const GRANTED_SNEAK_COSTS: AdditionalCost[] = [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }];
+
+function grantedSneak(s: GameState, pid: PlayerId, d: CardDef, o: GameObject): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (o.zone !== "graveyard" || o.owner !== pid) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    for (const g of abilitiesOf(s, p).sneakGrants ?? []) {
+      if (g.if && !staticConditionNow(s, g.if, p.id, pid)) continue;
+      if (!printedMatches(g.filter, d)) continue;
+      return { kind: "grantedSneak", mana: g.mana, costs: GRANTED_SNEAK_COSTS };
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -8536,7 +8566,8 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const blitz = grantedBlitz(s, pid, defOf(s, o));
   const emerge = grantedEmerge(s, pid, defOf(s, o));
   const evoke = grantedEvoke(s, pid, defOf(s, o), o);
-  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(evoke ? [evoke] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
+  const sneak = grantedSneak(s, pid, defOf(s, o), o);
+  return [...own, ...(sneak ? [sneak] : []), ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(freerun ? [freerun] : []), ...(sling ? [sling] : []), ...(blitz ? [blitz] : []), ...(emerge ? [emerge] : []), ...(evoke ? [evoke] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...((dreamHallsOn(s) && dreamHallsCost(defOf(s, o))) ? [dreamHallsCost(defOf(s, o))!] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "generic") ? [altCost(defOf(s, o), "genericMv", s, pid)!] : []), ...(payZeroSource(s, pid, o, "energy") ? [altCost(defOf(s, o), "energyForSpell", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeAny(s, o, pid) ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(topFreeGrant(s, o, pid) ? [altCost(defOf(s, o), "topFree", s, pid)!] : []), ...(["evidence" as const, "nextFree" as const, "nextLife" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) || yardCitadel(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid, o)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -8932,7 +8963,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
   const paidHow = s.pending?.kind === "castFree" ? s.pending.how : undefined;
-  o.castAlt = madness && paidHow !== "paid" ? (paidHow === "miracle" ? "miracle" : "madness") : choices.alt;
+  // Ninja Teen (round 428): a sneak cost given to the card is a sneak ability's (CR 702.190a): "if its sneak cost was paid".
+  o.castAlt = madness && paidHow !== "paid" ? (paidHow === "miracle" ? "miracle" : "madness") : choices.alt === "grantedSneak" ? "sneak" : choices.alt;
   if (choices.alt === "warp" || choices.alt === "grantedWarp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
@@ -9043,7 +9075,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (discarded.length) item.costDiscarded = discarded;
   // Dralnu's Pet: "the discarded card" its kicker discarded, for the permanent it becomes (CR 614.1c).
   if (discarded.length) o.costDiscarded = discarded;
-  if (choices.alt === "sneak") o.sneak = returned;
+  if (choices.alt === "sneak" || choices.alt === "grantedSneak") o.sneak = returned;
   // Cast using web-slinging (CR 702.188a): the creature it returned, for "the returned creature".
   // A web-slinging cost a permanent gave it (Amazing Spider-Man) is casting it using web-slinging too.
   if ((choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) || choices.alt === "grantedWebSlinging") o.webSlung = returned;
@@ -9364,7 +9396,8 @@ function targetsLike(s: GameState, targets: TargetChoice[] | undefined, filter: 
 
 // Eye of Duskmantle (round 405): a permission only for life rather than mana is the last its caster would keep; with a
 // plain one too, paying life stays an alternative cost of that one (yardCitadel).
-const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0) + (w.alt === "citadel" ? 4 : 0);
+// Ninja Teen (round 428): a permission only for a sneak cost too.
+const permissionBurden = (w: CastFromGraveyard) => (w.costs.length || w.entersWith || w.entersTapped ? 2 : 0) + (w.exileIfToGraveyard ? 1 : 0) + (w.alt === "citadel" ? 4 : w.alt === "sneak" ? 3 : 0);
 
 /**
  * Eye of Duskmantle (round 405): "You may ... cast spells from among cards in your graveyard you've surveilled this turn. If
@@ -9407,7 +9440,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.yourTurn && s.activePlayer !== holder) continue;
       if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
       // Eye of Duskmantle (round 405): life rather than the mana cost, which a card without one can pay too (CR 118.6a).
-      if (!d.manaCost && !g.way.mana && g.way.alt !== "citadel") continue;
+      // Ninja Teen (round 428): for a sneak cost, which has its own mana (CR 118.9, 702.190a).
+      if (!d.manaCost && !g.way.mana && g.way.alt !== "citadel" && g.way.alt !== "sneak") continue;
       if (!printedMatches(g.filter, d)) continue;
       if (g.arrived && !arrivedThisTurn(s, o, g.arrived)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
@@ -10047,7 +10081,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   // 118.9), the mana value of what's cast (a split card's half, X as 0, CR 107.3b), for the card it lets be cast only.
   const payPend = s?.pending?.kind === "castFree" && s.pending.player === pid && s.pending.pay && s.pending.pay.kind !== "mana" && choices?.objectId === s.pending.objectId ? s.pending.pay : undefined;
   const payCosts: AdditionalCost[] = !payPend ? [] : payPend.kind === "discard" ? [{ kind: "discard", n: payPend.n }] : payPend.kind === "lifeMv" ? [{ kind: "payLife", n: manaValue(parseManaCost(d.manaCost)) }] : payPend.kind === "energyMv" ? [{ kind: "payEnergy", n: manaValue(parseManaCost(d.manaCost)) }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : []), ...(s && !choices?.faceDown ? addedSpellCosts(s, d.manaCost) : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...payCosts, ...topCosts, ...(taxLife ? [{ kind: "payLife" as const, n: taxLife }] : []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(viaCosts(d, choices, s, pid) ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(choices?.alt === "grantedSneak" ? GRANTED_SNEAK_COSTS : (altCost(d, choices?.alt, s, pid)?.costs ?? [])), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...kickerExtraCosts(d, choices?.kicks), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : []), ...entwineExtraCosts(d, choices?.modes), ...(s ? spliceExtraCosts(s, choices?.splice) : []), ...(s && !choices?.faceDown ? addedSpellCosts(s, d.manaCost) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   // Phyrexian Purge: so much life for each target chosen (CR 601.2c before 601.2f).
@@ -11990,7 +12024,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(costLifePaid > 0 ? { costLifePaid } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
+  // Dynaheir, Invoker Adept (round 428): the mana spent on its costs.
+  const manaSpentOnCosts = Object.values(paid.spent).reduce((a, b) => a + b, 0);
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(manaSpentOnCosts > 0 ? { manaSpent: manaSpentOnCosts } : {}), ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(costLifePaid > 0 ? { costLifePaid } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

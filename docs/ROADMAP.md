@@ -1,7 +1,7 @@
 # Roadmap
 
-31,781 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
+31,789 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,945 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4369,6 +4369,30 @@ line blocks.
    Light of Alabaster (Lane B's next), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in
    their earlier lists). Known gaps: Aang's bot always transforms Aang, Master of Elements back at upkeep; Blitzball's
    bot attaches World Champion to its creature with the greatest power.
+   Round 428 went on down the "Out after round N" lists and `npm run popular`, most played first, to sneak given to cards
+   in a graveyard and an ability copied by the mana spent on it. Ninja Teen's level 3, "Creature cards in your graveyard
+   have sneak {3}{B}." and "You may cast creature spells from your graveyard using their sneak abilities." (CR 716.2a,
+   702.190a: during your declare blockers step, returning an unblocked attacker you control, entering tapped and attacking
+   its player, 702.190b; a card's own sneak or the one given, either, rulings; CompiledCard.sneakGrants, AltCostKind
+   grantedSneak, cast as a sneak cost, castAlt "sneak"; a graveyardGrants permission with `alt` "sneak"). Dynaheir,
+   Invoker Adept's "You may activate abilities of other creatures you control as though those creatures had haste." (CR
+   302.6, not its own; they don't gain haste, rulings; creatureAbilitiesHaste "others") and "{T}: When you next activate
+   an ability that isn't a mana ability this turn by spending four or more mana to activate it, copy that ability. You may
+   choose new targets for the copy." (a delayed trigger, CR 603.7a, used up only by such an ability, not by a mana ability,
+   rulings, CR 605.1a, nor by one paid with less mana; mana spent on {X} counts, CR 602.2b, 601.2h; the copy resolves
+   first, CR 707.10; nextCast `minManaSpent`, the activated event's `manaSpent`). A browser test clicks through Ninja
+   Teen's graveyard sneak entry. +2, 31,789 of 31,936 on this stacked branch (round 427 #702); the compiled text of every
+   other card is unchanged.
+   Out after round 428 (looked at, not done): Yavimaya Bloomsage // Channel (Channel's "any time you could activate a mana
+   ability, you may pay 1 life. If you do, add {C}.": a mana source that isn't an object, usable whenever a mana ability
+   is, CR 605.3a, while paying costs and in every payment prompt, which the automatic payment would need to know about),
+   Captain America, First Avenger ("deals damage equal to that Equipment's mana value divided as you choose among one,
+   two, or three targets": the division is announced, CR 601.2d via 602.2b, before the cost that sets the amount is paid,
+   601.2h, and no ruling says how), Ashiok, Wicked Manipulator, Lich's Mirror, Breathstealer's Crypt and Titania's Song
+   (still out, for the reasons in their earlier lists), the cards rounds 425-427 left out (still out, for their reasons),
+   and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
+   bots activate Dynaheir's ability only with an ability of four or more mana they could also pay for; bots sneak a card
+   from their graveyard only for a token or a less valuable unblocked attacker, as from their hand.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

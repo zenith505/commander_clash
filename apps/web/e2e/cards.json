@@ -33920,6 +33920,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2c5044ff-a303-4276-8e23-7caac30a275b",
+  "name": "Ninja Teen",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Class",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Class"
+  ],
+  "oracleText": "(Gain the next level as a sorcery to add its ability.)\nWhenever a creature you control leaves the battlefield, each opponent loses 1 life.\n{1}{B}: Level 2\nCreatures you control get +1/+0 and have menace.\n{B}: Level 3\nCreature cards in your graveyard have sneak {3}{B}.\nYou may cast creature spells from your graveyard using their sneak abilities.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmt",
+  "releasedAt": "2026-03-06",
+  "rarity": "rare",
+  "layout": "class",
+  "gameChanger": false
+ },
+ {
   "oracleId": "00037840-6089-42ec-8c5c-281f9f474504",
   "name": "Nissa, Worldsoul Speaker",
   "manaCost": "{3}{G}",

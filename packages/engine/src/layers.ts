@@ -1327,6 +1327,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.some((x) => cond.colors.includes(x)) && (!cond.types || !!c.types?.some((t) => cond.types!.includes(t))));
     case "noneInHand":
       return !(s.players[you]?.hand ?? []).some((id) => printedMatches(cond.filter, defOf(s, s.objects[id]!)));
+    case "bentAllFour": {
+      // Avatar Aang (round 427): all four this turn, before it was on the battlefield too (rulings).
+      const done = s.turnLog?.bent?.[you] ?? [];
+      return (["water", "earth", "fire", "air"] as const).every((k) => done.includes(k));
+    }
+    case "playerDealtCombatDamage":
+      // Sidequest: Play Blitzball (round 427): the combat damage each player was dealt this turn, added up (CR 510.2, 120.3).
+      return Object.values(s.turnLog?.combatDamage ?? {}).some((n) => n >= cond.n);
     case "opponentDealtDamage":
       // Also an opponent who has left the game since (Spinerock Knoll rulings).
       return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => (cond.you ? Number(p) === you : Number(p) !== you) && n >= cond.n);

@@ -15,7 +15,7 @@ import { voteTally } from "./run-votes";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards, discardToTop, logSpared } from "./run-library";
 import { describeMods } from "./describe";
-import { evolves, fireEvent } from "./triggers";
+import { bent, evolves, fireEvent } from "./triggers";
 import { cantPhaseIn, phaseIn, phaseOut } from "../phasing";
 import { isSuspended } from "./run-zones";
 import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -685,6 +685,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           turn: s.turn,
           step: s.step,
         });
+        // "Whenever you earthbend": as the delayed triggered ability is made (CR 701.66b), round 427.
+        bent(s, ctx.controller, "earth");
       }
       return;
     }

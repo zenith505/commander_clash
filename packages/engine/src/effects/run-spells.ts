@@ -10,7 +10,7 @@ import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { bindChosen, canChooseTarget, isLegalTarget, legalTargets, objectMatches, onlyPermanentOrPlayer, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal, itemQuality } from "./targeting";
 import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
-import { closeZoneBatch, fireEvent } from "./triggers";
+import { bent, closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
 import { suspendExiled } from "./run-zones";
 import { defMv, sameName } from "../faces";
@@ -1362,7 +1362,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           if (!ctx.legal[k] || t?.kind !== "stack") continue;
           const item = s.stack.find((x) => x.id === t.id);
           const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+          const there = !!item;
           counterOnStack(s, ctx, t.id, src, undefined, "exile", true);
+          // Airbend (round 427): a spell exiled from the stack counts as exiled, a copy too (CR 701.65b, 707.10a).
+          if (e.airbend && there && !s.stack.some((x) => x.id === t.id)) bent(s, ctx.controller, "air");
           // Smirking Spelljacker: the card, still that object in exile, linked to this permanent (CR 607.2a, 400.7); a copy
           // of a spell ceases to exist (CR 707.10a), so nothing is.
           if (e.linked && o && s.objects[o.id] === o && o.zone === "exile" && !o.isToken && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });

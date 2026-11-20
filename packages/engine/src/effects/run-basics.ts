@@ -12,7 +12,7 @@ import { emptyPool } from "../mana";
 import { tappedForMana } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { evalAmount } from "../amounts";
-import { fireEvent } from "./triggers";
+import { bent, fireEvent } from "./triggers";
 import { bindBound, bindChosen, objectMatches } from "./targeting";
 import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
@@ -1054,6 +1054,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const p = player(s, ctx.controller);
       addMana(s, p.id, Array(n).fill("R"), { from: manaSourceOrigins(s, ctx), keep: "combat" });
       if (n) log(s, `${p.name} adds ${"{R}".repeat(n)} (until end of combat).`);
+      // "Whenever you firebend": a firebending ability of yours resolved (CR 702.189b), round 427.
+      if (e.firebending) bent(s, ctx.controller, "fire");
       return;
     }
     case "noEffect":

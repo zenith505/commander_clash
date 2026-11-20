@@ -363,7 +363,7 @@ export type TriggerSourceEvent =
   /** One of this permanent's mana abilities resolved (CR 605.3b), making this much mana (Tyvar the Bellicose). */
   | { type: "manaAbilityResolved"; id: ObjectId; amount: number }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; /** Ashnod the Uncaring (round 422): one or more permanents were sacrificed to pay its costs (not for mana to pay them, rulings). */ costSacrificed?: true; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; /** Ashnod the Uncaring (round 422): one or more permanents were sacrificed to pay its costs (not for mana to pay them, rulings). */ costSacrificed?: true; /** Verrak, Warped Sengir (round 423): how much life was paid to activate it (its costs, Phyrexian mana paid with life among them). */ costLifePaid?: number; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -2969,6 +2969,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
     // `o` the object with the trigger, `you` its controller.
+    // Verrak (round 423): "that much life" is the life paid to activate it, its event's amount.
+    const lifePaidAmount = ev.costLifePaid ? { amount: ev.costLifePaid } : {};
     const activatedMatch = (o: GameObject, you: PlayerId) => (e: string, t: TriggeredAbility): boolean => {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
@@ -2980,6 +2982,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Ashnod the Uncaring (round 422): "if one or more permanents were sacrificed to activate it": to pay its costs (CR
         // 602.2b; a Treasure sacrificed for the mana doesn't count, rulings), fixed once paid, so as true as it resolves (CR 603.4).
         if (a.costSacrificed && !ev.costSacrificed) return false;
+        // Verrak, Warped Sengir (round 423): "if life was paid to activate it": some life (more than 0, CR 119.4) paid as its costs
+        // were (CR 602.2b, 107.4f), fixed once paid, so as true as it resolves (CR 603.4).
+        if (a.costLifePaid && !ev.costLifePaid) return false;
         // Ertha Jo: "an ability that targets a creature or player": its targets as it was activated (CR 602.2i, 115.1).
         if (a.targetsCreatureOrPlayer) {
           const item = ev.stackId ? s.castItems?.[ev.stackId] : undefined;
@@ -2997,13 +3002,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       };
     // Leori, Sparktouched Hunter: "Until end of turn, whenever you activate an ability of a planeswalker of that type" (a
     // delayed triggered ability, CR 603.7b), matched the same way.
-    fromFloating((src, ctrl, triggers) => add(src, ctrl, activatedMatch(src, ctrl), triggers, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, activatedMatch(src, ctrl), triggers, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player, ...lifePaidAmount }));
     // Rowan Kenrith's emblem: its owner's (CR 114.4), from the command zone.
-    fromEmblems((o, owner) => add(o, owner, activatedMatch(o, owner), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player }));
+    fromEmblems((o, owner) => add(o, owner, activatedMatch(o, owner), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player, ...lifePaidAmount }));
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, activatedMatch(o, you), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
+      add(o, you, activatedMatch(o, you), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player, ...lifePaidAmount });
       // Haunting Wind: "Whenever ... a player activates an artifact's ability without {T} in its activation cost, ~ deals 1
       // damage to that artifact's controller": the artifact as it was activated is the subject, its controller then too
       // if it's gone (a Clue sacrificed to pay for it, CR 608.2h). Mana abilities too, as nothing says otherwise.
@@ -3117,7 +3122,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
         // Tamiyo, the Moon Sage's emblem: "a card is put into your graveyard from anywhere, you may return it": that card is
         // the group, alone.
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard" || (b.what === "leaves" && b.them)) && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard" || b.what === "discards" || b.what === "leavesGraveyard" || b.what === "exiledYourCreatures" || (b.what === "leaves" && b.them)) && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : b.each && b.what === "toGraveyard" ? { group: [{ id: matched[k]!.id, zc: matched[k]!.zc }] } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };
@@ -3787,6 +3792,14 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   // Hero of Bretagard, Ranar the Ever-Watchful (round 404): cards put into exile from your hand, for any reason (foretell
   // too), and permanents, tokens too, a spell or ability you control exiled from the battlefield (rulings).
   if (b.what === "exiledFromHandOrByYou") return m.to === "exile" && ((m.from === "hand" && m.owner === you && !m.notCard) || (m.from === "battlefield" && m.exiledBy === you));
+  // Kaya, Spirits' Justice (round 425): a creature you controlled as it left the battlefield (CR 603.10a), a token too,
+  // or a creature card from your graveyard (as a card there), put into exile.
+  if (b.what === "exiledYourCreatures") {
+    if (m.to !== "exile" || m.createdBy !== undefined) return false;
+    if (m.from === "battlefield") return m.controller === you && !!m.chars?.types.includes("Creature");
+    const card = m.notCard ? undefined : s.cards[m.card];
+    return m.from === "graveyard" && m.owner === you && !!card && restingDef(card).types.includes("Creature");
+  }
   if (m.createdBy !== undefined) return false;
   // The rest are about cards (not tokens or copies of spells, CR 111.1, 707.10), as they are in that zone.
   if (m.notCard) return false;

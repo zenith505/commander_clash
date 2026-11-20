@@ -9,11 +9,18 @@ import { RulesError, type GameObject, type GameState, type ObjectId } from "./ty
 
 type Entry = NonNullable<GameState["entersChoices"]>[number];
 
-/** The cards of its controller's graveyard it may exile now: never itself (rulings), nor one already chosen. */
+/** The graveyards it exiles from: its controller's, or with `anyGraveyard` (Dermotaxi, round 423) every player's still in the game (CR 800.4a), in turn order. */
+function yardsOf(s: GameState, o: GameObject): ObjectId[] {
+  const how = compileCard(defOf(s, o)).entersExileFromYard;
+  if (!how?.anyGraveyard) return player(s, controllerOf(s, o)).graveyard;
+  return s.turnOrder.flatMap((pid) => (player(s, pid).lost ? [] : player(s, pid).graveyard));
+}
+
+/** The cards of its controller's graveyard (any graveyard, with `anyGraveyard`) it may exile now: never itself (rulings), nor one already chosen. */
 export function yardExileOptions(s: GameState, o: GameObject, chosen: readonly string[]): ObjectId[] {
   const how = compileCard(defOf(s, o)).entersExileFromYard;
   if (!how) return [];
-  return player(s, controllerOf(s, o)).graveyard.filter((id) => id !== o.id && !chosen.includes(id) && printedMatches(how.filter, defOf(s, obj(s, id))));
+  return yardsOf(s, o).filter((id) => id !== o.id && !chosen.includes(id) && printedMatches(how.filter, defOf(s, obj(s, id))));
 }
 
 /** How many cards it must exile: "one" (or none with none there), X, or undefined for "any number". */
@@ -43,8 +50,9 @@ export function askYardExile(s: GameState, o: GameObject, c: Entry): boolean {
   }
   const left = need === undefined ? undefined : need - chosen.length;
   const counted = how.counterEach ? `, each one a ${how.counterEach.slice(0, -1).join(", ")}, or ${how.counterEach.at(-1)} counter` : "";
-  const prompt = need === undefined ? `exile any number of ${how.filter.text}s from your graveyard as it enters${chosen.length ? ` (${chosen.length} so far)` : ""}` : need === 1 ? `exile ${/^[aeiou]/.test(how.filter.text) ? "an" : "a"} ${how.filter.text} from your graveyard as it enters` : `exile ${need} ${how.filter.text}s from your graveyard as it enters${counted} (${left} more to choose)`;
-  s.pending = { kind: "chooseOption", player: you, source: name, what: "exileFromYard", options: [...options, ...(need === undefined ? ["done"] : [])], labels: [...options.map((id) => `Exile ${nameOf(s, id)}`), ...(need === undefined ? [chosen.length ? "That's all" : "Exile none"] : [])], objectId: o.id, prompt };
+  const yardWord = how.anyGraveyard ? "a" : "your";
+  const prompt = need === undefined ? `exile any number of ${how.filter.text}s from ${yardWord} graveyard as it enters${chosen.length ? ` (${chosen.length} so far)` : ""}` : need === 1 ? `exile ${/^[aeiou]/.test(how.filter.text) ? "an" : "a"} ${how.filter.text} from ${yardWord} graveyard as it enters` : `exile ${need} ${how.filter.text}s from ${yardWord} graveyard as it enters${counted} (${left} more to choose)`;
+  s.pending = { kind: "chooseOption", player: you, source: name, what: "exileFromYard", options: [...options, ...(need === undefined ? ["done"] : [])], labels: [...options.map((id) => `Exile ${nameOf(s, id)}${how.anyGraveyard && obj(s, id).owner !== you ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : ""}`), ...(need === undefined ? [chosen.length ? "That's all" : "Exile none"] : [])], objectId: o.id, prompt };
   return true;
 }
 
@@ -69,16 +77,17 @@ function finishYardExile(s: GameState, o: GameObject, c: Entry, ids: string[]) {
   const how = compileCard(defOf(s, o)).entersExileFromYard!;
   const you = controllerOf(s, o);
   const need = needed(s, o, c);
-  const cards = ids.filter((id) => s.objects[id]?.zone === "graveyard" && player(s, you).graveyard.includes(id));
+  const yards = yardsOf(s, o);
+  const cards = ids.filter((id) => s.objects[id]?.zone === "graveyard" && yards.includes(id));
   const key = `${o.id}@${o.zoneChanges ?? 0}`;
   if (cards.length) {
-    log(s, `${player(s, you).name} exiles ${cards.map((id) => nameOf(s, id)).join(", ")} from their graveyard as ${defOf(s, o).name} enters.`);
+    log(s, `${player(s, you).name} exiles ${cards.map((id) => nameOf(s, id)).join(", ")} from ${how.anyGraveyard ? cards.map((id) => (obj(s, id).owner === you ? "their" : `${player(s, obj(s, id).owner).name}'s`)).join(" and ") : "their"} graveyard as ${defOf(s, o).name} enters.`);
     for (const id of cards) {
       moveObject(s, id, "exile");
       ((s.linkedExile ??= {})[key] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
     }
     invalidateCharacteristics(s);
-  } else log(s, `${player(s, you).name} exiles no cards from their graveyard as ${defOf(s, o).name} enters.`);
+  } else log(s, `${player(s, you).name} exiles no cards from ${how.anyGraveyard ? "a" : "their"} graveyard as ${defOf(s, o).name} enters.`);
   if (need !== undefined && how.n === "x" && cards.length < need) {
     log(s, `${defOf(s, o).name} couldn't exile ${need} ${how.filter.text}s, so it goes to its owner's graveyard instead.`);
     neverEnters(s, o);

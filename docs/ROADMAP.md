@@ -11581,7 +11581,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   theirs at one of their opponents' things (bot.ts chooseStormRedirect), and choose its new target as for any "choose new
   targets". The stack card shows the spell's counters and a button for its ability. Browser tests click through
   discarding your Mountain to send Ana's Lightning Storm back at her, and Ana's Stone Rain on your Mountain coming back
-  with Sacred Ground. +2, 31,799 of 31,936 on B276's branch (with main through round 427). The compiled text of every
+  with Sacred Ground. +2, 31,799 of 31,936 with main through B276. The compiled text of every
   other card is unchanged.
 - Out after round B277 (looked at, not done): the lists after round B276 stay out. Spy Kit stays out (every nonlegendary
   creature card's name at once: every check of a name in the engine, the legend rule's among them, would have to know).

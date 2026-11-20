@@ -3721,7 +3721,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
-            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : ""}.`}
+            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : copyEnds && "untilLeaves" in copyEnds ? ` until ${s.objects[copyEnds.untilLeaves.id] ? characteristics(s, s.objects[copyEnds.untilLeaves.id]!).name : "its Aura"} leaves the battlefield` : ""}.`}
           >
             Copy
           </span>

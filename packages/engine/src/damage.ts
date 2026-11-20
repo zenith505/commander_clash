@@ -391,9 +391,11 @@ export function dealDamage(
     // Wolverine: "if ~ dealt damage to another creature this turn".
     const srcObj = src.id ? s.objects[src.id] : undefined;
     const srcKey = srcObj && `${srcObj.id}@${srcObj.zoneChanges ?? 0}`;
+    // Runesword (round B276): a gone permanent's ability dealing it, as the object it last was on the battlefield (CR 608.2h).
+    const srcWas = src.ref && !src.spell ? `${src.ref.object}@${src.ref.zc}` : undefined;
     // Aegar: what dealt damage to it this turn, as the source was then; Brine Hag, Giant Albatross: which permanent it
     // was (`src`); Blazing Effigy: its name.
-    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n, name: src.name, ...(srcKey && !src.spell ? { src: srcKey } : {}) });
+    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n, name: src.name, ...(srcKey && !src.spell ? { src: srcKey } : {}), ...(srcWas && srcWas !== srcKey ? { srcWas } : {}) });
     if (srcKey && src.id !== o.id && c.types.includes("Creature") && !s.turnLog.damagedCreature?.includes(srcKey)) (s.turnLog.damagedCreature ??= []).push(srcKey);
     // Thirsting Axe: "if equipped creature didn't deal combat damage to a creature this turn".
     if (srcKey && opts.combat && c.types.includes("Creature") && !s.turnLog.combatDamagedCreature?.includes(srcKey)) (s.turnLog.combatDamagedCreature ??= []).push(srcKey);

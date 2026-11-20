@@ -972,7 +972,7 @@ export interface CopyEffect {
  * (Zygon Infiltrator); `whileAttached`, while the Aura or Equipment `id` stays attached to `host`, each the same object
  * on the battlefield (Blade of Shared Souls, Assimilation Aegis). A phased-out permanent can't be seen (CR 702.26f).
  */
-export type CopyWhile = { whileTapped: { id: ObjectId; zc: number; untaps: number } } | { whileAttached: { id: ObjectId; zc: number; host: ObjectId; hostZc: number } };
+export type CopyWhile = { whileTapped: { id: ObjectId; zc: number; untaps: number } } | { whileAttached: { id: ObjectId; zc: number; host: ObjectId; hostZc: number } } | /** Secret Invasion (round B276): until the permanent `id` (as the object `zc`) leaves the battlefield; phasing out isn't leaving (CR 702.26d). */ { untilLeaves: { id: ObjectId; zc: number } };
 
 /**
  * What a mana's source was as it made the mana (CR 106.3): snow mana pays {S} (107.4h); "mana from a Treasure", "mana
@@ -2298,7 +2298,12 @@ export interface TurnLog {
    * controlled dealt damage to it this turn").
    */
   /** `amount`: how much (Burning-Eye Zubera: "if 4 or more damage was dealt to it this turn"). */
-  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[]; amount?: number; /** The source's name as it dealt the damage (Blazing Effigy). */ name?: string; /** The permanent that dealt it, "id@zoneChanges" (Brine Hag). */ src?: string }[]>;
+  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[]; amount?: number; /** The source's name as it dealt the damage (Blazing Effigy). */ name?: string; /** The permanent that dealt it, "id@zoneChanges" (Brine Hag). */ src?: string; /** Runesword (round B276): a permanent that had left the battlefield as its ability dealt the damage, as the object it last was there ("id@zoneChanges", CR 608.2h), when that isn't `src`. */ srcWas?: string }[]>;
+  /**
+   * Runesword (Effect runeswordMark, round B276): the creatures ("id@zoneChanges", CR 400.7) whose damage this turn marks the
+   * creatures dealt it: they can't be regenerated this turn, and they're exiled instead if they would die this turn.
+   */
+  runesword?: string[];
   /** How many times each permanent (by "id@zoneChanges") was dealt damage this turn, one for each damage event (Hercules, Olympian Hero's "for the first time each turn"). */
   timesDealtDamage?: Record<string, number>;
   /**
@@ -3118,6 +3123,8 @@ export interface Resolving {
   exiled?: { o: GameObject; ch: Characteristics; /** Who controlled it as it last existed ("its controller", CR 608.2h): Chaotic Transformation. */ controller?: PlayerId }[];
   /** The cards its exile instructions exiled from graveyards so far while this resolves (Count "cardsExiledThisWay"). */
   exiledCards?: ObjectId[];
+  /** Tawnos's Coffin (Effects coffinNote and coffinWatch, round B275): the target's counters and the Auras attached to it just before the exile, as the objects they were. */
+  coffinNoted?: { counters: Record<string, number>; auras: { id: ObjectId; zc: number }[] };
   /** The cards exileNamed exiled from a player's graveyard, hand and library so far while this resolves (Kotose, the Silent Spider, round 420: "the exiled cards"). */
   namedExiled?: ObjectId[];
   /** The total toughness of what a returnExiled with `toughnessThisWay` returned (Count "returnedToughness"). */
@@ -3379,6 +3386,10 @@ export interface Resolving {
     mireLand?: { pick?: string };
     /** Dimensional Breach (Effect breachReturn, round B274): asked which exiled card; the card chosen (an object id). */
     breachReturn?: { pick?: string };
+    /** Tawnos's Coffin (Effect coffinReturn): the card is back; the permanents it became. */
+    coffinBack?: { id: ObjectId; zc: number }[];
+    /** Takklemaggot (Effect takklemaggot, round B275): the creature chosen for it ("" while asked, "none" if none could be). */
+    takkHost?: string;
     /** Lynde, Cheerful Tormentor (round 394): the Curse move chosen ("id>player" or "none"), "" while asked. */
     curseMove?: string;
     /** Assimilation Aegis (Effect becomeCopyOfLinked, round 396): the exiled creature card chosen to copy (an object id), "" while asked. */

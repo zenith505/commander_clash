@@ -10,7 +10,8 @@ import { attack, card, controls, menu, modal, passTo, resolveUntil, seat } from 
 test("The Fourteenth Doctor: the Doctors revealed go to your graveyard, it enters as Sickbay Orderly with haste and attacks", async ({ page }) => {
   const s = scene({ hand: ["The Fourteenth Doctor"], board: LANDS, library: ["Sickbay Orderly", "Divination", "Emergency Medical Hologram"] });
   const doc = one(s, "The Fourteenth Doctor");
-  const [orderly, holo, div] = ["Sickbay Orderly", "Emergency Medical Hologram", "Divination"].map((n) => idsOf(s, n, "library", 0)[0]!);
+  const lib = (n: string) => idsOf(s, n, "library", 0)[0]!;
+  const [orderly, holo, div] = [lib("Sickbay Orderly"), lib("Emergency Medical Hologram"), lib("Divination")];
   await open(page, s);
   await card(page, "The Fourteenth Doctor", s).click();
   const asked = await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "copy" && st.pending.player === 0);

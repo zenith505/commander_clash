@@ -8513,7 +8513,7 @@ export type AdditionalCost =
    * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
    * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
    */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Nethergoyf's escape: "Exile any number of other cards from your graveyard with four or more card types among them": any number of them (at least one), as long as the cards chosen have this many card types among them (CR 205.2a, rulings); `n` is 1. */ cardTypes?: number; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true; /** Gorex, the Tombshell: a spell's cost whose cards are all linked to the permanent the spell becomes (CR 607.2q, StackItem.costExiled, CompiledCard.costExileLinked). */ linkSpell?: true; /** Coin of Fate: an activated ability's cost whose cards are all kept for "the exiled cards" (StackItem.costExiled). */ costCards?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true; /** Araumi of the Dead Tide (round B271): "Exile cards from your graveyard equal to the number of opponents you have": `n` is the number of opponents its controller has as it's paid (game.ts bindPerOpponent). */ perOpponent?: true; /** Nethergoyf's escape: "Exile any number of other cards from your graveyard with four or more card types among them": any number of them (at least one), as long as the cards chosen have this many card types among them (CR 205.2a, rulings); `n` is 1. */ cardTypes?: number; /** Night Soil: "Exile two creature cards from a single graveyard": all `n` from any one player's graveyard (yours too). */ singleGraveyard?: true; /** Osgir, the Reconstructor: "{X}, Exile an artifact card with mana value X from your graveyard": the one X announced as it's activated (CR 107.3a, 602.2b), and `filter` gets that mana value. */ mvX?: true; /** "Put three cards from your graveyard on the bottom of your library" (Battlefield Scrounger): the chosen cards go to the bottom of your library, in the order chosen (CR 401.4), not into exile. */ toBottom?: true; /** "Put a card an opponent owns from exile into that player's graveyard" (the Eldrazi processors): any card an opponent owns in exile, chosen in CostChoices.exileCards. */ process?: true; /** Gorex, the Tombshell: a spell's cost whose cards are all linked to the permanent the spell becomes (CR 607.2q, StackItem.costExiled, CompiledCard.costExileLinked). */ linkSpell?: true; /** Coin of Fate: an activated ability's cost whose cards are all kept for "the exiled cards" (StackItem.costExiled). */ costCards?: true }
   /**
    * "Exile an instant or sorcery spell you control" (Nivmagus Elemental, CR 602.2b): one of the ability's controller's spells
    * on the stack that matches, a copy too, chosen in CostChoices.exileSpell; it leaves the stack without being countered.
@@ -10479,6 +10479,22 @@ export interface CompiledCard {
   playOwnCountered?: CounterKind;
   /** Draugr Necromancer (round B270): "You may cast spells from among cards in exile your opponents own with ice counters on them, and you may spend mana from snow sources as though it were mana of any color to cast those spells": any face-up such card but a land, whatever exiled it (rulings), with the usual timing and costs (rulings); mana from snow sources pays its colored symbols as though it were that color (CR 609.4b, CostSymbol `orSnow`). */
   castOpponentsCountered?: CounterKind;
+  /**
+   * Ian Malcolm, Chaotician (round B271): "During each player's turn, that player may cast a spell from among the cards they
+   * don't own exiled with ~, and mana of any type can be spent to cast it": every player, its controller or not, on their
+   * own turn, one spell each turn for this object (as Coram's and Muldrotha's "during each of your turns" permissions,
+   * rulings; TurnLog.linkedSpellOnce), a card its one exile ability exiled (CR 607.2a) that the player doesn't own, with
+   * the usual timing (rulings), mana of any type (CR 609.4b).
+   */
+  castLinkedOthersTurn?: true;
+  /**
+   * Haldan, Avid Arcanist (round B271): "You may play lands and cast noncreature spells from among cards you exiled that
+   * have fetch counters on them, and you may spend mana as though it were mana of any color to cast those spells": a
+   * face-up card in exile with this counter that its controller exiled (GameObject.exiledByPlayer), played with the usual
+   * timing (rulings), a spell only as a noncreature one (an Adventure of a creature card too, rulings), mana as though of
+   * any color (CR 609.4b).
+   */
+  playExiledCountered?: CounterKind;
   /**
    * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
    * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).

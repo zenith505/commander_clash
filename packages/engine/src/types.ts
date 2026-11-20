@@ -860,6 +860,8 @@ export interface GameObject {
    * Exiled face down by hideaway (CR 702.75a): only players who controlled `by`, the permanent that exiled it, may look
    * at it (`seen`). Gone when it changes zones.
    */
+  /** Haldan, Avid Arcanist (round B271): the player who exiled this card, while it stays in exile as this object (set where an effect puts counters on cards it exiles, Pako, Arcane Retriever's; CR 400.7). */
+  exiledByPlayer?: PlayerId;
   hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string; /** When: the cards one instruction exiled face down together share it, a group a processor chooses from (rulings on Ruin Processor). */ at?: number; /** Grimoire Thief: whoever controls this source (as this object, CR 400.7) may look too, and goes on being able to (rulings); see GameState.exileLookWatch. */ watch?: { id: ObjectId; zc: number } };
   /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
   encoded?: { id: ObjectId; zc: number }[];

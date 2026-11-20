@@ -26,6 +26,7 @@ import { roundB267Line } from "./laneb267-lines";
 import { roundB268Line } from "./laneb268-lines";
 import { roundB269Line } from "./laneb269-lines";
 import { roundB270Line } from "./laneb270-lines";
+import { roundB271Line } from "./laneb271-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2441,6 +2442,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB269Line(line, out, isSpell)) continue;
     // Draugr Necromancer, Spellweaver Helix, Abstract Performance (round B270).
     if (roundB270Line(line, out, isSpell)) continue;
+    // Ian Malcolm, Chaotician, Haldan, Avid Arcanist (round B271).
+    if (roundB271Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8205,6 +8208,15 @@ function linkExile(out: CompiledCard) {
     const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile && !fromHands.includes(e)));
     if (others || out.spell || tops.length + fromHands.length !== 1) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
     else (tops[0] ?? fromHands[0]!).linked = true;
+  }
+  // Ian Malcolm, Chaotician (round B271): "the cards ... exiled with ~" are the ones its one "that player exiles the top
+  // card of their library" exiled (CR 607.2a).
+  if (out.castLinkedOthersTurn) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && e.who.ref === "eventPlayer" && !e.putAll && !e.counters);
+    const others = all.some((e) => e.type === "exile" || (e.type === "exileTop" && !tops.includes(e)) || e.type === "exileGraveyard" || e.type === "impulse" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "exileHand" || (e.type === "discard" && !!e.exile) || (e.type === "search" && e.dest.zone === "exile") || e.type === "castFromAmong" || e.type === "pick" || e.type === "chooseFromGraveyard");
+    if (others || out.spell || tops.length !== 1 || out.playLinkedWhile || out.playLinked || out.playLinkedIf || out.playLinkedForLife) out.unsupported.push("(casts cards exiled with it that it can't link to one exile ability)");
+    else tops[0]!.linked = true;
   }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
   // Court of Locthwain: "cast a spell from among cards exiled with ~" too.

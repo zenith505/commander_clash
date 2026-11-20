@@ -162,6 +162,7 @@ import {
   auraHostOptions,
   lastDrawnInHand,
   bindLegendaryNames,
+  bindPerOpponent,
   deferredChoice,
   ignorableBy,
   payableDelayed,
@@ -8627,7 +8628,8 @@ function ownAbilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Activat
     // Ronin, Shadow Stalker: "an Equipment attached to ~", this permanent.
     const c2 = c1.kind === "sacrifice" ? { ...c1, filter: bindAttachedToSource(c1.filter, o.id, o.attachedTo) } : c1;
     // Key to the Side-Door: the names of our legendary permanents now.
-    const c = bindLegendaryNames(s, pid, c2);
+    // Araumi of the Dead Tide (round B271): as many cards as we have opponents.
+    const c = bindPerOpponent(s, pid, bindLegendaryNames(s, pid, c2));
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
       if (!f) return null;
@@ -8758,7 +8760,7 @@ function ownAbilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Activat
     } else if (c.kind === "exileFromGraveyard" && !c.x) {
       // "Exile a card from your graveyard": cards we have no use for there, the cheapest first.
       const pool = player(s, pid)
-        .graveyard.filter((x) => x !== o.id && !out.exileCards?.includes(x) && !usefulInGraveyard(s, x) && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))))
+        .graveyard.filter((x) => x !== o.id && !out.exileCards?.includes(x) && !usefulInGraveyard(s, x) && !(c.perOpponent && targeted.has(x)) && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))))
         .sort((a, b) => mv(s, a) - mv(s, b));
       if (pool.length < c.n) return null;
       out.exileCards = [...(out.exileCards ?? []), ...pool.slice(0, c.n)];

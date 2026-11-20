@@ -4341,6 +4341,34 @@ line blocks.
    mana is spent on them are not counted as given an ability for Jasmine's mana; Celestial Reunion's bot (and the
    planner) chooses the creature type with the most creatures to behold; Niko's bot use is untested beyond simulated
    games.
+   Round 427 went on down the "Out after round N" lists and `npm run popular`, most played first, to a static ability
+   granted to a Saga that grants a mana ability, a transform on combat damage dealt this turn, and the four kinds of
+   bending. Huatli, Poet of Unity // Roar of the Fifth People's chapter II, 'This Saga gains "Creatures you control have
+   '{T}: Add {R}, {G}, or {W}.'"' (no duration but the Saga's, rulings; the granted static joins layer 6 once the effect
+   granting it has applied, CR 613.8a, with the later timestamp, 613.7a, and covers creatures that come later, 611.3a:
+   grants.ts grantedStaticOk now takes an addAbility whose ability isn't static, and innerQuotes reads "have '...'").
+   Sidequest: Play Blitzball's "At the end of combat on your turn, if a player was dealt 6 or more combat damage this
+   turn, transform this enchantment, then attach it to a creature you control." (one player's combat damage this turn in
+   all, both combat damage steps, CR 510.4, TurnLog.combatDamage, StaticCondition playerDealtCombatDamage; attached as it
+   resolves, not targeted, CR 701.3a, only as an Equipment; "At the end of combat" read like "At end of combat").
+   Avatar Aang's "Whenever you waterbend, earthbend, firebend, or airbend, draw a card. Then if you've done all four this
+   turn, transform Avatar Aang." (a waterbend cost paid however, CR 701.67a and rulings: as a spell's additional cost,
+   an ability's cost, ward or "unless you waterbend"; earthbend's delayed trigger made, 701.66b; a firebending ability
+   resolved, 702.189b, Effect addCombatMana `firebending`; objects exiled by an instruction to airbend, once for it,
+   701.65b, Effect exile and counterSpell `airbend`; effects/triggers.ts bent, TurnLog.bent counted over the whole turn,
+   rulings) and its back face's "Spells you cast cost {W}{U}{B}{R}{G} less to cast." (each color, or {1} once the cost has
+   none of it, CR 118.7b-c, CostMod coloredOrGenericEach) and "At the beginning of each upkeep, you may transform Aang,
+   Master of Elements. If you do, ..." (the same object after transforming, CR 712.18). A browser test clicks through
+   Blitzball's attach choice. +3, 31,793 of 31,936 with main 73cb89a (rounds 426 and B268-B274) merged in; the compiled text of every
+   other card is unchanged but the 35 firebending and airbend cards, which only gained the `firebending` or `airbend`
+   flag.
+   Out after round 427 (looked at, not done): Wayta, Trainer Prodigy (its "a creature you control being dealt damage
+   causes a triggered ability ... to trigger" needs the creatures dealt damage on every damage event, and "~ deals
+   damage" events don't carry who was dealt it; its cost reduction "if it targets two creatures you control" is fine,
+   CR 601.2f), the cards rounds 425 and 426 left out (still out, for their reasons), Cass, Hand of Vengeance and Bruna,
+   Light of Alabaster (Lane B's next), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in
+   their earlier lists). Known gaps: Aang's bot always transforms Aang, Master of Elements back at upkeep; Blitzball's
+   bot attaches World Champion to its creature with the greatest power.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5677,7 +5705,7 @@ line blocks.
    battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel (done in round B200); The Spot, Living Portal (done in round 397).
    Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
    counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
-   Sidequest: Play Blitzball (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
+   Sidequest: Play Blitzball (done in round 427) (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
    (each player plays their own exiled cards and can't play cards from their hand); Ian Chesterton (done in round B248) and Hatchery Sliver (done in round B248)
    (replicate granted to Saga or Sliver spells, its cost equal to the spell's mana cost); Rashmi and Ragavan (cast free
    only if the mana value is less than your artifacts, else castable this turn); Boltbender (new targets for any number
@@ -5930,7 +5958,7 @@ line blocks.
    it, chosen one by one).
    Out after round 240 (looked at, not done): Geyadrone Dihada (protection from permanents with corruption counters
    on them: the protection quality would need the source's counters); Altar of the Wretched (done in round 334) and The Enigma Jewel (their
-   back faces don't parse yet); Huatli, Poet of Unity (chapter II grants a static that works in layer 6, which granted
+   back faces don't parse yet); Huatli, Poet of Unity (done in round 427) (chapter II grants a static that works in layer 6, which granted
    statics don't support); Nethergoyf and Winter, Cynical Opportunist (done in round 352) (exile any number of cards with four or more card types
    among them: a picker constraint on the cost); Repeated Reverberation (copy the next instant or sorcery spell OR the
    next loyalty ability, as before); Jon Irenicus, Shattered One and Strago and Relm (looked at,
@@ -6170,7 +6198,7 @@ line blocks.
    and Glorious Protector ask what to exile even when they've already left the battlefield (nothing is exiled then); bots
    give Xantcha and Captive Audience to the opponent with the least life; goading is handled as a layer 6 effect, so
    "goaded creatures" (Bothersome Quasit) waits on the goad as a dependency (CR 613.8). Smaller gaps from round 123:
-   waterbend {X} costs, "whenever you waterbend" (Avatar Aang), Watery Grasp (done in round 300)
+   waterbend {X} costs, "whenever you waterbend" (Avatar Aang, done in round 427), Watery Grasp (done in round 300)
    and Aang's Iceberg (other lines) are out; you don't pick what waterbend taps: autopay pays mana first, then taps what
    makes no mana, noncreatures, then the smallest creatures (as for improvise), for ward—waterbend and spells too; bots
    don't waterbend with creatures that could still attack this turn; a draw an opponent's Notion Thief replaces isn't
@@ -11588,7 +11616,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature" ability, and choose an opponent's most valuable
   creature for Takklemaggot (their own least valuable one if there's no other). Browser tests click through exiling
   Ana's Grizzly Bears with your Pacifism on it and untapping the Coffin in your untap step, and choosing Ana's Llanowar
-  Elves for Takklemaggot after your Bears dies. +2, 31,792 of 31,936 on B274's branch (with main through round 426). The
+  Elves for Takklemaggot after your Bears dies. +2, 31,792 of 31,936 on B274's branch (with main through round 426), 31,795 with main
+  through round 427. The
   compiled text of every other card is unchanged.
 - Out after round B275 (looked at, not done): the lists after round B274 stay out. Judgment calls and known gaps: a
   merged permanent the Coffin exiles comes back as all its cards (CR 730.3c), each tapped with the noted counters, and

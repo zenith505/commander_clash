@@ -414,6 +414,9 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     ownCreatureTargeted: t.ownCreatureTargeted,
     creatureCardLeftGraveyard: t.creatureCardLeftGraveyard,
     descended: capped(t.descended ?? {}),
+    // Round 427: Avatar Aang's kinds of bending (four at most) and Sidequest: Play Blitzball's combat damage, as far as 6.
+    bent: t.bent ? Object.fromEntries(Object.entries(t.bent).map(([k, v]) => [k, [...v].sort()])) : undefined,
+    combatDamage: t.combatDamage ? Object.fromEntries(Object.entries(t.combatDamage).map(([k, v]) => [k, Math.min(v, 6)])) : undefined,
     creaturesExiled: capped(t.creaturesExiled ?? {}),
     // Bonecache Overseer counts to three; Kutzil's Flanker counts as it enters, not in a loop of passing.
     leftGraveyardCount: capped((t.leftGraveyardCount ?? {}) as Record<number, number>),

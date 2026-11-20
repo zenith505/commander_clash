@@ -186,6 +186,7 @@ import { round423Line } from "./round423";
 import { round424Line } from "./round424";
 import { round425Line } from "./round425";
 import { round426Line } from "./round426";
+import { round427Line } from "./round427";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1070,6 +1071,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Sidequest: Play Blitzball, Avatar Aang (round 427): oracle/round427.ts.
+    if (round427Line(line, raw, out, isSpell)) continue;
     // Jasmine Boreal of the Seven, Niko, Light of Hope, Celestial Reunion (round 426): oracle/round426.ts.
     if (round426Line(line, raw, out, isSpell)) continue;
     // Redemptor Dreadnought, Kaya, Spirits' Justice (round 425): oracle/round425.ts.

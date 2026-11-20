@@ -1,6 +1,6 @@
 # Roadmap
 
-31,788 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,790 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,942 of
 9,979 (99%).
 
@@ -11535,6 +11535,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B274 (least played first, from the Lane B skip lists, neither in Lane A's round 427): Dimensional Breach's "Exile
+  all permanents. For as long as any of those cards remain exiled, at the beginning of each player's upkeep, that player
+  returns one of the exiled cards they own to the battlefield." (every permanent, tokens ceasing to exist, CR 111.7,
+  704.5d; one delayed triggered ability controlled by the caster, CR 603.7d, that triggers at the beginning of each
+  player's upkeep from the next turn on and ends once none of those cards is still in exile as the object it became there,
+  CR 400.7, 610.3; that upkeep's player chooses which of their own to return, rulings, only one that could legally enter,
+  rulings: not an Aura with nothing it could enchant, CR 303.4g, nor a land while lands can't enter; an Aura enchants what
+  its player chooses as it enters, CR 303.4f; DelayedTrigger `eachUpkeepWhileExiled`, Effects dimensionalBreach and
+  breachReturn in run-laneb274.ts). Next of Kin's "When enchanted creature dies, you may put a creature card you own with
+  lesser mana value from your hand or from the command zone onto the battlefield. If you do, return ~ to the battlefield
+  attached to that creature at the beginning of the next end step." (less than the creature's mana value as it last
+  existed, its copiable values then, CR 603.10a, 608.2h, a face-down one's or a token's with no mana cost 0; the command
+  zone means your commander, CR 408.3, put, not cast, so no tax, CR 903.8; putFromHand `orCommand` and
+  `lesserMvThanSubject`; then a delayed trigger as Gift of Immortality's about the creature put, Effect delayed each
+  `createdWithAura`: ~ returns from the graveyard attached to it only if it's still on the battlefield as that object and
+  ~ is still in the graveyard, otherwise ~ stays there, rulings on Gift of Immortality, CR 400.7). Bots cast Breach only when
+  the opponents have more worth on the battlefield on average than they do (as Warp World), return their most valuable
+  exiled card and put the creature card with the highest mana value they can. The hand picker reads "Your hand
+  and command zone" for Next of Kin. Browser tests click through Next of Kin's pick of Isamaru from the command zone (Craw
+  Wurm, mana value 6, not offered) and its return at the end step, and casting Dimensional Breach and choosing Grizzly
+  Bears over Sol Ring at your next upkeep. +2, 31,787 of 31,936 on B273's branch, 31,790 with main through round 426 merged in. The
+  compiled text of every other card is unchanged.
+- Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star, Ghostly Flame, Snowblind,
+  Land Equilibrium, Noxious Vapors, Chorus of the Conclave, Breathstealer's Crypt, Glyph of Delusion and Guardian Beast
+  were looked at again and stay out for the reasons in the earlier lists; the Wishes and other "outside the game" cards
+  stay out (nothing outside the game here). Judgment calls and known gaps: Dimensional Breach's upkeep trigger goes on
+  the stack at every player's upkeep while any of its cards is exiled, also for a player who owns none of them (it then
+  does nothing, as written); a commander its owner moves to the command zone after Breach exiles it (CR 903.9a) is no
+  longer one of the exiled cards; a land is judged "can't enter" by its front face only. Next in line (not looked at
+  closely yet): Takklemaggot and Tawnos's Coffin (both return an Aura or the exiled card in ways no effect does yet).
 - Round B273 (least played first, the two cards round B272 named next in line, neither in Lane A's rounds 426-427):
   Spellweaver Volute's "Enchant instant card in a graveyard" (an Aura spell that targets an instant card in any graveyard
   and stays on the battlefield attached to it, the first Aura to enchant something that's neither a permanent nor a

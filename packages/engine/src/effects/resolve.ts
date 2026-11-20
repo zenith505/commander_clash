@@ -412,7 +412,7 @@ function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): v
   const m = item.manaAbility!;
   const o = item.sourceId ? s.objects[item.sourceId] : undefined;
   if (!o) return;
-  if (m.tapped && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: item.controller });
+  if (m.tapped && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: item.controller, made });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves", while it's still that permanent.
   if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === (item.sourceZc ?? o.zoneChanges ?? 0)) fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: made.length });
   const results = manaTriggerResults(s, item.controller, o, { tap: !!m.tapped } as ManaAbility, made);

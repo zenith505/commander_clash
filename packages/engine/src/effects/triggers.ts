@@ -361,11 +361,11 @@ export type TriggerSourceEvent =
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number; /** The first card they draw in their draw step. */ firstInDrawStep?: true; /** The card drawn, in their hand. */ card?: ObjectId }
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
-  | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
+  | { type: "tappedForMana"; id: ObjectId; player: PlayerId; /** The mana its mana ability made (C.A.M.P., round 430). */ made?: ManaType[] }
   /** One of this permanent's mana abilities resolved (CR 605.3b), making this much mana (Tyvar the Bellicose). */
   | { type: "manaAbilityResolved"; id: ObjectId; amount: number }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; /** Ashnod the Uncaring (round 422): one or more permanents were sacrificed to pay its costs (not for mana to pay them, rulings). */ costSacrificed?: true; /** Verrak, Warped Sengir (round 423): how much life was paid to activate it (its costs, Phyrexian mana paid with life among them). */ costLifePaid?: number; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; /** Ashnod the Uncaring (round 422): one or more permanents were sacrificed to pay its costs (not for mana to pay them, rulings). */ costSacrificed?: true; /** Verrak, Warped Sengir (round 423): how much life was paid to activate it (its costs, Phyrexian mana paid with life among them). */ costLifePaid?: number; /** Dynaheir, Invoker Adept (round 428): the mana spent to pay its costs (CR 602.2b, 601.2h). */ manaSpent?: number; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Its activation cost has the tap symbol {T} (Haunting Wind). */ tapSymbol?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true; /** A ninjutsu ability (CR 702.49). */ ninjutsu?: true; /** A boast ability (CR 702.142a). */ boast?: true; /** An embalm or eternalize ability (CR 702.128a, 702.129a). */ embalm?: true; /** An exhaust ability (CR 702.177a), a mana ability too. */ exhaust?: true; /** A power-up ability (CR 702.193a). */ powerUp?: true; /** An outlast ability (CR 702.107a). */ outlast?: true; /** An ability of a card in its activator's own graveyard (Neerdiv, Devious Diver). */ fromOwnGraveyard?: true; /** A loyalty ability (CR 606.3): how many loyalty counters its cost removed (0 for a + one, CR 606.4). */ loyalty?: { removed: number } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -1682,18 +1682,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // land"; "that player" is who tapped it).
     const o = obj(s, ev.id);
     // Mana Web: what the land could produce as it was tapped (CR 106.7), for when it's gone by the time that resolves.
-    const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}) };
+    const info = { player: ev.player, ...(o.zone === "battlefield" && objIsType(s, o, "Land") ? { couldProduce: landCouldProduce(s, o) } : {}), ...(ev.made ? { manaMade: [...ev.made] } : {}) };
     // Desolation: "each player who tapped a land for mana this turn" (CR 106.12), whatever was on the battlefield then (rulings).
     if (o.zone === "battlefield" && objIsType(s, o, "Land")) {
       const tl = ((s.turnLog ??= {}).tappedLandForMana ??= []);
       if (!tl.includes(ev.player)) tl.push(ev.player);
     }
     const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
-    add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && !t.manaTap?.attached && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "tappedForMana" && !!t.manaTap?.filter && byOk(t, ctrl) && objectMatches(s, t.manaTap.filter, o, ctrl, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      // C.A.M.P. (round 430): "fortified land", the one it's attached to as it's tapped.
+      add(w, ctrl, (e, t) => e === "tappedForMana" && (t.manaTap?.attached ? w.attachedTo === o.id : !!t.manaTap?.filter && objectMatches(s, t.manaTap.filter, o, ctrl, false)) && byOk(t, ctrl), undefined, undefined, o, undefined, undefined, undefined, info);
     }
   } else if (ev.type === "countersPut") {
     // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control": "that many" is how many.
@@ -2593,7 +2594,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Havengul Lich (round 400): only that card, cast from the graveyard it was in as that object (CR 400.7, 601.2a; a
       // spell keeps the zone count it had there, castSpell).
       if (d.card && !(spell && spell.id === d.card.id && (spell.zoneChanges ?? 0) === d.card.zc && spell.castFrom === "graveyard")) continue;
-      if (d.loyalty === "only" || d.exhaust || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
+      if (d.loyalty === "only" || d.exhaust || d.minManaSpent || d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(rest, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       // Zevlor, Elturel Exile: a spell that doesn't target only one opponent or one opponent's permanent doesn't use it up.
       if (d.onlyOpponentOrTheirs && opponentOrTheirsTarget(s, item?.targets ?? [], d.controller) === undefined) continue;
       // Yidris, Maelstrom Wielder: each spell cast from your hand this turn gains cascade; the effect isn't used up.
@@ -2995,6 +2996,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.exhaust && !ev.mana && ev.stackId)
       for (const d of [...(s.nextCast ?? [])]) {
         if (!d.exhaust || d.controller !== ev.player || d.turn !== s.turn) continue;
+        s.nextCast = s.nextCast!.filter((x) => x !== d);
+        s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+      }
+    // Dynaheir, Invoker Adept (round 428): "When you next activate an ability that isn't a mana ability this turn by spending
+    // four or more mana to activate it, copy that ability": a delayed trigger (CR 603.7a), once (603.7c), used up only by
+    // such an ability (a mana ability doesn't, rulings, CR 605.1a; one with less mana spent doesn't). Its copy resolves first.
+    if (!ev.mana && ev.stackId && (ev.manaSpent ?? 0) > 0)
+      for (const d of [...(s.nextCast ?? [])]) {
+        if (!d.minManaSpent || (ev.manaSpent ?? 0) < d.minManaSpent || d.controller !== ev.player || d.turn !== s.turn) continue;
         s.nextCast = s.nextCast!.filter((x) => x !== d);
         s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
       }

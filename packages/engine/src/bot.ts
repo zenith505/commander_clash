@@ -1729,6 +1729,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const best = pend.options.filter((x) => x !== "none").sort((a, b) => score(b) - score(a))[0];
         return [{ type: "chooseOption", player: pid, choice: best && score(best) > 0 ? best : "none" }];
       }
+      // Metamorphic Alteration (round 429): what it enchants becomes a copy of the chosen creature: the best one for a
+      // creature of ours, the least for anyone else's.
+      const aura = pend.objectId ? s.objects[pend.objectId] : undefined;
+      const host = aura?.attachedTo ? s.objects[aura.attachedTo] : undefined;
+      if (aura && host && compileCard(defOf(s, aura)).enchantedCopiesChosen && controllerOf(s, host) !== pid) {
+        const size = (id: string) => power(s, obj(s, id)) + toughness(s, obj(s, id)) + mv(s, id);
+        return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(a) - size(b))[0]! }];
+      }
       const pick = [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0]!;
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
@@ -7760,6 +7768,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
       // Pit Automaton: only with an exhaust ability of ours still to activate this turn and the mana for both.
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.exhaust) && !exhaustReady(s, pid, id, manaValue(parseManaCost(ab.manaCost)))) continue;
+      // Dynaheir, Invoker Adept (round 428): only with an ability of ours costing four or more mana that we could pay for too.
+      if (ab.body.effects.some((e) => e.type === "nextCast" && e.minManaSpent) && !bigAbilityReady(s, pid, id, manaValue(parseManaCost(ab.manaCost)), 4)) continue;
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
@@ -8647,6 +8657,22 @@ function chooseSneak(s: GameState, pid: PlayerId): Action[] | null {
     const plan = castPlan(s, pid, id, false, undefined, "sneak");
     if (plan) return plan;
   }
+  // Ninja Teen (round 428): creature cards in our graveyard cast using a sneak ability, their own or one it gives them.
+  for (const id of me.graveyard) {
+    const o = obj(s, id);
+    const way = graveyardWays(s, o, pid).find((w) => w.kind === "permission" && w.alt === "sneak");
+    if (!way) continue;
+    const d = defOf(s, o);
+    const value = (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0);
+    for (const alt of ["sneak", "grantedSneak"] as const) {
+      const sneak = altCost(d, alt, s, pid, o);
+      const cost = sneak?.costs?.find((c) => c.kind === "returnToHand");
+      if (!sneak || cost?.kind !== "returnToHand") continue;
+      if (!returnCandidates(s, pid, cost).some((x) => !obj(s, x).isCommander && (obj(s, x).isToken || worth(s, pid, obj(s, x)) < value))) continue;
+      const plan = castPlan(s, pid, id, false, "permission", alt);
+      if (plan) return plan;
+    }
+  }
   return null;
 }
 
@@ -9351,6 +9377,19 @@ function exhaustReady(s: GameState, pid: PlayerId, except: ObjectId, reserve: nu
     const o = obj(s, id);
     if (id === except || controllerOf(s, o) !== pid) return false;
     return abilitiesOf(s, o).activated.some((ab, i) => ab.keyword === "Exhaust" && !ab.mana && !o.activatedEver?.includes(i) && manaValue(parseManaCost(ab.manaCost)) <= room);
+  });
+}
+
+/**
+ * Dynaheir, Invoker Adept (round 428): another permanent of ours has an ability that isn't a mana ability whose mana cost is
+ * at least `min` and that we'd have the mana for, after `reserve`.
+ */
+function bigAbilityReady(s: GameState, pid: PlayerId, except: ObjectId, reserve: number, min: number): boolean {
+  const room = availableMana(s, pid) - reserve;
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    if (id === except || controllerOf(s, o) !== pid) return false;
+    return abilitiesOf(s, o).activated.some((ab) => !ab.mana && !ab.loyalty && manaValue(parseManaCost(ab.manaCost)) >= min && manaValue(parseManaCost(ab.manaCost)) <= room);
   });
 }
 

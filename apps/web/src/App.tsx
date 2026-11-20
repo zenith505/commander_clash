@@ -706,7 +706,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     else setTargeting((t) => (answering(t) ? null : t));
     // (Two identical triggers in a row, Lucy MacLean's for two tokens entering at once, round B269: the next one is asked
     // once the first is on the stack, so the stack's size tells them apart.)
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? `${pending.description}#${s?.stack.length ?? 0}#${s?.triggerQueue.length ?? 0}` : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : ""]);
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? `${pending.description}#${s?.stack.length ?? 0}#${s?.triggerQueue.length ?? 0}` : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : pending?.kind === "handToTop" && pending.discarding ? `${pending.discarding.join(",")}#${s?.log.length ?? 0}` : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
   // Who defends a permanent that can be attacked: a planeswalker's controller, a battle's protector (CR 506.2, 310.9b).
@@ -2502,7 +2502,7 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", grantedEvoke: "Evoke", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", nextFree: "Cast it:", nextLife: "Cast it:", linkedFree: "Cast it:", topFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:", dreamHalls: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", grantedWarp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", grantedFreerunning: "Freerunning", grantedWebSlinging: "Web-slinging", grantedBlitz: "Blitz", grantedEmerge: "Emerge", grantedEvoke: "Evoke", sneak: "Sneak", grantedSneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", nextFree: "Cast it:", nextLife: "Cast it:", linkedFree: "Cast it:", topFree: "Cast it:", prowl: "Prowl", genericMv: "Cast it for", energyForSpell: "Cast it:", dreamHalls: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth, Eye of Duskmantle); X is 0",
@@ -2529,6 +2529,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   grantedEvoke: "it's sacrificed as it enters (evoke from Ashling, the Limitless)",
   foretell: "a foretold card is cast for its foretell cost",
   sneak: "during your declare blockers step: return an unblocked attacker to your hand; a creature enters tapped and attacking",
+  grantedSneak: "sneak given to it (Ninja Teen): during your declare blockers step, return an unblocked attacker to your hand; it enters tapped and attacking",
   surge: "only if you've cast another spell this turn",
   spectacle: "only if an opponent lost life this turn",
   prowl: "only if a player was dealt combat damage this turn by a creature you controlled with one of its creature types",
@@ -6581,8 +6582,9 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}: </strong>you discard {pending.discarding.map((id) => cardOf(s, id).name).join(", ")}. Click any of {pending.discarding.length === 1 ? "it" : "them"} to put on top of your
-          library instead of into your graveyard{discards.length > 1 ? " (first pick ends on top)" : ""}.
+          <strong>{pending.source}: </strong>you discard {pending.discarding.map((id) => cardOf(s, id).name).join(", ")}. Click {pending.discarding.length === 1 ? "it" : "any of them"} to{" "}
+          {pending.revealing ? `reveal and put on top of your library instead (${pending.revealing})` : "put on top of your library instead of into your graveyard"}
+          {discards.length > 1 ? " (first pick ends on top)" : ""}.
         </span>
         <button onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
           {discards.length ? `Put ${discards.length} on top` : "All to the graveyard"}

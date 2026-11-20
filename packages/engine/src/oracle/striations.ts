@@ -95,7 +95,7 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     if (!bar || bar.activateIf) return false;
     add.activated.push({ ...bar, activateIf: { kind: "classLevel", min: level - 1, max: level - 1 }, text: part.header });
   }
-  const more = { costMods: [] as NonNullable<CompiledCard["costMods"]>, equipLess: [] as NonNullable<CompiledCard["equipLess"]>, fromTop: [] as NonNullable<CompiledCard["fromTop"]>, graveyardGrants: [] as NonNullable<CompiledCard["graveyardGrants"]>, lookTop: false, playLinked: false, extraLandsIf: [] as StaticCondition[] };
+  const more = { costMods: [] as NonNullable<CompiledCard["costMods"]>, equipLess: [] as NonNullable<CompiledCard["equipLess"]>, fromTop: [] as NonNullable<CompiledCard["fromTop"]>, graveyardGrants: [] as NonNullable<CompiledCard["graveyardGrants"]>, sneakGrants: [] as NonNullable<CompiledCard["sneakGrants"]>, lookTop: false, playLinked: false, extraLandsIf: [] as StaticCondition[] };
   const lists = ["triggers", "activated", "mana", "statics"] as const;
   const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k) && k !== "textKeywords").sort(([a], [b]) => a.localeCompare(b)));
   for (const line of part.lines) {
@@ -108,9 +108,9 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     const inner = compileLine(line);
     if (inner.unsupported.length) return false;
     // Static abilities kept in fields of their own, each made conditional the same way.
-    const { costMods, equipLess, fromTop, lookTop, playLinked, extraLands, countMods, graveyardGrants, ...others } = inner;
+    const { costMods, equipLess, fromTop, lookTop, playLinked, extraLands, countMods, graveyardGrants, sneakGrants, ...others } = inner;
     if (rest(others as CompiledCard) !== rest(empty)) return false;
-    if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || graveyardGrants?.some((g) => g.if)) return false;
+    if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || graveyardGrants?.some((g) => g.if) || sneakGrants?.some((g) => g.if)) return false;
     // A counter or token replacement (Innkeeper's Talent's level 3): an ability it has while the condition holds (layer 6).
     if (countMods?.length) {
       if (inner.statics.length || inner.triggers.length || inner.activated.length || inner.mana.length) return false;
@@ -124,6 +124,8 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     if (fromTop) more.fromTop.push(...fromTop.map((t) => ({ ...t, if: t.if ? { kind: "allOf" as const, conds: [cond, t.if] } : cond })));
     // Exploration Broodship's 8+: its once-each-turn graveyard permission.
     if (graveyardGrants) more.graveyardGrants.push(...graveyardGrants.map((g) => ({ ...g, if: cond })));
+    // Ninja Teen's level 3 (round 428): sneak for the creature cards in your graveyard, while it's that level.
+    if (sneakGrants) more.sneakGrants.push(...sneakGrants.map((g) => ({ ...g, if: cond })));
     if (lookTop) more.lookTop = true;
     if (playLinked) more.playLinked = true;
     for (let i = 0; i < (extraLands ?? 0); i++) more.extraLandsIf.push(cond);
@@ -149,6 +151,7 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
   if (more.equipLess.length) out.equipLess = [...(out.equipLess ?? []), ...more.equipLess];
   if (more.fromTop.length) out.fromTop = [...(out.fromTop ?? []), ...more.fromTop];
   if (more.graveyardGrants.length) out.graveyardGrants = [...(out.graveyardGrants ?? []), ...more.graveyardGrants];
+  if (more.sneakGrants.length) out.sneakGrants = [...(out.sneakGrants ?? []), ...more.sneakGrants];
   if (more.extraLandsIf.length) out.extraLandsIf = [...(out.extraLandsIf ?? []), ...more.extraLandsIf];
   if (more.lookTop) out.lookTopIf = cond;
   if (more.playLinked) out.playLinkedIf = cond;

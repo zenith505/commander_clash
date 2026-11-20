@@ -11,7 +11,7 @@ import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource, chosenPlayerOf } from "./resolve";
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
-import { discardCards } from "./run-library";
+import { discardCards, discardToTopEach } from "./run-library";
 import { canTransform, lockedDoors } from "./run-permanents";
 import { COLOR_NAMES, describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
@@ -1201,6 +1201,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 const t = ctx.targets[i];
                 return colors.length > 0 && !!t && targetIs(s, ctx, i, { kind: t.kind === "stack" ? "spell" : "object", types: [], notTypes: [], notColors: [], colors, text: "shares a color" });
               })(e.cond.filter, e.cond.index)
+            : e.cond.kind === "targetSharesColorWithManaMade"
+            ? ((i) => {
+                // C.A.M.P. (round 430): the colors among the mana the land made ({C} is no color, CR 105.1), against the
+                // target creature's colors as this resolves; one of several is enough (rulings).
+                const colors = [...new Set((ctx.event?.manaMade ?? []).filter((m) => m !== "C"))] as Color[];
+                const o = ctx.legal[i] ? objects(s, { ref: "target", index: i }, ctx)[0] : undefined;
+                return colors.length > 0 && !!o && o.zone === "battlefield" && characteristics(s, o).colors.some((c) => colors.includes(c));
+              })(e.cond.index)
             : e.cond.kind === "targetGreatestPower"
             ? ((o) => !!o && o.zone === "battlefield" && objIsType(s, o, "Creature") && !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && power(s, obj(s, id)) > power(s, o)))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "flickeredIs"
@@ -1861,8 +1869,12 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     }
     if (!pu.acted) {
       const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
-      // "Unless that player discards a card": a cost, paid as it resolves (CR 118.12a), so not Library of Leng's.
-      for (const pid of who) discardCards(s, pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
+      // "Unless that player discards a card": a cost, paid as it resolves (CR 118.12a), so not Library of Leng's; Nephalia
+      // Academy's (round 430) for a player who chose to discard because of another player's spell or ability (rulings).
+      const discarding = Object.fromEntries(who.map((pid) => [pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id))]));
+      const tops = discardToTopEach(s, discarding, who, src, ctx, true);
+      if (tops === "paused") return "paused";
+      for (const pid of who) discardCards(s, pid, discarding[pid]!, "", false, false, ctx.controller, undefined, tops[pid]);
       for (const pid of who) {
         const top = (pu.chosen?.[pid]?.top ?? []).filter((id) => player(s, pid).hand.includes(id));
         for (const id of [...top].reverse()) moveObject(s, id, "library", { top: true });

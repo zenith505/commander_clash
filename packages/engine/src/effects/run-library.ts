@@ -2543,8 +2543,13 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
     });
   }
   const tops = toTop.filter((id) => ids.includes(id));
+  // Nephalia Academy (round 430): "reveal that card and put it on top of your library" (CR 701.20a): each card named.
+  const academy = academyName(s, pid);
+  const topNames = tops.map((id) => names[ids.indexOf(id)]!);
   for (const id of [...tops].reverse()) moveObject(s, id, "library", { top: true });
-  if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
+  if (tops.length) log(s, academy && !lengName(s, pid) ? `${player(s, pid).name} reveals ${topNames.join(", ")} and puts ${tops.length === 1 ? "it" : "them"} on top of their library instead (${academy}).` : `${player(s, pid).name} puts ${tops.length === 1 ? topNames[0] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid) ?? academy}).`);
+  // The choice made for this discard is used up (see discardToTop): a later discard in the same resolution asks again.
+  if (s.resolving?.scratch?.toTop) delete s.resolving.scratch.toTop[pid];
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   if (cycled) ((s.turnLog ??= {}).cycled ??= {})[pid] = (s.turnLog.cycled?.[pid] ?? 0) + ids.length;
   if (cycled) for (const c of cards) (player(s, pid).cycledNames ??= {})[c.name] = (player(s, pid).cycledNames?.[c.name] ?? 0) + 1;
@@ -2560,26 +2565,50 @@ export function lengName(s: GameState, pid: PlayerId): string | undefined {
 }
 
 /**
+ * Nephalia Academy (round 430) `pid` controls: its name, if any. With `by` (the controller of the spell or ability making
+ * them discard), only while that's another player: every other player is an opponent (CR 102.3). Rulings: a discard
+ * they chose to make because of that spell or ability counts too ("unless that player discards a card", ward's "Discard
+ * a card"), and the card is still discarded (discard triggers see it).
+ */
+export function academyName(s: GameState, pid: PlayerId, by?: PlayerId | null): string | undefined {
+  if (by === null || by === pid) return undefined;
+  const o = s.battlefield.map((id) => obj(s, id)).find((o) => controllerOf(s, o) === pid && abilitiesOf(s, o).discardToTopFromOpponents);
+  return o && defOf(s, o).name;
+}
+
+/**
+ * Library of Leng or Nephalia Academy: what lets `pid` put the cards `by`'s spell or ability makes them discard on top of
+ * their library instead, if anything. Leng's covers any effect but never a cost (its rulings: `cost`, a discard paid as a
+ * cost or chosen as one); the Academy's, another player's spell or ability, a discard chosen for it too (its rulings).
+ */
+export function toTopName(s: GameState, pid: PlayerId, by: PlayerId | undefined, cost: boolean): string | undefined {
+  return (!cost ? lengName(s, pid) : undefined) ?? (by !== undefined ? academyName(s, pid, by) : undefined);
+}
+
+/**
  * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
  * instead of into your graveyard." (CR 614.1a). Asked as an effect makes `pid` discard `ids` (never for a cost:
  * rulings), before they're discarded: which of them go on top, each card on its own, in the order they choose (the
  * first ending on top), a randomly discarded one too, once it's been picked (rulings). "paused" while they choose.
+ * Nephalia Academy (round 430) the same way, for a spell or ability another player controls (ctx.controller), a cost
+ * included (`cost`: one the resolving ability asks for, "unless that player discards a card").
  */
-export function discardToTop(s: GameState, pid: PlayerId, ids: ObjectId[], src: string, ctx: ResolveCtx): ObjectId[] | "paused" {
-  if (!ids.length || !s.resolving || ctx.asCost || opponentForbidsDiscard(s, pid, ctx.controller)) return [];
+export function discardToTop(s: GameState, pid: PlayerId, ids: ObjectId[], src: string, ctx: ResolveCtx, cost = false): ObjectId[] | "paused" {
+  if (!ids.length || !s.resolving || opponentForbidsDiscard(s, pid, ctx.controller)) return [];
   const sc = (s.resolving.scratch ??= {});
   const done = sc.toTop?.[pid];
   if (done) return done;
-  if (!lengName(s, pid)) return [];
-  s.pending = { kind: "handToTop", player: pid, count: ids.length, source: src, upTo: true, discarding: ids };
+  const by = toTopName(s, pid, ctx.controller, cost || !!ctx.asCost);
+  if (!by) return [];
+  s.pending = { kind: "handToTop", player: pid, count: ids.length, source: src, upTo: true, discarding: ids, ...(by !== lengName(s, pid) ? { revealing: by } : {}) };
   return "paused";
 }
 
 /** discardToTop for each player of `who` in turn (APNAP, CR 101.4): "paused" while one of them chooses. */
-function discardToTopEach(s: GameState, chosen: Record<string, ObjectId[]>, who: PlayerId[], src: string, ctx: ResolveCtx): Record<string, ObjectId[]> | "paused" {
+export function discardToTopEach(s: GameState, chosen: Record<string, ObjectId[]>, who: PlayerId[], src: string, ctx: ResolveCtx, cost = false): Record<string, ObjectId[]> | "paused" {
   const out: Record<string, ObjectId[]> = {};
   for (const pid of who) {
-    const t = discardToTop(s, pid, chosen[pid] ?? [], src, ctx);
+    const t = discardToTop(s, pid, chosen[pid] ?? [], src, ctx, cost);
     if (t === "paused") return "paused";
     out[pid] = t;
   }

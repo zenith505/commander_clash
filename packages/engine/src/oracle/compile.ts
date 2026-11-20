@@ -188,6 +188,9 @@ import { round424Line } from "./round424";
 import { round425Line } from "./round425";
 import { round426Line } from "./round426";
 import { round427Line } from "./round427";
+import { round428Line } from "./round428";
+import { round429Line } from "./round429";
+import { round430Line } from "./round430";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -508,7 +511,8 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
   const hurtsHost = c.triggers.some((tr) => (tr.host === "attached" || tr.activates?.equipped) && allEffects(tr.body.effects).some((e) => (e.type === "damage" && e.to.ref === "subjectController") || (e.type === "loseLife" && e.who.ref === "subjectController")));
   // Wellspring, Captivating Glance: a trigger that gains control of the enchanted permanent takes it from its controller.
   const stealsHost = c.triggers.some((tr) => allEffects(tr.body.effects).some((e) => e.type === "continuous" && e.what.ref === "attached" && !e.giveTo && e.mods.some((m) => m.kind === "control")));
-  return { targets: [c.enchantedControllerCantCast || hurtsHost || stealsHost ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
+  // Metamorphic Alteration (round 429): bots turn an opponent's creature into a copy of a lesser one (bot.ts chosenObject).
+  return { targets: [c.enchantedControllerCantCast || hurtsHost || stealsHost || c.enchantedCopiesChosen ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
 }
 
 // ---------------------------------------------------------------------------
@@ -1072,6 +1076,12 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 430: oracle/round430.ts.
+    if (round430Line(line, raw, out, isSpell)) continue;
+    // Round 429: oracle/round429.ts.
+    if (round429Line(line, raw, out, isSpell)) continue;
+    // Ninja Teen, Dynaheir, Invoker Adept (round 428): oracle/round428.ts.
+    if (round428Line(line, raw, out, isSpell)) continue;
     // Sidequest: Play Blitzball, Avatar Aang (round 427): oracle/round427.ts.
     if (round427Line(line, raw, out, isSpell)) continue;
     // Jasmine Boreal of the Seven, Niko, Light of Hope, Celestial Reunion (round 426): oracle/round426.ts.

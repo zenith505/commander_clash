@@ -11587,7 +11587,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature" ability, and choose an opponent's most valuable
   creature for Takklemaggot (their own least valuable one if there's no other). Browser tests click through exiling
   Ana's Grizzly Bears with your Pacifism on it and untapping the Coffin in your untap step, and choosing Ana's Llanowar
-  Elves for Takklemaggot after your Bears dies. +2, 31,792 of 31,936 on B274's branch (with main through round 426). The
+  Elves for Takklemaggot after your Bears dies. +2, 31,792 of 31,936 on B274's branch (with main through round 426), 31,795 with main
+  through round 427. The
   compiled text of every other card is unchanged.
 - Out after round B275 (looked at, not done): the lists after round B274 stay out. Judgment calls and known gaps: a
   merged permanent the Coffin exiles comes back as all its cards (CR 730.3c), each tapped with the noted counters, and

@@ -27,6 +27,8 @@ import { roundB268Line } from "./laneb268-lines";
 import { roundB269Line } from "./laneb269-lines";
 import { roundB270Line } from "./laneb270-lines";
 import { roundB271Line } from "./laneb271-lines";
+import { roundB272Line } from "./laneb272-lines";
+import { roundB273Line } from "./laneb273-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2447,6 +2449,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB270Line(line, out, isSpell)) continue;
     // Ian Malcolm, Chaotician, Haldan, Avid Arcanist (round B271).
     if (roundB271Line(line, out, isSpell)) continue;
+    // Cass, Hand of Vengeance, Bruna, Light of Alabaster (round B272).
+    if (roundB272Line(line, out, isSpell)) continue;
+    // Spellweaver Volute, Bludgeon Brawl (round B273).
+    if (roundB273Line(line, out, isSpell, d)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

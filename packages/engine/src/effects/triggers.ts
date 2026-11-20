@@ -428,7 +428,9 @@ function diesMatches(
   }
   if (srcId === dying.o.id) {
     // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
-    if (d.orSelf) return d.filter.owner !== "you" || dying.o.owner === you;
+    // "Whenever ~ or another creature you control dies, if it was enchanted or equipped" (Cass, Hand of Vengeance, round
+    // B272): ~ too only if it was (CR 603.4, 603.10a).
+    if (d.orSelf) return (d.filter.owner !== "you" || dying.o.owner === you) && (!d.filter.status || objectMatches(s, { kind: "object", text: d.filter.text, status: d.filter.status }, dying.o, you, false, undefined, dying.c));
     if (d.other) return false;
   } else if (d.self) return false;
   // "A creature of the chosen type" (Species Specialist): the type chosen for the watcher, as it last existed if it's
@@ -1086,6 +1088,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         return a?.zone === "battlefield" && characteristics(s, a).subtypes.includes("Equipment") ? [{ id: a.id, zc: a.zoneChanges ?? 0 }] : [];
       });
       if (equipment.length) (lki as LastKnown).equipment = equipment;
+      // Cass, Hand of Vengeance (round B272): the Auras attached to it then, each as the object it was on the battlefield (an
+      // Aura that left with it too, as it last existed there), to find the cards they became in a graveyard (CR 603.10a).
+      const auras = (ev.attachments ?? []).flatMap((aid) => {
+        const a = s.objects[aid];
+        if (!a || !characteristics(s, a).subtypes.includes("Aura")) return [];
+        const zc = a.zone === "battlefield" ? (a.zoneChanges ?? 0) : s.lastKnown?.[aid]?.zc;
+        return zc === undefined ? [] : [{ id: a.id, zc }];
+      });
+      if (auras.length) (lki as LastKnown).auras = auras;
       const dying = { o: ev.snapshot, c: ev.chars };
       // Decaying Soil (round B234, TriggeredAbility.lookBackYardAtLeast): the cards in that player's graveyard just before
       // this event (CR 603.10a), so not those the same event put there (moves of one instruction happen at once, CR 608.2c),

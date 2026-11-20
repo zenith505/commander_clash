@@ -5777,6 +5777,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a9aa3bc7-db5a-4792-a53a-40acb6ca4b20",
+  "name": "Bludgeon Brawl",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Each noncreature, non-Equipment artifact is an Equipment with equip {X} and \"Equipped creature gets +X/+0,\" where X is that artifact's mana value.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6290233b-b015-4909-8aba-bf8d65cc37b5",
   "name": "Blue Mage's Cane",
   "manaCost": "{2}{U}",
@@ -6973,6 +6999,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e8f213eb-58db-4fab-bd0b-2acfd0a86ac3",
+  "name": "Bruna, Light of Alabaster",
+  "manaCost": "{3}{W}{W}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Angel",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying, vigilance\nWhenever Bruna attacks or blocks, you may attach to it any number of Auras on the battlefield and you may put onto the battlefield attached to it any number of Aura cards that could enchant it from your graveyard and/or hand.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "578e0577-0ad8-4bfb-a317-9684c508770a",
   "name": "Brutal Deceiver",
   "manaCost": "{2}{R}",
@@ -7922,6 +7985,43 @@
   "releasedAt": "2024-02-09",
   "rarity": "rare",
   "layout": "case",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f9b6b1db-37c6-43d4-b762-6c9770da5964",
+  "name": "Cass, Hand of Vengeance",
+  "manaCost": "{2}{R}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Ranger",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ranger"
+  ],
+  "oracleText": "Vigilance\nWhenever Cass or another creature you control dies, if it was enchanted or equipped, return any number of Aura cards that were attached to it from your graveyard to the battlefield attached to target creature, then attach any number of Equipment that were attached to it to that creature.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {
@@ -10629,6 +10729,32 @@
   "set": "isd",
   "releasedAt": "2011-09-30",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c6a2e410-b182-48d1-aeb2-bc8de27e9cd2",
+  "name": "Cremate",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target card from a graveyard.\nDraw a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -44979,6 +45105,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3d92e5ce-9d30-4203-9f84-6c36117440cf",
+  "name": "Spellweaver Volute",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant instant card in a graveyard\nWhenever you cast a sorcery spell, copy the enchanted instant card. You may cast the copy without paying its mana cost. If you do, exile the enchanted card and attach this Aura to another instant card in a graveyard.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "69e1a166-02f7-43f8-b099-dbb01034370c",
   "name": "Sphinx Ambassador",
   "manaCost": "{5}{U}{U}",
@@ -51518,6 +51674,36 @@
   "commanderLegal": "legal",
   "set": "tdm",
   "releasedAt": "2025-04-11",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "090d88a9-7f2d-4bd1-a30a-7c48d05068be",
+  "name": "Unholy Strength",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +2/+1.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

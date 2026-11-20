@@ -118,6 +118,8 @@ import { runLaneB265Effect } from "./run-laneb265";
 import { runLaneB266Effect } from "./run-laneb266";
 import { runLaneB267Effect } from "./run-laneb267";
 import { runLaneB270Effect } from "./run-laneb270";
+import { runLaneB272Effect } from "./run-laneb272";
+import { runLaneB273Effect } from "./run-laneb273";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
 import { runRound327Effect } from "./run-round327";
@@ -2193,6 +2195,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB267Effect(s, e, ctx, src);
     case "abstractPiles":
       return runLaneB270Effect(s, e, ctx, src);
+    case "deadAurasOnto":
+      return runLaneB272Effect(s, e, ctx, src);
+    case "copyEnchantedCard":
+      return runLaneB273Effect(s, e, ctx, src);
     case "exileSelfUntilTargetLeaves":
       return runLaneB241Effect(s, e, ctx, src);
     case "gatherSpecimens":

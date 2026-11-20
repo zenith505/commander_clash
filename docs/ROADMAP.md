@@ -1,6 +1,6 @@
 # Roadmap
 
-31,794 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,797 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,942 of
 9,979 (99%).
 
@@ -11582,7 +11582,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counts, as the object it last was, CR 608.2h, damageDealtTo `srcWas`; Effect runeswordMark, TurnLog.runesword). Browser
   tests click through casting Secret Invasion on your Grizzly Bears and exiling Ana's Serra Angel (the Copy chip's
   title), and activating Runesword on your attacking Bears blocked by Ana's Drudge Skeletons, which is exiled. +2, 31,794
-  of 31,936 on B275's branch (with main through B274). The compiled text of every other card is unchanged.
+  of 31,936 on B275's branch (with main through B274), 31,797 with main through round 427. The compiled text of every other card is unchanged.
 - Out after round B276 (looked at, not done): the lists after round B275 stay out. Equinox stays out ("counter target
   spell if it would destroy a land you control": whether the spell would destroy a land if it resolved right then, not
   by a choice, a random chance, damage or a sacrifice, rulings, needs a look ahead into everything the spell would do,

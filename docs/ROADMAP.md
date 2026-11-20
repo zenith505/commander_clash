@@ -11508,6 +11508,35 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B272 (least played first, the two cards round B271 named next in line, neither in Lane A's rounds 426-427):
+  Cass, Hand of Vengeance's "Whenever ~ or another creature you control dies, if it was enchanted or equipped, return any
+  number of Aura cards that were attached to it from your graveyard to the battlefield attached to target creature, then
+  attach any number of Equipment that were attached to it to that creature." (a leaves-the-battlefield ability that looks
+  back in time, CR 603.10a, Cass itself only if it was enchanted or equipped too, CR 603.4, the "~ or another" check in
+  effects/triggers.ts diesMatches now honours the filter's status; the Auras attached to it as it last existed are
+  recorded in LastKnown.auras, and the cards they became in your graveyard, one zone change later and still there, CR
+  400.7, are offered if they could legally enchant the target, rulings, CR 303.4f, Effect deadAurasOnto in
+  run-laneb272.ts, under your control, CR 110.2a; then the Equipment that were attached to it, LastKnown.equipment, still
+  those objects, whoever controls them, Effect attachAny `deadEquipment`; with the target illegal, nothing, CR 608.2b).
+  Bruna, Light of Alabaster's "Whenever ~ attacks or blocks, you may attach to it any number of Auras on the battlefield
+  and you may put onto the battlefield attached to it any number of Aura cards that could enchant it from your graveyard
+  and/or hand." (any player's Auras, each staying under its controller's control, CR 701.3a, only ones that could
+  legally enchant it, rulings, CR 701.3b, Effect attachAny `anyAura`; then Aura cards of yours from the graveyard and
+  hand, judged against Bruna as it is after the first part, CR 608.2c, under your control, CR 110.2a, Effect putFromHand
+  `couldEnchantSelf`; nothing once Bruna has left or is a new object, CR 400.7, 303.4g). Bots target their best creature
+  for Cass and return only the Auras that help it (onto another player's creature only the others), and take for Bruna
+  only Auras that help it, from permanents that aren't theirs, and Aura cards that help it. The hand-and-graveyard picker
+  now names the permanent the cards are attached to (PendingDecision searchLibrary `attachingTo`). Browser tests click
+  through Cass's target, Aura card and Equipment picks and Bruna's Aura pick and hand-and-graveyard pick. +2, 31,783 of
+  31,936 on this branch (B271's, with main through round 425). The compiled text of every other card is unchanged.
+- Out after round B272 (looked at, not done): the lists after round B271 stay out. Stormkeld Curator // Giant Secrets
+  ("When ~ enters, you may put any number of Aura cards from your graveyard and/or hand onto the battlefield attached to
+  it.", Bruna's second half) isn't legal in Commander, so it's skipped. Judgment calls and known gaps: bots never move a
+  harmful Aura onto Bruna (moving an opponent's Pacifism off one of their creatures can be worth it) and judge whether an
+  Aura helps from its static abilities only (auraHelps). Next in line (not looked at closely yet): Spellweaver Volute
+  (an Aura on an instant card in a graveyard, copied and cast as you cast a sorcery, then moved to another instant card;
+  round B270's Spellweaver Helix has the copy-and-cast part) and Bludgeon Brawl (noncreature artifacts become Equipment
+  with an equip cost and a bonus from their mana value, layers 4 and 6).
 - Round B271 (least played first, from the cards round B270 named next in line, none of them in Lane A's rounds 424-425):
   Ian Malcolm, Chaotician's "During each player's turn, that player may cast a spell from among the cards they don't own
   exiled with ~, and mana of any type can be spent to cast it." (every player, its controller or not, on their own turn;

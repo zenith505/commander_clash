@@ -4762,6 +4762,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.cloak ? "cloak" : "manifest"} ${pending.what} from your hand (each a face-down 2/2 creature${pending.cloak ? " with ward {2}" : ""})`
                 : pending.fromHand && pending.swap
                 ? `${pending.source}: you may exchange it with ${pending.what} from your hand (aura swap)`
+                : pending.fromHand && pending.attachingTo !== undefined
+                ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} onto the battlefield attached to ${s.objects[pending.attachingTo] ? cardOf(s, pending.attachingTo).name : "it"}`
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield${pending.blocking && s.objects[pending.blocking] ? ` blocking ${cardOf(s, pending.blocking).name}` : ""}`
                 : pending.fromGraveyard === "exile" && pending.copiedBy !== undefined
@@ -4903,7 +4905,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : mixed ? `Your ${mixedZones}` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : mixed ? `Your ${mixedZones}` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand && pending.attachingTo !== undefined ? "Your hand and graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {

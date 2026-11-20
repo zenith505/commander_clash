@@ -636,6 +636,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
   // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).
+  // Aang, Master of Elements (round 427): "Spells you cast cost {W}{U}{B}{R}{G} less to cast. (This can reduce generic
+  // costs.)": each color off the cost's mana of that color, or {1} of its generic mana once it has none (CR 118.7b-c).
+  if (text === "Spells you cast cost {W}{U}{B}{R}{G} less to cast") {
+    const base = parseCostChange("Spells you cast cost {1} less to cast");
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
+    return { costMod: { ...base.costMod, n: 0, coloredOrGenericEach: ["W", "U", "B", "R", "G"], text: line } };
+  }
   // Eluge: "The first instant or sorcery spell you cast each turn costs {U} (or {1}) less to cast for each land you control
   // with a flood counter on it": {U} off for each while there's {U} in the cost, then {1} (rulings).
   if ((m = /^(The first .*?spell you cast each turn) costs \{([WUBRG])\} \(or \{1\}\) less to cast for each (.+)$/.exec(text))) {
@@ -1626,6 +1633,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you have no (land|creature|artifact|enchantment|instant|sorcery|planeswalker) cards in hand$/.exec(text))) return { kind: "noneInHand", filter: { kind: "card", types: [capital(m[1]!)], text: `${m[1]} card` } };
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you were dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!), you: true };
+  if ((m = new RegExp(`^a player was dealt ${NUM} or more combat damage this turn$`).exec(text))) return { kind: "playerDealtCombatDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   // Deepway Navigator: "you attacked with three or more Merfolk this turn": of that type as they were declared.
   if ((m = new RegExp(`^you attacked with ${NUM} or more ([A-Z][a-z]+) this turn$`).exec(text)) && CREATURE_TYPES.has(singularWord(m[2]!))) return { kind: "attackedWith", n: num(m[1]!), subtype: singularWord(m[2]!) };

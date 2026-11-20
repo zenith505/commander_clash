@@ -330,14 +330,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       if (perm?.kind !== "object") return null;
       const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, ...(orSpell[2] ? { notSource: true } : {}), ...(orSpell[1] ? { optional: true } : {}), text: `${orSpell[1] ?? ""}${orSpell[2] ?? ""}target ${orSpell[3]} or spell` });
       return [
-        { type: "counterSpell", index: i, exileSpell: true, ownerMayCost: "{2}" },
-        { type: "exile", what: { ref: "target", index: i }, ownerMay: { cost: "{2}" } },
+        { type: "counterSpell", index: i, exileSpell: true, ownerMayCost: "{2}", airbend: true },
+        { type: "exile", what: { ref: "target", index: i }, ownerMay: { cost: "{2}" }, airbend: true },
       ];
     }
     const fx = parseSentence(`Exile ${m[1]!}`, ctx);
     const ex = fx?.length === 1 ? fx[0] : undefined;
     if (ex?.type !== "exile" || ex.until || ex.linked || !["target", "each", "subject"].includes(ex.what.ref)) return null;
-    return [{ ...ex, ownerMay: { cost: "{2}" } }];
+    return [{ ...ex, ownerMay: { cost: "{2}" }, airbend: true }];
   }
   // "Discard a card and sacrifice an artifact, a creature, and a land": in that order.
   if ((m = /^Discard a card and (sacrifice .+)$/.exec(s))) {

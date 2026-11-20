@@ -1,7 +1,7 @@
 import { exiledWithNamed } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
-import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
+import { isRealKicker, type AbilityBody, type BatchTrigger, type BendKind, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, borrowedTriggersOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
 import { whileTappedHolds, checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
@@ -217,6 +217,8 @@ export type TriggerSourceEvent =
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
   | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number; /** A surveil that was the player's first this turn (TurnLog.surveilled). */ firstSurveil?: true; /** A scry: how many of the cards its player chose to put on the bottom (The Temporal Anchor). */ bottom?: number }
+  /** Avatar Aang (round 427): `player` waterbended, earthbended, firebended or airbended (see bent). */
+  | { type: "bent"; player: PlayerId; kind: BendKind }
   /** A player clashed (CR 701.30a), whether or not they started it; `won`, whether they won it (701.30d). */
   | { type: "clashed"; player: PlayerId; won: boolean }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
@@ -513,6 +515,18 @@ export function attackingYouNow(s: GameState, id: ObjectId, you: PlayerId, orPla
   if (!a.attackingPermanent) return true;
   const p = s.objects[a.attackingPermanent.id];
   return orPlaneswalkers && !!p && p.zone === "battlefield" && (p.zoneChanges ?? 0) === a.attackingPermanent.zc && objIsType(s, p, "Planeswalker") && controllerOf(s, p) === you;
+}
+
+/**
+ * `pid` waterbended, earthbended, firebended or airbended (Avatar Aang, round 427): noted for the turn (TurnLog.bent, "if
+ * you've done all four this turn") and its "whenever you ..." abilities triggered. Waterbend: a waterbend cost paid, however
+ * (CR 701.67a, rulings); earthbend: as its delayed triggered ability is made (701.66b); firebend: as a firebending ability
+ * resolves (702.189b); airbend: once for each instruction that exiled one or more objects (701.65b).
+ */
+export function bent(s: GameState, pid: PlayerId, kind: BendKind) {
+  const log = (((s.turnLog ??= {}).bent ??= {})[pid] ??= []);
+  if (!log.includes(kind)) log.push(kind);
+  fireEvent(s, { type: "bent", player: pid, kind });
 }
 
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
@@ -1516,6 +1530,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youExpend" && t.expend !== undefined && ev.before < t.expend && ev.after >= t.expend, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "bent") {
+    // Avatar Aang: "Whenever you waterbend, earthbend, firebend, or airbend" (CR 701.65b, 701.66b, 701.67a, 702.189b).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youBend" && !!t.bends?.includes(ev.kind), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "scried") {
     const kind = ev.how === "scry" ? "youScry" : "youSurveil";

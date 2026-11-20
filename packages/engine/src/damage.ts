@@ -453,6 +453,7 @@ export function dealDamage(
     const toPlayer = ((s.turnLog ??= {}).sourceToPlayer ??= {})[key] ??= {};
     toPlayer[p.id] = (toPlayer[p.id] ?? 0) + n;
     if (!opts.combat) ((s.turnLog ??= {}).noncombatDamage ??= {})[p.id] = (s.turnLog.noncombatDamage?.[p.id] ?? 0) + n;
+    else ((s.turnLog ??= {}).combatDamage ??= {})[p.id] = (s.turnLog.combatDamage?.[p.id] ?? 0) + n;
     if (src.types.includes("Artifact")) ((s.turnLog ??= {}).artifactDamage ??= {})[p.id] = (s.turnLog.artifactDamage?.[p.id] ?? 0) + n;
     // "Whenever you're dealt damage": once for the damage dealt at the same time (see dealPlanned).
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);

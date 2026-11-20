@@ -2678,6 +2678,10 @@ export type StaticCondition =
   /** "If an opponent was dealt combat damage by a legendary creature this turn" (Blitzball): whoever controlled it (rulings). */
   | { kind: "opponentCombatDamagedByLegendary" }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
+  /** "If a player was dealt 6 or more combat damage this turn" (Sidequest: Play Blitzball, round 427): any player's, in total from every source and combat damage step this turn, one who has left the game since too (TurnLog.combatDamage). */
+  | { kind: "playerDealtCombatDamage"; n: number }
+  /** Avatar Aang (round 427): "if you've done all four this turn": you waterbended, earthbended, firebended and airbended this turn (TurnLog.bent), before ~ was on the battlefield too (rulings). */
+  | { kind: "bentAllFour" }
   | { kind: "opponentDealtDamage"; n: number; /** "If you were dealt 4 or more damage this turn" (Boarded Window): `you`. */ you?: true }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
   | { kind: "attackedWith"; n: number; /** "Three or more Merfolk" (Deepway Navigator): of that creature type as they were declared. */ subtype?: string; /** Fearless Swashbuckler: "if a Pirate and a Vehicle attacked this combat": with `combat`, an attacker declared this combat with each of these subtypes, as it was declared (one creature may be both, rulings). */ eachSubtype?: string[]; /** In this combat only, not this turn (Kytheon, Hero of Akros). */ combat?: true; /** "If they were attacked this turn by an Assassin you controlled" (Ramses, Assassin Lord): only attackers declared attacking the event's player, not a planeswalker of theirs (rulings). */ eventPlayer?: true }
@@ -3044,6 +3048,8 @@ export type Effect =
    */
   | {
       type: "exile";
+      /** An instruction to airbend (CR 701.65a-b): "whenever you airbend" once if it exiled anything (round 427). */
+      airbend?: true;
       what: ObjRef;
       /** "Exile it. If you do, ..." (Hofri Ghostforge): whether it went to exile is what "if you do" asks (round354.ts). */
       setsDid?: true;
@@ -5128,7 +5134,7 @@ export type Effect =
   /** Its leaves trigger: "that creature's controller sacrifices it", the creature it put onto the battlefield. */
   | { type: "sacrificeAnimated" }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
-  | { type: "addCombatMana"; n: Amount }
+  | { type: "addCombatMana"; /** A firebending ability's (CR 702.189b: "whenever you firebend"). */ firebending?: true; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
    * stack (CR 605.1, 605.5a). `chosen` adds that much mana of the color chosen just before (a "choose" effect). */
   /** `times`: "Add {R} for each card in target opponent's hand" (Jeska's Will). */
@@ -5373,6 +5379,8 @@ export type Effect =
       linked?: true;
       /** With `exileSpell`: airbend (CR 701.65a): while the card stays exiled, its owner may cast it for this rather than its mana cost. */
       ownerMayCost?: string;
+      /** With `ownerMayCost`: an instruction to airbend (CR 701.65b, round 427). */
+      airbend?: true;
       /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
       n?: number;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
@@ -7127,6 +7135,12 @@ export type TriggerEvent =
   /** Paranormal Analyst: "Whenever you manifest dread" (CR 701.62a), even if it couldn't be done in full (rulings); TriggerEventInfo.group is the card it put into the graveyard. */
   | "youManifestDread"
   | "youScryOrSurveil"
+  /**
+   * Avatar Aang (round 427): "Whenever you waterbend, earthbend, firebend, or airbend": a waterbend cost you paid (CR
+   * 701.67a, rulings: however it was paid), a delayed trigger of earthbend you made (701.66b), a firebending ability of
+   * yours that resolved (702.189b), or objects you exiled because of an instruction to airbend (701.65b); TriggeredAbility.bends.
+   */
+  | "youBend"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
   | "youProliferate"
   /** "Whenever you forage" (Corpseberry Cultivator): each time you forage, as a cost or as an instruction (CR 701.61a). */
@@ -7301,7 +7315,12 @@ export type TriggerEvent =
 /** `endOfCombat`: "this combat" (Stensian Sanguinist), until this combat's end of combat step ends (CR 511.3). */
 export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat" | /** Chancellor of the Annex: for the rest of the game (with `once` and `forPlayer`, until that player's first spell). */ "game" | /** Giant Oyster (round B228): "for as long as ~ remains tapped": until the source untaps or leaves the battlefield (CR 611.2b), from an activated ability whose source is tapped. */ "whileTapped";
 
+/** The four kinds of bending (CR 701.65-701.67, 702.189). */
+export type BendKind = "water" | "earth" | "fire" | "air";
+
 export interface TriggeredAbility {
+  /** "youBend": the kinds of bending it triggers on. */
+  bends?: BendKind[];
   /**
    * Kodama of the Center Tree: "soulshift X, where X is the number of Spirits you control": for a "selfDies" trigger, X is
    * the number of permanents of this subtype its controller controlled just before it left (itself and the others leaving
@@ -8492,6 +8511,8 @@ export interface CostMod {
   moreColored?: Color[];
   /** Eluge: "costs {U} (or {1}) less ... for each": `times` that color, each one {1} once the cost has none of it left. */
   coloredOrGeneric?: Color;
+  /** Aang, Master of Elements (round 427): "cost {W}{U}{B}{R}{G} less to cast": each of these colors once, {1} instead once the cost has none of it (CR 118.7b-c); `n` is 0. */
+  coloredOrGenericEach?: Color[];
   /** The Defilers: only if the caster chose to pay this much life for it as an additional cost (CostChoices.lifeFor). */
   payLife?: number;
   /** Eminence (The Ur-Dragon): it also works while its commander is in the command zone (CR 113.6). */

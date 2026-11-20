@@ -15,7 +15,7 @@ import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDama
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
+import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -7999,6 +7999,10 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         moreColored.push(...m.moreColored);
         continue;
       }
+      if (m.coloredOrGenericEach) {
+        lessColoredOrGeneric.push(...m.coloredOrGenericEach);
+        continue;
+      }
       if (m.coloredOrGeneric) {
         const k = Math.max(0, m.times ? evalAmount(s, m.times, { controller: c.controller, sourceId: src.id }) : 0);
         for (let i = 0; i < k; i++) lessColoredOrGeneric.push(m.coloredOrGeneric);
@@ -8787,6 +8791,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
   });
   if (choices.waterbend?.length) log(s, `${p.name} taps ${choices.waterbend.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
+  // "Whenever you waterbend": its waterbend cost paid, however (Avatar Aang's rulings, CR 701.67a), round 427.
+  const wk = compileCard(d).kicker;
+  if (wk?.waterbend !== undefined && (wk.required || choices.kicks?.includes(0))) bent(s, p.id, "water");
   // The Dragons of Tarkir reveal cycle: controlling a Dragon as it's finished being cast counts the same as revealing one
   // (rulings), with nothing revealed; a copy doesn't get that (StackItem.kickedByControl).
   const ifControl = compileCard(d).kicker?.ifControl;
@@ -11863,6 +11870,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     if (ab.crew !== undefined && costs?.crewLoyalty !== undefined) removeCountersCost(s, obj(s, costs.crewLoyalty), { counter: "loyalty", n: 1 }, p.id);
   });
   if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} ${ab.bendCreaturesOnly ? "to pay for it" : "to waterbend"}.`);
+  // "Whenever you waterbend" (round 427): a "Waterbend {N}" cost paid (CR 701.67a); Heirloom Epic's isn't one.
+  if (ab.waterbend !== undefined && !ab.bendCreaturesOnly) bent(s, p.id, "water");
   // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
   // +1 gone before it resolves makes a Horror as big as her loyalty after the +1.
   if (lki?.counters && o.zone === "battlefield" && (ab.loyalty !== undefined || ab.loyaltyX || ab.putCounters || ab.removeCounters)) Object.assign(lki, { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } });
@@ -14479,6 +14488,8 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
     }
     payLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
+    // "Whenever you waterbend" (round 427): ward—waterbend, "unless you waterbend" (CR 701.67a).
+    if (pend.waterbend) bent(s, p.id, "water");
     if (pend.poison) {
       // "Ward—Get five poison counters": getting them is the payment (CR 118.3); ten or more loses as a state-based
       // action (CR 704.5c).

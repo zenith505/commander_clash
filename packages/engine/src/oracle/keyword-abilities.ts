@@ -1117,7 +1117,7 @@ interface KeywordParts {
 /** CR 702.189a: "Whenever this creature attacks, add N {R}. Until end of combat, you don't lose this mana as steps and phases end." */
 export function firebending(n: Amount, text: string): TriggeredAbility {
   const add = typeof n === "number" ? "{R}".repeat(n) : "X {R}";
-  return { event: "selfAttacks", body: { targets: [], effects: [{ type: "addCombatMana", n }], text: `${text.charAt(0).toUpperCase()}${text.slice(1)}: add ${add}. Until end of combat, you don't lose this mana as steps and phases end.` } };
+  return { event: "selfAttacks", body: { targets: [], effects: [{ type: "addCombatMana", n, firebending: true }], text: `${text.charAt(0).toUpperCase()}${text.slice(1)}: add ${add}. Until end of combat, you don't lose this mana as steps and phases end.` } };
 }
 
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {

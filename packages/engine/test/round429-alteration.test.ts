@@ -69,11 +69,11 @@ describe("Metamorphic Alteration", () => {
     const { s: s0, ap, ids } = setup([alteration()]);
     const b = putOnBattlefield(s0, ap, bear());
     const t = putOnBattlefield(s0, ap, card("Test Spirit", "Creature — Spirit", "", { power: "1", toughness: "1", keywords: ["Flying"], oracleText: "Flying" }));
-    s0.objects[t]!.token = true;
+    s0.objects[t]!.isToken = true;
     const s = enchant(s0, ap, ids[0]!, b, t);
     expect(nameOf(s, b)).toBe("Test Spirit");
     expect(characteristics(s, s.objects[b]!).keywords).toContain("Flying");
-    expect(s.objects[b]!.token).toBeFalsy();
+    expect(s.objects[b]!.isToken).toBeFalsy();
   });
 
   it("a creature that isn't normally one (an animated land): the enchanted creature becomes a land, the Aura goes to the graveyard, and it's itself again", () => {

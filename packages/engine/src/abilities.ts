@@ -2132,7 +2132,15 @@ export type Modification =
    * is a triggered, activated or mana ability in which "~" ("this creature") is the object that has it.
    * Text naming the granting card by name is about that card (CR 201.5a), so it isn't compiled.
    */
-  | { kind: "addAbility"; text: string }
+  | {
+      kind: "addAbility";
+      text: string;
+      /**
+       * Bludgeon Brawl (round B273): 'equip {X} and "Equipped creature gets +X/+0," where X is that artifact's mana value':
+       * each X in the text is the mana value of the object getting it, as it is then (layers.ts, CR 202.3).
+       */
+      mvX?: true;
+    }
   | { kind: "setPT"; power: Amount; toughness: Amount } // layer 7b
   /** "Is ... named Legitimate Businessperson" (Witness Protection): its name, a text-changing effect (layer 3, CR 613.1c). */
   | { kind: "setName"; name: string }
@@ -4269,6 +4277,13 @@ export type Effect =
    * cards, each only if it could legally enchant the target (rulings, CR 303.4f), under your control (CR 110.2a).
    */
   | { type: "deadAurasOnto"; host: number }
+  /**
+   * Spellweaver Volute (round B273): "copy the enchanted instant card. You may cast the copy without paying its mana cost.
+   * If you do, exile the enchanted card and attach ~ to another instant card in a graveyard." The card it enchants as the
+   * ability resolves, or as it last existed on the battlefield (LastKnown.enchantsCard, rulings); the copy is created in a
+   * graveyard and cast from there (CR 707.12, rulings).
+   */
+  | { type: "copyEnchantedCard" }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true; /** Helm of Kaldra (round 417): "Attach those Equipment to it": to the token just created (the first one), not the source. */ toCreated?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */

@@ -3688,6 +3688,12 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Level {o.classLevel}
           </span>
         )}
+        {o.enchantsCard && s.objects[o.enchantsCard.id]?.zone === "graveyard" && (
+          // Spellweaver Volute (round B273): an Aura enchanting a card in a graveyard.
+          <span className="chip other enchants-card" title={`Enchanting ${cardOf(s, o.enchantsCard.id).name} in ${s.players[s.objects[o.enchantsCard.id]!.owner]!.name}'s graveyard.`}>
+            On {cardOf(s, o.enchantsCard.id).name}
+          </span>
+        )}
         {o.attachedToPlayer !== undefined && (
           <span className="chip other" title={`${s.players[controllerOf(s, o)]!.name}'s Aura, enchanting ${s.players[o.attachedToPlayer]!.name}.`}>
             On {s.players[o.attachedToPlayer]!.name}

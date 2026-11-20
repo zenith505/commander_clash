@@ -1,6 +1,6 @@
 # Roadmap
 
-31,781 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,785 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
@@ -11508,6 +11508,37 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B273 (least played first, the two cards round B272 named next in line, neither in Lane A's rounds 426-427):
+  Spellweaver Volute's "Enchant instant card in a graveyard" (an Aura spell that targets an instant card in any graveyard
+  and stays on the battlefield attached to it, the first Aura to enchant something that's neither a permanent nor a
+  player, rulings, CR 303.4a, 303.4f; it falls off as a state-based action once that card changes zones, CR 400.7,
+  704.5m, rulings; the Animate Dead check in game.ts now covers every "enchant ... card in a graveyard") and "Whenever you
+  cast a sorcery spell, copy the enchanted instant card. You may cast the copy without paying its mana cost. If you do,
+  exile the enchanted card and attach ~ to another instant card in a graveyard." (the copy is created in a graveyard and
+  cast from there while the ability resolves, CR 707.12, rulings, so Ashes of the Abhorrent stops it; free, timing
+  ignored, CR 118.9, 608.2g; a copy not cast ceases to exist, CR 704.5e, 707.10a; only once it's cast is the card exiled
+  and ~ attached to another instant card in any graveyard, chosen as it resolves, not targeted, CR 701.3a, or left
+  enchanting nothing and put into the graveyard; with ~ gone in response, the card it enchanted as it last existed is still
+  copied, even if it has since left the graveyard, while a card that left first took ~ with it, so nothing is copied,
+  rulings, LastKnown `enchantsCard`; Effect copyEnchantedCard in run-laneb273.ts). Bludgeon Brawl's "Each noncreature,
+  non-Equipment artifact is an Equipment with equip {X} and "Equipped creature gets +X/+0," where X is that artifact's
+  mana value." (every player's such artifacts, the subtype in layer 4 and both abilities in layer 6 for the same group,
+  CR 613.1d, 613.1f, 613.6; "noncreature" makes it wait for effects that animate artifacts, CR 613.8a, so March of the
+  Machines' creatures aren't Equipment and fall off, rulings, CR 704.5p, and a second Brawl adds nothing, its group being
+  empty; X is each artifact's mana value, Modification addAbility `mvX` in layers.ts; they keep their other abilities, so
+  an equipped Sol Ring still taps for mana, rulings). Bots cast the copy whenever it can be cast and move Volute to the
+  instant card with the highest mana value; they equip Brawl's artifacts like any Equipment. An Aura enchanting a card
+  in a graveyard shows an "On <card>" chip. Browser tests click through casting Volute onto Ana's Lightning Bolt, the
+  free copy cast from Divination's trigger and the pick of Shock over Cremate, and equipping Sol Ring and Mind Stone onto
+  Grizzly Bears under Brawl. +2, 31,785 of 31,936 on this branch (B272's, with main through round 425). The compiled text
+  of every other card is unchanged.
+- Out after round B273 (looked at, not done): the lists after round B272 stay out. Judgment calls and known gaps: Volute's
+  copy is created in its caster's graveyard (the engine keeps each card in its owner's zones), not necessarily the one
+  the copied card was in, which only matters to effects about "your graveyard" while it's being cast; moving Volute to a
+  card in a graveyard fires no "becomes attached" trigger (none could apply to a card); the rulings' Aura that's also an
+  artifact under Brawl (an Aura Equipment) isn't tested. No fresh card is left at the bottom of the list: every remaining unsupported
+  card is in an earlier skip list (North Star, Ghostly Flame, Golgothian Sylex and the others), so the next Lane B round
+  starts by looking at those again, least played first.
 - Round B272 (least played first, the two cards round B271 named next in line, neither in Lane A's rounds 426-427):
   Cass, Hand of Vengeance's "Whenever ~ or another creature you control dies, if it was enchanted or equipped, return any
   number of Aura cards that were attached to it from your graveyard to the battlefield attached to target creature, then

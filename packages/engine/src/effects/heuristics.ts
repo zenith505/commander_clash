@@ -22,7 +22,10 @@ export function doesNothingNow(s: GameState, sourceId: ObjectId, body: AbilityBo
       (e.type === "adapt" && (o.counters["+1/+1"] ?? 0) > 0 && o.adaptFresh !== s.turn) ||
       (e.type === "monstrosity" && !!o.monstrous) ||
       // "If ~ is a Warrior, ..." while it isn't one (Figure of Destiny).
-      (e.type === "if" && !e.otherwise?.length && e.cond.kind === "state" && e.cond.cond.kind === "selfIs" && !staticConditionNow(s, e.cond.cond, o.id, controllerOf(s, o))),
+      (e.type === "if" && !e.otherwise?.length && e.cond.kind === "state" && e.cond.cond.kind === "selfIs" && !staticConditionNow(s, e.cond.cond, o.id, controllerOf(s, o))) ||
+      // Supper for Spiders (round B268): no creature card went to an opponent's graveyard from the battlefield this turn.
+      (e.type === "returnAllFromGraveyard" && !e.toHand && e.who.ref === "eachOpponent" && !!e.filter.fromBattlefieldThisTurn && e.filter.types?.length === 1 && e.filter.types[0] === "Creature" &&
+        !s.turnOrder.some((pid) => pid !== o.owner && !s.players[pid]!.lost && s.players[pid]!.graveyard.some((id) => s.objects[id]?.fromBattlefieldTurn === s.turn && (s.cards[s.objects[id]!.cardId]?.types ?? []).includes("Creature")))),
   );
 }
 

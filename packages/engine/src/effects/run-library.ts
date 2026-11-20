@@ -2249,7 +2249,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const powers = e.differentPowers ? new Set(options.map((id) => characteristics(s, obj(s, id)).power)).size : undefined;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0), eachMost ?? Infinity, powers ?? Infinity, e.payLife ? Math.floor(payableLife(s, pid) / e.payLife) : Infinity));
         // Green Sun's Twilight: "Choose a creature card and/or a land card": one at least, when there is one.
-        const min = e.required ? max : e.atLeastOne ? Math.min(1, max) : e.upTo || e.filter ? 0 : max;
+        // Selective Adaptation (round B268): a card for each keyword there's one for, checked as they're chosen
+        // (oneOfEachAllFits), not a count.
+        const min = e.oneOfEachAll ? 0 : e.required ? max : e.atLeastOne ? Math.min(1, max) : e.upTo || e.filter ? 0 : max;
         if (!e.sacrificeFirst) log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         // Getaway Barrel: a random one of those that match, no choice (rng.ts).
         if (e.pickRandom && max > 0 && options.length > max) {
@@ -2260,13 +2262,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
-          const what = e.totalMv !== undefined && (count >= 99 || max > 1) ? `${count >= 99 ? "any number of" : `up to ${count}`} ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.play === "exiled" ? ` (you may cast it for as long as it remains exiled${e.playUndaunted ? ", with undaunted" : ""})` : e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.playCast ? " (you may cast it this turn)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : e.into === "cyberman" ? "onto the battlefield face down (2/2 Cyberman artifact creature)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
+          const what = e.totalMv !== undefined && (count >= 99 || max > 1) ? `${count >= 99 ? "any number of" : `up to ${count}`} ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach && e.oneOfEachAll ? `a card for each of ${e.oneOfEach.map((f) => f.text.replace(/^card with /, "")).join(", ")} there's one for` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
+          const to = e.landsOnto ? "(lands onto the battlefield tapped, the others into your hand)" : e.oneOnto ? "(then one of them onto the battlefield, the others into your hand)" : e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.play === "exiled" ? ` (you may cast it for as long as it remains exiled${e.playUndaunted ? ", with undaunted" : ""})` : e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.playCast ? " (you may cast it this turn)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : e.into === "cyberman" ? "onto the battlefield face down (2/2 Cyberman artifact creature)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
           const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           // Guided Passage: another player picks, for `p` (an opponent you chose, so the cards that help you least).
           const chooser = e.chooser ? players(s, e.chooser, ctx).find((x) => !player(s, x).lost) : undefined;
           const theirs = (w: string) => (chooser !== undefined && chooser !== p.id ? w.replace(/\byour\b/g, `${p.name}'s`) : w);
-          s.pending = { kind: "searchLibrary", player: chooser ?? p.id, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, helps: true as const } : {}), source: src, what, cards: options, min, max, dig: { looked: sc.looked, to: theirs(e.lifeEach ? `${to} (you lose ${e.lifeEach} life for each)` : e.payLife ? `${to} (you pay ${e.payLife} life for each)` : to), rest: theirs(rest), ...(e.lifeEach ? { lifeEach: e.lifeEach } : {}), ...(e.payLife ? { payLife: e.payLife } : {}) }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(totalMv !== undefined ? { totalMv } : {}), ...(e.differentPowers ? { distinctPowers: true as const } : {}) };
+          s.pending = { kind: "searchLibrary", player: chooser ?? p.id, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, helps: true as const } : {}), source: src, what, cards: options, min, max, dig: { looked: sc.looked, to: theirs(e.lifeEach ? `${to} (you lose ${e.lifeEach} life for each)` : e.payLife ? `${to} (you pay ${e.payLife} life for each)` : to), rest: theirs(rest), ...(e.lifeEach ? { lifeEach: e.lifeEach } : {}), ...(e.payLife ? { payLife: e.payLife } : {}) }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.oneOfEachAll ? { oneOfEachAll: true as const } : {}), ...(totalMv !== undefined ? { totalMv } : {}), ...(e.differentPowers ? { distinctPowers: true as const } : {}) };
           return "paused";
         }
         // Nothing to choose: all of them, or (one for each) as many as fit.
@@ -2301,6 +2303,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         return;
       };
       if (sc.castingTarget !== undefined && e.castFree) return;
+      // Selective Adaptation (round B268): "Put one of the chosen cards onto the battlefield, the other chosen cards into
+      // your hand": the chooser picks which, once they're all chosen (one instruction, CR 608.2c).
+      if (e.oneOnto && !sc.moved && found.length > 1 && (sc.oneOnto === undefined || !found.includes(sc.oneOnto))) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "oneOnto", options: [...found], labels: found.map((id) => defOf(s, obj(s, id)).name), prompt: `choose the card to put onto the battlefield (the other${found.length === 2 ? " goes" : "s go"} into your hand)` };
+        return "paused";
+      }
+      const onto = e.oneOnto ? (found.length === 1 ? found[0] : sc.oneOnto) : undefined;
       // Green Sun's Twilight: "put the chosen cards onto the battlefield or into your hand": all of them the same way,
       // chosen once they're chosen (rulings).
       if (e.orHand && !sc.moved) {
@@ -2320,10 +2329,10 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       if (sc.moved) return toBottom(s, from, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false) ?? castExiled();
       // An Aura put onto the battlefield: its controller chooses what it enchants as it enters (CR 303.4f), or it stays
       // with the rest (303.4g).
-      const hosts = e.into === "battlefield" ? chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src) : new Map<ObjectId, AuraHost>();
+      const hosts = e.into === "battlefield" ? chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src) : onto !== undefined ? chooseAuraHosts(s, [{ o: obj(s, onto), under: p.id }], src) : new Map<ObjectId, AuraHost>();
       if (hosts === "paused") return "paused";
       found = found.filter((id) => {
-        if (e.into !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id)) return true;
+        if ((e.into !== "battlefield" && id !== onto) || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id)) return true;
         log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays with the rest.`);
         return false;
       });
@@ -2352,19 +2361,23 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       else if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.play === "exiled" ? ` and may cast it for as long as it remains exiled${e.playUndaunted ? " (it has undaunted)" : ""}` : e.playFree ? " and may cast it this turn without paying its mana cost" : e.playCast ? " and may cast it this turn" : e.play ? " and may play it this turn" : ""}.`);
       else if (found.length && e.into === "graveyard") log(s, `${p.name} puts ${names(found)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
-      else if (found.length && !e.landsOnto) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
+      else if (found.length && onto !== undefined && found.includes(onto)) {
+        log(s, `${p.name} puts ${names([onto])} onto the battlefield.`);
+        if (found.length > 1) log(s, `${p.name} puts ${names(found.filter((id) => id !== onto))} into their hand.`);
+      } else if (found.length && !e.landsOnto) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       // Zimone's Experiment: the land cards taken go onto the battlefield tapped, the others into the hand.
-      const ontoField = (id: ObjectId) => e.into === "battlefield" || (!!e.landsOnto && isType(defOf(s, obj(s, id)), "Land"));
+      const ontoField = (id: ObjectId) => e.into === "battlefield" || id === onto || (!!e.landsOnto && isType(defOf(s, obj(s, id)), "Land"));
       if (e.landsOnto) {
         const lands = found.filter(ontoField);
         if (lands.length) log(s, `${p.name} puts ${names(lands)} onto the battlefield tapped.`);
         if (found.length > lands.length) log(s, `${p.name} puts ${names(found.filter((id) => !ontoField(id)))} into their hand.`);
       }
-      if (e.into === "battlefield" || faceDown || e.landsOnto) r.created = [];
+      if (e.into === "battlefield" || faceDown || e.landsOnto || onto !== undefined) r.created = [];
       r.digTook = found.length > 0;
       if (e.into === "hand") {
-        r.dugToHand = found.length;
-        r.dugToHandCards = [...found];
+        const toHand = found.filter((id) => id !== onto);
+        r.dugToHand = toHand.length;
+        r.dugToHandCards = toHand;
       }
       // Hew the Entwood: "Put all nonland cards chosen this way onto the battlefield, then put all land cards chosen this
       // way onto the battlefield tapped": two events, one after the other (CR 608.2c).
@@ -2375,6 +2388,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         for (const id of batch) {
           if (e.landsOnto && ontoField(id)) {
             moveObject(s, id, "battlefield", { controller: p.id, tapped: true });
+            if (obj(s, id).zone === "battlefield") r.created!.push(id);
+          } else if (id === onto) {
+            moveObject(s, id, "battlefield", { controller: p.id, ...hosts.get(id) });
             if (obj(s, id).zone === "battlefield") r.created!.push(id);
           } else if (e.into === "hand") moveObject(s, id, "hand");
           else if (e.into === "graveyard") moveObject(s, id, "graveyard");

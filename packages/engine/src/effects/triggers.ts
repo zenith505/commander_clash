@@ -3551,6 +3551,13 @@ function triggerBodyAsIs(s: GameState, t: PendingTrigger): AbilityBody {
   const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(lki ? { lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}), ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
+  // Lucy MacLean, Positively Armed (round B269): "target player other than its controller": the subject's controller now,
+  // or as it last existed on the battlefield (CR 608.2h), as the trigger is put on the stack (CR 603.3d).
+  if (t.subject && body.targets.some((x) => x.notSubjectController)) {
+    const subj = s.objects[t.subject.id];
+    const ctrl = subj && subj.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject.zc ? controllerOf(s, subj) : s.lastKnown?.[t.subject.id]?.controller;
+    return { ...body, targets: body.targets.map((x) => (x.notSubjectController ? (({ notSubjectController: _, ...rest }) => (ctrl !== undefined ? { ...rest, notPlayer: ctrl } : rest))(x) : x)) };
+  }
   // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
   if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
   // Necrotic Plague: "creature one of their opponents controls", "their" being the subject's controller as it last existed

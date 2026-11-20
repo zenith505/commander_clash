@@ -19,7 +19,7 @@ import { foundWith, newObjects } from "../mutate";
 import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { chooseAnOpponent, toBottom } from "./run-library";
-import { attackDefault, closeZoneBatch, fireEvent, inCombat } from "./triggers";
+import { attackDefault, bent, closeZoneBatch, fireEvent, inCombat } from "./triggers";
 import { asFace, defMv, hasName, layoutOf, registerFace, sameName, transformedFace } from "../faces";
 import { subjectLastMv } from "./run-laneb274";
 import { meld, meldPartners } from "../meld";
@@ -2175,12 +2175,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Lagrella, the Magpie: the delayed trigger made as this resolves (CR 603.7a), one for all the cards it exiles; its
       // source is this ability's, as it was, and its controller this ability's controller (CR 603.7e).
       const rider = e.returnRider && me ? { key: `r${s.nextId++}`, controller: ctx.controller, sourceId: me.id, sourceCardId: cardIdOf(me), sourceZc: me.zoneChanges ?? 0, body: e.returnRider } : undefined;
+      let airbent = false;
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "targetLeaves" && me ? ` until ${defOf(s, me).name} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
         const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)), controller: controllerOf(s, o) } : undefined;
         const fromYard = o.zone === "graveyard";
         moveObject(s, o.id, "exile");
+        if (o.zone === "exile" || newObjects(o).some((l) => s.objects[l.id]?.zone === "exile")) airbent = true;
         if (e.setsDid && o.zone === "exile" && s.resolving) s.resolving.did = true;
         if (before && o.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
         if (fromYard && o.zone === "exile" && s.resolving) (s.resolving.exiledCards ??= []).push(o.id);
@@ -2210,6 +2212,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : e.youMay.nextTurn ? "nextTurn" : e.youMay.whileControlled ? "whileControlled" : "exiled", turn: s.turn, ...(e.youMay.whileControlled && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.youMay.play ? {} : { castOnly: true as const }), ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.colorlessAny ? { colorlessAny: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
         }
       }
+      // "Whenever you airbend": once for the instruction, if it exiled one or more objects (CR 701.65b), round 427.
+      if (e.airbend && airbent) bent(s, ctx.controller, "air");
       return;
     }
     case "grantYardKeyword": {

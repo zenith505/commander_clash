@@ -13,7 +13,8 @@ import { markOnlyWalls } from "./laneb199";
  * an ability of its own.
  */
 // Teferi's Talent: "an emblem with 'You may activate ... on any player's turn ...'": an apostrophe inside is no quote mark.
-export const innerQuotes = (text: string) => text.replace(/ (with|and) '(.+?\.)'(?![A-Za-z])/g, ' $1 "$2"');
+// Roar of the Fifth People: "Creatures you control have '{T}: Add {R}, {G}, or {W}.'" (round 427).
+export const innerQuotes = (text: string) => text.replace(/ (with|and|have|has) '(.+?\.)'(?![A-Za-z])/g, ' $1 "$2"');
 
 /** Can we run an ability given in quotes (a token's or one granted to something)? */
 export function compileQuoted(text: string): boolean {
@@ -143,7 +144,14 @@ function namesGrantSource(c: CompiledCard): boolean {
  */
 const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop", "combatToPlayerDrawsHalf", "damagedCantRegenerate"]);
 // Earthbind's granted "Enchanted creature loses flying" (removeKeywords) joins layer 6 the same way.
-export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || m.kind === "removeKeywords" || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
+// Roar of the Fifth People (round 427): a granted "Creatures you control have '{T}: Add ...'" (addAbility) joins layer 6 the
+// same way, once the effect granting it has applied (CR 613.8a), when what it adds is a triggered, activated or mana ability
+// only: one that adds a static ability could change the abilities the earlier layer 6 effects already settled.
+export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => (m.kind === "addKeywords" || m.kind === "removeKeywords" || (m.kind === "addAbility" && addsNoStatic(m.text)) || !["2", "4", "5", "6"].includes(layerOf(m))) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
+const addsNoStatic = (text: string) => {
+  const c = compileGranted(text);
+  return !c.statics.length && !c.unsupported.length && c.triggers.length + c.activated.length + c.mana.length > 0;
+};
 
 /**
  * Can an effect give this quoted ability to an object? It's one ability we can run: triggered, activated or mana

@@ -2180,6 +2180,10 @@ export interface TurnLog {
   damagedBy?: Record<number, string[]>;
   /** Noncombat damage each player was dealt this turn (Chandra's Incinerator), also after they lost the game (rulings). */
   noncombatDamage?: Record<number, number>;
+  /** Combat damage each player was dealt this turn (Sidequest: Play Blitzball, round 427), also after they lost the game. */
+  combatDamage?: Record<number, number>;
+  /** Avatar Aang (round 427): for each player, the kinds of bending they did this turn (effects/triggers.ts bent). */
+  bent?: Record<number, ("water" | "earth" | "fire" | "air")[]>;
   /** Damage each player was dealt this turn by sources that were artifacts as they dealt it (Reverse Polarity). */
   artifactDamage?: Record<number, number>;
   /** Players who scried or surveilled this turn (Proctor of Potential). */

@@ -65,7 +65,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // The beginning of combat step (CR 507) and end of combat step (CR 511).
   [/^At the beginning of combat on your turn, (.+)$/, "yourBeginCombat"],
   [/^At the beginning of (?:each combat|combat on each player's turn), (.+)$/, "eachBeginCombat"],
-  [/^At end of combat on your turn, (.+)$/, "yourEndCombat"],
+  // "At the end of combat on your turn" (Sidequest: Play Blitzball, round 427): the same step.
+  [/^At (?:the )?end of combat on your turn, (.+)$/, "yourEndCombat"],
   [/^At end of combat, (.+)$/, "eachEndCombat"],
   // "To a player or battle": either (TriggeredAbility.orBattle).
   // "When ~ deals combat damage to a player" (RMS Titanic) is the same trigger (CR 603.1).

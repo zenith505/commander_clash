@@ -4339,6 +4339,11 @@ export type Effect =
    * go away when it leaves the stack (rulings, CR 122.2).
    */
   | { type: "spellCounters"; counter: CounterKind; n: number }
+  /**
+   * Noxious Vapors (round B278): "Each player reveals their hand, chooses one card of each color from it, then discards all
+   * other nonland cards." (effects/run-laneb278.ts).
+   */
+  | { type: "keepOneOfEachColor" }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true; /** Helm of Kaldra (round 417): "Attach those Equipment to it": to the token just created (the first one), not the source. */ toCreated?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */

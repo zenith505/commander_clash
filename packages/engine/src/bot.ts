@@ -704,6 +704,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
     // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
     // Hollow Warrior (round B259): a cost to block, the same way.
+    // Noxious Vapors (round B278): the best cards of its hand that still fit one of each color (built greedily, as big as
+    // any: a transversal matroid), so a card is chosen for each color there's one left for.
+    if (pend.kind === "searchLibrary" && pend.keepColors && pend.oneOfEach) {
+      const found: string[] = [];
+      for (const id of [...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     // Land Equilibrium (round B278): the land worth least to it, the one just put there too.
     if (pend.kind === "pickPermanents" && pend.equilibrium) return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "sacrifice") }];
     if (pend.kind === "pickPermanents" && pend.blockCost) {

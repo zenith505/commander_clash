@@ -284,10 +284,10 @@ const MAX_UNBROKEN = 5000;
  * the game is a draw (CR 104.4b, 732.4). Any other choice (a spell, an ability, a target) starts the count again,
  * since a loop with an optional action isn't a draw (104.4b); no one is forced to break it either (732.5).
  */
-export function watchForMandatoryLoop(s: GameState, action: Action, allPassed: boolean) {
+export function watchForMandatoryLoop(s: GameState, action: Action, allPassed: boolean, /** A choice made within a mandatory action (Land Equilibrium's sacrifice), which doesn't start the count again. */ mandatoryChoice = false) {
   if (s.over) return;
   if (action.type !== "passPriority") {
-    s.loopWatch = undefined;
+    if (!mandatoryChoice) s.loopWatch = undefined;
     return;
   }
   // Only a full round of passing changes anything: the top of the stack resolved, or the step ended.

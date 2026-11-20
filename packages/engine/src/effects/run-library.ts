@@ -2576,7 +2576,7 @@ export function discardToTop(s: GameState, pid: PlayerId, ids: ObjectId[], src: 
 }
 
 /** discardToTop for each player of `who` in turn (APNAP, CR 101.4): "paused" while one of them chooses. */
-function discardToTopEach(s: GameState, chosen: Record<string, ObjectId[]>, who: PlayerId[], src: string, ctx: ResolveCtx): Record<string, ObjectId[]> | "paused" {
+export function discardToTopEach(s: GameState, chosen: Record<string, ObjectId[]>, who: PlayerId[], src: string, ctx: ResolveCtx): Record<string, ObjectId[]> | "paused" {
   const out: Record<string, ObjectId[]> = {};
   for (const pid of who) {
     const t = discardToTop(s, pid, chosen[pid] ?? [], src, ctx);

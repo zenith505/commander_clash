@@ -1,8 +1,9 @@
 // Lane B round B278 in the browser: Land Equilibrium (Ana controls it and no lands; you play your Forest, then click your
-// Mountain to sacrifice it, or the Forest just played).
+// Mountain to sacrifice it, or the Forest just played) and Noxious Vapors (you keep Lightning Helix and Lightning Bolt, one
+// card of each color, and discard Shivan Dragon).
 import { expect, test } from "@playwright/test";
-import { idsOf, open, pageErrors, scene, state } from "./scene";
-import { controls } from "./ui";
+import { LANDS, idsOf, one, open, pageErrors, scene, state } from "./scene";
+import { card, controls, modal, resolveUntil } from "./ui";
 import type { GameState } from "@cc/engine";
 
 /** The state once `done` holds (polled), kept: no second read after it. */
@@ -39,5 +40,26 @@ test("Land Equilibrium: you may sacrifice the Forest you just played", async ({ 
   await controls(page).getByRole("button", { name: "Sacrifice", exact: true }).click();
   const after = await settled(page, (x) => !x.pending && x.objects[forest]!.zone === "graveyard");
   expect(after.objects[mountain]!.zone).toBe("battlefield");
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Noxious Vapors: you keep Lightning Helix (white) and Lightning Bolt (red) and discard Shivan Dragon", async ({ page }) => {
+  const s = scene({ hand: ["Noxious Vapors", "Lightning Helix", "Lightning Bolt", "Shivan Dragon"], board: LANDS }, [{ hand: ["Grizzly Bears"] }]);
+  const [vapors, helix, bolt, dragon, bears] = [one(s, "Noxious Vapors"), one(s, "Lightning Helix"), one(s, "Lightning Bolt"), one(s, "Shivan Dragon"), one(s, "Grizzly Bears")];
+  await open(page, s);
+  await card(page, "Noxious Vapors", s).click();
+  await resolveUntil(page, (x) => x.pending?.kind === "searchLibrary" && x.pending.player === 0);
+  const pick = modal(page);
+  await expect(pick).toContainText("Noxious Vapors: choose one card of each color (a multicolored card for one of its colors) from your hand to keep; you discard your other nonland cards");
+  await expect(pick).toContainText("Your hand");
+  await pick.locator(`[data-pick="${helix}"]`).click();
+  await pick.locator(`[data-pick="${bolt}"]`).click();
+  await pick.getByRole("button", { name: "Keep 2" }).click();
+  const after = await resolveUntil(page, (x) => x.stack.length === 0 && !x.pending && x.objects[vapors]!.zone === "graveyard");
+  expect(after.objects[helix]!.zone).toBe("hand");
+  expect(after.objects[bolt]!.zone).toBe("hand");
+  expect(after.objects[dragon]!.zone).toBe("graveyard");
+  // Ana's only colored card is kept without a question.
+  expect(after.objects[bears]!.zone).toBe("hand");
   expect(pageErrors(page)).toEqual([]);
 });

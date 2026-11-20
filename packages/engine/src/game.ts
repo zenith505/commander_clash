@@ -399,6 +399,9 @@ export function applyInPlace(s: GameState, action: Action): void {
   let manaAbility = false;
   const expected = waitingOn(s);
   if (action.player !== expected) throw new RulesError(`waiting on player ${expected}, not ${action.player}`);
+  // Land Equilibrium (round B278): which land to sacrifice is a choice within a mandatory action, not an optional action
+  // (CR 104.4b): it doesn't break a loop of mandatory actions (with Sacred Ground's return, say).
+  const mandatoryChoice = s.pending?.kind === "pickPermanents" && !!s.pending.equilibrium;
   // Tezzeret, Betrayer of Flesh: whether this activates an ability of an artifact on the battlefield, as it's activated.
   const artifactAbility = artifactAbilityKind(s, action);
   // A mana ability paying for the next ability, which is begun first (rulings): it doesn't take the reduction.
@@ -573,7 +576,7 @@ export function applyInPlace(s: GameState, action: Action): void {
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
   if (artifactAbility.kind !== "none" || s.turnLog?.artifactAbility?.[p.id] === "mana") noteArtifactAbility(s, p.id, artifactAbility.artifact, artifactAbility.kind);
   afterAction(s, action.type === "activateMana" || manaAbility);
-  watchForMandatoryLoop(s, action, allPassed);
+  watchForMandatoryLoop(s, action, allPassed, mandatoryChoice);
 }
 
 /** The kind of ability `action` activates, and whether its source is an artifact on the battlefield (CR 109.2), for noteArtifactAbility. */

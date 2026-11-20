@@ -29108,6 +29108,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "800c258a-cfc4-4a54-a667-065ea8dea69e",
+  "name": "Lightning Helix",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Lightning Helix deals 3 damage to any target and you gain 3 life.",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2c0fceb6-d92d-4f4a-85a2-0af5be5bba81",
   "name": "Lightning Storm",
   "manaCost": "{1}{R}{R}",
@@ -34378,6 +34406,32 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "cd16634e-b894-4cff-9d5b-408932863c1f",
+  "name": "Noxious Vapors",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player reveals their hand, chooses one card of each color from it, then discards all other nonland cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pls",
+  "releasedAt": "2001-02-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "cb75aca6-dfc7-460d-b90c-80b7988f39a8",

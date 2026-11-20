@@ -1,6 +1,6 @@
 # Roadmap
 
-31,797 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,801 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,942 of
 9,979 (99%).
 
@@ -11563,6 +11563,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B278 (least played first, from the Lane B skip lists, neither in Lane A's rounds 428-430): Land Equilibrium's "If
+  an opponent who controls at least as many lands as you do would put a land onto the battlefield, that player instead puts
+  that land onto the battlefield then sacrifices a land of their choice." (a replacement effect, CR 614.1a: a land as it
+  would exist there, CR 614.12, put there by that opponent, by playing it or by a spell or ability, under anyone's control,
+  rulings, GameObject.putter; the lands counted before it enters, lands entering together counted before them all; one
+  sacrifice for each Land Equilibrium that applies, CR 614.5, of any land that player controls, the new one too, rulings;
+  made right after the instruction or action that put it there, game.ts equilibriumOwed / equilibriumSacrifices; the
+  sacrifice is caused by Land Equilibrium's controller, for Sacred Ground). Noxious Vapors' "Each player reveals their
+  hand, chooses one card of each color from it, then discards all other nonland cards." (each reveals, CR 701.20a, then
+  chooses in APNAP order, CR 101.4, a different card for each color, a multicolored card counting for whichever one of
+  its colors its player picks, and a card for each color there's one left for, as the rulings on Conflux and Selective
+  Adaptation read "a white card, a blue card, ..." and "a card with flying, a card with first strike, and so on"; a green
+  land card may be the green card; then all discard their other nonland cards at once, CR 701.9b; Effect
+  keepOneOfEachColor, run-laneb278.ts). Bots sacrifice the land worth least to them and keep their best cards that fit one
+  of each color. Browser tests click through sacrificing your Mountain or the Forest just played, and keeping Lightning
+  Helix and Lightning Bolt while Shivan Dragon is discarded. +2, 31,801 of 31,936 on B277's branch (with main through
+  B276). The compiled text of every other card is unchanged.
+- Out after round B278 (looked at, not done): the lists after round B277 stay out. Swirl the Mists stays out: its text
+  change reaches every spell and permanent, and 65 lines of supported cards are read as whole fixed sentences, so with
+  their color words changed they'd stop working (Defilers' "C permanent spells", the Mimics' "both C and C", Mangara's
+  Equity, Specter's Shriek and others); each of those needs reading with any color word first. Word of Command stays out
+  (another player plays a card while you control them, with only their lands' mana). Judgment calls and known gaps: a
+  land put onto the battlefield partway through a mana ability waits for Land Equilibrium's sacrifice until that ability
+  is done; Land Equilibrium and Sacred Ground together make a loop no one can stop (a draw, CR 104.4b): the choice of
+  land doesn't restart the loop's count, but the counts of cards put into graveyards this turn change each time round, so
+  the draw comes only after shortcuts.ts MAX_UNBROKEN resolutions (no shortcut offered). Next in line
+  (not looked at closely yet): Chorus of the Conclave, Emblazoned Golem, Guardian Beast, from the earlier skip lists.
 - Round B277 (least played first, two of the three cards round B276 named next in line, neither in Lane A's rounds
   428-429): Lightning Storm's "Discard a land card: Put two charge counters on Lightning Storm. You may choose a new target
   for it. Any player may activate this ability but only if Lightning Storm is on the stack." (an ability of the spell that

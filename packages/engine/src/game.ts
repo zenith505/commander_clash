@@ -13055,6 +13055,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "breachReturn") {
+    // Dimensional Breach (round B274): the exiled card returned to the battlefield.
+    const st = r.scratch?.breachReturn;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "spellDamageBack") {
     // Backdraft (round B229): the player and the spell's damage.
     const st = r.scratch?.spellDamageBack;

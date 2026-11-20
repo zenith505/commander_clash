@@ -12950,6 +12950,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "70d4f764-fca1-477a-9b0f-bbfcc1f7dfb1",
+  "name": "Dimensional Breach",
+  "manaCost": "{5}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile all permanents. For as long as any of those cards remain exiled, at the beginning of each player's upkeep, that player returns one of the exiled cards they own to the battlefield.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "scg",
+  "releasedAt": "2003-05-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "52d14717-0cbc-4d7e-b546-54ea91580338",
   "name": "Dimir Guildgate",
   "manaCost": "",
@@ -33789,6 +33815,36 @@
   "commanderLegal": "legal",
   "set": "tdm",
   "releasedAt": "2025-04-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5b079914-1302-40b5-8060-7c3e5b6e9eae",
+  "name": "Next of Kin",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nWhen enchanted creature dies, you may put a creature card you own with lesser mana value from your hand or from the command zone onto the battlefield. If you do, return this card to the battlefield attached to that creature at the beginning of the next end step.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

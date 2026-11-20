@@ -4762,6 +4762,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand${pending.revealFor !== undefined ? `; ${pending.revealFor === HUMAN ? "you choose" : `${s.players[pending.revealFor]!.name} chooses`} one of them for you to discard` : ""}`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
+                : pending.fromHand && pending.keepColors
+                ? `${pending.source}: choose ${pending.what} from your hand to keep; you discard your other nonland cards`
                 : pending.fromHand && pending.handFor !== undefined
                 ? `${pending.source}: choose ${pending.what}`
                 : pending.fromHand && pending.shuffle
@@ -4852,7 +4854,7 @@ function LibrarySearch({
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min || (!!pending.pairsPerYard && !evenPerYard(s, found)) || (!!pending.exactly && found.length > 0 && found.length !== pending.max) || (!!pending.cardTypes && found.length > 0 && cardTypesAmong(s, found) < pending.cardTypes) || (!!pending.oneOfEach && !!pending.oneOfEachAll && !oneOfEachAllFits(pending.oneOfEach, found.map((id) => cardOf(s, id)), pending.cards.filter((id) => !found.includes(id)).map((id) => cardOf(s, id))))} onClick={() => onDone(found)}>
-            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : pending.shuffle ? (found.length ? "Shuffle in" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.keepColors ? (found.length ? `Keep ${found.length}` : "Keep none") : pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : pending.shuffle ? (found.length ? "Shuffle in" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">
@@ -5600,6 +5602,12 @@ function Controls({
           ) : transformed ? (
             <>
               <strong>{pending.source}:</strong> it&apos;s defeated. Cast <strong>{s.cards[registerFace(s, o, 1)]!.name}</strong> transformed without paying its mana cost? If you don&apos;t, it stays in exile.
+            </>
+          ) : pending.hasteEot ? (
+            <>
+              {/* Alaundo the Seer (round B279): the trigger the exiled card gained from it. */}
+              <strong>{d.name}:</strong> the last time counter is gone. Cast it without paying its mana cost?
+              {isType(d, "Creature") ? " It gains haste until end of turn." : ""} If you don&apos;t, it stays in exile.
             </>
           ) : pending.how === "suspend" ? (
             <>

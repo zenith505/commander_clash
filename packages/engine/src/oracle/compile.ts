@@ -33,6 +33,8 @@ import { roundB274Line } from "./laneb274-lines";
 import { roundB275Line } from "./laneb275-lines";
 import { roundB276Line } from "./laneb276-lines";
 import { roundB277Line } from "./laneb277-lines";
+import { roundB278Line } from "./laneb278-lines";
+import { roundB279Line } from "./laneb279-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2478,6 +2480,10 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB276Line(line, out, isSpell)) continue;
     // Lightning Storm, Sacred Ground (round B277).
     if (roundB277Line(line, out, isSpell)) continue;
+    // Land Equilibrium (round B278).
+    if (roundB278Line(line, out, isSpell)) continue;
+    // Emblazoned Golem, Alaundo the Seer (round B279).
+    if (roundB279Line(line, out, isSpell, d)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

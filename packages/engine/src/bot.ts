@@ -609,6 +609,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = player(s, pid).hand.filter((id) => defOf(s, obj(s, id)).types.includes("Creature")).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
       if (best) return [{ type: "discard", player: pid, objectIds: [best] }];
     }
+    // Alaundo the Seer (round B279): the card comes back free once its time counters (its mana value) are gone, a counter a
+    // turn: the cheapest card with a mana value, not a land or a 0 (which never come back) while there is one.
+    const atHand = pend.kind === "discard" && pend.exile && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "discard" && atHand?.type === "discard" && atHand.alaundoMv && pend.count === 1) {
+      const hand = player(s, pid).hand.filter((id) => !pend.filter || printedMatches(pend.filter, defOf(s, obj(s, id))));
+      const best = hand.filter((id) => !isType(defOf(s, obj(s, id)), "Land") && defMv(defOf(s, obj(s, id))) > 0).sort((a, b) => defMv(defOf(s, obj(s, a))) - defMv(defOf(s, obj(s, b))) || defWorth(defOf(s, obj(s, b))) - defWorth(defOf(s, obj(s, a))))[0];
+      if (best) return [{ type: "discard", player: pid, objectIds: [best] }];
+    }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo, pend.among) }];
     // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
     // that wants the graveyard (madness, flashback and the like).
@@ -704,6 +712,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
     // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
     // Hollow Warrior (round B259): a cost to block, the same way.
+    // Noxious Vapors (round B278): the best cards of its hand that still fit one of each color (built greedily, as big as
+    // any: a transversal matroid), so a card is chosen for each color there's one left for.
+    if (pend.kind === "searchLibrary" && pend.keepColors && pend.oneOfEach) {
+      const found: string[] = [];
+      for (const id of [...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
+    // Land Equilibrium (round B278): the land worth least to it, the one just put there too.
+    if (pend.kind === "pickPermanents" && pend.equilibrium) return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "sacrifice") }];
     if (pend.kind === "pickPermanents" && pend.blockCost) {
       const rest = s.blockCostsDue?.costs.slice(1) ?? [];
       const declared = [...new Set((s.blockCostsDue?.blocks ?? []).map((b) => b.blocker))];
@@ -2724,7 +2741,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
       // Koh, the Face Stealer (round 399): its card chosen before combat, so a borrowed attack ability works this turn.
       // Valki, God of Lies (round 408): its copy before combat too.
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard" || e.type === "becomeCopyOfLinkedX")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Alaundo the Seer (round B279): a card and a time counter a turn, rather than attacking with it.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard" || e.type === "becomeCopyOfLinkedX" || e.type === "timeCounterFromOwnExiled")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -4589,6 +4607,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   const kickX = compileCard(d).kicker?.costs.find((c) => parseManaCost(c).hasX);
   if (!cost.hasX && kickX && !via && !alt) {
     xs = [...xChoices(availableMana(s, pid) - totalWithoutX(s, pid, id) - manaValue(parseManaCost(kickX)), xCount(parseManaCost(kickX))), undefined];
+    // Emblazoned Golem (round B279): X is one mana of each of that many colors, so no more than 5 (or what reductions take
+    // off beyond that), the biggest that can be paid first.
+    if (compileCard(d).kickXOneOfEachColor) {
+      const most = Math.min(5 + Math.max(0, manaValue(parseManaCost(d.manaCost)) - totalWithoutX(s, pid, id)), availableMana(s, pid) - totalWithoutX(s, pid, id));
+      xs = [...Array.from({ length: Math.max(0, most) }, (_, i) => most - i), undefined];
+    }
     // "Target artifact with mana value X or less" as it enters: no more X than the best one an opponent has needs.
     const spec = compileCard(d).triggers.find((t) => t.event === "selfEnters")?.body.targets.find((t) => t.kind === "object" && t.xRange?.key === "manaValue" && t.xRange.at === "most");
     if (spec) {

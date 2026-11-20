@@ -1067,6 +1067,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1e048c15-50d6-4313-880a-e04348952a51",
+  "name": "Alaundo the Seer",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Shaman",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Shaman"
+  ],
+  "oracleText": "{T}: Draw a card, then exile a card from your hand and put a number of time counters on it equal to its mana value. It gains \"When the last time counter is removed from this card, if it's exiled, you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn.\" Then remove a time counter from each other card you own in exile.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d5c4d36c-54b3-4149-906b-a57a670260fc",
   "name": "Alhammarret's Archive",
   "manaCost": "{5}",
@@ -15296,6 +15331,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fbeafc81-1ddb-4b54-8f86-e6afd5f81db8",
+  "name": "Emblazoned Golem",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "Kicker {X} (You may pay an additional {X} as you cast this spell.)\nSpend only colored mana on X. No more than one mana of each color may be spent this way.\nIf this creature was kicked, it enters with X +1/+1 counters on it.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Kicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0eecdfb3-3b05-4051-a660-060ff6df80ef",
   "name": "Emergent Ultimatum",
   "manaCost": "{B}{B}{G}{G}{G}{U}{U}",
@@ -28163,6 +28227,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a3711453-b17d-4b1c-b726-9b41f36d07ab",
+  "name": "Land Equilibrium",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If an opponent who controls at least as many lands as you do would put a land onto the battlefield, that player instead puts that land onto the battlefield then sacrifices a land of their choice.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e36f4649-934d-4e8a-bd5f-39f164ea6937",
   "name": "Land Grant",
   "manaCost": "{1}{G}",
@@ -29212,6 +29302,34 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "800c258a-cfc4-4a54-a667-065ea8dea69e",
+  "name": "Lightning Helix",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Lightning Helix deals 3 damage to any target and you gain 3 life.",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -34570,6 +34688,32 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "cd16634e-b894-4cff-9d5b-408932863c1f",
+  "name": "Noxious Vapors",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player reveals their hand, chooses one card of each color from it, then discards all other nonland cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pls",
+  "releasedAt": "2001-02-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "cb75aca6-dfc7-460d-b90c-80b7988f39a8",

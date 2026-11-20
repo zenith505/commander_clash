@@ -643,7 +643,17 @@ export function log(s: GameState, text: string, to?: PlayerId) {
 
 /** What a CastPay has its caster pay, as the card says it: "by discarding a card", "by paying life equal to its mana value". */
 export function castPayText(pay: CastPay): string {
-  return pay.kind === "discard" ? `by discarding ${pay.n === 1 ? "a card" : `${pay.n} cards`}` : pay.kind === "lifeMv" ? "by paying life equal to its mana value" : pay.kind === "energyMv" ? "by paying {E} equal to its mana value" : `by paying ${pay.mana}`;
+  return pay.kind === "discard" ? `by discarding ${pay.n === 1 ? "a card" : `${pay.n} cards`}` : pay.kind === "lifeMv" ? "by paying life equal to its mana value" : pay.kind === "energyMv" ? "by paying {E} equal to its mana value" : pay.kind === "suspendCost" ? "by paying its suspend cost" : pay.suspend ? `by paying its suspend cost ${pay.mana}` : `by paying ${pay.mana}`;
+}
+
+/**
+ * The CastPay a castFree decision offers for this card: The Face of Boe's "pay its suspend cost rather than its mana cost"
+ * (round 431) is the card's own suspend cost (CompiledCard.suspend), its X at least 1 for a "Suspend X" card.
+ */
+export function castPayFor(s: GameState, pay: CastPay, id: ObjectId): CastPay {
+  if (pay.kind !== "suspendCost") return pay;
+  const sp = compileCard(defOf(s, obj(s, id))).suspend;
+  return sp ? { kind: "mana", mana: sp.cost, suspend: true, ...(sp.x ? { xMin: 1 } : {}) } : pay;
 }
 
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
@@ -6103,7 +6113,7 @@ function linkedFlash(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted"> & { life?: true; /** Draugr Necromancer (round B270): mana from snow sources as though it were mana of any color. */ snowAny?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "anyColor" | "colorlessAny" | "free" | "orPay" | "cost" | "more" | "less" | "affinity" | "undaunted" | "waterbend"> & { life?: true; /** Draugr Necromancer (round B270): mana from snow sources as though it were mana of any color. */ snowAny?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
   return how === "anyType" ? { anyType: true } : how === "anyColor" ? { anyColor: true } : how === "life" ? { life: true } : how === "snowAny" ? { snowAny: true } : how === "plain" || linkedPlayGrant(s, o, pid) >= 0 ? {} : undefined;
@@ -6288,6 +6298,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // "During your next turn" (Galvanic Relay): not the turn it was exiled (rulings).
   if (m.until === "duringNextTurn" && !(s.activePlayer === pid && s.turn > m.turn)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
+  // Hama, the Bloodbender (round 431): "during your turn".
+  if (m.yourTurnOnly && s.activePlayer !== pid) return false;
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   if (m.attackedWithCommander && s.players[pid]?.commanderAttackedTurn !== s.turn) return false;
@@ -7674,6 +7686,10 @@ export function castProblem(
   // Light Up the Night: "If you cast this spell this way, X can't be 0" (CastFromGraveyard.xMin). Without an X yet, the
   // question is whether it could be cast this way (castSpell holds a cast to it, X left out being 0).
   if (via?.xMin && x !== undefined && x < via.xMin) return "X can't be 0";
+  // The Face of Boe (round 431): a card cast for its suspend cost has to have one; "Suspend X—... X can't be 0." holds.
+  const suspendPay = free && s.pending?.kind === "castFree" ? s.pending.pay : undefined;
+  if (suspendPay?.kind === "suspendCost") return `${d.name} has no suspend cost`;
+  if (suspendPay?.kind === "mana" && suspendPay.xMin && x !== undefined && x < suspendPay.xMin) return "X can't be 0";
   // Mind Grind: "X can't be 0", so it can't be cast without paying its mana cost either (rulings, CR 107.3b).
   if (manaX && !costX && (x ?? 0) < (compileCard(d).xMin ?? 0)) return "X can't be 0";
   // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
@@ -8256,8 +8272,9 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
   }
   if (how.waterbend?.length) {
     // Waterbend as an additional cost (CR 701.67a): up to the waterbend cost's own generic mana, if it's being paid.
+    // Hama, the Bloodbender (round 431): or the waterbend cost paid rather than its mana cost, from exile.
     const k = compileCard(d).kicker;
-    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? (k.waterbend === "X" ? (x ?? 0) : k.waterbend) : 0;
+    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? (k.waterbend === "X" ? (x ?? 0) : k.waterbend) : exileWaterbendCap(s, pid, o, how);
     if (!cap) return `${d.name} has no waterbend cost being paid`;
     const problem = castWaterbendProblem(s, pid, how.waterbend, cap, [...(convoke ?? []), ...(improvise ?? []), ...(how.tap ?? []), ...(how.teamwork ?? []), ...(how.conspire ?? []), ...(how.harmonize !== undefined ? [how.harmonize] : []), ...(how.sacrifice ?? [])]);
     if (problem) return problem;
@@ -8281,6 +8298,23 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     ({ cost, extra } = reduced);
   }
   return { cost, extra };
+}
+
+/**
+ * Hama, the Bloodbender (round 431): cast from exile "by waterbending {X} rather than paying its mana cost": the generic
+ * mana in that waterbend cost, which is how many artifacts and creatures may be tapped for it (CR 701.67a; rulings: not
+ * more, whatever raises the total cost). 0 when the spell isn't being cast that way.
+ */
+export function exileWaterbendCap(s: GameState, pid: PlayerId, o: GameObject, how: CostChoices = {}): number {
+  const cost = exileWaterbendCost(s, pid, o, how);
+  return cost ? parseManaCost(cost).symbols.reduce((n, y) => n + (y.kind === "generic" ? y.amount : 0), 0) : 0;
+}
+
+/** The waterbend cost a spell is cast for from exile (Hama, the Bloodbender), or undefined when it isn't cast that way. */
+export function exileWaterbendCost(s: GameState, pid: PlayerId, o: GameObject, how: CostChoices = {}): string | undefined {
+  if (how.via || how.alt || how.faceDown || freeCastOf(s, pid) === o.id || o.zone !== "exile") return undefined;
+  const ex = exilePermission(s, o, pid);
+  return ex?.waterbend ? ex.cost : undefined;
 }
 
 /** Artifacts and creatures tapped to waterbend as a spell is cast: untapped ones you control, each once, no more than `cap` (CR 701.67a). */
@@ -8891,6 +8925,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Light Up the Night cast with its flashback: X left out is 0, which it can't be (CastFromGraveyard.xMin).
   const xMinVia = choices.via ? graveyardWay(s, o, choices.via, p.id)?.xMin : undefined;
   if (xMinVia && (x ?? 0) < xMinVia) throw new RulesError("X can't be 0");
+  // The Face of Boe (round 431): "Suspend X—... X can't be 0." for its suspend cost, X left out being 0.
+  const suspendPayX = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id && s.pending.pay?.kind === "mana" ? s.pending.pay.xMin : undefined;
+  if (suspendPayX && (x ?? 0) < suspendPayX) throw new RulesError("X can't be 0");
   // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
   // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
   const unpicked = castExtraCosts(d, { ...choices, objectId: id, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);
@@ -8944,6 +8981,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "Whenever you waterbend": its waterbend cost paid, however (Avatar Aang's rulings, CR 701.67a), round 427.
   const wk = compileCard(d).kicker;
   if (wk?.waterbend !== undefined && (wk.required || choices.kicks?.includes(0))) bent(s, p.id, "water");
+  // Hama, the Bloodbender (round 431): cast from exile by waterbending rather than paying its mana cost.
+  else if (exileWaterbendCost(s, p.id, o, choices) !== undefined) bent(s, p.id, "water");
   // The Dragons of Tarkir reveal cycle: controlling a Dragon as it's finished being cast counts the same as revealing one
   // (rulings), with nothing revealed; a copy doesn't get that (StackItem.kickedByControl).
   const ifControl = compileCard(d).kicker?.ifControl;

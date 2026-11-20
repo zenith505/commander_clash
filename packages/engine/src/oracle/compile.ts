@@ -191,6 +191,7 @@ import { round427Line } from "./round427";
 import { round428Line } from "./round428";
 import { round429Line } from "./round429";
 import { round430Line } from "./round430";
+import { round431Line } from "./round431";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1076,6 +1077,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 431: oracle/round431.ts.
+    if (round431Line(line, raw, out, isSpell)) continue;
     // Round 430: oracle/round430.ts.
     if (round430Line(line, raw, out, isSpell)) continue;
     // Round 429: oracle/round429.ts.
@@ -8308,7 +8311,7 @@ function linkExile(out: CompiledCard) {
   // Kaho, Minamo Historian; Jeleva, Nephalia's Scourge; Shell of the Last Kappa: "cast a spell from among cards exiled
   // with ~" as it resolves: the cards its one exile instruction exiled (CR 607.2a): Kaho's search, Jeleva's "each player
   // exiles the top X cards", Shell's exiled spell.
-  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted && !e.evidenceLinked) || e.type === "playLinkedThisTurn"))) {
+  if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted && !e.evidenceLinked && !e.escapeLinked) || e.type === "playLinkedThisTurn"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);

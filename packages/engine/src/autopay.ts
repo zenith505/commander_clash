@@ -5,7 +5,7 @@ import { addedAbilityCosts, addedSpellCosts, anyAddedCosts, anyAddedSacrifice } 
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilityCostOf, withManaTax, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax, piracyTap, PIRACY_SPEND } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { payableShields, payShieldProblem } from "./pay-shields";
-import { abilityProblem, beholdTypeFor, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, exileWaterbendCap, beholdTypeFor, costIsPaid, spellHow, definedX, definedCastX, firstArtifactLess, lessWaterbend, waterbendCap, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, payableDelayed, payDelayedProblem, ignorableBy, ignoreEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, sylexed, suspendProblem, plotProblem, plotCost, foretellProblem, foretellActionCost, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -428,6 +428,13 @@ export function planCast(
   const wk = compileCard(d).kicker;
   if (wk?.waterbend !== undefined && (wk.required || choices.kicks?.includes(0)) && !choices.waterbend?.length) {
     const wb = autoWaterbend(s, pid, cost, extra, wk.waterbend === "X" ? (x ?? 0) : wk.waterbend, [...sacrificedTargets(s, targets), ...targetIds, ...tapping, ...(choices.tap ?? [])], use);
+    const c = cast([])[0]!;
+    if (wb && c.type === "castSpell") return [...wb.taps, { ...c, waterbend: wb.tapped }];
+  }
+  // Hama, the Bloodbender (round 431): cast from exile by waterbending {X} rather than paying its mana cost.
+  const exileBend = wk?.waterbend === undefined && !choices.waterbend?.length ? exileWaterbendCap(s, pid, o, choices) : 0;
+  if (exileBend) {
+    const wb = autoWaterbend(s, pid, cost, extra, exileBend, [...sacrificedTargets(s, targets), ...targetIds, ...tapping, ...(choices.tap ?? [])], use);
     const c = cast([])[0]!;
     if (wb && c.type === "castSpell") return [...wb.taps, { ...c, waterbend: wb.tapped }];
   }

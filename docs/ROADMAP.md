@@ -4359,7 +4359,7 @@ line blocks.
    rulings) and its back face's "Spells you cast cost {W}{U}{B}{R}{G} less to cast." (each color, or {1} once the cost has
    none of it, CR 118.7b-c, CostMod coloredOrGenericEach) and "At the beginning of each upkeep, you may transform Aang,
    Master of Elements. If you do, ..." (the same object after transforming, CR 712.18). A browser test clicks through
-   Blitzball's attach choice. +3, 31,787 of 31,936 on this stacked branch (round 426 #699, with main 06f3efa, Lane B B268-B271, in it); the compiled text of every
+   Blitzball's attach choice. +3, 31,791 of 31,936 with main 8391ce7 (rounds 426 and B268-B273) merged in; the compiled text of every
    other card is unchanged but the 35 firebending and airbend cards, which only gained the `firebending` or `airbend`
    flag.
    Out after round 427 (looked at, not done): Wayta, Trainer Prodigy (its "a creature you control being dealt damage

@@ -2832,6 +2832,10 @@ function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
   const by = o.damagedBy ?? [];
   // Etching of Kumano: who controlled each source as it dealt `o` damage this turn.
   const dealt = s.turnLog?.damageDealtTo?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? [];
+  // Runesword (round B276): "If a creature dealt damage by the targeted creature would die this turn, exile that creature
+  // instead" (CR 614.1a), damage from the target as that object (CR 400.7), whether or not Runesword is still around.
+  const marks = s.turnLog?.runesword ?? [];
+  if (marks.length && dealt.some((d) => (!!d.src && marks.includes(d.src)) || (!!d.srcWas && marks.includes(d.srcWas)))) return true;
   for (const id of s.battlefield) {
     const w = obj(s, id);
     const how = abilitiesOf(s, w).exileWhatItDamaged;
@@ -2978,6 +2982,11 @@ export function endWhileTapped(s: GameState): boolean {
 /** Whether a round 396 "for as long as" copy duration still holds (CR 611.2b; a phased-out permanent can't be seen, 702.26f). */
 export function copyWhileHolds(s: GameState, w: CopyWhile): boolean {
   if ("whileTapped" in w) return whileTappedHolds(s, w.whileTapped);
+  // Secret Invasion (round B276): until that permanent leaves the battlefield; phasing out isn't leaving it (CR 702.26d).
+  if ("untilLeaves" in w) {
+    const o = s.objects[w.untilLeaves.id];
+    return !!o && (o.zone === "battlefield" || o.zone === "phasedOut") && (o.zoneChanges ?? 0) === w.untilLeaves.zc;
+  }
   const { id, zc, host, hostZc } = w.whileAttached;
   const a = s.objects[id];
   const h = s.objects[host];
@@ -3104,10 +3113,12 @@ export function damagedNoRegen(s: GameState): Set<ObjectId> {
   const dealt = s.turnLog?.damageDealtTo;
   if (!dealt) return out;
   const shamans = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).damagedCantRegenerate).map((id) => `${id}@${obj(s, id).zoneChanges ?? 0}`));
-  if (!shamans.size) return out;
+  // Runesword (round B276): "the creature dealt damage can't be regenerated this turn", damage from the target as that object.
+  const marks = new Set(s.turnLog?.runesword ?? []);
+  if (!shamans.size && !marks.size) return out;
   for (const id of s.battlefield) {
     const o = obj(s, id);
-    if (objIsType(s, o, "Creature") && (dealt[`${id}@${o.zoneChanges ?? 0}`] ?? []).some((d) => !!d.src && shamans.has(d.src))) out.add(id);
+    if (objIsType(s, o, "Creature") && (dealt[`${id}@${o.zoneChanges ?? 0}`] ?? []).some((d) => (!!d.src && (shamans.has(d.src) || marks.has(d.src))) || (!!d.srcWas && marks.has(d.srcWas)))) out.add(id);
   }
   return out;
 }

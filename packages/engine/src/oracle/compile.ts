@@ -169,6 +169,7 @@ import { round405Line } from "./round405";
 import { round406Line } from "./round406";
 import { round407Line } from "./round407";
 import { linkTibaltExiles, round408Line } from "./round408";
+import { linkRound433 } from "./round433";
 import { round409Line } from "./round409";
 import { round410Line } from "./round410";
 import { round411Line } from "./round411";
@@ -7943,6 +7944,8 @@ const castsTheExiled = new WeakSet<CompiledCard>();
 function linkExile(out: CompiledCard) {
   // Tibalt, Cosmic Impostor (round 408): its emblem plays the cards all its exile abilities exiled (oracle/round408.ts).
   linkTibaltExiles(out);
+  // The Creation of Avacyn (round 433): its chapters' "the exiled card" (oracle/round433.ts).
+  linkRound433(out);
   // Kylox's Voltstrider (round 401): "cards exiled with it" are those its one "Collect evidence N:" cost exiled (CR 607.2a),
   // with no other exile instruction on the card.
   const bodies0 = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];

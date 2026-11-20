@@ -11295,7 +11295,9 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
 const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   // Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant."
   (!!o && (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === true || (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === "enteredThisTurn" && o.enteredTurn === s.turn))) ||
-  [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
+  [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed) ||
+  // Jace's Machinations (round 433): this turn, for its controller's planeswalkers of that subtype as they are now.
+  (!!o && !!s.turnLog?.loyaltyAtInstantSpeed?.some((g) => g.player === pid && controllerOf(s, o) === pid && objIsType(s, o, "Planeswalker") && characteristics(s, o).subtypes.includes(g.subtype)));
 
 /**
  * Spoils of War: the X a spell's own text sets as it's cast (CR 107.3c), from the opponent chosen then (CostChoices.xOpponent):

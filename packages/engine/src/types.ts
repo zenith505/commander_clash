@@ -2089,6 +2089,8 @@ export interface TurnLog {
   linkedSpellOnce?: string[];
   /** Lara Croft, Tomb Raider (round 432, Effect playCounteredThisTurn): each permission to play one card from exile with this kind of counter on it this turn, `used` once a card was played with it. */
   playCounteredGrants?: { player: PlayerId; counter: string; used?: true }[];
+  /** Jace's Machinations (round 433, Effect loyaltyAtInstantThisTurn): players who may activate loyalty abilities of their planeswalkers of this subtype any time they could cast an instant, on any player's turn, this turn. */
+  loyaltyAtInstantSpeed?: { player: PlayerId; subtype: string }[];
   /** Predatory Focus: the players whose creatures assign their combat damage this turn as though they weren't blocked (CR 510.1c). */
   unblockedDamage?: PlayerId[];
   /** Power Surge: the untapped lands the active player controlled as this turn began, before its untap step (CR 502.3); left out when none. */
@@ -3494,6 +3496,8 @@ export interface Resolving {
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
+    /** The Creation of Avacyn (round 433, Effect linkedCreatureOrHand): the linked cards as they were when it began, the ones that may be put onto the battlefield, and whether that is done. */
+    avacyn?: { cards: { id: ObjectId; zc: number }[]; put: ObjectId[]; entered?: true };
     /** A "you may" declined whose `otherwise` asks another "you may" (Gathering Stone): that one's text, while it's asked. */
     mayOtherwise?: string;
     /** Scholar of New Horizons (Effect search `mayInstead`): asked whether the found card goes there instead (the answer is `may`). */

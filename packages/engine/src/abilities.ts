@@ -6134,6 +6134,25 @@ export type Effect =
    */
   | { type: "playCounteredThisTurn"; counter: CounterKind }
   /**
+   * Jace's Machinations (round 433): "Until end of turn, you may activate loyalty abilities of Jace planeswalkers you control
+   * on any player's turn any time you could cast an instant.": for the spell's controller this turn (TurnLog
+   * loyaltyAtInstantSpeed), still one loyalty ability of each permanent each turn (CR 606.3, rulings).
+   */
+  | { type: "loyaltyAtInstantThisTurn"; subtype: string }
+  /**
+   * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
+   * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
+   * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).
+   */
+  | { type: "linkedFaceUpLoseLife" }
+  /**
+   * The Creation of Avacyn (round 433), chapter III: "You may put the exiled card onto the battlefield if it's a creature
+   * card. If you don't put it onto the battlefield, put it into its owner's hand.": if any linked card still in exile is a
+   * creature card (a face-down one has no characteristics, CR 406.3a), its controller may put all the permanent cards among
+   * them onto the battlefield; every other one goes to its owner's hand (rulings).
+   */
+  | { type: "linkedCreatureOrHand" }
+  /**
    * Allure of the Unknown (round 420): "Reveal the top six cards of your library. An opponent exiles a nonland card from
    * among them, then you put the rest into your hand. That opponent may cast the exiled card without paying its mana
    * cost.": the opponent chosen as it resolves (CR 608.2d), who picks; cast by them as this resolves or never (rulings,

@@ -271,6 +271,11 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
   // Myrkul, Lord of Bones: "except it's an enchantment and loses all other card types": its only card type, keeping its
   // supertypes and enchantment subtypes (CR 205.1a, as for Machine God's Effigy below).
   if (/^it's an enchantment and (?:it )?loses all other card types$/.test(text)) return { setTypes: ["Enchantment"] };
+  // The Eleventh Hour (round 433): "except it's a legendary Alien named Prisoner Zero": a name of its own (its text's
+  // references to itself by name still mean itself, CR 201.5), legendary (its other supertypes kept, as Benthic Anomaly's
+  // rulings), its card types kept and that creature type instead of every subtype it had, Vehicle too (rulings).
+  const named = /^it's a legendary ([A-Z][a-z]+) named ([A-Z][a-z]+(?: [A-Z][a-z]+)*)$/.exec(text);
+  if (named) return CREATURE_TYPES.has(named[1]!) ? { legendary: true, setSubtypes: [named[1]!], allSubtypes: true, name: named[2]! } : null;
   // Quoted abilities first, so commas inside them don't split anything.
   const quoted: string[] = [];
   let t = text.replace(/"([^"]+)"/g, (_, q: string) => `\u0000${quoted.push(q) - 1}\u0000`);

@@ -49348,6 +49348,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7f32344f-06d8-4862-bfeb-f90a3e1d7fc2",
+  "name": "The Creation of Avacyn",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Search your library for a card, exile it face down, then shuffle.\nII — Turn the exiled card face up. If it's a creature card, you lose life equal to its mana value.\nIII — You may put the exiled card onto the battlefield if it's a creature card. If you don't put it onto the battlefield, put it into its owner's hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "07799012-7051-400e-adde-b54b41b80c70",
   "name": "The Dalek Emperor",
   "manaCost": "{5}{B}{R}",
@@ -49489,6 +49517,36 @@
   "set": "dom",
   "releasedAt": "2018-04-27",
   "rarity": "uncommon",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6b3e1aaf-6909-400a-88f2-9e9fde9a0cf7",
+  "name": "The Eleventh Hour",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Search your library for a Doctor card, reveal it, put it into your hand, then shuffle.\nII — Create a Food token and a 1/1 white Human creature token with \"Doctor spells you cast cost {1} less to cast.\"\nIII — Create a token that's a copy of target creature, except it's a legendary Alien named Prisoner Zero.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Food"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
   "layout": "saga",
   "gameChanger": false
  },

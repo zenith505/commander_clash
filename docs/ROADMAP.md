@@ -4508,6 +4508,34 @@ line blocks.
    Fourteenth Doctor's "Doctor card" is any card with the Doctor subtype. Known gaps: a card that both Lara's permission and
    Evelyn, the Covetous's once-each-turn play could play uses up Lara's, even when Evelyn's any-color mana paid for it;
    bots choose the copy for The Fourteenth Doctor as they would for any clone from a graveyard.
+   Round 433 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card a Saga's
+   chapter I exiled face down and its later chapters, a token copy with a name of its own, and loyalty abilities at instant
+   speed for one turn. The Creation of Avacyn's "I — Search your library for a card, exile it face down, then shuffle.",
+   "II — Turn the exiled card face up. If it's a creature card, you lose life equal to its mana value." and "III — You may
+   put the exiled card onto the battlefield if it's a creature card. If you don't put it onto the battlefield, put it into
+   its owner's hand." (the cards its own chapter I exiled, CR 607.2a, oracle/round433.ts linkRound433; with two or more,
+   their total mana value if one is a creature card, and all its permanent cards or none, rulings; a card still face down
+   at chapter III has no characteristics, CR 406.3a, so it goes to your hand; Effects linkedFaceUpLoseLife,
+   linkedCreatureOrHand). The Eleventh Hour's "III — Create a token that's a copy of target creature, except it's a legendary
+   Alien named Prisoner Zero." (legendary, its other supertypes kept as Benthic Anomaly's rulings say, its card types kept,
+   Alien instead of every subtype, Vehicle too, rulings; CopyExcept.allSubtypes; a copy with a name of its own now reads the
+   copied text's references to itself by name as itself, CR 201.5, which Mishra's Warform gets too, while "named <its
+   name>" stays a name). Jace's Machinations' "Until end of turn, you may activate loyalty abilities of Jace planeswalkers
+   you control on any player's turn any time you could cast an instant." (its controller's Jace planeswalkers as they are
+   when activated, the Empower Jace token too; still one loyalty ability of each a turn, CR 606.3, rulings; TurnLog
+   loyaltyAtInstantSpeed). Browser tests click through Avacyn's search and its chapter III Yes and No, and The Eleventh
+   Hour's target. +3, 31,815 of 31,936 on this stacked branch (round 432 #714); the compiled text of every other card is
+   unchanged.
+   Out after round 433 (looked at, not done): Captain America, First Avenger (its "Throw" damage is divided as targets are
+   chosen, CR 601.2d, before the cost that unattaches the Equipment fixes the amount, CR 601.2h, and it has no rulings),
+   Pulmonic Sliver (still out: an optional "put it on top of its owner's library instead" asked in the middle of any move
+   to a graveyard, which zone moves can't pause for), Filigree Vector (done in round B280), Battlefield Thaumaturge, Nihiloor,
+   Drain Power, Ertai's Meddling and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds
+   425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the
+   reasons in their earlier lists). Judgment calls: The Eleventh Hour's token keeps snow and other supertypes (no ruling
+   says so for it); Jace's Machinations has rulings only on Empower Jace and the once-a-turn limit. Known gaps: bots don't
+   plan to activate a Jace's loyalty abilities on other players' turns; a copy's "named <its name>" ability that only reads
+   with "~" (Biovisionary's) isn't kept by a renamed copy.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -16,7 +16,7 @@ export { ringBearer, isRingBearer, timesTempted, loseRingBearer, ringBearerOptio
 export { harmfulCounter, reselectOptions } from "./run-permanents";
 export { tokenDef } from "./run-tokens";
 export { unlessCost, addDelayed, kickedMatches, changeTargetOptions } from "./run-spells";
-export { discardCards } from "./run-library";
+export { discardCards, lengName, toTopName } from "./run-library";
 export { isSuspended, enterAttacking } from "./run-zones";
 export { canPayNow, timesPay } from "./run-choices";
 export { COLOR_NAMES, describePay, describeDest, describeMods } from "./describe";

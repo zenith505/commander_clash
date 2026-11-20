@@ -6,12 +6,12 @@ import { log, obj, player } from "../game";
 import type { GameState } from "../types";
 import type { ResolveCtx } from "./resolve";
 import { players } from "./resolve";
-import { discardCards } from "./run-library";
+import { discardCards, discardToTop } from "./run-library";
 import { printedMatches } from "./targeting";
 
 type B260Effect = Extract<Effect, { type: "discardSplicedNames" }>;
 
-export function runLaneB260Effect(s: GameState, e: B260Effect, ctx: ResolveCtx, _src: string): "paused" | void {
+export function runLaneB260Effect(s: GameState, e: B260Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     // Minamo's Meddling: "That spell's controller reveals their hand, then discards each card with the same name as a card
     // spliced onto that spell." The spell's controller as resolution began (CR 608.2h), countered or not (one that can't
@@ -23,12 +23,16 @@ export function runLaneB260Effect(s: GameState, e: B260Effect, ctx: ResolveCtx, 
       if (pid === undefined) return;
       const p = player(s, pid);
       const hand = p.hand.map((id) => defOf(s, obj(s, id)).name);
-      log(s, hand.length ? `${p.name} reveals their hand: ${hand.join(", ")}.` : `${p.name} reveals an empty hand.`);
+      // Revealed once: Nephalia Academy's question (round 430) below comes back here.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.toTop?.[pid]) log(s, hand.length ? `${p.name} reveals their hand: ${hand.join(", ")}.` : `${p.name} reveals an empty hand.`);
       const names = s.resolving?.spellSpliced?.[e.spell] ?? [];
       if (!names.length) return;
       const named = { kind: "card" as const, types: [], notTypes: [], notColors: [], namedAny: [...new Set(names)], text: "card with the same name as a spliced card" };
       const hit = p.hand.filter((id) => printedMatches(named, defOf(s, obj(s, id))));
-      if (hit.length) discardCards(s, pid, hit, "", false, false, ctx.controller);
+      const tops = discardToTop(s, pid, hit, src, ctx);
+      if (tops === "paused") return "paused";
+      if (hit.length) discardCards(s, pid, hit, "", false, false, ctx.controller, undefined, tops);
       return;
     }
   }

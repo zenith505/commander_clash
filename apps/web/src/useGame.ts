@@ -187,6 +187,17 @@ function hasInstantPlay(s: GameState): boolean {
       const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt: "sneak" });
       if (!problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt: "sneak" }))) return true;
     }
+  // Ninja Teen (round 428): creature cards in your graveyard cast using their sneak abilities, their own or one it gives them.
+  if (s.activePlayer === HUMAN && s.step === "declareBlockers")
+    for (const id of me.graveyard)
+      for (const g of graveyardWays(s, obj(s, id), HUMAN)) {
+        if (g.alt !== "sneak") continue;
+        for (const alt of ["sneak", "grantedSneak"] as const) {
+          if (!altCost(cardOf(s, id), alt, s, HUMAN, obj(s, id))) continue;
+          const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { via: g.kind, alt });
+          if (!problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via: g.kind, alt }))) return true;
+        }
+      }
   // Guardian Angel (round B263): paying for one more shield is a special action, any time you have priority (CR 116.2c).
   for (const ps of payableShields(s, HUMAN)) if (planPayShield(s, HUMAN, ps.id)) return true;
   // Turning a face-down permanent face up is a special action, any time you have priority (CR 702.37e).

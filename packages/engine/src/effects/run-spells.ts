@@ -11,7 +11,7 @@ import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, 
 import { bindChosen, canChooseTarget, isLegalTarget, legalTargets, objectMatches, onlyPermanentOrPlayer, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal, itemQuality } from "./targeting";
 import { ResolveCtx, objects, amountNow, players, blockHistoryAt } from "./resolve";
 import { bent, closeZoneBatch, fireEvent } from "./triggers";
-import { discardCards, toBottom } from "./run-library";
+import { discardCards, discardToTop, toBottom } from "./run-library";
 import { suspendExiled } from "./run-zones";
 import { defMv, sameName } from "../faces";
 import { copyKey, type CopyExcept } from "../copies";
@@ -758,6 +758,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.alt ? { alt: e.alt } : {}),
           ...(e.loyalty ? { loyalty: e.loyalty } : {}),
           ...(e.exhaust ? { exhaust: true as const } : {}),
+          ...(e.minManaSpent ? { minManaSpent: e.minManaSpent } : {}),
           ...(ctx.x ? { x: ctx.x } : {}),
           // Loki Laufeyson: its power as each spell is cast, the source as the object that activated it (round B202), even if
           // it left the battlefield before this resolved.
@@ -1768,7 +1769,11 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
   }
   // "Ward—Discard a card": the cards they chose to discard (see payUnless).
   if (sc.paid === undefined && (unless.discard || unless.discardHand || unless.discardRandom) && sc.chosen?.[payer]) {
-    discardCards(s, payer, sc.chosen[payer]!);
+    // Nephalia Academy (round 430): a discard chosen because of another player's spell or ability (rulings), not Library of
+    // Leng's (a cost, its rulings).
+    const tops = discardToTop(s, payer, sc.chosen[payer]!.filter((id) => player(s, payer).hand.includes(id)), by, ctx, true);
+    if (tops === "paused") return "paused";
+    discardCards(s, payer, sc.chosen[payer]!, "", false, false, undefined, undefined, tops);
     sc.paid = true;
   }
   // Grip of Amnesia: the cards in their graveyard as they chose to pay (see payUnless), exiled as the payment.

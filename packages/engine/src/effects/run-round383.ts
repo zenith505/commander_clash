@@ -3,7 +3,7 @@ import { continueDraws, log, opponents, player } from "../game";
 import type { DrawAfter, GameState, ObjectId, Player, PlayerId, WasteDraw } from "../types";
 import { RulesError } from "../types";
 import { apnap } from "./resolve";
-import { discardCards, lengName, sparedFromDiscard } from "./run-library";
+import { discardCards, lengName, sparedFromDiscard, toTopName } from "./run-library";
 
 /**
  * Words of Waste: "The next time you would draw a card this turn, each opponent discards a card instead." The draw doesn't
@@ -36,10 +36,12 @@ function wasteNext(s: GameState, w: WasteDraw): "paused" | void {
     s.pending = { kind: "discard", player: q, count: 1, source: w.source, waste: w };
     return "paused";
   }
-  w.leng ??= w.order.filter((x) => (w.chosen[x] ?? []).length > 0 && !!lengName(s, x));
+  // Nephalia Academy (round 430) too: the Words' controller is another player.
+  w.leng ??= w.order.filter((x) => (w.chosen[x] ?? []).length > 0 && !!toTopName(s, x, w.drawer, false));
   const lq = w.leng.find((x) => !w.toTop || !(x in w.toTop));
   if (lq !== undefined) {
-    s.pending = { kind: "handToTop", player: lq, count: w.chosen[lq]!.length, source: w.source, upTo: true, discarding: w.chosen[lq]!, waste: w };
+    const by = toTopName(s, lq, w.drawer, false);
+    s.pending = { kind: "handToTop", player: lq, count: w.chosen[lq]!.length, source: w.source, upTo: true, discarding: w.chosen[lq]!, waste: w, ...(by && by !== lengName(s, lq) ? { revealing: by } : {}) };
     return "paused";
   }
   const r = s.resolving;

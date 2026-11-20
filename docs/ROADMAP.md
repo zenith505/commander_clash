@@ -1,7 +1,7 @@
 # Roadmap
 
-31,803 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,944 of
+31,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4369,6 +4369,112 @@ line blocks.
    Light of Alabaster (Lane B's next), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in
    their earlier lists). Known gaps: Aang's bot always transforms Aang, Master of Elements back at upkeep; Blitzball's
    bot attaches World Champion to its creature with the greatest power.
+   Round 428 went on down the "Out after round N" lists and `npm run popular`, most played first, to sneak given to cards
+   in a graveyard and an ability copied by the mana spent on it. Ninja Teen's level 3, "Creature cards in your graveyard
+   have sneak {3}{B}." and "You may cast creature spells from your graveyard using their sneak abilities." (CR 716.2a,
+   702.190a: during your declare blockers step, returning an unblocked attacker you control, entering tapped and attacking
+   its player, 702.190b; a card's own sneak or the one given, either, rulings; CompiledCard.sneakGrants, AltCostKind
+   grantedSneak, cast as a sneak cost, castAlt "sneak"; a graveyardGrants permission with `alt` "sneak"). Dynaheir,
+   Invoker Adept's "You may activate abilities of other creatures you control as though those creatures had haste." (CR
+   302.6, not its own; they don't gain haste, rulings; creatureAbilitiesHaste "others") and "{T}: When you next activate
+   an ability that isn't a mana ability this turn by spending four or more mana to activate it, copy that ability. You may
+   choose new targets for the copy." (a delayed trigger, CR 603.7a, used up only by such an ability, not by a mana ability,
+   rulings, CR 605.1a, nor by one paid with less mana; mana spent on {X} counts, CR 602.2b, 601.2h; the copy resolves
+   first, CR 707.10; nextCast `minManaSpent`, the activated event's `manaSpent`). A browser test clicks through Ninja
+   Teen's graveyard sneak entry. +2, 31,793 of 31,936 on this stacked branch (round 427 #702, with main 8391ce7, Lane B B272-B273, in it); the
+   compiled text of every other card is unchanged.
+   Out after round 428 (looked at, not done): Yavimaya Bloomsage // Channel (Channel's "any time you could activate a mana
+   ability, you may pay 1 life. If you do, add {C}.": a mana source that isn't an object, usable whenever a mana ability
+   is, CR 605.3a, while paying costs and in every payment prompt, which the automatic payment would need to know about),
+   Captain America, First Avenger ("deals damage equal to that Equipment's mana value divided as you choose among one,
+   two, or three targets": the division is announced, CR 601.2d via 602.2b, before the cost that sets the amount is paid,
+   601.2h, and no ruling says how), Ashiok, Wicked Manipulator, Lich's Mirror, Breathstealer's Crypt and Titania's Song
+   (still out, for the reasons in their earlier lists), the cards rounds 425-427 left out (still out, for their reasons),
+   and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
+   bots activate Dynaheir's ability only with an ability of four or more mana they could also pay for; bots sneak a card
+   from their graveyard only for a token or a less valuable unblocked attacker, as from their hand.
+   Round 429 went on down the "Out after round N" lists and `npm run popular`, most played first, to an Aura's static copy
+   effect, copies of several graveyard cards cast as a reflexive trigger resolves, and a once-a-turn play from exile.
+   Bloodthirsty Adversary's "you may pay {2}{R} any number of times. When you pay this cost one or more times, put that
+   many +1/+1 counters on this creature, then exile up to that many target instant and/or sorcery cards with mana value 3
+   or less from your graveyard and copy them. You may cast any number of the copies without paying their mana costs." (a
+   reflexive trigger, CR 603.12, its targets chosen as it's put on the stack with X the times paid, rulings; the cards
+   still legal exiled and copied, the copies cast then or never, CR 608.2g, 707.12, the cards staying exiled, rulings;
+   castFromAmong `copies` from a `many` "x" slot). Metamorphic Alteration's "As this Aura enters, choose a creature." (CR
+   614.12, anyone's, the enchanted one too, not one entering with it, rulings) and "Enchanted creature is a copy of the
+   chosen creature." (a static copy effect, CR 707.2, 611.3a, of the values locked in as it was chosen, Chosen.copyKey,
+   rulings: not its counters or other effects, a token's original values without becoming a token; with the Aura's
+   timestamp, CR 613.7e; a copy of a noncreature makes the Aura fall off, rulings, CR 704.5m; CopyEffect `aura`, kept by
+   game.ts syncAuraCopies). Evelyn, the Covetous's "exile the top card of each player's library with a collection counter
+   on it" (GameObject.exiledByPlayer) and "Once each turn, you may play a card from exile with a collection counter on it
+   if it was exiled by an ability you controlled, and you may spend mana as though it were mana of any color to cast it."
+   (a land as the turn's land play, a spell with the usual timing, CR 305.1, 601.3, 609.4b; one card each turn for each
+   Evelyn object, CompiledCard.playExiledCounteredOnce). A browser test clicks through each. +3, 31,798 of 31,936
+   on this stacked branch (round 428 #705, with round 427's head 037bca2 and main 73cb89a in it), 31,802 with main f60fd58
+   (Lane B B275-B276) merged in; the compiled text of every other card is unchanged.
+   Out after round 429 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability, only one per ability is modeled), the cards rounds 425-428 left out (still out, for their reasons), and the
+   rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
+   Metamorphic Alteration's copy effect begins at the next state-based action check after it becomes attached, so an
+   ability the copy has that would trigger on the Aura's own entering doesn't; bots aim it at an opponent's creature and
+   choose the least creature to copy; a card another permission could also play is played with that one, leaving
+   Evelyn's play for the turn unused.
+   Round 430 went on down the "Out after round N" lists and `npm run popular`, most played first, to a discard replaced
+   when an opponent causes it and a trigger on a fortified land's mana. Nephalia Academy's "If a spell or ability an
+   opponent controls causes you to discard a card, you may reveal that card and put it on top of your library instead of
+   putting it anywhere else." (CR 614.1a: each card on its own, in the order chosen, the first ending on top, as for
+   Library of Leng; over madness's exile or Obstinate Baloth's, CR 616.1; still discarded, so discard triggers see it; a
+   discard chosen because of the opponent's spell or ability counts, rulings: "unless that player discards a card" and
+   ward's "Discard a card" too, which Leng's doesn't cover). Every path where another player's spell or ability makes you
+   discard asks it (run-library.ts academyName, toTopName, discardToTop with `cost`): discard and random discard effects,
+   Duress-like picks, connive, votes, punishers, "unless" and ward costs, Words of Waste, Chains of Mephistopheles (asked
+   before its discard, PendingDecision handToTop `chains`; Library of Leng now covers Chains' discard too, an effect,
+   its rulings), Nebuchadnezzar and Minamo's Meddling. C.A.M.P.'s "Whenever fortified land is tapped for mana, put a
+   +1/+1 counter on target creature you control. If that creature shares a color with the mana that land produced,
+   create a Junk token." (the land it's attached to, CR 301.6, tapped for mana by anyone, CR 106.12; a trigger that
+   targets uses the stack, CR 605.1b; the land's own mana as replacement effects made it, not mana another ability adds
+   for its tapping, its colors against the creature's as it resolves, one of several enough, rulings; the tappedForMana
+   event's `made`, TriggerEventInfo.manaMade, Condition targetSharesColorWithManaMade). Browser tests click through the
+   Academy's question for an opponent's Chains (twice, the second prompt starting with nothing picked) and C.A.M.P.'s
+   trigger. +2, 31,804 of 31,936 on this stacked branch (round 429 #707, with main f60fd58, B275-B276, in it); the compiled text of every other card is
+   unchanged.
+   Out after round 430 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   ability, only one per ability is modeled), Battlefield Thaumaturge (still out, as after round 386), the cards rounds
+   425-429 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for
+   the reasons in their earlier lists). Known gaps: bots put back on top with the Academy what they would with Library
+   of Leng (spells, and lands while short of them); C.A.M.P.'s bot picks the creature for the counter without looking
+   at the mana's color; C.A.M.P. sees no color for mana whose color another player chooses (Spectral Searchlight's
+   kind, which no land has).
+   Round 431 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card cast for its
+   suspend cost, a trigger an escaped creature enters with, and an exiled card cast by waterbending. The Face of Boe's "{T}:
+   You may cast a spell with suspend from your hand. If you do, pay its suspend cost rather than its mana cost. Activate
+   only as a sorcery." (one card with suspend, cast as the ability resolves, rulings, its timing ignored, CR 608.2g, for its
+   suspend cost as an alternative cost, CR 118.9, CastPay "suspendCost"; cast, not suspended, so no time counters or haste,
+   CR 702.62a; a card with no mana cost like Ancestral Vision can be cast this way, CR 118.6; a "Suspend X" card's X is
+   announced, CR 107.3a, and can't be 0). Skyway Robber's "This creature escapes with "Whenever this creature deals combat
+   damage to a player, you may cast an artifact, instant, or sorcery spell from among cards exiled with this creature
+   without paying its mana cost."" (CR 702.138c: it has the ability only if it escaped, TriggeredAbility.activeIf; the
+   cards are those its escape cost exiled, linked to the permanent the spell became, CR 607.2a, the last time it escaped
+   only, rulings). Hama, the Bloodbender's "When Hama enters, target opponent mills three cards. Exile up to one
+   noncreature, nonland card from that player's graveyard. For as long as you control Hama, you may cast the exiled card
+   during your turn by waterbending {X} rather than paying its mana cost, where X is its mana value." (the card chosen as
+   it resolves, after the mill; a permission ended if Hama has left or changed control, CR 611.2b; normal timing; the
+   waterbend cost an alternative cost, CR 118.9, up to X of it paid by tapping artifacts and creatures, summoning sick ones
+   too, CR 701.67a, rulings; an X in the card's own cost is 0; GameObject.mayPlay `cost` with `waterbend`, `yourTurnOnly`;
+   "whenever you waterbend" sees it). Browser tests click through each, Hama's twice (mana, then waterbending). +3, 31,803
+   of 31,936 on this stacked branch (round 430 #709), 31,809 with round 430's head 7b21a52 (main 6388275, B277) merged in;
+   the compiled text of every other card is unchanged.
+   Out after round 431 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
+   430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
+   that creature's, checked with its last known power), Drain Power (mana abilities another player activates for each land,
+   then that mana moved), Ertai's Meddling (delay counters, then the card put onto the stack as a copy of the spell), the
+   cards rounds 425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still
+   out, for the reasons in their earlier lists). Judgment calls: Hama's X is the exiled card's mana value as it is in exile,
+   fixed as it's exiled (a split card's both halves, CR 709.4); "X can't be 0" in a "Suspend X" line holds for The Face of
+   Boe's cast too. Known gaps: Skyway Robber's ability is read as its own with "if it escaped", so if it later becomes a
+   copy of something else it loses it (the escape's layer 6 effect would keep it, CR 613.1f), and escaping with an escape
+   another permanent gives it (Underworld Breach) links no cards to it, so nothing can be cast; bots pick for Hama the dearest
+   card their lands, artifacts and creatures could pay for, and activate The Face of Boe only with a suspend card in hand.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

@@ -667,6 +667,10 @@ export interface GameObject {
     castAnotherThisTurn?: true;
     /** Durnan of the Yawning Portal (round 380): "That spell has undaunted": {1} less for each opponent its caster has (CR 702.125a-b). */
     undaunted?: true;
+    /** Hama, the Bloodbender (round 431): with `cost`, "by waterbending {X} rather than paying its mana cost": the cost is a waterbend cost, so up to its generic mana may be paid by tapping artifacts and creatures (CR 701.67a). */
+    waterbend?: true;
+    /** Hama, the Bloodbender (round 431): "during your turn": only while `player` is the active player. */
+    yourTurnOnly?: true;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -964,6 +968,12 @@ export interface CopyEffect {
    * during an end step lasts until the next turn's (as for a delayed trigger, CR 513.2) or that turn's next added end step.
    */
   until?: "endOfTurn" | { turnOf: PlayerId } | { nextEndStep: { turn: number; endSteps: number } } | CopyWhile;
+  /**
+   * Metamorphic Alteration (round 429): the copy effect of an Aura's static ability on the permanent it enchants (CR 611.3a,
+   * 707.2), with the Aura's timestamp (613.7e), kept while that Aura (`until` whileAttached) is attached to it and has the
+   * ability (game.ts syncAuraCopies), not one that began after the permanent entered.
+   */
+  aura?: true;
 }
 
 /**
@@ -1887,7 +1897,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true; /** Only these cards ("then discard one of them": the cards just drawn, Soldevi Sage). */ /** Chains of Mephistopheles (round B237): a discard instead of a draw, then the draws to make (see game.ts draw), the first of `made` the one the discard leads to. */ thenDraw?: { left: number; made: number[]; after?: DrawAfter }; among?: ObjectId[]; /** Worldpurge: the cards clicked are the ones kept (up to `count`, with `upTo`); the rest are shuffled into the library. */ keep?: true; /** Words of Waste (round 383): the discard replacing a draw, not a resolving spell's. */ waste?: WasteDraw }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[]; /** With `discarding`: Words of Waste's discard (round 383), not a resolving spell's. */ waste?: WasteDraw }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Shuffled into the library instead (See Beyond). */ shuffle?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[]; /** With `discarding`: Words of Waste's discard (round 383), not a resolving spell's. */ waste?: WasteDraw; /** With `discarding`, Nephalia Academy (round 430): its name, the cards put on top revealed. */ revealing?: string; /** With `discarding`, Chains of Mephistopheles' discard instead of a draw (round 430): then the draws go on (see game.ts chainsDiscard). */ chains?: { left: number; made: number[]; after?: DrawAfter } }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -2409,7 +2419,7 @@ export interface GameState {
   yardCastGrants?: { id: ObjectId; zc: number; kind: "jumpStart" | "harmonize" }[];
   flashbackGrants?: { id: ObjectId; zc: number; /** Escape with this cost instead (The Grim Captain's Locker, CR 702.138a). */ escape?: { mana: string; exile: number }; /** "You may cast this card from your graveyard" instead (Case of the Uneaten Feast). */ cast?: true; /** Flashback with this cost instead of the card's mana cost (Archmage's Newt's "flashback {0}"). */ mana?: string }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; /** Havengul Lich (round 400): only this card being cast from the graveyard it was in then, as that object (CR 400.7), with the trigger's source as the object it was (`sourceZc`). */ card?: { id: ObjectId; zc: number }; sourceZc?: number; /** Jaya's Phoenix, Repeated Reverberation (Effect nextCast `loyalty`). */ loyalty?: "also" | "only"; /** Magus Lucea Kane (Effect nextCast `xAbility`): an ability with {X} in its activation cost uses it up too. */ xAbility?: true; /** Zevlor, Elturel Exile: only a spell whose one target is an opponent or a permanent an opponent controls (Effect nextCast). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Every matching spell this turn, not used up (Yidris, Maelstrom Wielder). */ allTurn?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** Savage Summoning: the creature enters with this counter too. */ counter?: string; /** World War Hulk, Marshland Bloodcaster: an alternative cost for that spell (AltCostKind "nextFree", "nextLife"). */ alt?: "free" | "life"; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number; /** Loki Laufeyson (round B202): only a spell with mana value at most this permanent's power as it's cast, or its power as it last existed on the battlefield. */ mvMaxPowerOf?: { id: ObjectId; zc: number }; /** Pit Automaton (Effect nextCast `exhaust`): only the next exhaust ability that isn't a mana ability. */ exhaust?: true }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; /** Havengul Lich (round 400): only this card being cast from the graveyard it was in then, as that object (CR 400.7), with the trigger's source as the object it was (`sourceZc`). */ card?: { id: ObjectId; zc: number }; sourceZc?: number; /** Jaya's Phoenix, Repeated Reverberation (Effect nextCast `loyalty`). */ loyalty?: "also" | "only"; /** Magus Lucea Kane (Effect nextCast `xAbility`): an ability with {X} in its activation cost uses it up too. */ xAbility?: true; /** Zevlor, Elturel Exile: only a spell whose one target is an opponent or a permanent an opponent controls (Effect nextCast). */ onlyOpponentOrTheirs?: true; cascade?: true; /** Every matching spell this turn, not used up (Yidris, Maelstrom Wielder). */ allTurn?: true; /** "Has storm" (Crackling Spellslinger): the spell's own storm ability triggers (CR 702.40a). */ storm?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** Soulfire Grand Master: it goes to its owner's hand instead of the graveyard as it resolves. */ toHand?: true; /** Savage Summoning: the creature enters with this counter too. */ counter?: string; /** World War Hulk, Marshland Bloodcaster: an alternative cost for that spell (AltCostKind "nextFree", "nextLife"). */ alt?: "free" | "life"; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number; /** Loki Laufeyson (round B202): only a spell with mana value at most this permanent's power as it's cast, or its power as it last existed on the battlefield. */ mvMaxPowerOf?: { id: ObjectId; zc: number }; /** Pit Automaton (Effect nextCast `exhaust`): only the next exhaust ability that isn't a mana ability. */ exhaust?: true; /** Dynaheir, Invoker Adept (round 428): only the next ability that isn't a mana ability with at least this much mana spent to activate it. */ minManaSpent?: number }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made
@@ -2955,6 +2965,11 @@ export interface Chosen {
   object?: { id: ObjectId; zc: number };
   /** Koh, the Face Stealer (round 399): "Choose a creature card exiled with ~": that card, as the object it is in exile (CR 400.7). */
   card?: { id: ObjectId; zc: number };
+  /**
+   * Metamorphic Alteration (round 429): the chosen creature's copiable values as it was chosen (CR 707.2), a key into
+   * GameState.cards: locked in then, whatever happens to that creature later (rulings).
+   */
+  copyKey?: string;
 }
 
 export interface TurnRule {
@@ -2999,6 +3014,8 @@ export interface TriggerEventInfo {
   amount?: number;
   /** "Whenever a land is tapped for mana" (Mana Web): the types of mana that land could produce as it was tapped (CR 106.7), for when it has left by the time the ability resolves. */
   couldProduce?: ManaType[];
+  /** "Whenever fortified land is tapped for mana" (C.A.M.P., round 430): the mana that permanent's mana ability made (CR 106.12), as replacement effects changed it. */
+  manaMade?: ManaType[];
   /** Archfiend of Spite: the source that dealt the damage, for "that source's controller" as the ability resolves (rulings); while it's still that object on the battlefield or the stack, its controller then, otherwise `player`, its controller as it last existed (CR 608.2h). */
   sourceOf?: { id: ObjectId; zc: number };
   /** A counters-put trigger: the kind of counter put (Bold Plagiarist's "the same number and kind of counters"). */

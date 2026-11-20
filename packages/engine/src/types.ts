@@ -2087,6 +2087,8 @@ export interface TurnLog {
   tappedLandForMana?: PlayerId[];
   /** Hedonist's Trove (CompiledCard.playLinkedSpellOnce): the sources ("id@zoneChanges") whose cards a spell was cast from this turn with that permission. */
   linkedSpellOnce?: string[];
+  /** Lara Croft, Tomb Raider (round 432, Effect playCounteredThisTurn): each permission to play one card from exile with this kind of counter on it this turn, `used` once a card was played with it. */
+  playCounteredGrants?: { player: PlayerId; counter: string; used?: true }[];
   /** Predatory Focus: the players whose creatures assign their combat damage this turn as though they weren't blocked (CR 510.1c). */
   unblockedDamage?: PlayerId[];
   /** Power Surge: the untapped lands the active player controlled as this turn began, before its untap step (CR 502.3); left out when none. */

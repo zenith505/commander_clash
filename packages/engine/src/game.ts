@@ -1953,7 +1953,9 @@ export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec):
   // Activated Sleeper: only one put there from the battlefield this turn.
   // The Master, Formed Anew: a face-up card in exile with that kind of counter on it, by its printed characteristics.
   if (filter.kind === "card" && filter.exiledWithCounter) return s.players.flatMap((p) => p.exile).filter((id) => id !== o.id && !obj(s, id).faceDown && !obj(s, id).isToken && (obj(s, id).counters[filter.exiledWithCounter!] ?? 0) > 0 && printedMatches(filter, defOf(s, obj(s, id))));
-  if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
+  // The Fourteenth Doctor (round 432): "in your graveyard that was put there from your library this turn": the graveyard of
+  // the player it enters under, a card put there from their library this turn (GameObject.fromLibraryTurn).
+  if (filter.kind === "card") return livingPlayers(s).filter((pid) => !filter.owner || (filter.owner === "you") === (pid === o.controller)).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && (!filter.fromLibraryThisTurn || obj(s, id).fromLibraryTurn === s.turn)));
   // Mockingbird's "with mana value less than or equal to the amount of mana spent to cast ~": the spell it was.
   const bound = filter.bound ? bindBound(s, filter, { controller: controllerOf(s, o), sourceId: o.id, manaSpent: o.manaSpent ?? 0 }) : filter;
   // Worms of the Earth (round B258): entering as a copy of a land, it couldn't enter at all (CR 608.3e's example: Clone and
@@ -2015,6 +2017,12 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
+    // The Fourteenth Doctor (round 432): "If you do, it gains haste until end of turn": the permanent it's becoming (CR
+    // 400.7), only as a copy.
+    if (own.hasteIfCopied) {
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: realDefOf(s, o).name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      invalidateCharacteristics(s);
+    }
     // Superior Spider-Man: "When you do, exile that card" (CR 603.12): that card, if it's still the same object then.
     if (own.exileCopied && target.zone === "graveyard")
       s.triggerQueue.push({ sourceId: o.id, sourceCardId: cardIdOf(o), controller: o.controller, index: -1, subject: { id: target.id, zc: target.zoneChanges ?? 0 }, body: { targets: [], effects: [{ type: "exile", what: { ref: "subjectCard", zone: "graveyard" } }], text: "When you do, exile that card." } });
@@ -6032,8 +6040,31 @@ function useExiledOnce(s: GameState, o: GameObject, pid: PlayerId): void {
   ((s.turnLog ??= {}).linkedSpellOnce ??= []).push(key);
 }
 
-function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOnce?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
+/**
+ * Lara Croft, Tomb Raider (round 432): the index of an unused permission of `pid`'s this turn (TurnLog.playCounteredGrants)
+ * to play this card: face up in exile with that kind of counter on it, whoever owns it and whatever exiled it.
+ */
+function counteredGrantFor(s: GameState, o: GameObject, pid: PlayerId): number {
+  if (o.zone !== "exile" || o.faceDown || o.hiddenExile || o.isToken) return -1;
+  return (s.turnLog?.playCounteredGrants ?? []).findIndex((g) => g.player === pid && !g.used && (o.counters[g.counter] ?? 0) > 0);
+}
+
+/**
+ * Lara Croft, Tomb Raider (round 432): playing this exiled card with no other lasting permission of `pid`'s that lets them
+ * (Evelyn's once-each-turn play gives way to this one) uses up one of their permissions for this turn.
+ */
+function useCounteredGrant(s: GameState, o: GameObject, pid: PlayerId): void {
+  const i = counteredGrantFor(s, o, pid);
+  if (i < 0 || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || preparedCopyCastable(s, o, pid) || ownLinkedPlayPermission(s, o, pid, true, true)) return;
+  s.turnLog!.playCounteredGrants![i]!.used = true;
+}
+
+function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOnce?: true, notGrant?: true, notHauken?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   let how: false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" = false;
+  // Lara Croft, Tomb Raider (round 432): a permission this turn for one card with that counter, paying as usual.
+  if (!notGrant && counteredGrantFor(s, o, pid) >= 0) how = "plain";
+  // Hauken's Insight (round 432): a land card exiled with it, once during each of your turns.
+  if (!notHauken && !how && linkedLandOnceSource(s, o, pid)) how = "plain";
   // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
   // now (rulings), mana of any color for the spells (CR 609.4b).
   for (const em of liveEmblems(s))
@@ -6222,12 +6253,41 @@ export function linkedFreeOnceSource(s: GameState, o: GameObject, pid: PlayerId,
     if (!p || controllerOf(s, p) !== pid) continue;
     const once = compileCard(defOf(s, p)).linkedFreeOnce;
     if (!once || (p.linkedFreeOnceUsed?.turn === s.turn && p.linkedFreeOnceUsed.zc === (p.zoneChanges ?? 0))) continue;
-    if (!(s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0) && l.turn === s.turn)) continue;
-    const max = evalAmount(s, once.maxMv, { controller: pid, sourceId: p.id });
+    // Hauken's Insight (round 432): during its controller's turns, any card exiled with it, whenever.
+    if (once.hauken && s.activePlayer !== pid) continue;
+    if (!(s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0) && (once.hauken || l.turn === s.turn))) continue;
+    const max = once.maxMv ? evalAmount(s, once.maxMv, { controller: pid, sourceId: p.id }) : Infinity;
     const fits = (d: CardDef) => !isType(d, "Land") && defMv(d) <= max;
     if (face ? fits(face) : fits(defOf(s, o)) || castableFaces(s, o).some((f) => asFace(s, o, f, () => fits(defOf(s, o))))) return p;
   }
   return undefined;
+}
+
+/**
+ * Hauken's Insight (round 432): a permanent `pid` controls whose "Once during each of your turns, you may play a land ...
+ * from among the cards exiled with ~" lets them play this exiled land card now: during their turn, one its exile abilities
+ * exiled (CR 607.2a), still that object (CR 400.7), its once not used this turn. Played as the turn's land play with the
+ * usual timing (rulings).
+ */
+function linkedLandOnceSource(s: GameState, o: GameObject, pid: PlayerId): GameObject | undefined {
+  if (o.zone !== "exile" || !s.linkedExile || o.faceDown || s.activePlayer !== pid || !isType(defOf(s, o), "Land")) return undefined;
+  for (const id of s.battlefield) {
+    const p = s.objects[id];
+    if (!p || controllerOf(s, p) !== pid || !compileCard(defOf(s, p)).linkedFreeOnce?.hauken) continue;
+    if (p.linkedFreeOnceUsed?.turn === s.turn && p.linkedFreeOnceUsed.zc === (p.zoneChanges ?? 0)) continue;
+    if ((s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) return p;
+  }
+  return undefined;
+}
+
+/**
+ * Hauken's Insight (round 432): playing this land with no other lasting permission of `pid`'s uses up that permanent's once
+ * this turn (Evelyn's and Lara Croft's give way to it).
+ */
+function useLinkedLandOnce(s: GameState, o: GameObject, pid: PlayerId): void {
+  const p = linkedLandOnceSource(s, o, pid);
+  if (!p || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || ownLinkedPlayPermission(s, o, pid, true, true, true)) return;
+  p.linkedFreeOnceUsed = { turn: s.turn, zc: p.zoneChanges ?? 0 };
 }
 
 /** Court of Locthwain's grant or Maralen's permission (round 406): `pid` may cast this exiled card without paying its mana cost. */
@@ -6734,6 +6794,8 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429), before any other permission is used up
+  useCounteredGrant(s, o, p.id); // Lara Croft, Tomb Raider (round 432): after Evelyn's, which gives way to it
+  useLinkedLandOnce(s, o, p.id); // Hauken's Insight (round 432): after the others, which it gives way to
   useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
@@ -9043,6 +9105,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const linkedRider = castFrom === "exile" && choices.alt !== "linkedFree" && isType(d, "Creature") ? linkedEntersWith(s, o, p.id) : undefined;
   if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
   if (choices.alt !== "linkedFree") useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429)
+  if (choices.alt !== "linkedFree") useCounteredGrant(s, o, p.id); // Lara Croft, Tomb Raider (round 432): after Evelyn's
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
   if (choices.alt !== "linkedFree") useLinkedSpellOnce(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);

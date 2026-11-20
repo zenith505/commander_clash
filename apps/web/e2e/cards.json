@@ -15296,6 +15296,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8170dcbb-9879-414c-819d-ea2658ff770c",
+  "name": "Emergency Medical Hologram",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Artifact Creature — Illusion Doctor",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Illusion",
+   "Doctor"
+  ],
+  "oracleText": "When this creature enters, put a +1/+1 counter on target creature. You gain 1 life.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "not_legal",
+  "set": "trk",
+  "releasedAt": "2026-11-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0eecdfb3-3b05-4051-a660-060ff6df80ef",
   "name": "Emergent Ultimatum",
   "manaCost": "{B}{B}{G}{G}{G}{U}{U}",
@@ -18991,6 +19023,35 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "7c427c3d-ecd8-45ef-bebd-8f10f4a311db",
+  "name": "Gaea's Cradle",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {G} for each creature you control.",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "jgp",
+  "releasedAt": "1998-01-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "26f6cc1e-d85e-45a3-a1ed-7f09d7cfc7df",
@@ -25586,6 +25647,87 @@
   "gameChanger": false
  },
  {
+  "oracleId": "16d2a56a-7181-4ef3-866b-10dd8615d9e9",
+  "name": "Jacob Hauken, Inspector // Hauken's Insight",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Advisor // Legendary Enchantment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "{T}: Draw a card, then exile a card from your hand face down. You may look at that card for as long as it remains exiled. You may pay {4}{U}{U}. If you do, transform Jacob Hauken.",
+  "power": "0",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Jacob Hauken, Inspector",
+    "manaCost": "{1}{U}",
+    "typeLine": "Legendary Creature — Human Advisor",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Advisor"
+    ],
+    "oracleText": "{T}: Draw a card, then exile a card from your hand face down. You may look at that card for as long as it remains exiled. You may pay {4}{U}{U}. If you do, transform Jacob Hauken.",
+    "power": "0",
+    "toughness": "2",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/8/2/823a764f-76b5-4340-bdaf-df9ca1d0ffd2.jpg?1783924280",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/8/2/823a764f-76b5-4340-bdaf-df9ca1d0ffd2.jpg?1783924280"
+   },
+   {
+    "name": "Hauken's Insight",
+    "manaCost": "",
+    "typeLine": "Legendary Enchantment",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [],
+    "oracleText": "At the beginning of your upkeep, exile the top card of your library face down. You may look at that card for as long as it remains exiled.\nOnce during each of your turns, you may play a land or cast a spell from among the cards exiled with this permanent without paying its mana cost.",
+    "colors": [
+     "U"
+    ],
+    "colorIndicator": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/8/2/823a764f-76b5-4340-bdaf-df9ca1d0ffd2.jpg?1783924280",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/8/2/823a764f-76b5-4340-bdaf-df9ca1d0ffd2.jpg?1783924280"
+   }
+  ]
+ },
+ {
   "oracleId": "ca79cd3f-13ba-4d11-b885-48a504ae69aa",
   "name": "Jadzi, Oracle of Arcavios // Journey to the Oracle",
   "manaCost": "{6}{U}{U}",
@@ -28185,6 +28327,48 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ddfd9dca-c886-4e13-b467-990469c31a61",
+  "name": "Lara Croft, Tomb Raider",
+  "manaCost": "{G}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ranger",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ranger"
+  ],
+  "oracleText": "First strike, reach\nWhenever Lara Croft attacks, exile up to one target legendary artifact card or legendary land card from a graveyard and put a discovery counter on it. You may play a card from exile with a discovery counter on it this turn.\nRaid — At end of combat on your turn, if you attacked this turn, create a Treasure token.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Reach",
+   "First strike",
+   "Treasure",
+   "Raid"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-11-20",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32891,6 +33075,37 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7a43bd27-fdd8-41f0-9bc4-92568f3408f1",
+  "name": "Mox Amber",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -43549,6 +43764,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "94688e62-f39f-41fd-9309-f16b715ef724",
+  "name": "Sickbay Orderly",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Caitian Doctor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Caitian",
+   "Doctor"
+  ],
+  "oracleText": "Lifelink (Damage dealt by this creature also causes you to gain that much life.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "not_legal",
+  "set": "trc",
+  "releasedAt": "2026-11-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "728d2e30-2f36-4054-81db-29b01e376a82",
   "name": "Sickening Dreams",
   "manaCost": "{1}{B}",
@@ -49313,6 +49561,45 @@
   "commanderLegal": "legal",
   "set": "who",
   "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0afcf1eb-ac2c-4bb0-8823-9fe45968c2d9",
+  "name": "The Fourteenth Doctor",
+  "manaCost": "{R/G}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Time Lord Doctor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Doctor"
+  ],
+  "oracleText": "When you cast this spell, reveal the top fourteen cards of your library. Put all Doctor cards revealed this way into your graveyard and the rest on the bottom of your library in a random order.\nYou may have The Fourteenth Doctor enter as a copy of a Doctor card in your graveyard that was put there from your library this turn. If you do, it gains haste until end of turn.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-12-11",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -6128,6 +6128,12 @@ export type Effect =
    */
   | { type: "mayCastExiledWaterbend" }
   /**
+   * Lara Croft, Tomb Raider (round 432): "You may play a card from exile with a discovery counter on it this turn.": the
+   * ability's controller may play one face-up card in exile with this kind of counter on it this turn, any such card
+   * (TurnLog.playCounteredGrants), a land as the turn's land play, a spell with its usual timing and costs (CR 305.1, 601.3).
+   */
+  | { type: "playCounteredThisTurn"; counter: CounterKind }
+  /**
    * Allure of the Unknown (round 420): "Reveal the top six cards of your library. An opponent exiles a nonland card from
    * among them, then you put the rest into your hand. That opponent may cast the exiled card without paying its mana
    * cost.": the opponent chosen as it resolves (CR 608.2d), who picks; cast by them as this resolves or never (rulings,
@@ -9222,7 +9228,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Wall of Stolen Identity: "When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control ~": a reflexive trigger about the permanent it copied (CR 603.12, 611.2b). */ tapCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true; /** The Mimeoplasm: "you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card": two cards in graveyards are chosen (the one copied first), both exiled. */ exileTwo?: true };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Wall of Stolen Identity: "When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control ~": a reflexive trigger about the permanent it copied (CR 603.12, 611.2b). */ tapCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true; /** The Mimeoplasm: "you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card": two cards in graveyards are chosen (the one copied first), both exiled. */ exileTwo?: true; /** The Fourteenth Doctor (round 432): "If you do, it gains haste until end of turn": the permanent it became, only if it entered as a copy. */ hasteIfCopied?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "With two +1/+1 counters and a lifelink counter on it" (Dust Animus): a second kind, under the same condition. */ also?: { counter: CounterKind; n: number }; /** "With a +1/+1 counter, a flying counter, a deathtouch counter, and a shield counter on it" (Agent's Toolkit): the kinds after the first two. */ more?: { counter: CounterKind; n: number }[]; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind; /** "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that player controls" (Canker Abomination): counted once the player is chosen, the same way. */ afterPlayer?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
@@ -10494,7 +10500,16 @@ export interface CompiledCard {
    * one exile ability exiled this turn (GameState.linkedExile entries with `turn`), once each turn for this object
    * (GameObject.linkedFreeOnceTurn), the spell's mana value at most `maxMv` (game.ts linkedFreeOnceSource).
    */
-  linkedFreeOnce?: { maxMv: AmountExpr };
+  linkedFreeOnce?: {
+    maxMv?: AmountExpr;
+    /**
+     * Hauken's Insight (round 432): "Once during each of your turns, you may play a land or cast a spell from among the
+     * cards exiled with ~ without paying its mana cost.": during its controller's turns only, any card its exile abilities
+     * exiled (its front face's too, rulings), whenever exiled, face-down ones included, and a land as the turn's land play
+     * with the usual timing (rulings), the once shared by both (game.ts linkedFreeOnceSource, linkedLandOnceSource).
+     */
+    hauken?: true;
+  };
   /**
    * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
    * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).

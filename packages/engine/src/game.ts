@@ -29,7 +29,7 @@ import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/ru
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
 import { pileDrawLabel } from "./effects/run-round386";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
-import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
+import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType } from "./copies";
 import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
@@ -1365,6 +1365,7 @@ export function moveObject(
   o.textFrom = undefined; // so do text-changing effects
   o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
   o.copyEffects = undefined;
+  o.chosenTypeAside = undefined; // a new object (CR 400.7)
   // Krovikan Vampire: a creature that died after being dealt damage this turn, and what dealt it (rulings: any damage).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && o.damagedBy?.length) ((s.turnLog ??= {}).diedDamaged ??= []).push({ id, zc: o.zoneChanges, by: [...o.damagedBy] });
   o.tapped = false;
@@ -2682,12 +2683,16 @@ function lifeZeroReplaced(s: GameState, pid: PlayerId): boolean {
   return true;
 }
 
+/** Life paid so far (payLife), only ever compared before and after paying a cost: Verrak, Warped Sengir's "if life was paid to activate it" (round 423). Not game state. */
+let lifePaidTally = 0;
+
 /**
  * A player pays life (CR 119.4): that much life is lost, and "whenever you pay life" (Font of Agonies) sees the payment.
  * Only payments use this, not life lost without the word "pay" (rulings on Font of Agonies).
  */
 export function payLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
+  lifePaidTally += n;
   loseLife(s, pid, n);
   fireEvent(s, { type: "lifePaid", player: pid, amount: n });
 }
@@ -2983,6 +2988,7 @@ export function endCopyWhile(s: GameState): boolean {
     if (kept.length === o.copyEffects.length) continue;
     const was = defOf(s, o).name;
     o.copyEffects = kept.length ? kept : undefined;
+    restoreChosenType(o); // Mirror of the Forebears (round 423)
     invalidateCharacteristics(s);
     log(s, `${was} stops being a copy and is ${defOf(s, o).name} again.`);
     ended = true;
@@ -10860,7 +10866,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       if (c.kind === "exileFromGraveyard" && (c.linkSpell || c.costCards)) for (const id of ids) exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
       // "Create a token that's a copy of the exiled card" (Tawnos, Solemn Survivor): the one card this cost exiled, the
       // only cost that exiles anything (compile.ts yardCostCard), still that card in exile (CR 400.7).
-      if (c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && !c.process && c.n === 1 && ids.length === 1 && costs.filter((x) => x.kind === "exileFromGraveyard" || x.kind === "exileFromHand" || x.kind === "craft" || (x.kind === "sacrifice" && x.exile) || (x.kind === "mill" && x.exile) || (x.kind === "reveal" && x.exile)).length === 1)
+      if (c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && !c.linkSpell && !c.process && c.n === 1 && ids.length === 1 && costs.filter((x) => x.kind === "exileFromGraveyard" || x.kind === "exileFromHand" || x.kind === "craft" || (x.kind === "sacrifice" && x.exile) || (x.kind === "mill" && x.exile) || (x.kind === "reveal" && x.exile)).length === 1)
         exiled?.push({ id: ids[0]!, zc: obj(s, ids[0]!).zoneChanges ?? 0 });
     }
     closeZoneBatch(s); // each cost is an event of its own (rulings on Conspiracy Unraveler)
@@ -11623,6 +11629,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
   }
+  // Verrak, Warped Sengir (round 423): the life its costs pay (CR 602.2b): Phyrexian mana paid with life (CR 107.4f), a
+  // life cost, and "Pay N life" among its other costs (payExtraCosts below).
+  const lifeTallyBefore = lifePaidTally;
   payLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
   if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
   if (ab.energyCost) loseEnergy(s, p.id, ab.energyCost);
@@ -11750,6 +11759,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   const costSacrificed = (s.turnLog?.sacrificed?.length ?? 0) > sacrificesBefore;
+  const costLifePaid = lifePaidTally - lifeTallyBefore;
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Dodgy Jalopy: its power in the graveyard as it's exiled for scavenge (rulings), by its characteristic-defining ability.
   const scavengedPower = ab.scavengeVariable && o.zone === "graveyard" ? cardPT(s, o, "power") : undefined;
@@ -11834,7 +11844,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(costLifePaid > 0 ? { costLifePaid } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -12873,6 +12883,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = ((r.scratch ??= {}).textWord ??= {});
     if (pend.what === "textFrom") st.from = choice;
     else st.to = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "giveControlTo") {
+    // Dack Fayden, Helping Hand (round 424): the opponent who gains control of `about` (Effect giveEachToDifferentOpponent).
+    (r.scratch ??= {}).giveControlTo = Number(choice);
     continueResolution(s);
     return;
   }

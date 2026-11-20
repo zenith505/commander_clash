@@ -1,6 +1,6 @@
 # Roadmap
 
-31,770 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,778 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,940 of
 9,979 (99%).
 
@@ -4234,6 +4234,86 @@ line blocks.
    from the hand and the defending player's guess) and the rest of `npm run popular` above rank 17,500 (still out, for
    the reasons in their earlier lists). Known gaps: bots cast spells from their hands into Possibility Storm and
    Knowledge Pool without weighing what they lose.
+   Round 423 went on down the "Out after round N" lists and `npm run popular`, most played first, to two copy effects and
+   round 422's Ashnod's twin. Verrak, Warped Sengir's "Whenever you activate an ability that isn't a mana ability, if life
+   was paid to activate it, you may pay that much life again. If you do, copy that ability. You may choose new targets for
+   the copy." (any source's ability; the life its costs paid, Phyrexian mana paid with life among it, CR 602.2b, 107.4f,
+   counted as they're paid; an intervening if, CR 603.4; not with less life than that, CR 119.4; activated event
+   `costLifePaid`, TriggeredAbility.activates `costLifePaid`, the may's `payLife` its event amount). Mirror of the
+   Forebears's "{1}: Until end of turn, ~ becomes a copy of target creature you control of the chosen type, except it's an
+   artifact in addition to its other types." (the target bound to the type chosen as it was activated, so a second
+   activation in response still resolves, rulings; while it's a copy, the type chosen for it is set aside,
+   GameObject.chosenTypeAside, so a copied creature's abilities that read "the chosen type" find none, CR 707.2, rulings;
+   back once no copy effect is left, CR 611.2a). Dermotaxi's "Imprint — As ~ enters, exile a creature card from a
+   graveyard." (any player's graveyard, mandatory if there's one, CR 614.12a; entersExileFromYard `anyGraveyard`) and "Tap
+   two untapped creatures you control: Until end of turn, ~ becomes a copy of the exiled card, except it's a Vehicle
+   artifact in addition to its other types." (the card linked to it, as printed, CR 607.2a, 707.2; tapping isn't crewing,
+   rulings; with that card gone from exile, nothing). Browser tests click through Dermotaxi's pick of Ana's Serra Angel and
+   its copy, Verrak's payment for Greed and Mirror of the Forebears becoming an Elvish Archdruid. +3, 31,760 of 31,936 on
+   this stacked branch with main 4038d7f; the compiled text of every other card is unchanged.
+   Out after round 423 (looked at, not done): Pulmonic Sliver (an optional "put it on top of its owner's library instead"
+   for each Sliver about to go to a graveyard: the engine has no way to ask during a zone change), Nephalia Academy (an
+   opponent-caused discard put on top instead: Library of Leng's prompt covers some discard paths, not punishers, ward,
+   random reveals or Chains of Mephistopheles), Sunken Palace (its mana ability's {1}{U} and "Exile seven cards from your
+   graveyard" costs, and mana that copies an ability it's spent on), Cryptic Spires (colors circled as the deck is built),
+   Grip of Chaos, Taster of Wares, Curse of Leeches and The Seventh Doctor (Lane B's round B267), and the rest of `npm run
+   popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps: bots activate Dermotaxi
+   and Mirror of the Forebears without weighing what the copy is worth; Verrak's bot pays while it keeps more than 5 life after paying.
+   Round 424 went on down the "Out after round N" lists and `npm run popular`, most played first, to three cards whose
+   pieces were all there but one each. Swindler's Scheme's "Whenever an opponent casts a spell from their hand, you may
+   reveal the top card of your library. If it shares a card type with that spell, counter that spell and that opponent may
+   cast the revealed card without paying its mana cost." (decided without looking, rulings; the spell's card types as it
+   is on the stack, or as it last existed there, CR 205.2a, 608.2h; countered only if it's still there, the free cast from
+   your library not depending on it, CR 608.2c, 608.2g; not cast, the card stays on top; Effect revealTopCounterSharing).
+   Dack Fayden, Helping Hand's "When ~ enters, reveal cards from the top of your library until you reveal X creature
+   cards, where X is the number of opponents you have. Put those creature cards onto the battlefield, then shuffle.
+   They're goaded for the rest of the game. For each of those permanents, choose a different opponent. Each opponent gains
+   control of the permanent for which they were chosen." (revealUntil `n` with `remember`, a goad for the game, CR
+   701.15a-b, then Effect giveEachToDifferentOpponent: a "giveControlTo" pick for each, the last one without asking, and
+   all the control changes at once, CR 613.1b, 611.2a). Emissary of Grudges's "Reveal the player you chose: Choose new
+   targets for target spell or ability if it's controlled by the chosen player and if it targets you or a permanent you
+   control. Activate only once." (any spell or ability targeted; StaticCondition `targetItemOfChosenTargetsYou` checked as
+   it resolves, one such target among several enough, rulings; any target may be kept, CR 115.7d). Browser tests click
+   through Dack's picks, casting Ana's Serra Angel from her library after her Scheme counters your Hill Giant, and
+   Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f (31,767 with main 4d75ae2,
+   B267, merged in); the compiled text of every other card is unchanged.
+   Out after round 424 (looked at, not done): Secret Invasion (the enchanted creature a copy of the creature the Aura
+   exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (its
+   back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
+   other permanents while it's untapped), Redemptor Dreadnought (its Plasma Incinerator line compiles wrongly, review
+   follow-up 18: fix it with the card), Selective Adaptation, Supper for Spiders and Brilliant Ultimatum (Lane B's round
+   B268), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known
+   gaps: bots never reveal Emissary of Grudges's player; Swindler's Scheme's bot reveals only against spells of mana value
+   3 or more; Dack's bot gives each creature to the opponent with the least power on the battlefield.
+   Round 425 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card exiled to pay
+   for a spell and linked to the permanent it becomes, and a copy of a card from among those just exiled. Redemptor
+   Dreadnought's "Fallen Warrior — As an additional cost to cast this spell, you may exile a creature card from your
+   graveyard." (an optional cost chosen and paid like a kicker cost with no mana, CR 601.2b; the card linked to the
+   permanent the spell becomes, CR 607.2q, CompiledCard.costExileLinked) and "Plasma Incinerator — Whenever this creature
+   attacks, if a card is exiled with it, it gets +X/+X until end of turn, where X is the power of the exiled card." (an
+   intervening if, CR 603.4; that card's power as a card in exile, its own characteristic-defining ability included, CR
+   604.3; none once the card has left exile, CR 400.7). This closes review follow-up 18: the attack line no longer reads a
+   sacrificed cost's power. Kaya, Spirits' Justice's "Whenever one or more creatures you control and/or creature cards in
+   your graveyard are put into exile, you may choose a creature card from among them. Until end of turn, target token you
+   control becomes a copy of it, except it has flying." (once for each event, CR 603.2c, BatchTrigger `exiledYourCreatures`:
+   a creature as it last existed on the battlefield, CR 603.10a, tokens too though no card of theirs can be chosen; the
+   card chosen as it resolves, only one still in exile, rulings; copied as printed, rulings, CR 707.2, plus flying, CR
+   707.9a; Effect becomeCopyOfAmong `inExile` and `except`) and "−2: Exile target creature you control. For each other
+   player, exile up to one target creature that player controls." (you choose every target, rulings; each other player
+   an opponent in a free-for-all game, CR 102.3; TargetSpec perOpponent after the first target). Browser tests click
+   through Redemptor Dreadnought's offered exile of Serra Angel, its attack as an 8/8, and Kaya's −2 on your Serra Angel
+   and Ana's Hill Giant with your token becoming a Serra Angel. +2, 31,769 of 31,936 on this stacked branch with main 4d75ae2 (B267) merged in; the compiled
+   text of every other card is unchanged.
+   Out after round 425 (looked at, not done): Ulalek, Fused Atrocity (copies of all spells and then of all other
+   abilities you control put on the stack at once: their order is their controller's choice, CR 405.3, and nothing lets a
+   player order copies yet), Galea, Kindler of Hope (its "When you cast an Equipment spell this way" needs the permission
+   a spell was cast with, and the ability it gives the spell kept on the permanent, CR 400.7a), Taskmaster, Mercenary
+   Mimic ("target creature on the battlefield or creature card in a graveyard": one target from either zone), Codie,
+   Ravenous Codex ("a prepared spell" isn't a term the Comprehensive Rules define; CR 722.3d speaks of a spell cast as a
+   prepare spell), Battlefield Thaumaturge (still out, as in its earlier lists), Sanar, Innovative First-Year ("for each
+   of those colors, you may exile a card of that color": whether one multicolored card can count for two colors isn't
+   settled), Lara Croft, Tomb Raider (still out), and the rest of `npm run popular` above rank 17,500 (still out, for the
+   reasons in their earlier lists). Known gaps: Kaya's bot copies the card worth the most, if worth more than the token.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5543,13 +5623,13 @@ line blocks.
    from the cards its collect evidence exiled); Reversal of Fortune (done in round B265) (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
-   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand;
+   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand (done in round 424);
    Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force (done in round B247).
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
-   them); Verrak, Warped Sengir, Ashnod the Uncaring and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
+   them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
    Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
@@ -6497,7 +6577,7 @@ line blocks.
      Noctis, Raubahn (ward-pay life), Sokka Swordmaster.
    - Harmonize (CR 702.180) works on 8 cards; still out: Glacial Dragonhunt, Nature's Rhythm, Synchronized Charge,
      Songcrafter Mage (granting harmonize). Paradigm works on all 5 cards and demonstrate on all 6.
-   - Secret choices in triggers (Stalking Leonin, Emissary of Grudges) are out.
+   - Secret choices in triggers (Stalking Leonin, Emissary of Grudges) are out (both done since, in rounds 377 and 424).
    Left from the round after harmonize (Khârn, dice, face-down exile you may play, main phase triggers, more cascade
    grants, exile until a nonland card):
    - Khârn the Betrayer: damage dealt to it by several sources at once is one control change, and the opponent for
@@ -11453,8 +11533,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   by its size (pileMode "faceDownYard"). Browser tests click through Doom Blade exiling Ana's Hill Giant with an ice
   counter and casting it from her exile with snow Islands, Helix's free copy of Divination when you cast Lava Axe,
   casting Abstract Performance (choosing Ana, then casting Grizzly Bears from the pile she leaves you) and putting Ana's
-  face-down pile into her graveyard for her Abstract Performance. +3, 31,770 of 31,936 on this branch (B269's, stacked on
-  B268 and B267). The compiled text of every other card is unchanged.
+  face-down pile into her graveyard for her Abstract Performance. +3, 31,778 of 31,936 with B268-B269 and main through
+  round 425. The compiled text of every other card is unchanged.
 - Out after round B270 (looked at, not done): the lists after round B269 stay out. Judgment calls and known gaps: snow mana
   goes to a colored symbol under Draugr's permission only when no mana of the symbol's own color is left for it; bots cast
   Spellweaver Helix's copy whenever it can be cast, choosing its targets as for any free spell. Ian Malcolm, Chaotician, Araumi of the Dead Tide, Haldan, Avid Arcanist, Cass, Hand of Vengeance and Bruna, Light
@@ -12322,7 +12402,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   other legendary creatures" lands (done in round B161) (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
   for a card exiled by a different ability), Split the Spoils (done in round B153) (piles), Swindler's Scheme (counter and cast the revealed
-  card), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
+  card; done in round 424), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
   entered; B98 fixed that: see round B98.)
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card
@@ -12585,9 +12665,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
   (Deepfathom Echo, Sakashima's Will; Cytoshape and Polymorphous Rush done in round B139); "for as long as" durations (Assimilation Aegis,
   Blade of Shared Souls and Zygon Infiltrator done in round 396, Secret Invasion); copying an exiled card (Dimir Doppelganger (done in round 362), The
-  Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
+  Mimeoplasm, Dermotaxi (done in round 423), Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
   Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
-  Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
+  Forebears, done in round 423), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes (done in round B199), Absorbing Man (done in round 397),
   Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection (done in round B249); planeswalkers (Saheeli,
   Oko, Kaya).
 - Madness: "if its madness cost was paid" (Grave Scrabbler), X or non-mana madness costs, granting madness (Falkenrath

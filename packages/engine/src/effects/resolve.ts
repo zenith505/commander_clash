@@ -32,6 +32,7 @@ import { runRedistributeLifeEffect } from "./run-round362";
 import { runMayCastExiledSpellEffect, runUntilLeavesToBottomEffect } from "./run-round363";
 import { runRound420Effect } from "./run-round420";
 import { runRound421Effect } from "./run-round421";
+import { runRound424Effect } from "./run-round424";
 import { runChooseSourceNowEffect } from "./run-round364";
 import { runMillUntilEffect } from "./run-round373";
 import { runOpponentSplitsCostExiledEffect, runReturnWithSacrificedEffect, runSwapFromGraveyardsEffect } from "./run-round374";
@@ -2027,6 +2028,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileCause":
     case "castRevealedFree":
       return runRound421Effect(s, e, ctx, src);
+    case "revealTopCounterSharing":
+    case "giveEachToDifferentOpponent":
+      return runRound424Effect(s, e, ctx, src);
     case "mayCastExiledSpell":
       return runMayCastExiledSpellEffect(s, e, ctx);
     case "sacrificeTargetsReveal":

@@ -1965,6 +1965,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles && pend.pileMode === "blindExile") return [{ type: "chooseOption", player: pid, choice: pend.piles[0].length <= pend.piles[1].length ? "0" : "1" }];
     // Raging River (round B265): the label whose pile could block this attacker least: the untapped creatures in it
     // (those with flying can block it anyway), weighed by their power and toughness.
+    // Dack Fayden, Helping Hand (round 424): each creature goes to an opponent anyway, goaded by us, so it attacks someone
+    // else: the opponent with the least power on the battlefield gets it, keeping the others busy with each other.
+    if (pend.kind === "chooseOption" && pend.what === "giveControlTo") {
+      const boardPower = (pid: number) => s.battlefield.reduce((n, id) => { const o = obj(s, id); return controllerOf(s, o) === pid && objIsType(s, o, "Creature") ? n + Math.max(0, power(s, o)) : n; }, 0);
+      const pick = [...pend.options].sort((a, b) => boardPower(Number(a)) - boardPower(Number(b)))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "riverSide" && pend.about && s.objects[pend.about]) {
       const a = obj(s, pend.about);
       const pile = (side: "left" | "right") => {
@@ -2266,7 +2273,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "copyAmong") {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
       const best = pend.options.filter((o) => o !== "none").sort((a, b) => size(b) - size(a))[0];
-      const host = s.resolving ? s.objects[s.resolving.item.sourceId ?? ""] : undefined;
+      // Kaya, Spirits' Justice (round 425): its target token, not Kaya.
+      const host = s.resolving ? s.objects[s.resolving.scratch?.copyAmongHost ?? s.resolving.item.sourceId ?? ""] : undefined;
       const now = host && host.zone === "battlefield" ? defWorth(defOf(s, host)) : 0;
       return [{ type: "chooseOption", player: pid, choice: best !== undefined && size(best) > now ? best : "none" }];
     }
@@ -4405,7 +4413,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Frankenstein's Monster's X is capped below by our creature cards in the graveyard (see the X choices).
   const yard = compileCard(d).entersExileFromYard;
   if (yard && yard.n !== "x") {
-    const cards = player(s, pid).graveyard.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c))));
+    // Dermotaxi (round 423): a creature card from any graveyard, worth casting only with one there.
+    const yards = yard.anyGraveyard ? s.turnOrder.flatMap((p) => player(s, p).graveyard) : player(s, pid).graveyard;
+    const cards = yards.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c))));
     if (!cards.some((c) => (yard.n === "one" ? mv(s, c) : characteristics(s, obj(s, c)).toughness) > 0)) return null;
   }
   // Mox Diamond with no other land card to discard would only go to the graveyard.
@@ -6191,6 +6201,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // control that ability could target": only when the copies do us more good than harm (copyEachGain).
   const agrus = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0].eachOther?.copier ? e.effects[0] : undefined;
   if (r && agrus?.type === "copySpell" && agrus.eachOther) return copyEachGain(s, pid, s.stack.find((x) => x.id === r.item.cause), agrus.eachOther) > 0;
+  // Swindler's Scheme (round 424): "you may reveal the top card of your library": a hit trades the opponent's spell for our
+  // top card, so only against a spell of mana value 3 or more.
+  if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "revealTopCounterSharing") {
+    const spell = s.stack.find((x) => x.id === r.item.cause && x.kind === "spell");
+    return !!spell && spell.controller !== pid && spellManaValue(s, spell) >= 3;
+  }
   // Perplexing Chimera (round 413): "you may exchange control of ~ and that spell": an opponent's spell worth more than
   // the Chimera (mana value 4 or more), or one aimed at us or ours (its new targets go to theirs).
   if (r && e?.type === "may" && e.effects[0]?.type === "exchangeSpellControl" && e.effects[0].cause) {

@@ -2,7 +2,7 @@ import type { Effect, ObjRef } from "../abilities";
 import { defOf } from "../cards";
 import { restingDef } from "../faces";
 import { copyWhileHolds, log, player } from "../game";
-import { addCopyEffect, copiableDef, copyKey, exceptFor } from "../copies";
+import { addCopyEffect, copiableDef, copyKey, exceptFor, setChosenTypeAside } from "../copies";
 import type { CardDef, CopyWhile, GameState } from "../types";
 import { ResolveCtx, objects } from "./resolve";
 
@@ -36,7 +36,8 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
   // double-faced card (CR 712.8a); removing it from the graveyard later changes nothing (rulings).
   // Vesuvan Drifter, Deceiver of Form: the card revealed from the top of the library, as printed (CR 707.2, rulings), the
   // front face of a double-faced card (CR 712.8a).
-  if (ref.ref === "chosenFromYard" || ref.ref === "searchFound" || ref.ref === "revealed") {
+  // Dermotaxi (round 423): "the exiled card", linked to it (CR 607.2a), as printed (CR 707.2).
+  if (ref.ref === "chosenFromYard" || ref.ref === "searchFound" || ref.ref === "revealed" || ref.ref === "linkedCard") {
     const o = objects(s, ref, ctx)[0];
     return o && o.zone !== "battlefield" && o.zone !== "stack" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
   }
@@ -82,6 +83,7 @@ export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paus
   const keys = changing.map((o) => copyKey(s, base, exceptFor(s, o, e.except, ctx.sourceDef.name)));
   changing.forEach((o, i) => {
     const was = defOf(s, o).name;
+    setChosenTypeAside(o); // Mirror of the Forebears (round 423)
     addCopyEffect(s, o, keys[i]!, until);
     log(s, `${was} becomes a copy of ${base.name}${until === "endOfTurn" ? " until end of turn" : until ? ` until ${player(s, ctx.controller).name}'s next turn` : ""}.`);
   });
@@ -106,6 +108,7 @@ export function becomeCopyWhile(s: GameState, e: Extract<Effect, { type: "become
       log(s, `${was} doesn't become a copy of ${base.name}: ${e.duration === "whileTargetTapped" ? "that creature isn't tapped" : `${ctx.sourceDef.name} isn't attached to it`}.`);
       return;
     }
+    setChosenTypeAside(o);
     addCopyEffect(s, o, keys[i]!, w);
     log(s, `${was} becomes a copy of ${base.name} for as long as ${e.duration === "whileTargetTapped" ? `${defOf(s, tracked!).name} remains tapped` : `${ctx.sourceDef.name} remains attached to it`}.`);
   });

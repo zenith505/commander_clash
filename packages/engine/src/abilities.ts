@@ -222,6 +222,8 @@ export type Count =
   | { kind: "stackCounteredThisWay" }
   /** Leeches: "that much", the poison counters its loseAllCounters instruction removed. */
   | { kind: "poisonLostThisWay" }
+  /** Pygmy Hippo (round B285): "the amount of mana that player lost this way" (Effect drainLose, ResolvingState.manaLost). */
+  | { kind: "manaLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
   /** "Draw a card for each one they gained control of this way" (Coveted Falcon): those objects (the targets still legal, CR 608.2b) now controlled by that player. */
@@ -4356,6 +4358,18 @@ export type Effect =
    */
   | { type: "drainPower" }
   /**
+   * Pygmy Hippo (round B285): "you may have defending player activate a mana ability of each land they control and lose all
+   * unspent mana": `who` does what Drain Power's target does (effects/run-laneb281.ts activateEachLand), then their whole
+   * pool is lost (CR 106.4), its amount kept for "the amount of mana that player lost this way" (Count manaLostThisWay).
+   */
+  | { type: "drainLose"; who: PlayerRef }
+  /**
+   * Ice Cauldron (round B285): "Put a charge counter on ~ and note the type and amount of mana spent to pay this activation
+   * cost": the mana spent, each one (StackItem.manaSpentTypes; GameObject.notedManaAll), and the card exiled from the hand
+   * just before as the last one exiled with ~ (GameObject.cauldronCard); its source only while it's the same object.
+   */
+  | { type: "noteCauldron" }
+  /**
    * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
    * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the
    * stack as a copy of the original spell." (CR 603.7; its subject is the card in exile, GameState.meddled its spell as it
@@ -8284,7 +8298,7 @@ export type ManaProduce =
   | { kind: "milledSymbols" }
   | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
   /** Jeweled Amulet: "Add one mana of ~'s last noted type" (GameObject.notedMana); none if no type was noted (rulings). */
-  | { kind: "noted" }
+  | { kind: "noted"; /** Ice Cauldron (round B285): "Add ~'s last noted type and amount of mana": all of it, each mana as noted (GameObject.notedManaAll). */ all?: true }
   | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
@@ -8580,6 +8594,13 @@ export interface ManaSpend {
    * controls an ability", game.ts spellGainsAbilities), or a face-down spell, a 2/2 creature with no abilities (CR 708.2a).
    */
   noAbilitySpells?: true;
+  /**
+   * Ice Cauldron (round B285): "Spend this mana only to cast the last card exiled with ~": bound as the mana is made
+   * (spend.ts boundSpend) to `card`, the card ~ last exiled (GameObject.cauldronCard), only while it's that object in exile
+   * (CR 400.7), any cost of casting it (rulings: its additional costs too); null with none.
+   */
+  lastExiled?: true;
+  card?: { id: ObjectId; zc: number } | null;
   text: string;
 }
 

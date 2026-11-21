@@ -24251,6 +24251,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2b7e4e70-53b1-4d4f-bdcc-56c2e15f367a",
+  "name": "Ice Cauldron",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: You may exile a nonland card from your hand. You may cast that card for as long as it remains exiled. Put a charge counter on this artifact and note the type and amount of mana spent to pay this activation cost. Activate only if there are no charge counters on this artifact.\n{T}, Remove a charge counter from this artifact: Add this artifact's last noted type and amount of mana. Spend this mana only to cast the last card exiled with this artifact.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c532ecd2-feeb-41f5-bda0-b05e86f86a45",
   "name": "Ice Cave",
   "manaCost": "{3}{U}{U}",
@@ -39150,6 +39172,41 @@
   "commanderLegal": "legal",
   "set": "sth",
   "releasedAt": "1998-03-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0d39513a-1f05-4d9a-a772-745f4f1a3471",
+  "name": "Pygmy Hippo",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Hippo",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hippo"
+  ],
+  "oracleText": "Whenever this creature attacks and isn't blocked, you may have defending player activate a mana ability of each land they control and lose all unspent mana. If you do, this creature assigns no combat damage this turn and at the beginning of your next main phase this turn, you add an amount of {C} equal to the amount of mana that player lost this way.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

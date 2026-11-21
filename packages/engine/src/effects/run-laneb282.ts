@@ -150,7 +150,7 @@ function putMeddled(s: GameState, o: GameObject, orig: StackItem, card: GameObje
   const name = orig.description;
   s.stack.push({ ...rest, id, kind: "spell", objectId: o.id, controller: who, copy: true, description: name });
   log(s, `${player(s, who).name} puts ${o.faceDown ? "a face-down spell" : nameOf(s, o.id)} onto the stack as a copy of the original spell${describeTargets(s, rest.targets ?? [])}.`);
-  fireEvent(s, { type: "cast", stackId: id, controller: who, card: defOf(s, o), copy: true });
+  fireEvent(s, { type: "cast", stackId: id, controller: who, card: defOf(s, o), copy: true, copyOf: orig.id });
   fireEvent(s, { type: "targeted", stackId: id });
 }
 

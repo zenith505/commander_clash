@@ -37,6 +37,7 @@ import { roundB278Line } from "./laneb278-lines";
 import { roundB279Line } from "./laneb279-lines";
 import { roundB280Line } from "./laneb280-lines";
 import { roundB281Line } from "./laneb281-lines";
+import { roundB282Line } from "./laneb282-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2490,6 +2491,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB280Line(line, out, isSpell)) continue;
     // Celestial Dawn (round B281).
     if (roundB281Line(line, out, isSpell)) continue;
+    // Ertai's Meddling, Shared Fate (round B282).
+    if (roundB282Line(line, out, isSpell, d)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

@@ -4356,6 +4356,13 @@ export type Effect =
    */
   | { type: "drainPower" }
   /**
+   * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
+   * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the
+   * stack as a copy of the original spell." (CR 603.7; its subject is the card in exile, GameState.meddled its spell as it
+   * was; effects/run-laneb282.ts).
+   */
+  | { type: "meddleReturn" }
+  /**
    * Alaundo the Seer (round B279): "Then remove a time counter from each other card you own in exile": every card its
    * controller owns in exile with a time counter, face up or down, suspended or not (rulings), but those this resolution
    * exiled from a hand (ResolvingState.exiledFromHandCards).
@@ -5443,6 +5450,14 @@ export type Effect =
       plot?: true;
       /** With `exileSpell`: the card exiled is linked to this source (CR 607.2a), "the exiled card" of its other ability (Smirking Spelljacker). */
       linked?: true;
+      /**
+       * With `exileSpell`, Ertai's Meddling (round B282): "Target spell's controller exiles it with X delay counters on it." (a
+       * copy ceases to exist, CR 707.10a); with `meddleReturn`, the card later comes back as a copy of the spell it was
+       * (effects/run-laneb282.ts).
+       */
+      meddle?: true;
+      /** With `meddle`: its "At the beginning of each of that player's upkeeps ..." line too. */
+      meddleReturn?: true;
       /** With `exileSpell`: airbend (CR 701.65a): while the card stays exiled, its owner may cast it for this rather than its mana cost. */
       ownerMayCost?: string;
       /** With `ownerMayCost`: an instruction to airbend (CR 701.65b, round 427). */
@@ -9771,6 +9786,13 @@ export interface CompiledCard {
    * player's draws.
    */
   drawWeirding?: true;
+  /**
+   * Shared Fate (round B282): "If a player would draw a card, that player exiles the top card of one of their opponents'
+   * libraries face down instead." (CR 614.1a): every player's draws, each Shared Fate a replacement of its own (rulings).
+   */
+  drawSharedFate?: true;
+  /** With `drawSharedFate`: "Each player may look at cards they exiled with ~, and they may play lands and cast spells from among those cards." */
+  sharedFatePlay?: true;
   /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as

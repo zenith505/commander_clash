@@ -1,7 +1,7 @@
 # Roadmap
 
-31,817 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
+31,819 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,947 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -3615,7 +3615,7 @@ line blocks.
    Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
    Killer, Celestial Dawn (done in round B281), Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr (done in round B263),
-   Shared Fate, Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
+   Shared Fate (done in round B282), Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
    Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
    round 285: Koh, the Face Stealer's "Pay 1 life: Choose a creature card exiled with Koh." and "Koh has all activated and
@@ -4467,7 +4467,7 @@ line blocks.
    Out after round 431 (looked at, not done): Filigree Vector (done in round B280) and Battlefield Thaumaturge (still out, as after round
    430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
    that creature's, checked with its last known power), Drain Power (done in round B281) (mana abilities another player activates for each land,
-   then that mana moved), Ertai's Meddling (delay counters, then the card put onto the stack as a copy of the spell), the
+   then that mana moved), Ertai's Meddling (done in round B282) (delay counters, then the card put onto the stack as a copy of the spell), the
    cards rounds 425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still
    out, for the reasons in their earlier lists). Judgment calls: Hama's X is the exiled card's mana value as it is in exile,
    fixed as it's exiled (a split card's both halves, CR 709.4); "X can't be 0" in a "Suspend X" line holds for The Face of
@@ -5776,7 +5776,7 @@ line blocks.
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of
-   combat, attacking for them); Ertai's Meddling (delay counters, then put onto the stack as a copy); Expose the Culprit (done in round 391)
+   combat, attacking for them); Ertai's Meddling (done in round B282) (delay counters, then put onto the stack as a copy); Expose the Culprit (done in round 391)
    (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (hatching
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
    for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
@@ -11669,6 +11669,39 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B282 (least played first, two of the three cards round B281 named next, neither in Lane A's rounds 433-434):
+  Ertai's Meddling's "X can't be 0." (CR 107.3b, so it can't be cast without paying its mana cost, rulings), "Target spell's
+  controller exiles it with X delay counters on it." (exiled, not countered, so a spell that can't be countered goes too,
+  CR 701.6a; a copy of a spell ceases to exist and gets nothing, CR 707.10a, rulings; counterSpell `exileSpell` `meddle`,
+  effects/run-laneb282.ts meddleExile) and "At the beginning of each of that player's upkeeps, if that card is exiled,
+  remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the stack as a copy of the
+  original spell." (a delayed triggered ability the spell's controller controls, CR 603.7d, at each upkeep of the spell's
+  controller from the next one on, DelayedTrigger `eachPlayersUpkeepWhileExiled`, while that card is that object in exile,
+  CR 400.7, 603.4; the spell as it left the stack is noted, GameState.meddled; the card itself goes onto the stack under
+  that player's control with every decision made for it, its modes, X, targets as the objects they were then, kicker and
+  other additional or alternative costs, CR 707.10, the flashback cost paid among them, so it's exiled as it leaves the
+  stack again, rulings; it isn't cast, so nothing about casting sees it and a permanent it becomes wasn't cast,
+  GameObject.putNotCast, rulings; it can be countered or meddled with again, rulings). Shared Fate's "If a player would
+  draw a card, that player exiles the top card of one of their opponents' libraries face down instead." (a replacement of
+  every player's draws, CR 614.1a, each Shared Fate one of its own the drawing player chooses among, rulings, with the
+  opponent: game.ts drawReplacementChoices `fate:<id>:<opponent>`; never their own library, and an empty one exiles nothing,
+  rulings) and "Each player may look at cards they exiled with this enchantment, and they may play lands and cast spells
+  from among those cards." (that player sees the card, CR 406.3, and may play it, a land as their land play, a spell
+  paying its costs, rulings, for as long as that Shared Fate is on the battlefield as that object: GameObject.mayPlay until
+  "source"; nothing else may be done with them, rulings). Bots answer an opponent's spell with mana value 3 or more with the
+  Meddling as with a counterspell, X as big as they can pay, and exile from the opponent with the most cards in their
+  library. A browser test clicks through Divination's two draws with Shared Fate and casts Ana's Grizzly Bears from her
+  exile. +2, 31,819 of 31,936 on B281's branch. The compiled text of every other card is unchanged.
+- Out after round B282 (looked at, not done): the lists after round B281 stay out. Psychic Battle (still out: "Whenever a
+  player chooses one or more targets" is every choice of targets, as spells are cast, abilities activated or put on the
+  stack, copies get new targets and effects change targets, its own excepted, each with a reveal and the winner's change
+  of targets, CR 115.7, before the item resolves; not one hook yet). Judgment calls: Ertai's Meddling's card put onto the
+  stack is a copy of a spell put onto the stack (CR 707.10), so "whenever you cast or copy" abilities (magecraft) see it,
+  though cast triggers don't; Shared Fate offers an opponent whose library is empty (the text names no library with a
+  card). Known gaps: a face-down spell Ertai's Meddling exiles comes back face down (its rulings make it a face-up 2/2 with
+  no name, text or color, which the engine has no way to show), so its morph or disguise cost could turn it face up; the
+  draw Notion Thief or Alms Collector gives a player who could dredge or has a first-draw look (Scion of Halaster) isn't
+  offered to Shared Fate (that path draws without asking, as before). Next in line (not looked at closely yet): Uvilda, Dean of Perfection, Synthesis Pod, The Dragon-Kami Reborn.
 - Round B281 (least played first, the two cards round B280 named next that Lane A's rounds 432-433 don't take): Celestial
   Dawn's "Lands you control are Plains." (each land its controller controls has the land type Plains instead of its others,
   loses the abilities of its rules text and taps for {W}, CR 305.7, layer 4; supertypes stay and a land that would enter
@@ -11695,7 +11728,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   round B172). Known gaps: Drain Power doesn't offer a land's mana ability that would ask something more as it's activated
   (a creature to tap, a permanent to sacrifice for an added cost, Rhystic Cave's "unless any player pays", a color another
   player chooses, a card milled first), so such a land isn't activated; the drained player's order is fixed (cost-free
-  abilities first, then battlefield order). Next in line (not looked at closely yet): Shared Fate, Ertai's Meddling, Psychic Battle.
+  abilities first, then battlefield order). Next in line (not looked at closely yet): Shared Fate (done in round B282), Ertai's Meddling (done in round B282), Psychic Battle.
 - Round B280 (least played first, from the Lane B skip lists and the cards round B279 named next, none in Lane A's rounds
   431-432): Filigree Vector's "When this creature enters, put a +1/+1 counter on each of any number of target creatures and
   a charge counter on each of any number of target artifacts." (one triggered ability with two groups of targets, each
@@ -12549,7 +12582,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B186 (looked at, not done): Coffin Queen ("When ~ becomes untapped or you lose control of ~": whether ~
   leaving the battlefield after the ability resolved counts as losing control of it isn't settled by its rulings) stays out.
 - Out after round B185 (looked at, not done): Aeon Engine (reversing turn order changes every "in turn
-  order", APNAP and "next player" reading), Kheru Mind-Eater and Shared Fate (playing cards exiled face down by another
+  order", APNAP and "next player" reading), Kheru Mind-Eater and Shared Fate (done in round B282) (playing cards exiled face down by another
   player), Drain Power (done in round B281) (mana abilities activated for another player, then that mana moved), Dreamshaper Shaman (done in round B219) and Shifting
   Shadow (see the earlier lists) stay out.
 - Out after round B183 (looked at, not done): The Fugitive Doctor (done in round B184) ("gains flashback {2}{R}{G} until end of turn": round 340's
@@ -13056,7 +13089,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match (done in round B185), Reweave (done in round B215), Kheru Mind-Eater, Day of the Dragons (supported), Bloodbond March (done in round B185), Song of Inspiration (done in round B219), Countersculpt, Order of
-  Succession (supported), Drain Power (done in round B281), Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation (done in round B213), Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate.
+  Succession (supported), Drain Power (done in round B281), Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation (done in round B213), Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate (done in round B282).
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation (done in round B185), The Fugitive Doctor (done in round B184), Shifting Shadow, Prince of Thralls (done in round B185),
   Eriette, Manifold Insights (done in round B185), Fortune's Favor (supported), Curse of Inertia (done in round B184), Dreamshaper Shaman (done in round B219), Fishing Pole, Regna's Sanction (done in round B184),

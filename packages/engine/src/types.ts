@@ -416,6 +416,11 @@ export interface GameObject {
   movedWith?: { id: ObjectId; zc: number }[];
   /** A copy of a spell (CR 707.10): not a card; it ceases to exist off the stack (707.10a), or becomes a token (608.3f). */
   spellCopy?: boolean;
+  /**
+   * Ertai's Meddling (round B282): this card was put onto the stack as a copy of a spell (CR 707.10), not cast, so the
+   * permanent it becomes wasn't cast either. Cleared as it leaves the stack.
+   */
+  putNotCast?: true;
   /** "The copy gains haste and ..." (Nalfeshnee): an effect on the copy, which goes on applying to the token it becomes (CR 400.7a). */
   copyGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string };
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
@@ -1444,7 +1449,7 @@ export interface DelayedTrigger {
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
   /** `playersNextUpkeep`: at the beginning of `player`'s next upkeep (Phytotitan: the card's owner's). */
-  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** Nafs Asp: at the beginning of `player`'s next draw step (this turn's, if it hasn't begun yet). */ "playersNextDraw" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | /** Dimensional Breach (round B274): at the beginning of each player's upkeep on a later turn, for as long as one of its cards remains exiled (its body's breachReturn). */ "eachUpkeepWhileExiled" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked" | /** With `thisTurn`: each time the subject attacks one of `controller`'s opponents this turn (Maeve, Insidious Singer). */ "attacksOpponent" | /** Meandering Towershell, Noctis: at the beginning of `player`'s next declare attackers step (with `laterTurn`, on a later turn), after attackers are declared (CR 508.1). */ "playersNextDeclareAttackers";
+  when: /** Vivien's Stampede: a later main phase of the turn it was made, never one on a later turn. */ "nextMainThisTurn" | "nextEndStep" | "yourNextEndStep" | "yourNextTurnEndStep" | "playersNextEndStep" | /** Suppress: the end step of `player`'s next turn, a later turn. */ "playersNextTurnEndStep" | "playersNextUpkeep" | /** Nafs Asp: at the beginning of `player`'s next draw step (this turn's, if it hasn't begun yet). */ "playersNextDraw" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | /** Dimensional Breach (round B274): at the beginning of each player's upkeep on a later turn, for as long as one of its cards remains exiled (its body's breachReturn). */ "eachUpkeepWhileExiled" | /** Ertai's Meddling (round B282): at the beginning of each of `player`'s upkeeps on a later turn, for as long as the subject is that card in exile. */ "eachPlayersUpkeepWhileExiled" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked" | /** With `thisTurn`: each time the subject attacks one of `controller`'s opponents this turn (Maeve, Insidious Singer). */ "attacksOpponent" | /** Meandering Towershell, Noctis: at the beginning of `player`'s next declare attackers step (with `laterTurn`, on a later turn), after attackers are declared (CR 508.1). */ "playersNextDeclareAttackers";
   player?: PlayerId;
   combat?: number;
   /** With "playersNextDeclareAttackers": only on a later turn than the one it was made in ("on your next turn"). */
@@ -2400,6 +2405,12 @@ export interface GameState {
   graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number; /** What put them there, for the prompt (a merged permanent's cards if left out). */ source?: string; /** Who arranges them, if not their owner ("in any order", Misinformation). */ by?: PlayerId } }[];
   /** How many times abilities that ask ("if this is the second time this ability has resolved this turn") resolved this turn, by source object and ability. */
   resolutionCounts?: { turn: number; counts: Record<string, number> };
+  /**
+   * Ertai's Meddling (round B282): each card it exiled from the stack, as that object in exile (CR 400.7), with the spell it
+   * was as it left the stack (its stack item and its object then), for "puts it onto the stack as a copy of the original
+   * spell" (CR 707.10). Dropped once the card isn't that object in exile any more.
+   */
+  meddled?: { id: ObjectId; zc: number; item: StackItem; card: GameObject }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number; /** Maralen, Fae Ascendant (round 406): the turn it was exiled, for "cards exiled with ~ this turn". */ turn?: number }[]>;
   /** Soul Scourge, Laquatus's Champion: the player its enters ability targeted, by "sourceId@zc", for "that player" in its leaves ability (rulings). */

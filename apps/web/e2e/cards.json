@@ -2902,6 +2902,75 @@
   "gameChanger": false
  },
  {
+  "oracleId": "be2a4bc4-8af6-48c5-9421-32d26272e71a",
+  "name": "Arguel's Blood Fast // Temple of Aclazotz",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Enchantment // Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}{B}, Pay 2 life: Draw a card.\nAt the beginning of your upkeep, if you have 5 or less life, you may transform Arguel's Blood Fast.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Transform"
+  ],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Arguel's Blood Fast",
+    "manaCost": "{1}{B}",
+    "typeLine": "Legendary Enchantment",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [],
+    "oracleText": "{1}{B}, Pay 2 life: Draw a card.\nAt the beginning of your upkeep, if you have 5 or less life, you may transform Arguel's Blood Fast.",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/c/4/c4ac7570-e74e-4081-ac53-cf41e695b7eb.jpg?1783935780",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/c/4/c4ac7570-e74e-4081-ac53-cf41e695b7eb.jpg?1783935780"
+   },
+   {
+    "name": "Temple of Aclazotz",
+    "manaCost": "",
+    "typeLine": "Legendary Land",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "(Transforms from Arguel's Blood Fast.)\n{T}: Add {B}.\n{T}, Sacrifice a creature: You gain life equal to the sacrificed creature's toughness.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/c/4/c4ac7570-e74e-4081-ac53-cf41e695b7eb.jpg?1783935780",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/c/4/c4ac7570-e74e-4081-ac53-cf41e695b7eb.jpg?1783935780"
+   }
+  ]
+ },
+ {
   "oracleId": "3d5b6151-d985-423b-8ade-f00958bbd3f6",
   "name": "Armed and Armored",
   "manaCost": "{1}{W}",
@@ -3147,6 +3216,37 @@
   "set": "who",
   "releasedAt": "2023-10-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "67d66678-a8e6-4f80-bade-1f1daf4b0610",
+  "name": "Ashiok, Wicked Manipulator",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Ashiok",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Ashiok"
+  ],
+  "oracleText": "If you would pay life while your library has at least that many cards in it, exile that many cards from the top of your library instead.\n+1: Look at the top two cards of your library. Exile one of them and put the other into your hand.\n−2: Create two 1/1 black Nightmare creature tokens with \"At the beginning of combat on your turn, if a card was put into exile this turn, put a +1/+1 counter on this token.\"\n−7: Target player exiles the top X cards of their library, where X is the total mana value of cards you own in exile.",
+  "loyalty": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -32697,6 +32797,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2b8c2882-dbca-466a-a0af-dd1d65edfe7c",
+  "name": "Mimeoplasm, Revered One",
+  "manaCost": "{X}{B}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Ooze",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ooze"
+  ],
+  "oracleText": "As Mimeoplasm enters, exile up to X creature cards from your graveyard. It enters with three +1/+1 counters on it for each creature card exiled this way.\n{2}: Mimeoplasm becomes a copy of target creature card exiled with it, except it's 0/0 and has this ability.",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d8377869-f8f7-4b4b-93ad-3ad3c4826b1a",
   "name": "Mind Bend",
   "manaCost": "{U}",
@@ -35340,6 +35476,42 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "148271de-3351-41a1-bcf5-3ecaadc51540",
+  "name": "Nihiloor",
+  "manaCost": "{2}{W}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Horror",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horror"
+  ],
+  "oracleText": "When Nihiloor enters, for each opponent, tap up to one untapped creature you control. When you do, gain control of target creature that player controls with power less than or equal to the tapped creature's power for as long as you control Nihiloor.\nWhenever you attack with a creature an opponent owns, you gain 2 life and that player loses 2 life.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -42695,6 +42867,43 @@
   "commanderLegal": "legal",
   "set": "cmr",
   "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2676ba6d-e7a7-48cf-9c86-6e2a11f03096",
+  "name": "Sanar, Innovative First-Year",
+  "manaCost": "{2}{U/R}{U/R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Goblin Sorcerer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Sorcerer"
+  ],
+  "oracleText": "Vivid — At the beginning of your first main phase, reveal cards from the top of your library until you reveal X nonland cards, where X is the number of colors among permanents you control. For each of those colors, you may exile a card of that color from among the revealed cards. Then shuffle. You may cast the exiled cards this turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Vivid"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

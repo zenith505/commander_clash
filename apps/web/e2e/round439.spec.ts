@@ -35,13 +35,17 @@ test("Arvinox, the Mind Flail: at your end step it exiles Ana's bottom card face
   lib.push(viper);
   const s = playUntil(s0, (st) => st.step === "end" && st.activePlayer === 0 && !st.stack.length && !st.triggerQueue.length && !st.pending && st.objects[viper]!.zone === "exile");
   expect(s.objects[viper]!.hiddenExile?.seen).toEqual([0]);
-  await open(page, s);
+  // The page passes your priority at your own end step with nothing on the stack (useGame shouldAutoPass), so the game
+  // moved on to Ana's turn mid-click now and then. Open on Ana's end step instead, with your priority: the page stops
+  // there, and the Viper (flash) can still be cast from that exile.
+  const atAna = playUntil(s, (st) => st.step === "end" && st.activePlayer === 1 && st.priority === 0 && !st.stack.length && !st.pending);
+  expect(atAna.objects[viper]!.zone).toBe("exile");
+  await open(page, atAna);
   const theirs = seat(page, 1).locator(".zone", { hasText: "Exile" });
   await theirs.click();
   await expect(modal(page).locator(".zone-tag")).toHaveText("face down");
   await modal(page).locator(".card.playable", { hasText: "Ambush Viper" }).click();
-  const item = menu(page).getByRole("button", { name: /^Cast/ });
-  if (await item.count()) await item.first().click();
+  await menu(page).getByRole("button", { name: /^Cast/ }).first().click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[viper]!.zone === "battlefield");
   expect(after.objects[viper]!.controller).toBe(0);
   expect(after.objects[viper]!.owner).toBe(1);

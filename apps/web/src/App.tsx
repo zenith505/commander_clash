@@ -549,7 +549,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
   exile?: true;
   /** Night Soil: "from a single graveyard": the cards picked all have the same owner. */
   singleYard?: true;
-  /** Throne of the Grim Captain: one of the picks for each of the craft cost's slots (craftSlotsFit). */
+  /** Throne of the Grim Captain: one of the picks for each of the craft cost's slots (craftSlotsFit); Eye of Ojer Taq (round 434): picks that share a card type. */
   craftSlots?: Extract<AdditionalCost, { kind: "craft" }>;
   /** Nethergoyf's escape: the cards picked have at least this many card types among them (cardTypesAmong). */
   cardTypes?: number;
@@ -952,7 +952,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.craft !== undefined) continue;
         // "One or more" (CR 702.167a): any number from `n` up, so every candidate may be picked.
         const candidates = craftCandidates(s, HUMAN, s.objects[d.objectId]!, c);
-        return setCostPick({ activate: d, kind: "craft", label: cardOf(s, d.objectId).name, what: `craft: exile ${craftWhat(c)} ${c.cardsOnly ? "from your graveyard" : "you control or from your graveyard"}`, n: c.orMore ? Math.max(c.n, candidates.length) : c.n, ...(c.orMore ? { min: c.n } : {}), ...(c.slots ? { craftSlots: c } : {}), candidates, chosen: [] });
+        return setCostPick({ activate: d, kind: "craft", label: cardOf(s, d.objectId).name, what: `craft: exile ${craftWhat(c)} ${c.cardsOnly ? "from your graveyard" : "you control or from your graveyard"}`, n: c.orMore ? Math.max(c.n, candidates.length) : c.n, ...(c.orMore ? { min: c.n } : {}), ...(c.slots || c.shareCardType ? { craftSlots: c } : {}), candidates, chosen: [] });
       }
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
@@ -6235,7 +6235,8 @@ function Controls({
     return (
       <div className="controls card-type-pick">
         <span>
-          <strong>{pending.source}:</strong> choose a card type
+          {/* Apex Observatory (round 434): "a card type shared among two exiled cards used to craft it". */}
+          <strong>{pending.source}:</strong> {pending.prompt?.startsWith("choose a card type shared") ? pending.prompt : "choose a card type"}
         </span>
         {pending.options.map((o) => (
           <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>

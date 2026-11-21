@@ -194,6 +194,7 @@ import { round429Line } from "./round429";
 import { round430Line } from "./round430";
 import { round431Line } from "./round431";
 import { round432Line } from "./round432";
+import { round434Line } from "./round434";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1079,6 +1080,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 434: oracle/round434.ts.
+    if (round434Line(line, raw, out, isSpell)) continue;
     // Round 432: oracle/round432.ts.
     if (round432Line(line, raw, out, isSpell)) continue;
     // Round 431: oracle/round431.ts.
@@ -8124,7 +8127,8 @@ function linkExile(out: CompiledCard) {
   // Myr Welder: "all cards exiled with it" are the ones its one exile ability exiled (CR 607.2a). Territory Forge, Idris
   // (round 399): "the exiled card", Idris's exiled until it leaves the battlefield (a pick, not a target). Koh, the Face
   // Stealer: "a creature card exiled with ~" is one that any of its exile abilities exiled (CR 607.4).
-  if (out.borrows?.linked) {
+  // Locus of Enlightenment (round 434): its craft's exiled cards are linked by the craft (CR 702.167c), not by an exile here.
+  if (out.borrows?.linked && !out.borrows.crafted) {
     const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> | Extract<Effect, { type: "pick" }> => e.type === "exile" || (e.type === "pick" && e.action === "exile"));
     const others = all.some((e) => e.type === "exileGraveyard" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "exileTop" || (e.type === "discard" && !!e.exile));

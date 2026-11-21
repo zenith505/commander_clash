@@ -1,7 +1,7 @@
 # Roadmap
 
-31,812 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
+31,817 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,948 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4536,6 +4536,35 @@ line blocks.
    says so for it); Jace's Machinations has rulings only on Empower Jace and the once-a-turn limit. Known gaps: bots don't
    plan to activate a Jace's loyalty abilities on other players' turns; a copy's "named <its name>" ability that only reads
    with "~" (Biovisionary's) isn't kept by a renamed copy.
+   Round 434 went on down the "Out after round N" lists and `npm run popular`, most played first, to the two craft cards
+   whose materials weren't modeled. Eye of Ojer Taq's "Craft with two that share a card type {6}" (any two other permanents
+   you control and/or cards in your graveyard with a card type in common, a permanent's as it is now and a card's printed
+   ones, CR 702.167a-b; two lands do, rulings; AdditionalCost craft `shareCardType`, checked by craftSlotsFit) and Apex
+   Observatory's "This artifact enters tapped. As it enters, choose a card type shared among two exiled cards used to craft
+   it." and "{T}: The next spell you cast this turn of the chosen type can be cast without paying its mana cost." (the cards
+   the craft cost exiled, still in exile, CR 702.167c, 607.2a; a token isn't one, so with a token among them no type is
+   chosen and the ability does nothing, rulings; entersChoose `craftedShared`, game.ts craftedSharedTypes; then World War
+   Hulk's alternative cost for the first spell of that type this turn, CR 118.9). The Enigma Jewel's "Craft with four or
+   more nonlands with activated abilities {8}{U}" (nonland permanents and cards with an activated ability as they are now,
+   mana abilities and ones that work only from a hand or graveyard too, CR 602.1, 605.1a; craft `withActivated`,
+   game.ts hasActivatedAbility) and Locus of Enlightenment's "Locus of Enlightenment has each activated ability of the
+   exiled cards used to craft it. You may activate each of those abilities only once each turn." (as Mairsil's: each card's
+   an instance of its own, once each turn each, their mana and loyalty abilities too, CR 606.3; borrows `crafted`,
+   `withLoyalty`) and "Whenever you activate an ability that isn't a mana ability, copy it. You may choose new targets for
+   the copy." (Rowan Kenrith's emblem's trigger; the copy isn't activated, rulings). Browser tests click through Eye's
+   picker (Done only once the two share a type) and Apex Observatory's card type, its free Colossal Dreadmaw, and The Enigma
+   Jewel's picker and Locus's copied ping. +2, 31,817 of 31,936 on this stacked branch (round 433 #716); the compiled text of
+   every other card is unchanged.
+   Out after round 434 (looked at, not done): Captain America, First Avenger and Pulmonic Sliver (still out, as after round
+   433), Filigree Vector (done in round B280), Drain Power (done in round B281), Battlefield Thaumaturge, Nihiloor,
+   Ertai's Meddling and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds 425-430 left out (still out, for their
+   reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists).
+   Judgment calls: a permanent with cycling, unearth or another ability that works only from another zone has an
+   activated ability for The Enigma Jewel's craft (it has the ability where it doesn't function, CR 113.6); a craft material's card types for Eye of
+   Ojer Taq are a double-faced card's front face's in a graveyard (CR 712.8a). Known gaps: Locus of Enlightenment doesn't
+   get equip abilities (as Mairsil, an equip that couldn't attach it to anything, CR 301.5b-c, so only its activation and
+   the copy trigger are missing); bots tap Apex Observatory only in their main phase with a card of the chosen type in
+   hand with mana value 3 or more, and choose a card type as for any other choice.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

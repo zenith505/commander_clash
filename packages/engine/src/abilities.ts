@@ -1130,6 +1130,8 @@ export interface TargetSpec {
   inGraveyardOfTarget?: number;
   /** "Choose target opponent ... Destroy target nonblack creature that player controls" (Keeper of the Dead): controlled by this player target. A planeswalker target ("target player or planeswalker", Searing Blaze): by its controller. */
   controlledByTarget?: number;
+  /** Glyph of Delusion (round B291): "target creature that target Wall blocked this turn": blocked this turn by this object target, both as the objects they are now (TurnLog.blocks, CR 400.7). */
+  blockedByTarget?: number;
   /** Portal Manipulator: "choose target player and any number of target attacking creatures their opponents control": controlled by an opponent of this player target (any other player, CR 102.3). */
   controlledByOpponentOfTarget?: number;
   /**
@@ -4418,6 +4420,12 @@ export type Effect =
    */
   | { type: "refineTick" }
   | { type: "refineCast" }
+  /**
+   * God-Eternal Kefnet (round B291, CompiledCard.kefnetReveal): "copy that card and you may cast the copy. That copy costs
+   * {2} less to cast." The subject is the card revealed; the copy is made in its owner's hand and cast from there as this
+   * resolves, or never (rulings), for `less` less generic mana (CR 601.2f).
+   */
+  | { type: "kefnetCopy"; less: number }
   /**
    * Synthesis Pod (round B283): "Target opponent reveals cards from the top of their library until they reveal a card with
    * mana value equal to 1 plus the exiled spell's mana value. Exile that card, then that player shuffles. You may cast that
@@ -9903,6 +9911,12 @@ export interface CompiledCard {
    * creature card, that player discards it unless they pay 3 life." (CR 614.1a): every player's draws.
    */
   drawBreathstealer?: true;
+  /**
+   * God-Eternal Kefnet (round B291): "You may reveal the first card you draw each turn as you draw it. Whenever you reveal an
+   * instant or sorcery card this way, copy that card and you may cast the copy. That copy costs {2} less to cast." Asked as
+   * its controller draws their first card of a turn (game.ts kefnetAsk); a card revealed triggers Effect kefnetCopy.
+   */
+  kefnetReveal?: { less: number; text: string };
   /**
    * Shared Fate (round B282): "If a player would draw a card, that player exiles the top card of one of their opponents'
    * libraries face down instead." (CR 614.1a): every player's draws, each Shared Fate a replacement of its own (rulings).

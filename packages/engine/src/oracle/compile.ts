@@ -46,6 +46,7 @@ import { roundB287Line } from "./laneb287-lines";
 import { roundB288Line, roundB288Loyalty } from "./laneb288-lines";
 import { roundB289Line } from "./laneb289-lines";
 import { roundB290Line } from "./laneb290-lines";
+import { roundB291Line } from "./laneb291-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2534,6 +2535,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB289Line(line, out, isSpell)) continue;
     // Golgothian Sylex, Apocalypse Chime, City in a Bottle (round B290).
     if (roundB290Line(line, out, isSpell)) continue;
+    // God-Eternal Kefnet (round B291).
+    if (roundB291Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

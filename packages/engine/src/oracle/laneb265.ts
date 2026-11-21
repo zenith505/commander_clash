@@ -2,6 +2,7 @@
 // Phyrexian Portal's and Raging River's lines are roundB265Line in oracle/laneb265-lines.ts.
 import type { AbilityBody } from "../abilities";
 import { parseBody } from "./body";
+import { roundB291Spell } from "./laneb291-lines";
 
 const REVERSAL = "Target opponent reveals their hand. You may copy an instant or sorcery card in it. If you do, you may cast the copy without paying its mana cost.";
 
@@ -17,5 +18,5 @@ export function roundB265Spell(text: string): AbilityBody | null | undefined {
     if (!b || b.targets.length !== 1 || b.effects.length !== 2 || look?.type !== "lookAtHand" || cast?.type !== "castFromAmong" || !cast.fromHand || cast.max !== 1 || !cast.filter) return null;
     return { ...b, effects: [look, { ...cast, copies: true }], text };
   }
-  return undefined;
+  return roundB291Spell(text);
 }

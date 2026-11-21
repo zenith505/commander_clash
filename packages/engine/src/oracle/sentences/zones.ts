@@ -151,7 +151,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Goliath Daydreamer: "you may cast a spell from among cards you own in exile with dream counters on them without paying
   // its mana cost": one now, as this resolves (rulings), from every card you own in exile with one (not only those it
   // exiled), timing ignored.
-  if (/^[Yy]ou may cast a spell from among cards you own in exile with dream counters on them without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, ownExileCounter: "dream", max: 1 }];
+  // Dragon-Kami's Egg (round B283): "a creature spell from among cards you own in exile with hatching counters on them":
+  // the same, cast as a creature spell (the spell as it's cast, `asSpell`), face-down cards there too (the owner may look
+  // at them, rulings).
+  const amongCounters = /^[Yy]ou may cast a (creature )?spell from among cards you own in exile with (dream|hatching) counters on them without paying its mana cost$/.exec(s);
+  if (amongCounters && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, ownExileCounter: amongCounters[2]!, max: 1, ...(amongCounters[1] ? { filter: { kind: "card" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature spell" }, asSpell: true as const } : {}) }];
   // Ashiok, Nightmare Muse: "You may cast up to three spells from among face-up cards your opponents own from exile without
   // paying their mana costs": one at a time as this resolves, timing ignored (rulings), not later.
   if (/^[Yy]ou may cast up to three spells from among face-up cards your opponents own from exile without paying their mana costs$/.test(s) && !ctx.spell) return [{ type: "castFromAmong", who: { ref: "you" }, n: 0, opponentsExile: true, max: 3 }];

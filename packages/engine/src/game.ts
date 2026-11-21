@@ -10550,10 +10550,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       const what = craftWhat(c);
       const chosen = choices?.craft;
       if (!chosen) {
-        if (pool.length < c.n || (c.slots && !craftSlotsFit(s, pid, c, pool, true))) return `you need to exile ${what} ${c.cardsOnly ? "from your graveyard" : "you control or in your graveyard"} to ${doing}`;
+        if (pool.length < c.n || ((c.slots || c.shareCardType) && !craftSlotsFit(s, pid, c, pool, true))) return `you need to exile ${what} ${c.cardsOnly ? "from your graveyard" : "you control or in your graveyard"} to ${doing}`;
         continue;
       }
-      if ((c.orMore ? chosen.length < c.n : chosen.length !== c.n) || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (c.slots && !craftSlotsFit(s, pid, c, chosen))) return `choose ${what} to exile`;
+      if ((c.orMore ? chosen.length < c.n : chosen.length !== c.n) || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || ((c.slots || c.shareCardType) && !craftSlotsFit(s, pid, c, chosen))) return `choose ${what} to exile`;
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
@@ -11041,13 +11041,27 @@ export function processExiled(s: GameState, pid: PlayerId, chosen: ObjectId[], m
 export function craftCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "craft" }>): ObjectId[] {
   const field = c.cardsOnly ? [] : s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false));
   const yard = player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
-  return [...field, ...yard];
+  // The Enigma Jewel (round 434): "with activated abilities": the abilities each one has now, granted ones too (CR 613.1f).
+  return c.withActivated ? [...field, ...yard].filter((id) => hasActivatedAbility(s, obj(s, id))) : [...field, ...yard];
+}
+
+/** Whether `o` has an activated ability (CR 602.1), a mana ability among them (CR 605.1a), as it is now in its zone. */
+export function hasActivatedAbility(s: GameState, o: GameObject): boolean {
+  const ab = abilitiesOf(s, o);
+  return ab.activated.length > 0 || ab.mana.length > 0;
+}
+
+/** Eye of Ojer Taq (round 434): the card types of a craft material, a permanent's as it is now, a card's printed ones (CR 702.167b, 109.2). */
+function craftCardTypes(s: GameState, id: ObjectId): string[] {
+  const o = obj(s, id);
+  return o.zone === "battlefield" ? characteristics(s, o).types : defOf(s, o).types;
 }
 
 /** "A Dinosaur", "two artifacts", "one or more creatures", "four or more red instant and/or sorcery cards". */
 export function craftWhat(c: Extract<AdditionalCost, { kind: "craft" }>): string {
   if (c.slots) return c.slots.map((f) => `${/^[aeiou]/i.test(f.text) ? "an" : "a"} ${f.text}`).join(", ").replace(/, (an? \w+)$/, ", and $1");
-  if (c.orMore) return c.filter.types?.length || c.filter.subtypes?.length ? `${c.n} or more ${c.filter.text}` : `${c.n} or more permanents and/or cards`;
+  if (c.shareCardType) return `${numberWord(c.n)} that share a card type`;
+  if (c.orMore) return c.filter.types?.length || c.filter.subtypes?.length || c.withActivated ? `${c.n} or more ${c.filter.text}` : `${c.n} or more permanents and/or cards`;
   return `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`;
 }
 
@@ -11057,6 +11071,13 @@ export function craftWhat(c: Extract<AdditionalCost, { kind: "craft" }>): string
  * printed ones (CR 109.2).
  */
 export function craftSlotsFit(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "craft" }>, ids: ObjectId[], some = false): boolean {
+  // Eye of Ojer Taq (round 434): "two that share a card type": `n` of them with a card type in common (`some`: whether
+  // `n` of `ids` have one).
+  if (c.shareCardType) {
+    if (!some && ids.length !== c.n) return false;
+    const types = new Set(ids.flatMap((id) => craftCardTypes(s, id)));
+    return [...types].some((t) => ids.filter((id) => craftCardTypes(s, id).includes(t)).length >= (some ? c.n : ids.length));
+  }
   const slots = c.slots ?? [];
   if (!some && ids.length !== slots.length) return false;
   const fits = (id: ObjectId, f: TargetSpec) => {
@@ -14222,6 +14243,16 @@ function enterAttachedTo(s: GameState, o: GameObject, host: ObjectId) {
   askAttachColor(s, o);
 }
 
+/**
+ * Apex Observatory (round 434): the card types that two or more of the exiled cards used to craft `o` have in common, by
+ * their printed characteristics in exile (CR 702.167c, 607.2a): the cards its craft cost exiled, still in exile.
+ */
+export function craftedSharedTypes(s: GameState, o: GameObject): string[] {
+  const cards = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).map((l) => s.objects[l.id]).filter((x): x is GameObject => !!x && x.zone === "exile" && !x.faceDown);
+  const types = [...new Set(cards.flatMap((x) => defOf(s, x).types))];
+  return types.filter((t) => cards.filter((x) => defOf(s, x).types.includes(t)).length >= 2);
+}
+
 function askEntersChoice(s: GameState): boolean {
   const q = s.entersChoices;
   while (q?.length) {
@@ -14667,11 +14698,19 @@ function askEntersChoice(s: GameState): boolean {
       if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
       continue;
     }
+    // Apex Observatory (round 434): only a card type two of the exiled cards used to craft it share; none, no choice.
+    const shared = c.craftedShared ? craftedSharedTypes(s, o).filter((t) => (c.options ?? []).includes(t)) : undefined;
+    if (shared && !shared.length) {
+      log(s, `${defOf(s, o).name}: no two exiled cards used to craft it share a card type, so no card type is chosen.`);
+      q.shift();
+      if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+      continue;
+    }
     if (c.byOpponent) {
       s.pending = { kind: "chooseOption", player: chooser, source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id, prompt: `choose a creature type for ${player(s, controllerOf(s, o)).name}'s ${defOf(s, o).name}` };
       return true;
     }
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: shared ?? many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(shared ? { prompt: "choose a card type shared among two exiled cards used to craft it" } : c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;

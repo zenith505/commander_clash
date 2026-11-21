@@ -628,7 +628,10 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
         // Koh, the Face Stealer: only the last chosen card (CR 607.2d), still that card in exile (CR 400.7).
         if (b.chosen && (o.chosen?.card?.id !== l.id || o.chosen.card.zc !== l.zc)) continue;
         const card = s.objects[l.id];
-        if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card))) out.cards.push(defOf(s, card));
+        if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(b.filter, defOf(s, card))) {
+          out.cards.push(defOf(s, card));
+          out.cardIds.push(card.id); // Locus of Enlightenment's once-each-turn keys (round 434)
+        }
       }
     } else if (b.exiledWithCounter) {
       // Rex, Cyber-Hound: every exiled card with a brain counter on it, whoever owns it and however it got there; their
@@ -698,7 +701,9 @@ function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledC
   if (!hit) {
     // Sharkey, Tyrant of the Shire (round B251): "except mana abilities", those compiled as activated abilities too (CR 605.1a).
     const noMana = !!own.borrows!.noMana && !own.borrows!.loyalty;
-    const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX && !(noMana && a.mana);
+    // Locus of Enlightenment (round 434): "each activated ability": loyalty abilities too (CR 606.3).
+    const loyaltyToo = !!own.borrows!.withLoyalty;
+    const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && (loyaltyToo || (a.loyalty === undefined && !a.loyaltyX)) && !(noMana && a.mana);
     const base = found.objects.length;
     hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l, li) => l.activated.map((a, ai) => [a, ai] as const).filter(([a]) => usable(a)).map(([a, ai]) => ({ ...a, borrowed: true as const, ...(once && li >= base ? { onceKey: `${once[li - base]}#${ai}` } : {}) })))] };
     // Idris, Koh (round 399): "all activated and triggered abilities": the lenders' triggered abilities too.

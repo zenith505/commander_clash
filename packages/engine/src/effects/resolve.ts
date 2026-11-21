@@ -2253,6 +2253,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB283Effect(s, e, ctx, src);
     case "giveControlAttacking":
       return runLaneB284Effect(s, e, ctx, src);
+    case "drainLose":
     case "noteCauldron":
       return runLaneB285Effect(s, e, ctx, src);
     case "timeCounterFromOwnExiled":

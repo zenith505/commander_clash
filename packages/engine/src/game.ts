@@ -27,6 +27,7 @@ import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
 import { costExileLinksAcrossFaces, olagCandidates, olagCopyChosen } from "./effects/run-round435";
 import { sharedFateInstead } from "./effects/run-laneb282";
+import { cycloneDone, cycloneFor, cycloneInstead } from "./effects/run-laneb286";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
 import { pileDrawLabel } from "./effects/run-round386";
@@ -4200,8 +4201,12 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // drawing player chooses which one replaces the draw), and the opponent whose library's top card is exiled chosen with it.
   const fates = s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawSharedFate);
   const fateOpps = fates.length ? opponents(s, pid) : [];
-  if (!fates.length && !shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
+  // Unpredictable Cyclone (round B286): an instruction's draw (one no replacement made, CR 614.5) that the resolving cycling
+  // ability of a nonland card causes its controller to make. All of them do the same, so one stands for them.
+  const cyclone = madeArchives === undefined ? cycloneFor(s, pid) : undefined;
+  if (!cyclone && !fates.length && !shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
   const out = [...shields];
+  if (cyclone !== undefined) out.push({ key: `cyclone:${cyclone}`, label: `Exile cards from the top of your library until one shares a card type with the cycled card instead; you may cast it without paying its mana cost (${nameOf(s, cyclone)})` });
   if (reed !== undefined) out.push({ key: "reed", label: `Draw four cards instead (${nameOf(s, reed)})` });
   if (chains > 0) out.push({ key: "chains", label: "Discard a card instead, then draw a card; with no card in hand, mill a card (Chains of Mephistopheles)" });
   if (weirdings > 0) out.push({ key: "weirding", label: "Reveal the card instead; any other player may pay 2 life to put it into your graveyard, otherwise you draw it (Zur's Weirding)" });
@@ -4236,7 +4241,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of fates)
     for (const q of fateOpps) out.push({ key: `fate:${id}:${q}`, label: `Exile the top card of ${player(s, q).name}'s library face down instead${player(s, q).library.length ? "" : " (it's empty)"} (${nameOf(s, id)}${fates.length > 1 ? ` ${fates.indexOf(id) + 1}` : ""})` });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!fates.length && !shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
+  if (!cyclone && !fates.length && !shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge, Parallel Thoughts): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter|pthoughts):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -4353,6 +4358,7 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
+  if (key.startsWith("cyclone:")) return cycloneInstead(s, pid, key.slice("cyclone:".length), left, after, made);
   if (key.startsWith("fate:")) {
     const [, id, q] = key.split(":");
     return sharedFateInstead(s, pid, id!, Number(q) as PlayerId);
@@ -4518,6 +4524,7 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   if (choice === "thief" && !notionThief(s, p.id)) throw new RulesError("no Notion Thief replaces that draw");
   if (choice.startsWith("tutor:") && !s.battlefield.includes(choice.slice("tutor:".length))) throw new RulesError("that permanent no longer replaces the draw");
   if (choice.startsWith("exiles:") && !drawExilers(s, p.id).includes(choice.slice("exiles:".length))) throw new RulesError("that permanent no longer replaces the draw");
+  if (choice.startsWith("cyclone:") && cycloneFor(s, p.id) === undefined) throw new RulesError("that permanent no longer replaces the draw");
   if (choice.startsWith("fate:") && !((id) => s.battlefield.includes(id) && !!abilitiesOf(s, obj(s, id)).drawSharedFate)(choice.split(":")[1]!)) throw new RulesError("that permanent no longer replaces the draw");
   if (/^(?:sages|mayskip|counter|crypt):/.test(choice) && !s.battlefield.includes(choice.slice(choice.indexOf(":") + 1))) throw new RulesError("that permanent no longer replaces the draw");
   s.pending = null;
@@ -6622,7 +6629,7 @@ export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?:
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life", paying?: Pick<CostChoices, "counters" | "sacrifice">): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[]; whenDo?: AbilityBody; anyColor?: true } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life", paying?: Pick<CostChoices, "counters" | "sacrifice">): { by?: GameObject; once?: true; haste?: "endOfTurn"; creatureCounter?: true; costs?: AdditionalCost[]; whenDo?: AbilityBody; anyColor?: true; castTrigger?: AbilityBody } | undefined {
   if (o.zone !== "library" || player(s, o.owner).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
@@ -6671,6 +6678,9 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
         if (!costly || (chosen && !costly.chosen)) costly = { by: src, costs: top.costs, ...(chosen ? { chosen } : {}) };
         continue;
       }
+      // Galea, Kindler of Hope (round B286): a permission whose "When you cast an Equipment spell this way" applies to this
+      // spell is the one used, its caster's pick (as for haste).
+      if (!top.once && top.castTrigger && printedMatches(top.castTrigger.spell, d)) return { by: src, castTrigger: top.castTrigger.body };
       if (!top.once && top.haste) return { by: src, haste: top.haste };
       if (!top.once && top.creatureCounter && isType(d, "Creature")) return { by: src, creatureCounter: true };
       if (!top.once) plain ??= src;
@@ -7349,8 +7359,11 @@ function runCast(s: GameState, p: Player, action: Extract<Action, { type: "castS
   if (freeCastOf(s, p.id) === action.objectId) {
     // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
     if (askModeChooser(s, p, action, s.pending ?? undefined) || askChoosers(s, p, action, s.pending ?? undefined)) return;
+    const cyclone = s.pending?.kind === "castFree" ? s.pending.cyclone : undefined;
     castSpell(s, p, action.objectId, action.targets, action.modes, undefined, undefined, action.x, action);
     s.pending = null;
+    // Unpredictable Cyclone (round B286): the rest of its replacement, then the draws after it.
+    if (cyclone) return cycloneDone(s, p.id, cyclone);
     continueResolution(s);
     return;
   }
@@ -9282,10 +9295,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   // A once-a-turn permission to cast from the top is used up (Johann).
   let topCosts: AdditionalCost[] = [];
+  let topCastTrigger: { by: GameObject; body: AbilityBody } | undefined;
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id, choices.alt === "citadel" ? "life" : "mana", choices);
     topCosts = how?.costs ?? [];
     useTopPermission(s, p.id, how);
+    if (how?.castTrigger && how.by) topCastTrigger = { by: how.by, body: how.castTrigger };
     // "If you cast a creature spell this way, it gains haste until end of turn": the spell and the creature it becomes.
     if (how?.haste && isType(d, "Creature") && o.hasteCast !== "game") o.hasteCast = how.haste;
     // "If you cast a creature spell this way, that creature enters with an additional +1/+1 counter on it" (CR 614.1c).
@@ -9411,6 +9426,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // (CR 702.74a, 400.7b, 611.3d; rulings: even if Ashling has left by then).
   if (choices.alt === "grantedEvoke" && !o.spellCopy) (o.spellGains ??= []).push({ mods: [{ kind: "addAbility", text: GRANTED_EVOKE_TRIGGER }], timestamp: s.nextTimestamp++, controller: p.id, source: d.name, forever: true });
   for (const t of spentQueue) if (!("spell" in t) || spellMatches(s, t.spell, item)) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
+  // Galea, Kindler of Hope (round B286): its "When you cast an Equipment spell this way" trigger, about this spell.
+  if (topCastTrigger) s.triggerQueue.push({ sourceId: topCastTrigger.by.id, sourceCardId: cardIdOf(topCastTrigger.by), sourceZc: topCastTrigger.by.zoneChanges ?? 0, controller: p.id, index: -1, body: topCastTrigger.body, cause: stackId, subject: { id, zc: o.zoneChanges ?? 0 } });
   if (castTrigger) s.triggerQueue.push({ sourceId: castTrigger.sourceId, sourceCardId: castTrigger.sourceCardId, sourceZc: castTrigger.sourceZc, controller: p.id, index: -1, body: castTrigger.body, cause: stackId, subject: { id, zc: o.zoneChanges ?? 0 } });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
   // the permanent it becomes as it enters (one more zone change, CR 400.7).
@@ -12387,6 +12404,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
   const costSacrificed = (s.turnLog?.sacrificed?.length ?? 0) > sacrificesBefore;
   const costLifePaid = lifePaidTally - lifeTallyBefore;
+  // Unpredictable Cyclone (round B286): the card cycled and its card types as it was cycled, in its owner's hand.
+  const cycledTypes = ab.cycling && ab.discardSelf && o.zone === "hand" ? [...defOf(s, o).types] : undefined;
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Dodgy Jalopy: its power in the graveyard as it's exiled for scavenge (rulings), by its characteristic-defining ability.
   const scavengedPower = ab.scavengeVariable && o.zone === "graveyard" ? cardPT(s, o, "power") : undefined;
@@ -12432,6 +12451,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaPick.instead ? { instead: manaPick.instead } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
     ...(ab.crew !== undefined && !ab.saddle && !ab.tapPower && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
+    ...(cycledTypes ? { cycled: { card: id, types: cycledTypes } } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
   };
   if (manaPick) {
@@ -14891,6 +14911,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     // Declining cascade's free cast; casting it is a castSpell action instead.
     log(s, `${p.name} chooses not to cast ${nameOf(s, pend.objectId)}.`);
     s.pending = null;
+    if (pend.cyclone) return cycloneDone(s, p.id, pend.cyclone);
     continueResolution(s);
     return;
   }

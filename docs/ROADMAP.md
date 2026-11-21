@@ -4697,7 +4697,8 @@ line blocks.
    718.2a, a bestowed or mutating spell's creature card; X as 0, its "enters" abilities don't apply, counters stay,
    rulings; a spell that has left the stack is copied as it last existed there, CR 608.2h). Browser tests click through
    Wayta's {G} fight between two of your creatures and the Pools' {U} on Grizzly Bears with Sol Ring as its target. +2,
-   31,850 of 31,936 on this stacked branch (round 440 #730); the compiled text of every other card is unchanged.
+   31,854 of 31,936 on this stacked branch (round 440 #730, with main 1e5b51e, B287-B288, in it); the compiled text of
+   every other card is unchanged.
    Out after round 441 (looked at, not done): the lists after round 440 (still out, for their reasons). Known gaps: bots
    pick their least useful permanent for the Pools' copy, none for a legendary spell (the legend rule), and never hold
    its {U} for a permanent spell.

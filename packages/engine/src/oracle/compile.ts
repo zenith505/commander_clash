@@ -210,6 +210,9 @@ import { round432Line } from "./round432";
 import { round434Line } from "./round434";
 import { round435Line } from "./round435";
 import { round437Line } from "./round437";
+import { round438Line } from "./round438";
+import { round439Line } from "./round439";
+import { round440Line } from "./round440";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1095,6 +1098,12 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 440: oracle/round440.ts.
+    if (round440Line(line, raw, out, isSpell)) continue;
+    // Round 439: oracle/round439.ts.
+    if (round439Line(line, raw, out, isSpell)) continue;
+    // Round 438: oracle/round438.ts.
+    if (round438Line(line, raw, out, isSpell)) continue;
     // Round 437: oracle/round437.ts.
     if (round437Line(line, raw, out, isSpell)) continue;
     // Round 435: oracle/round435.ts.
@@ -8381,7 +8390,9 @@ function linkExile(out: CompiledCard) {
   // with ~" as it resolves: the cards its one exile instruction exiled (CR 607.2a): Kaho's search, Jeleva's "each player
   // exiles the top X cards", Shell's exiled spell.
   if (bodies.some((b) => allEffects(b.effects).some((e) => (e.type === "castFromAmong" && e.fromLinked && !e.crafted && !e.evidenceLinked && !e.escapeLinked) || e.type === "playLinkedThisTurn"))) {
-    const all = bodies.flatMap((b) => allEffects(b.effects));
+    // Forger's Foundry (round 440): the delayed trigger its mana makes (CR 603.7d) is an ability of its own too.
+    const spentBodies = out.mana.flatMap((a) => (a.spentTrigger ? [a.spentTrigger.body] : []));
+    const all = [...bodies, ...spentBodies].flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const searches = all.filter((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && e.dest.zone === "exile" && !e.others && !e.split && !e.mayInstead && !e.condDest && !e.landTo && !e.cardTo);

@@ -977,9 +977,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
       // ability's source (snow mana, CR 107.4h; mana from a creature).
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
+      // Sunken Palace (round 439): each mana carries its delayed trigger, whose source is the ability's (CR 603.7d).
+      const spentSource = e.spentTrigger && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const spentTrigger = e.spentTrigger && spentSource ? { ...e.spentTrigger, sourceId: spentSource.id, sourceCardId: cardIdOf(spentSource), sourceZc: ctx.sourceZc ?? spentSource.zoneChanges ?? 0 } : undefined;
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
         // "Until end of turn, you don't lose this mana as steps and phases end."
-        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
+        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}), ...(spentTrigger ? { spentTrigger } : {}) });
         if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
       }
       if (added) log(s, `${p.name} adds ${added}.`);

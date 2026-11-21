@@ -217,8 +217,16 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   // Manascape Refractor (round 382): "to pay the activation costs of ~'s abilities": an ability of that permanent being
   // activated, a mana ability too, not a special action or cumulative upkeep (CR 602.1, 605.1a, 609.4b).
   const ownAbility = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell && use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendAnyColorOwnAbilities;
+  // Nathan Drake, Treasure Hunter (round 437): "... to cast spells you don't own or to activate abilities of permanents you
+  // control but don't own": the spell's owner as it's cast (CR 108.3), or a permanent's owner, the ability's activation
+  // (mana abilities too, CR 605.1a), not a special action.
+  const notOwned =
+    !!use &&
+    use !== "other" &&
+    ("spell" in use ? use.owner !== undefined && use.owner !== pid : !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell && use.ability.zone === "battlefield" && controllerOf(s, use.ability) === pid && use.ability.owner !== pid);
   const orrery =
     ownAbility ||
+    (notOwned && mine.some((o) => !!abilitiesOf(s, o).spendAnyColorNotOwned)) ||
     (!!use && use !== "other" && "ability" in use && !!use.anyColor) ||
     mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities) || (walkerSpell && !!abilitiesOf(s, o).spendAnyColorPlaneswalkerSpells) || (!!spellSubtypes && spellSubtypes.includes(abilitiesOf(s, o).spendAnyColorSubtypeSpells ?? "\u0000"))) ||
     s.battlefield.some((id) => !!abilitiesOf(s, s.objects[id]!).spendAnyColorAll); // Mycosynth Lattice: every player

@@ -15,8 +15,8 @@ import { redistributions } from "./effects/run-round362";
 import { addedAbilityCosts, addedSacrificeCandidates } from "./added-costs";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
-import { activatedQuality, manyX, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
+import { activatedQuality, manyX, manyOfferSizes, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { withModes, modeRange, manySlot, manySlots, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
   applyInPlace,
@@ -611,6 +611,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = player(s, pid).hand.filter((id) => defOf(s, obj(s, id)).types.includes("Creature")).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
       if (best) return [{ type: "discard", player: pid, objectIds: [best] }];
     }
+    // Alaundo the Seer (round B279): the card comes back free once its time counters (its mana value) are gone, a counter a
+    // turn: the cheapest card with a mana value, not a land or a 0 (which never come back) while there is one.
+    const atHand = pend.kind === "discard" && pend.exile && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "discard" && atHand?.type === "discard" && atHand.alaundoMv && pend.count === 1) {
+      const hand = player(s, pid).hand.filter((id) => !pend.filter || printedMatches(pend.filter, defOf(s, obj(s, id))));
+      const best = hand.filter((id) => !isType(defOf(s, obj(s, id)), "Land") && defMv(defOf(s, obj(s, id))) > 0).sort((a, b) => defMv(defOf(s, obj(s, a))) - defMv(defOf(s, obj(s, b))) || defWorth(defOf(s, obj(s, b))) - defWorth(defOf(s, obj(s, a))))[0];
+      if (best) return [{ type: "discard", player: pid, objectIds: [best] }];
+    }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo, pend.among) }];
     // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
     // that wants the graveyard (madness, flashback and the like).
@@ -706,6 +714,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
     // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
     // Hollow Warrior (round B259): a cost to block, the same way.
+    // Noxious Vapors (round B278): the best cards of its hand that still fit one of each color (built greedily, as big as
+    // any: a transversal matroid), so a card is chosen for each color there's one left for.
+    if (pend.kind === "searchLibrary" && pend.keepColors && pend.oneOfEach) {
+      const found: string[] = [];
+      for (const id of [...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
+    // Land Equilibrium (round B278): the land worth least to it, the one just put there too.
+    // Lich's Mirror (round B280): our own permanents are shuffled back in, to draw again; another player's go to the graveyard.
+    if (pend.kind === "pickPermanents" && pend.mirrorStay !== undefined) return [{ type: "pickPermanents", player: pid, ids: pend.mirrorStay === pid ? [] : pend.options }];
+    if (pend.kind === "pickPermanents" && pend.equilibrium) return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "sacrifice") }];
     if (pend.kind === "pickPermanents" && pend.blockCost) {
       const rest = s.blockCostsDue?.costs.slice(1) ?? [];
       const declared = [...new Set((s.blockCostsDue?.blocks ?? []).map((b) => b.blocker))];
@@ -1715,7 +1734,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // seven to draw, and a dying Exquisite Archangel to the graveyard rather than exile.
     if (pend.kind === "chooseOption" && pend.what === "loseReplacement") {
       const opts = loseReplacements(s, pid, true);
-      const score = (o: (typeof opts)[number]) => o.life + (o.reversal !== undefined ? (player(s, pid).library.length >= 7 ? 15 : -1000) : 0) + (o.graveyard ? 1 : 0);
+      // Lich's Mirror (round B280): 20 life, less what it costs us: our board, and the game with fewer than seven cards to draw.
+      const cards = player(s, pid).library.length + player(s, pid).hand.length + player(s, pid).graveyard.length + s.battlefield.filter((id) => obj(s, id).owner === pid && !obj(s, id).isToken).length;
+      const board = s.battlefield.filter((id) => obj(s, id).owner === pid && !objIsType(s, obj(s, id), "Land")).length;
+      const score = (o: (typeof opts)[number]) => o.life + (o.reversal !== undefined ? (player(s, pid).library.length >= 7 ? 15 : -1000) : 0) + (o.graveyard ? 1 : 0) + (o.mirror ? (cards >= 7 ? -board : -1000) : 0);
       const best = opts.filter((o) => pend.options.includes(o.key)).sort((a, b) => score(b) - score(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best?.key ?? pend.options[0]! }];
     }
@@ -2726,7 +2748,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Memory Vessel (round 386): first, so the exiled cards can be played this turn (see chooseActivation).
       // Koh, the Face Stealer (round 399): its card chosen before combat, so a borrowed attack ability works this turn.
       // Valki, God of Lies (round 408): its copy before combat too.
-      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard" || e.type === "becomeCopyOfLinkedX")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      // Alaundo the Seer (round B279): a card and a time counter a turn, rather than attacking with it.
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => (e.type === "graveyardTurn" && !!e.costs) || e.type === "copyNamedCard" || e.type === "chooseBlocks" || e.type === "noHandPlaysUntilYourNextTurn" || e.type === "chooseLinkedCard" || e.type === "becomeCopyOfLinkedX" || e.type === "timeCounterFromOwnExiled")) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -3668,6 +3691,21 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
+  // Filigree Vector (round B280): several "any number of target" groups, laid out as offered (manyOfferSizes): +1/+1 and
+  // charge counters on each of our own permanents the group could be, never on another player's.
+  const groups = manySlots(printed.targets);
+  if (groups.length > 1) {
+    if (groups.length !== printed.targets.length) return null;
+    // As the trigger is put on the stack (pushTrigger), so the layout is the one it reads.
+    const src = sourceId ? sourceQuality(s, sourceId) : undefined;
+    const sizes = manyOfferSizes(s, printed, pid, src, sourceId)!;
+    return groups.flatMap((j, g) => {
+      const e = printed.effects.find((x) => x.type === "counters" && x.what.ref === "target" && x.what.index === j);
+      const good = e?.type === "counters" && (e.counter === "+1/+1" || e.counter === "charge");
+      const ours = good ? legalTargets(s, printed.targets[j]!, pid, undefined, src, sourceId).flatMap((t) => (t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid ? [t] : [])) : [];
+      return Array.from({ length: sizes[g]! }, (_, k): TargetChoice => ours[k] ?? { kind: "none" });
+    });
+  }
   if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
   // Command the Dreadhorde: the cards' total mana value is dealt to us first: the costliest cards that still leave us
   // more than 6 life, none if that's nothing worth it.
@@ -4591,6 +4629,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   const kickX = compileCard(d).kicker?.costs.find((c) => parseManaCost(c).hasX);
   if (!cost.hasX && kickX && !via && !alt) {
     xs = [...xChoices(availableMana(s, pid) - totalWithoutX(s, pid, id) - manaValue(parseManaCost(kickX)), xCount(parseManaCost(kickX))), undefined];
+    // Emblazoned Golem (round B279): X is one mana of each of that many colors, so no more than 5 (or what reductions take
+    // off beyond that), the biggest that can be paid first.
+    if (compileCard(d).kickXOneOfEachColor) {
+      const most = Math.min(5 + Math.max(0, manaValue(parseManaCost(d.manaCost)) - totalWithoutX(s, pid, id)), availableMana(s, pid) - totalWithoutX(s, pid, id));
+      xs = [...Array.from({ length: Math.max(0, most) }, (_, i) => most - i), undefined];
+    }
     // "Target artifact with mana value X or less" as it enters: no more X than the best one an opponent has needs.
     const spec = compileCard(d).triggers.find((t) => t.event === "selfEnters")?.body.targets.find((t) => t.kind === "object" && t.xRange?.key === "manaValue" && t.xRange.at === "most");
     if (spec) {

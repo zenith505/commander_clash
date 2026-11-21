@@ -5,7 +5,7 @@ export type CostSymbol =
   | { kind: "generic"; amount: number }
   | { kind: "colored"; color: ManaType } // includes {C}
   /** `life`: may be paid with 2 life instead, as {B} may with K'rrik (paying it as its black half). */
-  | { kind: "hybrid"; options: Color[]; life?: true; /** A hybrid Phyrexian symbol, {G/W/P} (CR 107.4f). */ phyrexian?: true; /** Abstruse Appropriation (round 408): colorless mana pays it too, as though it were one of `options` (CR 609.4b). */ orC?: true; /** Draugr Necromancer (round B270): mana from a snow source pays it too, whatever its type, as though it were one of `options` (CR 609.4b, 107.4h). */ orSnow?: true } // {W/U}
+  | { kind: "hybrid"; options: Color[]; life?: true; /** A hybrid Phyrexian symbol, {G/W/P} (CR 107.4f). */ phyrexian?: true; /** Abstruse Appropriation (round 408): colorless mana pays it too, as though it were one of `options` (CR 609.4b). */ orC?: true; /** Draugr Necromancer (round B270): mana from a snow source pays it too, whatever its type, as though it were one of `options` (CR 609.4b, 107.4h). */ orSnow?: true; /** Emblazoned Golem (round B279): "No more than one mana of each color may be spent this way": each of the cost's `distinct` symbols is paid with a different color (payFromPool). */ distinct?: true } // {W/U}
   | { kind: "twoHybrid"; color: Color; life?: true; /** Sunglasses of Urza: one mana of this color pays it too, as though it were `color` (CR 609.4b). */ also?: Color; /** Abstruse Appropriation (round 408): one colorless mana pays it too, as though it were `color`. */ orC?: true; /** Draugr Necromancer (round B270): one mana from a snow source pays it too, as though it were `color`. */ orSnow?: true } // {2/W}
   /**
    * {W/P}. `krrik`: a {B} that K'rrik lets be paid with 2 life, not a Phyrexian symbol (compleated doesn't count it).
@@ -122,6 +122,26 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   if (cost.symbols.some((x) => x.kind === "twoHybrid" && x.life)) {
     const as = (life: boolean): ParsedCost => ({ ...cost, symbols: cost.symbols.map((x) => (x.kind === "twoHybrid" && x.life ? (life ? { kind: "phyrexian", color: x.color } : { kind: "twoHybrid", color: x.color }) : x)) });
     return payFromPool(as(false), pool, extraGeneric, life, opts) ?? payFromPool(as(true), pool, extraGeneric, life, opts);
+  }
+  // Emblazoned Golem (round B279): its kicker's X paid only with colored mana, no more than one of each color (CR 601.2h):
+  // the `distinct` symbols as each choice of that many different colors among their options, the colors there's most of
+  // first, the rest of the cost paid around them.
+  const distinct = cost.symbols.filter((y): y is Extract<CostSymbol, { kind: "hybrid" }> => y.kind === "hybrid" && !!y.distinct);
+  if (distinct.length) {
+    const options = COLORS.filter((c) => distinct.every((y) => y.options.includes(c)));
+    if (distinct.length > options.length) return null;
+    const rest = cost.symbols.filter((y) => !(y.kind === "hybrid" && y.distinct));
+    const picks: Color[][] = [];
+    for (let mask = 0; mask < 1 << options.length; mask++) {
+      const pick = options.filter((_, i) => mask & (1 << i));
+      if (pick.length === distinct.length) picks.push(pick);
+    }
+    const spare = (pick: Color[]) => pick.reduce((n, c) => n + pool[c], 0);
+    for (const pick of picks.sort((a, b) => spare(b) - spare(a))) {
+      const paid = payFromPool({ ...cost, symbols: [...rest, ...pick.map((color) => ({ kind: "colored" as const, color }))] }, pool, extraGeneric, life, opts);
+      if (paid) return paid;
+    }
+    return null;
   }
   const p = { ...pool };
   // `prefer`: mana to spend before the rest where there's a choice (mana that can only be spent on this, CR 106.6).

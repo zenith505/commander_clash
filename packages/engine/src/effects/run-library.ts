@@ -1,4 +1,5 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
+import { alaundoExiled } from "./run-laneb279";
 import { abilitiesOf, cardIdOf, defOf, discardShieldOf, isPermanentCard, isType, objIsType, opponentForbidsDiscard } from "../cards";
 import { controllerOf, ignoredBy, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
@@ -766,6 +767,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             // The Eleventh Doctor: its mana value in time counters, and suspend; one with mana value 0 gets none, so it isn't
             // suspended (CR 702.62b, rulings on The Wedding of River Song).
             if (o.zone === "exile" && e.suspendMv) suspendExiled(s, o, defMv(defOf(s, o)));
+            // Alaundo the Seer (round B279): its mana value in time counters (none for 0, rulings), and the card gains Alaundo's
+            // trigger while it's this object in exile; it isn't suspended by this (rulings).
+            if (o.zone === "exile" && e.alaundoMv) alaundoExiled(s, o);
             // Linked to the source as it was when the ability was put on the stack (CR 607.2a).
             if (o.zone === "exile" && e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
           }

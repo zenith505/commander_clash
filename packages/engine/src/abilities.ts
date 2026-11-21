@@ -4339,6 +4339,23 @@ export type Effect =
    * go away when it leaves the stack (rulings, CR 122.2).
    */
   | { type: "spellCounters"; counter: CounterKind; n: number }
+  /**
+   * Noxious Vapors (round B278): "Each player reveals their hand, chooses one card of each color from it, then discards all
+   * other nonland cards." (effects/run-laneb278.ts).
+   */
+  | { type: "keepOneOfEachColor" }
+  /**
+   * Alaundo the Seer (round B279): "Then remove a time counter from each other card you own in exile": every card its
+   * controller owns in exile with a time counter, face up or down, suspended or not (rulings), but those this resolution
+   * exiled from a hand (ResolvingState.exiledFromHandCards).
+   */
+  | { type: "timeCounterFromOwnExiled" }
+  /**
+   * Alaundo the Seer's granted trigger (GameObject.alaundoCast): "When the last time counter is removed from this card, if
+   * it's exiled, you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until
+   * end of turn." Its subject is the card.
+   */
+  | { type: "alaundoCast" }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true; /** Helm of Kaldra (round 417): "Attach those Equipment to it": to the token just created (the first one), not the source. */ toCreated?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */
@@ -5050,7 +5067,7 @@ export type Effect =
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true; /** Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": with `random`, `n` cards revealed, only those matching this discarded. */ ofRevealed?: TargetSpec; /** With `exile`, Intellect Devourer: "each opponent exiles a card from their hand until ~ leaves the battlefield" (CR 610.3): returned to the hand then; nothing is exiled if ~ has already left (rulings). */ until?: "sourceLeaves"; /** With `exile`, Lightstall Inquisitor: "and may play that card for as long as it remains exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": its owner's permission (MayPlay `more`, `tapped`). */ ownerMay?: { more?: number; landTapped?: true }; /** With `exile`, Fiend of the Shadows: "You may play that card for as long as it remains exiled": the ability's controller may play it (MayPlay), with its usual timing and costs, even after the source has left (rulings). */ controllerMay?: true; /** With `exile`, The Eleventh Doctor: "exile a card from your hand with a number of time counters on it equal to its mana value. If it doesn't have suspend, it gains suspend." (CR 702.62). */ suspendMv?: true } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true; /** Fall: "reveals two cards at random from their hand, then discards each nonland card revealed this way": with `random`, `n` cards revealed, only those matching this discarded. */ ofRevealed?: TargetSpec; /** With `exile`, Intellect Devourer: "each opponent exiles a card from their hand until ~ leaves the battlefield" (CR 610.3): returned to the hand then; nothing is exiled if ~ has already left (rulings). */ until?: "sourceLeaves"; /** With `exile`, Lightstall Inquisitor: "and may play that card for as long as it remains exiled. Each spell cast this way costs {1} more to cast. Each land played this way enters tapped.": its owner's permission (MayPlay `more`, `tapped`). */ ownerMay?: { more?: number; landTapped?: true }; /** With `exile`, Fiend of the Shadows: "You may play that card for as long as it remains exiled": the ability's controller may play it (MayPlay), with its usual timing and costs, even after the source has left (rulings). */ controllerMay?: true; /** With `exile`, The Eleventh Doctor: "exile a card from your hand with a number of time counters on it equal to its mana value. If it doesn't have suspend, it gains suspend." (CR 702.62). */ suspendMv?: true; /** With `exile`, Alaundo the Seer (round B279): time counters equal to its mana value, and it gains Alaundo's trigger (GameObject.alaundoCast), not suspend. */ alaundoMv?: true } // CR 701.9
   /** CR 701.22, by the controller, or `who` ("target player scries X", Kozilek's Command). */
   | { type: "scry"; n: Amount; who?: PlayerRef }
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
@@ -9568,6 +9585,12 @@ export interface CompiledCard {
   /** Soul Burn (round B234): "Spend only black and/or red mana on X.": each mana paying X is one of these colors, as a hybrid symbol (spellCost). */
   spendOnlyOnXHybrid?: Color[];
   /**
+   * Emblazoned Golem (round B279): "Kicker {X}" with "Spend only colored mana on X. No more than one mana of each color may be
+   * spent this way.": kicked, the mana paying X is colored, each of a different color (spellCost's distinct hybrid symbols),
+   * less whatever reductions take off X (as Drain Life's rulings).
+   */
+  kickXOneOfEachColor?: true;
+  /**
    * Defensive Formation (round B266): "Rather than the attacking player, you assign the combat damage of each creature
    * attacking you. You can divide that creature's combat damage as you choose among any of the creatures blocking it."
    * (game.ts combatDamageAssigner, as banding's CR 702.22j).
@@ -9857,6 +9880,12 @@ export interface CompiledCard {
    */
   landsCantEnter?: true;
   /**
+   * Land Equilibrium (round B278): "If an opponent who controls at least as many lands as you do would put a land onto the
+   * battlefield, that player instead puts that land onto the battlefield then sacrifices a land of their choice." (CR
+   * 614.1a; GameState.equilibriumDue).
+   */
+  landEquilibrium?: true;
+  /**
    * Round B260: sacrifices this permanent's static abilities add to the costs of other spells and abilities (Brutal
    * Suppression, Drought; added-costs.ts, CR 601.2f, 602.2b).
    */
@@ -10040,6 +10069,12 @@ export interface CompiledCard {
    * total becomes equal to your starting life total" (40, CR 903.7).
    */
   loseGameExileSelf?: true | "startingLife";
+  /**
+   * Lich's Mirror (round B280): "If you would lose the game, instead shuffle your hand, your graveyard, and all permanents
+   * you own into your library, then draw seven cards and your life total becomes 20." A replacement effect (CR 614.1a), for
+   * any way of losing but conceding (rulings); see game.ts lichsMirror.
+   */
+  loseGameMirror?: true;
   /** Enduring Angel: "If your life total would be reduced to 0 or less, instead transform this creature and your life total becomes 3. Then if this creature didn't transform this way, you lose the game." (game.ts lifeZeroReplaced) */
   lifeZeroTransform?: true;
   /**

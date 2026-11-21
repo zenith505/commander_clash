@@ -7662,6 +7662,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "eb37496e-374f-41b9-bd52-f52f37bdac31",
+  "name": "Calamity, Galloping Inferno",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Horse Mount",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horse",
+   "Mount"
+  ],
+  "oracleText": "Haste\nWhenever Calamity attacks while saddled, choose a nonlegendary creature that saddled it this turn and create a tapped and attacking token that's a copy of it. Sacrifice that token at the beginning of the next end step. Repeat this process once.\nSaddle 1",
+  "power": "4",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Saddle",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2031bc31-81cc-407a-8615-29832f586bbc",
   "name": "Calciform Pools",
   "manaCost": "",
@@ -19054,6 +19090,35 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "118da256-d1ea-44e8-9026-317e49694d29",
+  "name": "Forger's Foundry",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {U}. When you spend this mana to cast an instant or sorcery spell with mana value 3 or less, you may exile that spell instead of putting it into its owner's graveyard as it resolves.\n{3}{U}{U}, {T}: You may cast any number of spells from among cards exiled with this artifact without paying their mana costs. Activate only as a sorcery.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "otc",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

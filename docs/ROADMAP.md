@@ -4662,6 +4662,27 @@ line blocks.
    (still out, for their reasons). Known gaps: bots never activate Sunken Palace's second ability (an activated mana
    ability with a cost to choose, which the automatic payment doesn't use); its {U} is spent first on a spell or ability
    it can pay for, kept back from other costs.
+   Round 440 went on down the "Out after round N" lists and `npm run popular`, most played first, past Ulalek and the
+   others still out, and Nihiloor and Ashiok, Wicked Manipulator (Lane B's round B288), to two cards whose pieces are
+   there now. Forger's Foundry's "{T}: Add {U}. When you spend this mana to cast an instant or sorcery spell with mana value
+   3 or less, you may exile that spell instead of putting it into its owner's graveyard as it resolves." (a delayed
+   trigger of the mana, CR 106.6, 603.7a, that triggers whether or not the Foundry is still there, X counted as chosen,
+   rulings; the choice made as it resolves, CR 608.2d, a replacement of the spell's move as it resolves, CR 608.2n,
+   614.1a; countered, it goes to the graveyard; the card linked to the Foundry, CR 607.2a) and "{3}{U}{U}, {T}: You may
+   cast any number of spells from among cards exiled with this artifact without paying their mana costs. Activate only
+   as a sorcery." (one at a time as it resolves, timing ignored, X as 0, rulings, CR 608.2g). Calamity, Galloping
+   Inferno's "Whenever ~ attacks while saddled, choose a nonlegendary creature that saddled it this turn and create a
+   tapped and attacking token that's a copy of it. Sacrifice that token at the beginning of the next end step. Repeat this
+   process once." (CR 702.171b-c, saddled as it was declared an attacker; not targeted, the same creature or another the
+   second time; each token's attack chosen as it enters, CR 508.4, never declared, so no attack triggers; rulings).
+   Browser tests click through the Foundry's exile question and its two free casts, and Calamity's two picks and the
+   players its tokens attack. +2, 31,845 of 31,936 on this stacked branch (round 439 #729); the compiled text of every
+   other card and face is unchanged.
+   Out after round 440 (looked at, not done): Nihiloor and Ashiok, Wicked Manipulator (Lane B's round B288), and the
+   lists after round 439 (still out, for their reasons). Judgment calls: a creature that saddled Calamity and is now
+   controlled by another player can still be chosen (the ability names no controller). Known gaps: bots always exile a
+   spell the Foundry's mana paid for, and tap the Foundry for mana like any other source, without keeping it for its
+   second ability.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

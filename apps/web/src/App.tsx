@@ -147,6 +147,8 @@ import {
   conspireCandidates,
   conspireInstances,
   replicateGranted,
+  chorusFor,
+  availableMana,
   offspringGranted,
   REPLICATE_MAX,
   dredgeOptions,
@@ -465,6 +467,8 @@ type CastDraft = {
   costOr?: number;
   /** Liquid Fire: the number chosen as an additional cost (CR 601.2b). */
   number?: number;
+  /** Chorus of the Conclave (round B284): the mana paid for its additional cost (CostChoices.chorus). */
+  chorus?: number;
   /** Creatures tapped for teamwork; empty when it isn't paid. */
   teamwork?: string[];
   /** Cast using harmonize: the creature tapped for it, or null for none (CR 702.180a-b). */
@@ -494,7 +498,7 @@ type EvidencePick = { label: string; n: number; candidates: string[]; optional: 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
 type CostOrPick = { draft: CastDraft; label: string; options: string[] };
 /** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b). */
-type NumberPick = { draft: CastDraft; label: string; min: number; max: number };
+type NumberPick = { draft: CastDraft; label: string; min: number; max: number; /** Chorus of the Conclave (round B284): the mana paid for its additional cost (CastDraft.chorus), not a number chosen. */ chorus?: string };
 
 /** How to forage for an ability's cost (CR 701.61a): exile three cards from your graveyard or sacrifice a Food. */
 type ForagePick = { label: string } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
@@ -1149,7 +1153,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
     const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}), ...(d.offering?.length ? { offering: d.offering[0]! } : {}) };
-    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}), ...(d.offspring?.some((n) => n > 0) ? { offspring: d.offspring } : {}) };
+    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}), ...(d.offspring?.some((n) => n > 0) ? { offspring: d.offspring } : {}), ...(d.chorus ? { chorus: d.chorus } : {}) };
     // Offering: the permanent to sacrifice is chosen as the spell is announced (CR 702.48b), and sets its cost and when
     // it can be cast. Skipping isn't offered when it couldn't be cast now without it.
     if (d.offering === undefined && compiled.offering && !free) {
@@ -1183,6 +1187,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.offspring === undefined) {
       const grants = offspringGranted(s, HUMAN, card);
       if (grants.length) return setOffspringPick({ draft: d, label: card.name, grants: grants.map((g) => ({ cost: g.cost, from: cardOf(s, g.source).name })), paid: grants.map(() => 0) });
+    }
+    // Chorus of the Conclave (round B284): "As an additional cost to cast creature spells, you may pay any amount of mana",
+    // announced with the other additional costs (CR 601.2b): 0 up to the mana left after the spell's mana value.
+    if (d.chorus === undefined) {
+      const ch = chorusFor(s, HUMAN, card, d.alt as CostChoices["alt"]);
+      const most = Math.max(0, availableMana(s, HUMAN) - (free ? 0 : card.cmc ?? 0));
+      if (ch !== undefined && most > 0) return setNumberPick({ draft: d, label: card.name, min: 0, max: most, chorus: cardOf(s, ch).name });
     }
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
     const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;
@@ -2241,7 +2252,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {numberPick && (
             <div className="targeting">
               <span>
-                <strong>{numberPick.label}</strong>: as an additional cost, choose a number
+                <strong>{numberPick.label}</strong>: {numberPick.chorus ? `as an additional cost (${numberPick.chorus}), you may pay any amount of mana; it enters with that many more +1/+1 counters` : "as an additional cost, choose a number"}
               </span>
               {Array.from({ length: numberPick.max - numberPick.min + 1 }, (_, i) => numberPick.min + i).map((n) => (
                 <button
@@ -2249,7 +2260,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   data-number={n}
                   onClick={() => {
                     setNumberPick(null);
-                    continueCast({ ...numberPick.draft, number: n });
+                    continueCast(numberPick.chorus ? { ...numberPick.draft, chorus: n } : { ...numberPick.draft, number: n });
                   }}
                 >
                   {n}

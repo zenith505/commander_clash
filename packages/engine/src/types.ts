@@ -855,6 +855,12 @@ export interface GameObject {
   creatureCountersCast?: number;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
+  /**
+   * Round B284: the mana paid for Chorus of the Conclave's additional cost as this creature spell was cast: the Chorus (as
+   * that object), the player who paid, and how much. It enters with that many more +1/+1 counters if that Chorus is still
+   * on the battlefield under that player's control as it enters (CR 614.1c, 113.6).
+   */
+  chorusPaid?: { source: ObjectId; zc: number; payer: PlayerId; n: number };
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
   spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true; until?: "yourNextTurn"; whileSpell?: true }[];
   /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
@@ -1690,6 +1696,11 @@ export interface CostChoices {
    * Signal), in the order `replicateGranted` lists them; the spell's own replicate is `kicks` (CR 702.56a-b).
    */
   replicate?: number[];
+  /**
+   * Round B284: Chorus of the Conclave's "As an additional cost to cast creature spells, you may pay any amount of mana":
+   * how much is paid (CR 601.2b, 601.2f), none when unset or 0.
+   */
+  chorus?: number;
   /**
    * Round 410: whether to pay each instance of offspring a permanent gives the spell (Zinnia, Valley's Voice), 1 or 0, in the
    * order `offspringGranted` lists them; the spell's own offspring is `kicks` (CR 702.175a-b, paid once each).

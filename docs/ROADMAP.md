@@ -4178,7 +4178,7 @@ line blocks.
    exile with Swamps, Allure as caster and as the chosen opponent, and Cloak and Dagger's picker. +3, 31,745 of 31,936 with
    main ba0e12b (B261 to B264) merged in; every other card compiles as on main or on the Lane A chain.
    Out after round 420 (looked at, not done): Lady Loki, Agent of Chaos (exiling the spell that triggered it, then damage
-   by the difference of two mana values; next in line), Parnesse, the Subtle Brush, Tahngarth, First Mate, Squall,
+   by the difference of two mana values; next in line), Parnesse, the Subtle Brush, Tahngarth, First Mate (done in round B284), Squall,
    Gunblade Duelist, Supper for Spiders, C.A.M.P., Filigree Vector (done in round B280) and the rest of `npm run popular` above rank 15,100
    (still out, for the reasons in their earlier lists). Known gaps: bots exile the card with the highest mana value with
    Cloak and Dagger and target the first opponent; Kotose's bot use takes any graveyard card.
@@ -4206,7 +4206,7 @@ line blocks.
    one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone, Redemptor
    Dreadnought (an optional additional cost exiling one creature card; note its Plasma Incinerator line compiles "the
    power of the exiled card" as a sacrificed cost's, which an attack trigger has none of: fix that with the cost),
-   Selective Adaptation, Tahngarth, First Mate and the rest of `npm run popular` above rank 15,100 (still out, for the
+   Selective Adaptation, Tahngarth, First Mate (done in round B284) and the rest of `npm run popular` above rank 15,100 (still out, for the
    reasons in their earlier lists). Known gaps: bots cast into Lady Loki's trigger without weighing the spell they lose;
    Medomai's Prophecy's bot name may be a land card.
    Round 422 went on down the "Out after round N" lists and `npm run popular`, most played first, to three cards whose
@@ -5775,7 +5775,7 @@ line blocks.
    cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
-   into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of
+   into your graveyard from your library this turn); Tahngarth, First Mate (done in round B284) (given to an attacking opponent until end of
    combat, attacking for them); Ertai's Meddling (done in round B282) (delay counters, then put onto the stack as a copy); Expose the Culprit (done in round 391)
    (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (done in round B283) (hatching
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
@@ -10473,7 +10473,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B189 (looked at, not done): Noxious Vapors ("chooses one card of each color": how a multicolored card
   counts has no ruling), The Prismatic Piper (done in round B249) and Faceless One (done in round B249) (a color chosen before the game begins, before mulligans:
   no pre-game choice exists yet), A Killer Among Us (done in round B233) (a creature type chosen secretly, revealed as a cost after the
-  sacrifice), Chorus of the Conclave (an extra mana payment of any amount added to every creature spell you cast), Essence
+  sacrifice), Chorus of the Conclave (done in round B284) (an extra mana payment of any amount added to every creature spell you cast), Essence
   of the Wild, Decaying Soil (done in round B234), Peace Talks, Yixlid Jailer, Escaped Shapeshifter and Threefold Signal (done in round B248) stay out for the
   reasons in the earlier lists.
 - Round B190 (least played first, from the Lane B skip lists): Evolving Door ("Count the colors of the sacrificed creature,
@@ -11669,6 +11669,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B284 (least played first, from the skip lists, neither card in Lane A's rounds 435-436): Tahngarth, First Mate's
+  "Whenever an opponent attacks with one or more creatures, if Tahngarth is tapped, you may have that opponent gain control
+  of Tahngarth until end of combat. If you do, choose a player or planeswalker that opponent is attacking. Tahngarth is
+  attacking that player or planeswalker." (any other player's declaration of attackers, CR 508.1, 603.2c; the intervening
+  if checked again as it resolves, CR 603.4; the choice first, then control until end of combat, layer 2, CR 500.5a, seen at
+  once so it isn't removed from combat, CR 506.4, then it's attacking what was chosen without being declared, so no
+  "attacks" trigger and no attack restriction applies, CR 506.3, 508.4, rulings; the choices are the players that player's
+  creatures attack now and the planeswalkers they attack, not a player whose planeswalker alone is attacked, its owner
+  included, rulings; with none left, control still changes and it isn't attacking, rulings; it stays tapped; Effect
+  giveControlAttacking, effects/run-laneb284.ts attackedNow). Chorus of the Conclave's "As an additional cost to cast
+  creature spells, you may pay any amount of mana. If you do, that creature enters with that many additional +1/+1
+  counters on it." (its controller's creature spells, not a bestowed Aura spell, CR 702.103b; announced with the other
+  additional costs, CR 601.2b, CostChoices.chorus, and added to the total cost as generic mana, CR 601.2f; game.ts
+  chorusFor; the counters as the creature enters, CR 614.1c, only while that Chorus is still on the battlefield as the
+  object it was under the payer's control, CR 113.6, 400.7, a static ability's effect; GameObject.chorusPaid). Bots lend
+  Tahngarth only when the attacker attacks someone else and send it at the player with the least life, never at
+  themselves; they pay their spare mana for Chorus's counters, keeping enough for the cheapest other spell in hand. A
+  "you may pay any amount of mana" picker for Chorus in the cast flow. Browser tests click through Tahngarth's question and
+  pick (Ana attacks you and Ben; it attacks Ben for her) and Chorus's amount (Grizzly Bears with three counters). +2,
+  31,824 of 31,936 on B283's branch. The compiled text of every other card is unchanged.
+- Out after round B284 (looked at, not done): the lists after round B283 stay out, Psychic Battle and Titania's Song too.
+  Vivien, Arkbow Ranger stays out with the Wishes (cards from outside the game, CR 400.11). Breathstealer's Crypt stays
+  out: its "they draw a card and reveal it" is a draw other replacements can still replace (CR 614.5, 616.1), and no
+  ruling says what "it" is when that draw becomes two (an Archive) or none (dredge). North Star ("for one spell this turn":
+  which spell, and when it's used up, has no ruling), False Dawn (every colored mana your spells and abilities add becomes
+  white: a replacement on all mana production, not only lands tapped for mana), Snowblind ("toughness minus 1" read inside
+  its own layer 7c effect, no ruling) and Ghostly Flame (damage from a "colorless source" that's still red, wherever color
+  of damage is looked at) were looked at again and stay out. Judgment calls and known gaps: Chorus's counters need it still
+  on the battlefield as the creature enters (no ruling either way; CR 113.6); a copy of the creature spell doesn't get them
+  (as for Boreal Outrider's); with two Choruses (the legend rule aside) only the first is offered.
 - Round B283 (least played first, the three cards round B282 named next, none in Lane A's rounds 434-435): Uvilda, Dean
   of Perfection's "{T}: You may exile an instant or sorcery card from your hand and put three refine counters on it. It
   gains "At the beginning of your upkeep, if this card is exiled, remove a refine counter from it" and "When the last
@@ -11697,7 +11727,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B283 (looked at, not done): the lists after round B282 stay out; Nihiloor and Parnesse, the Subtle Brush
   stay out, for the reasons in their earlier lists. Known gaps: bots never activate Uvilda (they attack with it); the Egg's
   trigger is logged under the Saga's name (the front face's). Next in line (not looked at closely yet): Tahngarth, First
-  Mate, Vivien, Arkbow Ranger, Breathstealer's Crypt.
+  Mate (done in round B284), Vivien, Arkbow Ranger, Breathstealer's Crypt.
 - Round B282 (least played first, two of the three cards round B281 named next, neither in Lane A's rounds 433-434):
   Ertai's Meddling's "X can't be 0." (CR 107.3b, so it can't be cast without paying its mana cost, rulings), "Target spell's
   controller exiles it with X delay counters on it." (exiled, not countered, so a spell that can't be countered goes too,
@@ -11809,7 +11839,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with a mana value. Browser tests click through kicking the Golem with X = 5 (and X up to 2 with only two colors of
   lands) and Alaundo's exile and the free cast with haste it leads to (its prompt now says the last time counter is
   gone). +2, 31,803 of 31,936 on B278's branch. The compiled text of every other card is unchanged.
-- Out after round B279 (looked at, not done): the lists after round B278 stay out. Chorus of the Conclave (still out, as
+- Out after round B279 (looked at, not done): the lists after round B278 stay out. Chorus of the Conclave (done in round B284) (still out, as
   after round B240), Guardian Beast (as after round B257). The Face of Boe, Skyway Robber and Hama, the Bloodbender are
   Lane A's round 431. Known gaps: a bot exiles a land or a card with mana value 0 with Alaundo (it never comes back)
   only when its hand holds nothing else; a bot's Golem X counts cost reductions only against its {2}. Next in line (not looked
@@ -11840,7 +11870,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   is done; Land Equilibrium and Sacred Ground together make a loop no one can stop (a draw, CR 104.4b): the choice of
   land doesn't restart the loop's count, but the counts of cards put into graveyards this turn change each time round, so
   the draw comes only after shortcuts.ts MAX_UNBROKEN resolutions (no shortcut offered). Next in line
-  (not looked at closely yet): Chorus of the Conclave, Emblazoned Golem, Guardian Beast, from the earlier skip lists.
+  (not looked at closely yet): Chorus of the Conclave (done in round B284), Emblazoned Golem, Guardian Beast, from the earlier skip lists.
 - Round B277 (least played first, two of the three cards round B276 named next in line, neither in Lane A's rounds
   428-429): Lightning Storm's "Discard a land card: Put two charge counters on Lightning Storm. You may choose a new target
   for it. Any player may activate this ability but only if Lightning Storm is on the stack." (an ability of the spell that
@@ -11954,7 +11984,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bears over Sol Ring at your next upkeep. +2, 31,787 of 31,936 on B273's branch, 31,790 with main through round 426 merged in. The
   compiled text of every other card is unchanged.
 - Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star, Ghostly Flame, Snowblind,
-  Land Equilibrium, Noxious Vapors, Chorus of the Conclave, Breathstealer's Crypt, Glyph of Delusion and Guardian Beast
+  Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion and Guardian Beast
   were looked at again and stay out for the reasons in the earlier lists; the Wishes and other "outside the game" cards
   stay out (nothing outside the game here). Judgment calls and known gaps: Dimensional Breach's upkeep trigger goes on
   the stack at every player's upkeep while any of its cards is exiled, also for a player who owns none of them (it then
@@ -12210,7 +12240,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B266 (looked at, not done): the lists after round B265 stay out. Judgment calls and known gaps:
   Defensive Formation's division is made for its controller the way banding's is (the engine has no damage assignment
   prompt for blocked attackers), so a human controller isn't asked how to divide it; bots don't attack around Defensive
-  Formation. North Star, Emblazoned Golem, Noxious Vapors, Snowblind, Land Equilibrium, Chorus of the Conclave and
+  Formation. North Star, Emblazoned Golem, Noxious Vapors, Snowblind, Land Equilibrium, Chorus of the Conclave (done in round B284) and
   Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
 - Round B265 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-420): Reversal of
   Fortune ("Target opponent reveals their hand. You may copy an instant or sorcery card in it. If you do, you may cast the
@@ -12435,7 +12465,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   exiles every card of the merged permanent (CR 730.3c), but the delayed trigger returns only the card the ability came from
   (no ruling says whether "this card" finds the others); bots don't weigh which creature Lucius's trigger should watch (any opponent's creature) or which
   creature Frantic Scapegoat should pass its suspicion to.
-- Out after round B240 (looked at, not done): the lists after round B239 stay out, and Chorus of the Conclave (still out: no
+- Out after round B240 (looked at, not done): the lists after round B239 stay out, and Chorus of the Conclave (done in round B284) (still out: no
   ruling says whether a creature spell paid for with its extra mana still enters with the counters once Chorus has left the
   battlefield, the "if you do" being part of its static ability). Known gap: bots don't plan around Bösium Strip's permission.
 - Out after round B239 (looked at, not done): the lists after round B238 stay out, and Ghostly Flame (still out: its rulings
@@ -12739,7 +12769,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   hand), Kodama of the Center Tree (done in round B213), Reflecting Mirror.
 - Out after round B150 (looked at, not done): Boneyard Mycodrax (done in round B198) (its scavenge compiles now; its "other creature cards in
   your graveyard" power doesn't yet), the never-examined names still left (Ring of Ma'rûf and the other wishes, Seafarer's
-  Quay and the other banding grants, Cyclopean Tomb, False Orders (done in round B256), Mirror-Shield Hoplite (done in round B266), Chorus of the Conclave, Temporal
+  Quay and the other banding grants, Cyclopean Tomb, False Orders (done in round B256), Mirror-Shield Hoplite (done in round B266), Chorus of the Conclave (done in round B284), Temporal
   Aperture, All Hallow's Eve (done in round B214), Idris, The Master, Alhammarret, Tazri, Sasaya, Nathan Drake, Feather, Rosheen, Ore-Rich
   Stalactite, Zevlor, Kellan, Leori, Mavinda): each needs a mechanic of its own (outside-the-game cards, banding, copies of
   abilities, exile-zone upkeeps, mana spent only on {X} costs).

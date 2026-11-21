@@ -9102,6 +9102,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e4e6ffab-3f0c-43f8-b1c3-b59c7fcb095d",
+  "name": "Chorus of the Conclave",
+  "manaCost": "{4}{G}{G}{W}{W}",
+  "cmc": 8,
+  "typeLine": "Legendary Creature — Dryad",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dryad"
+  ],
+  "oracleText": "Forestwalk (This creature can't be blocked as long as defending player controls a Forest.)\nAs an additional cost to cast creature spells, you may pay any amount of mana. If you do, that creature enters with that many additional +1/+1 counters on it.",
+  "power": "3",
+  "toughness": "8",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Forestwalk"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "65b3a40e-1d2b-4b24-996f-c935414ded7d",
   "name": "Chromatic Armor",
   "manaCost": "{1}{W}{U}",
@@ -48210,6 +48247,41 @@
   "set": "rtr",
   "releasedAt": "2012-10-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1a8a41a1-6fc5-4dc8-bd28-9bf404c777d7",
+  "name": "Tahngarth, First Mate",
+  "manaCost": "{2}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Minotaur Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Minotaur",
+   "Warrior"
+  ],
+  "oracleText": "Tahngarth can't be blocked by more than one creature.\nWhenever an opponent attacks with one or more creatures, if Tahngarth is tapped, you may have that opponent gain control of Tahngarth until end of combat. If you do, choose a player or planeswalker that opponent is attacking. Tahngarth is attacking that player or planeswalker.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

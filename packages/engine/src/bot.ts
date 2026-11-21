@@ -2,6 +2,7 @@ import { bindBound, cardPT, isLegalTarget, linkedCards, playerProtectedFrom, pla
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
 import { drainKey, drainOptions } from "./effects/run-laneb281";
+import { attackedNow } from "./effects/run-laneb284";
 import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type StaticCondition, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
@@ -156,6 +157,7 @@ import {
   mustAttackPlayers,
   conspireInstances,
   replicateGranted,
+  chorusFor,
   offspringGranted,
   walkersFreeToAttack,
   attackTargetScore,
@@ -1869,6 +1871,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // A creature put onto the battlefield attacking: the player the source attacks, offered first.
     // "Search your library and/or graveyard": both, for the most to choose from.
     if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];
+    // Tahngarth, First Mate (round B284): what it attacks for the attacking opponent: never us or our planeswalkers, the
+    // player with the least life first.
+    if (pend.kind === "chooseOption" && pend.what === "attackWhom" && givesControlAttacking(s)) {
+      const whose = (k: string) => Number(k.split(":")[0]) as PlayerId;
+      const foes = pend.options.filter((k) => whose(k) !== pid).sort((a, b) => player(s, whose(a)).life - player(s, whose(b)).life || (a.includes(":") ? 1 : 0) - (b.includes(":") ? 1 : 0));
+      return [{ type: "chooseOption", player: pid, choice: foes[0] ?? pend.options[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Selective Adaptation (round B268): the chosen card worth most on the battlefield (the greatest mana value, the cheap
     // ones are just as good in hand), a land only if there's nothing else.
@@ -5560,6 +5569,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
         .map((o) => obj(s, o))
         .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && extra.casualty !== o.id && extra.bargain !== o.id && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && (o.isToken || worth(s, pid, o) <= 3))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+  for (const chorus of chorusOptions(s, pid, id, alt, free))
   for (const replicate of replicateOptions(s, pid, id, free))
   for (const offspring of offspringOptions(s, pid, id, free))
   for (const offer of offering ? [undefined, offering.id] : [undefined])
@@ -5570,7 +5580,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
           // Splice costs beyond mana (Torrent of Stone's "sacrifice two Mountains"): paid as our other costs would be.
           const spliceCosts = splice?.costly && !buyback && !kicks.length ? chooseExtraCosts(s, pid, id, all ?? [], via, alt, extra.costOr, x ?? 0, modes, false, undefined, splice.ids) : undefined;
           if (splice?.costly && !spliceCosts) continue;
-          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(offspring ? { offspring } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(offspring ? { offspring } : {}), ...(chorus ? { chorus } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
           if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
           if (plan) return plan;
@@ -5618,6 +5628,19 @@ function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, t
 function wantsEvidence(c: CompiledCard): boolean {
   if (c.evidenceReduction) return true;
   return JSON.stringify([c.spell ?? null, c.triggers]).includes('"kind":"evidence"') || c.triggers.some((t) => t.ifEvidence);
+}
+
+/**
+ * Chorus of the Conclave (round B284): what to pay for its additional cost on a creature spell, tried first, then nothing:
+ * the spare mana, less what the cheapest other nonland card in hand costs (to keep casting).
+ */
+function chorusOptions(s: GameState, pid: PlayerId, id: string, alt?: CostChoices["alt"], free = false): (number | undefined)[] {
+  const d = defOf(s, obj(s, id));
+  if (chorusFor(s, pid, d, alt) === undefined) return [undefined];
+  const others = player(s, pid).hand.filter((c) => c !== id && !isType(defOf(s, obj(s, c)), "Land")).map((c) => defMv(defOf(s, obj(s, c))));
+  const keep = others.length ? Math.min(...others) : 0;
+  const pay = availableMana(s, pid) - (free ? 0 : totalWithoutX(s, pid, id)) - keep;
+  return pay > 0 ? [pay, undefined] : [undefined];
 }
 
 /**
@@ -6332,9 +6355,18 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
     .filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && s.objects[l.id]!.owner === pid).length;
 }
 
+/** Tahngarth, First Mate (round B284): is the resolving ability its "you may have that opponent gain control of ~"? */
+const givesControlAttacking = (s: GameState): boolean => !!s.resolving?.body.effects.some((e) => e.type === "may" && e.effects.some((x) => x.type === "giveControlAttacking"));
+
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Tahngarth, First Mate (round B284): lent to the attacking opponent only when it would attack someone else then, never
+  // us or our planeswalkers.
+  if (r && e?.type === "may" && e.effects.some((x) => x.type === "giveControlAttacking")) {
+    const to = r.item.event?.player;
+    return to !== undefined && to !== pid && attackedNow(s, to, r.item.sourceId).some((a) => a.player !== pid);
+  }
   // Captain Marvel, Apex Avenger: "you may put the same number and kind of counters on ~": not -1/-1, stun or the like.
   const sameKind = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "counters" && e.effects[0]!.eventCounter ? r?.item.event?.counter : undefined;
   if (sameKind !== undefined) return !harmfulCounter(sameKind);

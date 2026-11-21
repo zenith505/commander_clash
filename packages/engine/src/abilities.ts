@@ -4387,6 +4387,13 @@ export type Effect =
    * exiled card without paying its mana cost." `mv` is the mana value sought, counted as it resolves.
    */
   | { type: "podReveal"; mv: Amount }
+  /**
+   * Tahngarth, First Mate (round B284): "you may have that opponent gain control of ~ until end of combat. If you do, choose a
+   * player or planeswalker that opponent is attacking. ~ is attacking that player or planeswalker." `to` is the attacking
+   * opponent; the choice is made first, then control changes (layer 2, until end of combat, CR 500.5a) and the source becomes
+   * an attacking creature without being declared (CR 506.3, 508.4).
+   */
+  | { type: "giveControlAttacking"; to: PlayerRef }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true; /** Helm of Kaldra (round 417): "Attach those Equipment to it": to the token just created (the first one), not the source. */ toCreated?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */
@@ -10154,6 +10161,12 @@ export interface CompiledCard {
    * only as though it were colorless mana." (CR 609.4b), for every cost its controller pays with mana (spend.ts dawnCost).
    */
   dawnMana?: true;
+  /**
+   * Chorus of the Conclave (round B284): "As an additional cost to cast creature spells, you may pay any amount of mana. If
+   * you do, that creature enters with that many additional +1/+1 counters on it." (CR 601.2b, 601.2f, 614.1c): for its
+   * controller's creature spells (CostChoices.chorus, GameObject.chorusPaid).
+   */
+  chorusCost?: true;
   /** Averna, the Chaos Bloom: "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped." (CR 702.85a): for its controller's cascades, after the last card is exiled. */
   cascadeLand?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */

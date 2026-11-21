@@ -1424,6 +1424,7 @@ export function moveObject(
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
     o.extraCounters = undefined; // and the counters a spell will enter with
+    o.chorusPaid = undefined; // and what was paid for Chorus of the Conclave (round B284)
     o.spellGains = undefined;
     o.reboundGained = undefined;
     o.sunburstGained = undefined;
@@ -1691,6 +1692,12 @@ export function moveObject(
     // Storyweave (round B221): "each enters with two additional +1/+1 counters on it" (CR 614.1c).
     for (const k of storyweaveCounters(s, o)) counters[k.counter] = (counters[k.counter] ?? 0) + k.n;
     o.extraCounters = undefined;
+    // Chorus of the Conclave (round B284): "that creature enters with that many additional +1/+1 counters on it", while that
+    // Chorus is still on the battlefield as the object it was, under the control of the player who paid (CR 113.6, 400.7,
+    // 614.1c).
+    const chorus = fromZone === "stack" && o.chorusPaid ? s.objects[o.chorusPaid.source] : undefined;
+    if (chorus && o.chorusPaid && chorus.zone === "battlefield" && (chorus.zoneChanges ?? 0) === o.chorusPaid.zc && abilitiesOf(s, chorus).chorusCost && controllerOf(s, chorus) === o.chorusPaid.payer && o.chorusPaid.n > 0) counters["+1/+1"] = (counters["+1/+1"] ?? 0) + o.chorusPaid.n;
+    o.chorusPaid = undefined;
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
     for (const g of fromZone === "stack" ? (o.spellGains ?? []).filter((g) => !g.whileSpell) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : (g.until ?? "endOfTurn"), ...(g.until ? { turnOf: g.controller } : {}), affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
@@ -7800,6 +7807,8 @@ export function castProblem(
   if (kp) return kp;
   const rp = replicateProblem(s, pid, d, choices?.replicate);
   if (rp) return rp;
+  const chp = chorusProblem(s, pid, choices?.faceDown ? FACE_DOWN : d, choices);
+  if (chp) return chp;
   const op = offspringProblem(s, pid, d, choices?.offspring, !!choices?.faceDown);
   if (op) return op;
   const or = compileCard(d).costOr;
@@ -7867,7 +7876,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate" | "offspring"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate" | "offspring" | "chorus"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -7886,7 +7895,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
   // Emblazoned Golem (round B279): "Spend only colored mana on X. No more than one mana of each color may be spent this way."
   const golemKicked = !!compileCard(d).kickXOneOfEachColor && kicks.includes(0) && !how.faceDown && x > 0;
-  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate) + offspringMana(s, pid, d, how.offspring);
+  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate) + offspringMana(s, pid, d, how.offspring) + chorusMana(s, pid, d, how);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor, kicks.length > 0 && isRealKicker(kicker));
@@ -9195,6 +9204,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (rider?.counter) o.extraCounters = { ...o.extraCounters, [rider.counter]: (o.extraCounters?.[rider.counter] ?? 0) + 1 };
     if (rider?.subtypes?.length) (o.spellGains ??= []).push({ mods: [{ kind: "addTypes", types: [], subtypes: rider.subtypes }], timestamp: s.nextTimestamp++, controller: p.id, source: s.graveGrants!.find((g) => g.key === permit)!.source, forever: true });
   }
+  // Chorus of the Conclave (round B284): the mana paid for its additional cost, for the counters the creature enters with.
+  const chorus = choices.chorus ? chorusFor(s, p.id, d, choices.alt) : undefined;
+  o.chorusPaid = chorus !== undefined ? { source: chorus, zc: obj(s, chorus).zoneChanges ?? 0, payer: p.id, n: choices.chorus! } : undefined;
   // Undead Sprinter: "If you do, ~ enters with a +1/+1 counter on it": the spell cast with that permission (CR 614.1c).
   if (via?.entersWith) o.extraCounters = { ...o.extraCounters, [via.entersWith.counter]: (o.extraCounters?.[via.entersWith.counter] ?? 0) + via.entersWith.n };
   // Kaldring, the Rimestaff: "If you do, it enters tapped": the permanent this spell becomes (CR 614.1c).
@@ -9312,6 +9324,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
   const offspringText = offspringPaid.map((g) => `, paying offspring ${g.cost} (from ${nameOf(s, g.source)})`).join("");
+  const chorusText = o.chorusPaid ? `, paying {${o.chorusPaid.n}} more (${nameOf(s, o.chorusPaid.source)})` : "";
   const replicateText = replicated.map((r) => `, paying replicate ${replicateNow.find((g) => g.source === r.source)!.cost}${r.times === 1 ? " once" : r.times === 2 ? " twice" : ` ${r.times} times`} (from ${nameOf(s, r.source)})`).join("");
   // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
   const payWay = s.pending?.kind === "castFree" && s.pending.player === p.id && s.pending.objectId === id ? s.pending.pay : undefined;
@@ -9326,7 +9339,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${castTypeChosen(d, choices) && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${castTypeChosen(d, choices) && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${chorusText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).
@@ -10015,6 +10028,29 @@ function replicateMana(s: GameState, pid: PlayerId, d: CardDef, times?: number[]
   if (!times?.some((n) => n > 0)) return "";
   const grants = replicateGranted(s, pid, d);
   return times.map((n, i) => (grants[i]?.cost ?? "").repeat(Math.max(0, n))).join("");
+}
+
+/**
+ * Chorus of the Conclave (round B284): the permanent of `pid`'s whose "As an additional cost to cast creature spells, you may
+ * pay any amount of mana" applies to `d` as they cast it (a creature spell; a bestowed one is an Aura spell, CR 702.103b),
+ * the first on the battlefield if there are several (only one instance is offered).
+ */
+export function chorusFor(s: GameState, pid: PlayerId, d: CardDef, alt?: CostChoices["alt"]): ObjectId | undefined {
+  if (!isType(d, "Creature") || alt === "bestow") return undefined;
+  return s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).chorusCost);
+}
+
+/** Why this payment for Chorus of the Conclave's additional cost isn't allowed (CR 601.2b). */
+function chorusProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
+  const n = choices?.chorus;
+  if (!n) return null;
+  if (!Number.isInteger(n) || n < 0) return "pay a whole amount of mana for that additional cost";
+  return chorusFor(s, pid, d, choices.alt) === undefined ? `nothing lets you pay more mana as you cast ${d.name}` : null;
+}
+
+/** The generic mana paid for Chorus of the Conclave's additional cost (CR 601.2f), "" when none. */
+function chorusMana(s: GameState, pid: PlayerId, d: CardDef, how: Pick<CostChoices, "chorus" | "alt">): string {
+  return how.chorus && how.chorus > 0 && chorusFor(s, pid, d, how.alt) !== undefined ? `{${how.chorus}}` : "";
 }
 
 /** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a); with several instances, the least N. */

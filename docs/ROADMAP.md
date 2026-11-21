@@ -1,6 +1,6 @@
 # Roadmap
 
-31,842 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,844 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
 9,979 (99%).
 
@@ -11836,7 +11836,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   their creature cards in the graveyard (at least 1) and exile them all, and take for Sanar the nonland cards they could
   pay for, the greatest mana value first. Browser tests click through Mimeoplasm's "up to 2" exile and its copy of the
   exiled Serra Angel, and Sanar's red and blue picks among the revealed cards, then the cast of Hill Giant from exile. +2,
-  31,842 of 31,936 on B286's branch. The compiled text of every other card is unchanged.
+  31,842 of 31,936 on B286's branch, 31,844 with B286's head 6b5b618 (main 70cf91a, round 437) merged in. The compiled
+  text of every other card is unchanged.
 - Out after round B287 (looked at, not done): the lists after round B286 stay out. Judgment call: after Mimeoplasm becomes
   a copy, the "this ability" it keeps still refers to the cards its own enters replacement exiled (the ability is printed on
   it, CR 607.1a, and the card has no rulings saying otherwise); the copy is a 0/0 with its +1/+1 counters. Known gaps: bots

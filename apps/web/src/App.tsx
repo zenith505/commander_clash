@@ -5581,6 +5581,11 @@ function Controls({
             <>
               <strong>Miracle:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it stays in your hand.
             </>
+          ) : pending.how === "paid" && pending.less ? (
+            <>
+              {/* Uvilda, Dean of Perfection (round B283): the trigger the exiled card gained from it, its cost less {4} of generic mana. */}
+              <strong>{d.name}:</strong> the last refine counter is gone. Cast it now for <ManaCost cost={d.manaCost} size="sm" /> less <ManaCost cost={`{${pending.less}}`} size="sm" /> (generic mana only)? If you don&apos;t, it stays in exile.
+            </>
           ) : pending.how === "paid" ? (
             <>
               {/* Chandra, Torch of Defiance: the card just exiled, cast now or not at all. */}

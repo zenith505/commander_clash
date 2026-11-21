@@ -22,6 +22,7 @@ import type { TargetSpec } from "../abilities";
 import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { dealDamage, objectSource } from "../damage";
 import { couldEnchantAsLastExisted } from "./run-laneb208";
+import { refineExiled } from "./run-laneb283";
 
 /** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
 function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec {
@@ -919,6 +920,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const o = obj(s, id);
           if (o.zone !== "exile") continue;
           (s.resolving!.exiledFromHandCards ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+          // Uvilda, Dean of Perfection (round B283): refine counters, and the card gains its two triggers.
+          if (e.refine) refineExiled(s, o, e.refine);
           // Pick the Brain: "the same name as the exiled card" (SameNameRef exiledThisWay).
           (s.resolving!.exiledCards ??= []).push(id);
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });

@@ -2220,6 +2220,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         subject: { id: o.id, zc: o.zoneChanges ?? 0 },
         body: { targets: [], effects: [{ type: "alaundoCast" }], text: "When the last time counter is removed from ~, if it's exiled, you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn." },
       });
+    // Uvilda, Dean of Perfection (round B283): the trigger the card gained in exile, whatever removed its last refine
+    // counter, with an intervening "if it's exiled" (CR 603.4); its owner controls it (CR 113.8).
+    if (o?.zone === "exile" && ev.counter === "refine" && o.refined === (o.zoneChanges ?? 0))
+      s.triggerQueue.push({
+        sourceId: o.id,
+        sourceCardId: cardIdOf(o),
+        controller: o.owner,
+        index: -1,
+        subject: { id: o.id, zc: o.zoneChanges ?? 0 },
+        body: { targets: [], effects: [{ type: "refineCast" }], text: "When the last refine counter is removed from ~, if it's exiled, you may cast it. It costs {4} less to cast this way." },
+      });
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
     if (o?.zone === "exile" && ev.counter === "time" && hasSuspend(s, o))
       s.triggerQueue.push({
@@ -3311,6 +3322,22 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
             index: -1,
             subject: { id, zc: o.zoneChanges ?? 0 },
             body: { targets: [], effects: [{ type: "suspendTick" }], text: "Suspend: remove a time counter from ~." },
+          });
+      }
+    // Uvilda, Dean of Perfection (round B283): "At the beginning of your upkeep, if this card is exiled, remove a refine
+    // counter from it", gained by the card while it's that object in exile (CR 113.6, 400.7); "your" is its owner's (CR
+    // 109.5), who controls the trigger (CR 113.8). The intervening if is checked as it triggers and resolves (CR 603.4).
+    if (ev.step === "upkeep")
+      for (const id of player(s, ev.active).exile) {
+        const o = obj(s, id);
+        if (o.refined === (o.zoneChanges ?? 0) && o.owner === ev.active)
+          s.triggerQueue.push({
+            sourceId: id,
+            sourceCardId: cardIdOf(o),
+            controller: ev.active,
+            index: -1,
+            subject: { id, zc: o.zoneChanges ?? 0 },
+            body: { targets: [], effects: [{ type: "refineTick" }], text: "At the beginning of your upkeep, if ~ is exiled, remove a refine counter from it." },
           });
       }
     const pair = STEP_TRIGGERS[ev.step];

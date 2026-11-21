@@ -7903,6 +7903,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // resolves: an additional cost (CR 118.8, 601.2f).
   const added = s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.objectId === o.id ? (s.pending.addedMana ?? "") : "";
   const moreMana = mods.moreColored.map((c) => `{${c}}`).join("") + added;
+  // Uvilda, Dean of Perfection (round B283): "It costs {4} less to cast this way", as its granted trigger resolves: a cost
+  // reduction (CR 601.2f) that takes off generic mana only (rulings).
+  if (s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.objectId === o.id && s.pending.less && !how.faceDown) mods.less += s.pending.less;
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Khalni Hydra: "{G} less for each ...", counted as it's cast (rulings): {G} off while there's {G} to take, then {1}.

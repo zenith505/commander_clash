@@ -128,6 +128,7 @@ import { runLaneB277Effect } from "./run-laneb277";
 import { runLaneB278Effect } from "./run-laneb278";
 import { runLaneB281Effect } from "./run-laneb281";
 import { runLaneB282Effect } from "./run-laneb282";
+import { runLaneB283Effect } from "./run-laneb283";
 import { runLaneB279Effect } from "./run-laneb279";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
@@ -2231,6 +2232,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB281Effect(s, e, ctx, src);
     case "meddleReturn":
       return runLaneB282Effect(s, e, ctx, src);
+    case "refineTick":
+    case "refineCast":
+    case "podReveal":
+      return runLaneB283Effect(s, e, ctx, src);
     case "timeCounterFromOwnExiled":
     case "alaundoCast":
       return runLaneB279Effect(s, e, ctx, src);

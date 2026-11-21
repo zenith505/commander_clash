@@ -2347,7 +2347,7 @@ line blocks.
    and/or cards from their hand", you first (Descent into Madness, with a browser test of the pick). +10, 30,170 of 31,936 with B123.
    Out after round 293 (looked at, not done): Spellweaver Helix (done in round B270) (copying the other imprinted card when a card with one's
    name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
-   activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (refine
+   activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (done in round B283) (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (done in round B263) (a redirection chosen for each
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
    Caller of the Hunt (done in round B245), Enigmatic Incarnation (how it was cast); Don't Blink (done in round B252) (entering from exile replaced by a shuffle);
@@ -3593,7 +3593,7 @@ line blocks.
    The Spot's two targets, both of Tetsuo's modes and Absorbing Man's target, and watch Jeskai Infiltrator manifest. +4,
    31,588 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
    Out after round 397 (looked at, not done): Sentinel of Lost Lore (still out: targets in exile, "a card you own in exile
-   that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown (done in round 420), Synthesis Pod,
+   that has an Adventure"); Nihilith (a trigger of a suspended card in exile); Allure of the Unknown (done in round 420), Synthesis Pod (done in round B283),
    Taster of Wares, Nihiloor, Squall, Skyway Robber, Redemptor Dreadnought, Urgent Necropsy, Power Pack (done in round B266), Medomai's Prophecy,
    Monastery Raid, Winter's Chill (done in round B262), Divine Intervention (done in round B259), Kotose (done in round 420) and the rest from rank 15,000 to 20,000 (still out, for the
    reasons in their earlier lists).
@@ -4200,9 +4200,9 @@ line blocks.
    TriggerEventInfo.ptEquals; bots choose the power or toughness most common among their creatures and creature cards).
    No new prompts (the free cast, card name and number pickers are the ones browser tests already click through). +3,
    31,736 of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
-   Out after round 421 (looked at, not done): The Dragon-Kami Reborn (hatching counters on cards exiled face down), The
+   Out after round 421 (looked at, not done): The Dragon-Kami Reborn (done in round B283) (hatching counters on cards exiled face down), The
    Face of Boe (a spell cast for its suspend cost: the "Suspend X" cards' {X} in that cost isn't worked out), Skyway
-   Robber, Parnesse, the Subtle Brush, Uvilda, Dean of Perfection, Nihiloor (a reflexive trigger for each creature tapped,
+   Robber, Parnesse, the Subtle Brush, Uvilda, Dean of Perfection (done in round B283), Nihiloor (a reflexive trigger for each creature tapped,
    one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone, Redemptor
    Dreadnought (an optional additional cost exiling one creature card; note its Plasma Incinerator line compiles "the
    power of the exiled card" as a sacrificed cost's, which an attack trigger has none of: fix that with the cost),
@@ -5777,7 +5777,7 @@ line blocks.
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (given to an attacking opponent until end of
    combat, attacking for them); Ertai's Meddling (done in round B282) (delay counters, then put onto the stack as a copy); Expose the Culprit (done in round 391)
-   (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (hatching
+   (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (done in round B283) (hatching
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
    for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
    Ogre Battlecaster (done in round 401) ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (done in round 401) (spells
@@ -5787,7 +5787,7 @@ line blocks.
    Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand (done in round 424);
    Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force (done in round B247).
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
-   exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod ("Exile a
+   exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod (done in round B283) ("Exile a
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
@@ -11669,6 +11669,35 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B283 (least played first, the three cards round B282 named next, none in Lane A's rounds 434-435): Uvilda, Dean
+  of Perfection's "{T}: You may exile an instant or sorcery card from your hand and put three refine counters on it. It
+  gains "At the beginning of your upkeep, if this card is exiled, remove a refine counter from it" and "When the last
+  refine counter is removed from this card, if it's exiled, you may cast it. It costs {4} less to cast this way."" (an
+  instant or sorcery card of your choice or none, CR 609.3, exiled with three refine counters, CR 122.1; the two abilities
+  it gains work in exile, CR 113.6, controlled by its owner, CR 113.8, for as long as it stays that object there, CR 400.7:
+  GameObject.refined, effects/run-laneb283.ts refineTick and refineCast; each upkeep of its owner removes one, the
+  intervening if checked again, CR 603.4, and removing the last lets them cast it then, timing ignored, CR 608.2g, paying
+  its costs less {4} of generic mana only, rulings, castFree `less`; not cast, it stays exiled; it isn't suspend). The
+  Dragon-Kami Reborn's "I, II — You gain 2 life. Look at the top three cards of your library. Exile one of them face down
+  with a hatching counter on it, then put the rest on the bottom of your library in any order." (CR 714.2b, 406.3, 401.4;
+  exileFaceDown `counter`; you may look at it as long as it stays exiled, rulings) and Dragon-Kami's Egg's "Whenever this
+  creature or a Dragon you control dies, you may cast a creature spell from among cards you own in exile with hatching
+  counters on them without paying its mana cost." (read as "this creature or another Dragon you control", triggers.ts;
+  castFromAmong `ownExileCounter` with a creature filter). Synthesis Pod's "{1}{U/P}, {T}, Exile a spell you control:
+  Target opponent reveals cards from the top of their library until they reveal a card with mana value equal to 1 plus the
+  exiled spell's mana value. Exile that card, then that player shuffles. You may cast that exiled card without paying its
+  mana cost." (the exiled spell's mana value as it last existed on the stack, X included, CR 202.3e, 608.2h, counts.ts
+  "the exiled spell's"; any card type; a card's mana value in the library, a modal double-faced card's front face's, CR
+  712.8a; the other revealed cards stay for the shuffle, CR 701.20a; with none found, nothing is exiled; the free cast as it
+  resolves, CR 608.2g, rulings; podReveal). Bots pay a refine card's cast, pick the creature to hatch and the bottom order,
+  and use Synthesis Pod's cost on a spell of theirs that is about to be countered, as for other "Exile a spell you control"
+  costs. Browser tests click through Uvilda's hand pick and its upkeep cast for {U}{U}, Synthesis Pod's target, spell pick
+  and free cast, The Dragon-Kami Reborn's face-down pick and bottom order, and the Egg's free cast. +3, 31,822 of 31,936 on
+  B282's branch. The compiled text of every other card is unchanged.
+- Out after round B283 (looked at, not done): the lists after round B282 stay out; Nihiloor and Parnesse, the Subtle Brush
+  stay out, for the reasons in their earlier lists. Known gaps: bots never activate Uvilda (they attack with it); the Egg's
+  trigger is logged under the Saga's name (the front face's). Next in line (not looked at closely yet): Tahngarth, First
+  Mate, Vivien, Arkbow Ranger, Breathstealer's Crypt.
 - Round B282 (least played first, two of the three cards round B281 named next, neither in Lane A's rounds 433-434):
   Ertai's Meddling's "X can't be 0." (CR 107.3b, so it can't be cast without paying its mana cost, rulings), "Target spell's
   controller exiles it with X delay counters on it." (exiled, not countered, so a spell that can't be countered goes too,
@@ -11701,7 +11730,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   card). Known gaps: a face-down spell Ertai's Meddling exiles comes back face down (its rulings make it a face-up 2/2 with
   no name, text or color, which the engine has no way to show), so its morph or disguise cost could turn it face up; the
   draw Notion Thief or Alms Collector gives a player who could dredge or has a first-draw look (Scion of Halaster) isn't
-  offered to Shared Fate (that path draws without asking, as before). Next in line (not looked at closely yet): Uvilda, Dean of Perfection, Synthesis Pod, The Dragon-Kami Reborn.
+  offered to Shared Fate (that path draws without asking, as before). Next in line (not looked at closely yet): Uvilda, Dean of Perfection (done in round B283), Synthesis Pod (done in round B283), The Dragon-Kami Reborn (done in round B283).
 - Round B281 (least played first, the two cards round B280 named next that Lane A's rounds 432-433 don't take): Celestial
   Dawn's "Lands you control are Plains." (each land its controller controls has the land type Plains instead of its others,
   loses the abilities of its rules text and taps for {W}, CR 305.7, layer 4; supertypes stay and a land that would enter
@@ -12671,7 +12700,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   activating a mana ability of a permanent they don't control), Essence of the Wild (done in round B249) (creatures entering as a copy of it,
   a copy replacement applied before other enters replacements, rulings), Sunglasses of Urza (white mana spent as though
   it were red).
-- Out after round B162 (looked at, not done): Synthesis Pod (reveal until a card with mana value one more than the exiled
+- Out after round B162 (looked at, not done): Synthesis Pod (done in round B283) (reveal until a card with mana value one more than the exiled
   spell's, then cast it free: the Nivmagus cost works, the reveal-and-cast doesn't yet), Imperiosaur (mana from basic
   lands isn't told apart in the mana pool), Graceful Takedown (done in round B187) (two groups of targets), Peace Talks (activated abilities
   apart from triggered ones as sources of targeting), Wall of Shadows (done in round B199) (every target spec of a source), Noxious Vapors and

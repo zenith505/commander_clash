@@ -38,6 +38,7 @@ import { roundB279Line } from "./laneb279-lines";
 import { roundB280Line } from "./laneb280-lines";
 import { roundB281Line } from "./laneb281-lines";
 import { roundB282Line } from "./laneb282-lines";
+import { roundB283Chapter, roundB283Line } from "./laneb283-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -1271,7 +1272,9 @@ export function compile(d: CardDef): CompiledCard {
         // The Three Seasons (round B206).
         // Long List of the Ents (round 381).
         // Day of the Moon (round 382).
-        const r382 = round382Chapter(chapter[2]!);
+        // The Dragon-Kami Reborn (round B283).
+        const rB283 = roundB283Chapter(chapter[2]!);
+        const r382 = rB283 !== undefined ? rB283 : round382Chapter(chapter[2]!);
         const r381 = r382 !== undefined ? r382 : round381Chapter(chapter[2]!);
         const rB206 = r381 !== undefined ? r381 : roundB206Chapter(chapter[2]!);
         const r345 = rB206 !== undefined ? rB206 : round345Chapter(chapter[2]!, (x) => parseBody(x, {}));
@@ -2493,6 +2496,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB281Line(line, out, isSpell)) continue;
     // Ertai's Meddling, Shared Fate (round B282).
     if (roundB282Line(line, out, isSpell, d)) continue;
+    // Uvilda, Dean of Perfection, Synthesis Pod, Dragon-Kami's Egg (round B283).
+    if (roundB283Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8655,8 +8660,10 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   emergeEnters = false;
   for (const ab of out.activated) {
     yardExile = yardExileOne(ab.costs);
-    canSac = !!ab.costs?.some((c) => c.kind === "sacrifice") || yardExile;
-    exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
+    // Synthesis Pod (round B283): an "Exile a spell you control" cost keeps the spell's mana value as a sacrifice does.
+    const spellExile = !!ab.costs?.some((c) => c.kind === "exileSpell") && !ab.costs.some((c) => c.kind === "sacrifice" || c.kind === "exileFromGraveyard" || c.kind === "forage");
+    canSac = !!ab.costs?.some((c) => c.kind === "sacrifice") || yardExile || spellExile;
+    exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile) || spellExile;
     handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
     permExileCost = ab.costs?.filter((c) => c.kind === "exileFromHand" || c.kind === "exileFromGraveyard" || c.kind === "sacrifice" || c.kind === "craft").length === 1 && !!ab.costs.some((c) => c.kind === "sacrifice" && c.exile && c.n === 1);
     revealCost = oneReveal(ab.costs);

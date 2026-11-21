@@ -110,7 +110,7 @@ export function olagCopy(s: GameState, o: GameObject, cardId: ObjectId | undefin
 }
 
 /** The answer to the "transformCopy" question: the copy and counters, then the transform's event (see olagTransforms). */
-export function olagCopyChosen(s: GameState, o: GameObject, choice: string) {
+export function olagCopyChosen(s: GameState, o: GameObject, choice: ObjectId | undefined) {
   olagCopy(s, o, choice);
   fireEvent(s, { type: "transformed", id: o.id, face: o.face === 1 ? 1 : 0 });
 }

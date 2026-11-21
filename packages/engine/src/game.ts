@@ -13993,6 +13993,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   // Curse of Leeches's player is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
   if (pend.what === "attachPlayer") throw new RulesError("nothing to attach");
+  // Olag's copy (round 435) is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
+  if (pend.what === "transformCopy") throw new RulesError("nothing to choose");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };

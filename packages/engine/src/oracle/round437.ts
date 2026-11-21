@@ -1,6 +1,6 @@
 // Round 437's whole lines (compile.ts, before round 435's) and sentences (body.ts chain, before round 436's): Nathan Drake,
 // Treasure Hunter's mana spent as any color for what you don't own and its paid cast from each player's top card, and The
-// Ur-Sphinx's free cast of a card each player milled. (Pygmy Hippo is left to round B285.)
+// Ur-Sphinx's free cast of a card each player milled. (Pygmy Hippo is left to Lane B.)
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 

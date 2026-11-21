@@ -3141,7 +3141,7 @@ export type Effect =
    * any order (rulings).
    */
   | { type: "vault"; n: number; life: number }
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; /** "Its controller looks at ... and exiles it face down. They may play that card" (Gonti, Night Minister): who exiles, looks and may play; the ability's controller if unset. */ actor?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true; /** Ethereal Valkyrie: "It becomes foretold. Its foretell cost is its mana cost reduced by {2}.": foretold with that cost (CR 702.143), how much generic mana less. */ foretold?: number; /** "Look at the top two cards of target opponent's library. Exile one of them face down and put the other on the bottom of that library" (Siphon Insight): of the top `n`, the actor exiles the one they choose and the rest go to the bottom. */ pickOne?: true; /** With `pickOne` (Clone Shell): "then put the rest on the bottom of your library in any order", in the order the actor chooses. */ bottomAnyOrder?: true; /** With `pickOne` (Urianger Augurelt): "Look at the top card of your library. You may exile it face down.": the actor may exile none, and the cards not exiled stay where they are. */ optional?: true; /** With `look`, Grimoire Thief: "You may look at cards exiled with ~.": whoever controls the source later may look at them too, and keeps that once allowed (rulings). */ lookControllers?: true; /** With `pickOne`, Discover the Impossible: "and put the rest on the bottom of your library in a random order". */ bottomRandom?: true; /** Discover the Impossible: "You may cast the exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card into your hand.": cast as this resolves only as a spell of one of these types with at most this mana value (rulings), otherwise into its owner's hand. */ castOrHand?: { types: string[]; maxMv: number } }
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; /** "Its controller looks at ... and exiles it face down. They may play that card" (Gonti, Night Minister): who exiles, looks and may play; the ability's controller if unset. */ actor?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true; /** Ethereal Valkyrie: "It becomes foretold. Its foretell cost is its mana cost reduced by {2}.": foretold with that cost (CR 702.143), how much generic mana less. */ foretold?: number; /** "Look at the top two cards of target opponent's library. Exile one of them face down and put the other on the bottom of that library" (Siphon Insight): of the top `n`, the actor exiles the one they choose and the rest go to the bottom. */ pickOne?: true; /** With `pickOne` (Clone Shell): "then put the rest on the bottom of your library in any order", in the order the actor chooses. */ bottomAnyOrder?: true; /** With `pickOne` (Urianger Augurelt): "Look at the top card of your library. You may exile it face down.": the actor may exile none, and the cards not exiled stay where they are. */ optional?: true; /** With `look`, Grimoire Thief: "You may look at cards exiled with ~.": whoever controls the source later may look at them too, and keeps that once allowed (rulings). */ lookControllers?: true; /** With `pickOne`, Discover the Impossible: "and put the rest on the bottom of your library in a random order". */ bottomRandom?: true; /** The Dragon-Kami Reborn (round B283): "Exile one of them face down with a hatching counter on it": one counter of this kind on each card exiled. */ counter?: CounterKind; /** Discover the Impossible: "You may cast the exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card into your hand.": cast as this resolves only as a spell of one of these types with at most this mana value (rulings), otherwise into its owner's hand. */ castOrHand?: { types: string[]; maxMv: number } }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -4376,6 +4376,26 @@ export type Effect =
    * end of turn." Its subject is the card.
    */
   | { type: "alaundoCast" }
+  /**
+   * Uvilda, Dean of Perfection's granted triggers (round B283, GameObject.refined): "At the beginning of your upkeep, if
+   * this card is exiled, remove a refine counter from it" (`refineTick`) and "When the last refine counter is removed from
+   * this card, if it's exiled, you may cast it. It costs {4} less to cast this way." (`refineCast`). Their subject is the card.
+   */
+  | { type: "refineTick" }
+  | { type: "refineCast" }
+  /**
+   * Synthesis Pod (round B283): "Target opponent reveals cards from the top of their library until they reveal a card with
+   * mana value equal to 1 plus the exiled spell's mana value. Exile that card, then that player shuffles. You may cast that
+   * exiled card without paying its mana cost." `mv` is the mana value sought, counted as it resolves.
+   */
+  | { type: "podReveal"; mv: Amount }
+  /**
+   * Tahngarth, First Mate (round B284): "you may have that opponent gain control of ~ until end of combat. If you do, choose a
+   * player or planeswalker that opponent is attacking. ~ is attacking that player or planeswalker." `to` is the attacking
+   * opponent; the choice is made first, then control changes (layer 2, until end of combat, CR 500.5a) and the source becomes
+   * an attacking creature without being declared (CR 506.3, 508.4).
+   */
+  | { type: "giveControlAttacking"; to: PlayerRef }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec; /** Rhuk, Hexgold Nabber: "all Equipment attached to that creature": the trigger's subject's, now, or as it last existed if it died (CR 603.10a). */ fromSubject?: true; /** Helm of Kaldra (round 417): "Attach those Equipment to it": to the token just created (the first one), not the source. */ toCreated?: true }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */
@@ -5083,6 +5103,8 @@ export type Effect =
       by?: PlayerRef;
       /** Distended Mindbender: "a nonland card with mana value 3 or less and a card with mana value 4 or greater": a second card, matching this, chosen after the first (one of each if able, rulings), both then discarded at once (action "discard"). */
       also?: TargetSpec;
+      /** With action "exile", Uvilda, Dean of Perfection (round B283): "and put three refine counters on it. It gains ...": that many refine counters on the card exiled, and it gains Uvilda's two triggers while it's that object in exile (GameObject.refined). */
+      refine?: number;
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
@@ -10185,6 +10207,12 @@ export interface CompiledCard {
    * only as though it were colorless mana." (CR 609.4b), for every cost its controller pays with mana (spend.ts dawnCost).
    */
   dawnMana?: true;
+  /**
+   * Chorus of the Conclave (round B284): "As an additional cost to cast creature spells, you may pay any amount of mana. If
+   * you do, that creature enters with that many additional +1/+1 counters on it." (CR 601.2b, 601.2f, 614.1c): for its
+   * controller's creature spells (CostChoices.chorus, GameObject.chorusPaid).
+   */
+  chorusCost?: true;
   /** Averna, the Chaos Bloom: "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped." (CR 702.85a): for its controller's cascades, after the last card is exiled. */
   cascadeLand?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */

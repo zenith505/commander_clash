@@ -2565,6 +2565,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Face down: only its controller may look, if the ability says so or lets them play it (CR 406.3; rulings on
         // Gonti: "you may look at and play").
         o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look || e.play ? [p.id] : [], label: "Face down", at };
+        // The Dragon-Kami Reborn (round B283): "with a hatching counter on it" (CR 122.1), on the face-down card.
+        if (e.counter) o.counters[e.counter] = (o.counters[e.counter] ?? 0) + 1;
         // Grimoire Thief: any later controller of the source may look as well (rulings; GameState.exileLookWatch).
         if (e.lookControllers && ctx.sourceId) {
           o.hiddenExile.watch = { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 };

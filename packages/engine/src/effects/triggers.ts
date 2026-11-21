@@ -1,3 +1,4 @@
+import { pruneMeddled } from "./run-laneb282";
 import { exiledWithNamed } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
@@ -3235,6 +3236,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         s.delayed = s.delayed!.filter((x) => x !== d);
         continue;
       }
+      // Ertai's Meddling (round B282): "if that card is exiled" (CR 603.4) can't hold again once it isn't that object in exile
+      // (CR 400.7), nor once that player has left the game (no more upkeeps of theirs, CR 800.4a).
+      if (d.when === "eachPlayersUpkeepWhileExiled" && (s.objects[d.subject.id]?.zone !== "exile" || (s.objects[d.subject.id]!.zoneChanges ?? 0) !== d.subject.zc || d.player === undefined || !s.players[d.player] || player(s, d.player).lost)) {
+        s.delayed = s.delayed!.filter((x) => x !== d);
+        pruneMeddled(s);
+        continue;
+      }
       // Vivien's Stampede: "the next main phase this turn" never came: it never will.
       if (d.when === "nextMainThisTurn" && d.turn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);
@@ -3272,9 +3280,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? ev.step === "draw" && ev.active === d.player && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf("draw"))
               : d.when === "yourNextFirstMain"
               ? ev.step === "main1" && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
-              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || d.when === "eachUpkeepWhileExiled" || ev.active === (d.when === "playersNextUpkeep" ? d.player : d.controller)) && d.turn < s.turn;
+              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || d.when === "eachUpkeepWhileExiled" || ev.active === (d.when === "playersNextUpkeep" || d.when === "eachPlayersUpkeepWhileExiled" ? d.player : d.controller)) && d.turn < s.turn;
       if (!due) continue;
-      if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain" && d.when !== "eachUpkeepWhileExiled") s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain" && d.when !== "eachUpkeepWhileExiled" && d.when !== "eachPlayersUpkeepWhileExiled") s.delayed = s.delayed!.filter((x) => x !== d);
       // "If any of those cards remain exiled" (Glimpse the Impossible): it triggers only if one does (CR 603.4).
       const lead = d.body.effects[0];
       if (lead?.type === "exiledToGraveyard" && !(lead.cards ?? []).some((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc)) continue;

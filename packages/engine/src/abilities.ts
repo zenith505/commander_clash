@@ -2444,6 +2444,12 @@ export interface StaticAbility {
    * in your library" (Rootpath Purifier), "each creature card in your graveyard" (Ashes of the Fallen).
    */
   offFieldCards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
+  /**
+   * Celestial Dawn (round B281): "Nonland permanents you control are white. The same is true for spells you control and
+   * nonland cards you own that aren't on the battlefield": its color change applies to its controller's spells and the
+   * nonland cards they own outside the battlefield too (layers.ts offFieldColored).
+   */
+  offFieldColorsYours?: true;
 }
 
 /**
@@ -4345,6 +4351,18 @@ export type Effect =
    */
   | { type: "keepOneOfEachColor" }
   /**
+   * Drain Power (round B281): "Target player activates a mana ability of each land they control. Then that player loses all
+   * unspent mana and you add the mana lost this way." (CR 106.13; effects/run-laneb281.ts). The target is the spell's first.
+   */
+  | { type: "drainPower" }
+  /**
+   * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
+   * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the
+   * stack as a copy of the original spell." (CR 603.7; its subject is the card in exile, GameState.meddled its spell as it
+   * was; effects/run-laneb282.ts).
+   */
+  | { type: "meddleReturn" }
+  /**
    * Alaundo the Seer (round B279): "Then remove a time counter from each other card you own in exile": every card its
    * controller owns in exile with a time counter, face up or down, suspended or not (rulings), but those this resolution
    * exiled from a hand (ResolvingState.exiledFromHandCards).
@@ -5432,6 +5450,14 @@ export type Effect =
       plot?: true;
       /** With `exileSpell`: the card exiled is linked to this source (CR 607.2a), "the exiled card" of its other ability (Smirking Spelljacker). */
       linked?: true;
+      /**
+       * With `exileSpell`, Ertai's Meddling (round B282): "Target spell's controller exiles it with X delay counters on it." (a
+       * copy ceases to exist, CR 707.10a); with `meddleReturn`, the card later comes back as a copy of the spell it was
+       * (effects/run-laneb282.ts).
+       */
+      meddle?: true;
+      /** With `meddle`: its "At the beginning of each of that player's upkeeps ..." line too. */
+      meddleReturn?: true;
       /** With `exileSpell`: airbend (CR 701.65a): while the card stays exiled, its owner may cast it for this rather than its mana cost. */
       ownerMayCost?: string;
       /** With `ownerMayCost`: an instruction to airbend (CR 701.65b, round 427). */
@@ -9805,6 +9831,13 @@ export interface CompiledCard {
    */
   drawWeirding?: true;
   /**
+   * Shared Fate (round B282): "If a player would draw a card, that player exiles the top card of one of their opponents'
+   * libraries face down instead." (CR 614.1a): every player's draws, each Shared Fate a replacement of its own (rulings).
+   */
+  drawSharedFate?: true;
+  /** With `drawSharedFate`: "Each player may look at cards they exiled with ~, and they may play lands and cast spells from among those cards." */
+  sharedFatePlay?: true;
+  /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
    * each draw would happen.
@@ -10145,6 +10178,11 @@ export interface CompiledCard {
   spendAnyColor?: true;
   /** Sunglasses of Urza: "You may spend white mana as though it were red mana." (CR 609.4b): for its controller's costs, white mana pays {R}; it stays white. */
   spendWhiteAsRed?: true;
+  /**
+   * Celestial Dawn (round B281): "You may spend white mana as though it were mana of any color. You may spend other mana
+   * only as though it were colorless mana." (CR 609.4b), for every cost its controller pays with mana (spend.ts dawnCost).
+   */
+  dawnMana?: true;
   /** Averna, the Chaos Bloom: "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped." (CR 702.85a): for its controller's cascades, after the last card is exiled. */
   cascadeLand?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */

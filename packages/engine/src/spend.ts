@@ -216,6 +216,13 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
     mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities) || (walkerSpell && !!abilitiesOf(s, o).spendAnyColorPlaneswalkerSpells) || (!!spellSubtypes && spellSubtypes.includes(abilitiesOf(s, o).spendAnyColorSubtypeSpells ?? "\u0000"))) ||
     s.battlefield.some((id) => !!abilitiesOf(s, s.objects[id]!).spendAnyColorAll); // Mycosynth Lattice: every player
   const c0 = krrik ? blackForLife(cost) : cost;
+  // Celestial Dawn (round B281): its controller's nonwhite mana is spent only as though it were colorless, a restriction no
+  // permission to spend mana as though it were another color gets past (CR 101.2, 609.4b), so only white mana pays a colored
+  // symbol; Sharkey's "mana of any type" lets white mana pay a {C} too (CR 118.14).
+  if (mine.some((o) => !!abilitiesOf(s, o).dawnMana)) {
+    const anyType = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell && use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendAnyTypeOwnAbilities;
+    return dawnCost(c0, anyType);
+  }
   const c1 = mine.some((o) => !!abilitiesOf(s, o).spendWhiteAsRed) ? whiteAsRed(c0) : c0;
   // Quicksilver Elemental (round 400): "You may spend blue mana as though it were mana of any color to pay the activation
   // costs of ~'s abilities.", as Manascape Refractor's; Grell Philosopher: its gained abilities' (ManaUse blueAny).
@@ -227,6 +234,31 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   // from a snow source (rulings: snow isn't a type of mana).
   const anyType = activation && use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendAnyTypeOwnAbilities;
   return anyType ? anyColorPays(colorlessAsGeneric(c)) : orrery ? anyColorPays(c) : c;
+}
+
+/** Does `pid` control Celestial Dawn's "You may spend other mana only as though it were colorless mana" (round B281)? */
+export const dawnMana = (s: GameState, pid: PlayerId): boolean => s.battlefield.some((id) => !!abilitiesOf(s, s.objects[id]!).dawnMana && controllerOf(s, s.objects[id]!) === pid);
+
+/**
+ * Celestial Dawn (round B281): "You may spend white mana as though it were mana of any color. You may spend other mana only
+ * as though it were colorless mana." (CR 609.4b): white mana pays any colored symbol and generic mana but not {C} (colorless
+ * isn't a color, CR 105.1); any other mana pays generic mana and {C} (as colorless mana would) and nothing colored. So each
+ * colored symbol is {W}, a hybrid one {W} (a Phyrexian or K'rrik one {W/P}), {2/R} is {2/W}, {R/P} is {W/P}, and {C} is
+ * paid by any mana but white (all mana with `anyType`). The cost stays what it was and the mana spent stays what it was
+ * ("if {R} was spent" still sees red mana, rulings); generic, {X} and {S} don't change, nor do Emblazoned Golem's X symbols
+ * (generic mana that only colored mana pays: nonwhite mana spent as colorless is still colored mana, CR 609.4b).
+ */
+function dawnCost(cost: ParsedCost, anyType: boolean): ParsedCost {
+  return {
+    ...cost,
+    symbols: cost.symbols.map((x): CostSymbol => {
+      if (x.kind === "colored") return x.color === "C" ? (anyType ? { kind: "generic", amount: 1 } : { kind: "hybrid", options: ["U", "B", "R", "G"], orC: true }) : { kind: "colored", color: "W" };
+      if (x.kind === "hybrid" && !x.distinct) return x.life ? { kind: "phyrexian", color: "W", ...(x.phyrexian ? {} : { krrik: true as const }) } : { kind: "colored", color: "W" };
+      if (x.kind === "twoHybrid") return { kind: "twoHybrid", color: "W", ...(x.life ? { life: true as const } : {}) };
+      if (x.kind === "phyrexian") return { kind: "phyrexian", color: "W", ...(x.krrik ? { krrik: true as const } : {}) };
+      return x;
+    }),
+  };
 }
 
 /** Sharkey, Tyrant of the Shire (round B251): a {C} paid by mana of any type, as though it were generic (CR 609.4b). */

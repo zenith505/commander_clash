@@ -26,6 +26,7 @@ import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
 import { costExileLinksAcrossFaces, olagCandidates, olagCopyChosen } from "./effects/run-round435";
+import { sharedFateInstead } from "./effects/run-laneb282";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
 import { pileDrawLabel } from "./effects/run-round386";
@@ -1117,7 +1118,7 @@ export function moveObject(
   // token too (it's put into exile instead and ceases to exist, rulings: tokens are never cast), and a copy of a creature
   // spell (a copy isn't cast, CR 707.10), which ceases to exist anywhere but the stack (CR 707.10a). A spell that was cast
   // isn't affected, whatever zone it was cast from (rulings).
-  if (to === "battlefield" && s.exileUncastAnyTurn === s.turn && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged" && (fromZone !== "stack" || o.spellCopy) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
+  if (to === "battlefield" && s.exileUncastAnyTurn === s.turn && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged" && (fromZone !== "stack" || o.spellCopy || o.putNotCast) && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown, opts.entersAs)) {
     log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name}${o.isToken || o.spellCopy ? " (a token)" : ""} is exiled instead of entering: it wasn't cast (this turn).`);
     if (o.spellCopy) {
       delete s.objects[id];
@@ -1575,7 +1576,10 @@ export function moveObject(
   o.surveilledTurn = to === "graveyard" && fromZone === "library" && opts.surveilled ? s.turn : undefined;
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
-  o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
+  // Ertai's Meddling (round B282): a card put onto the stack as a copy of a spell wasn't cast (CR 707.10).
+  const putNotCast = fromZone === "stack" && !!o.putNotCast;
+  o.putNotCast = undefined;
+  o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy && !putNotCast ? true : undefined;
   o.castBy = castBy;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   o.enteredFromHand = to === "battlefield" && fromZone === "hand" ? true : undefined;
@@ -1609,7 +1613,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   // Counted after its "as ~ enters, choose" is answered when it counts what's chosen (afterChoice, see chooseOption).
-  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.notCastFromHand && castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice || printedCounters?.afterPlayer ? undefined : printedCounters;
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.notCastFromHand && castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy && !putNotCast)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice || printedCounters?.afterPlayer ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue, ...(o.costDiscarded ? { costDiscarded: o.costDiscarded } : {}) })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -4183,7 +4187,11 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of mine((a) => a.drawReturnsFromGraveyard)) if (!crypts.some((d) => nameOf(s, d) === nameOf(s, id))) crypts.push(id);
   // Parallel Thoughts (round 386): optional, each with its own pile (two of them are two different replacements).
   const piles = mine((a) => a.drawFromPile);
-  if (!shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
+  // Shared Fate (round B282): anyone's, for every player's draws, mandatory, each a replacement of its own (rulings: the
+  // drawing player chooses which one replaces the draw), and the opponent whose library's top card is exiled chosen with it.
+  const fates = s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawSharedFate);
+  const fateOpps = fates.length ? opponents(s, pid) : [];
+  if (!fates.length && !shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
   const out = [...shields];
   if (reed !== undefined) out.push({ key: "reed", label: `Draw four cards instead (${nameOf(s, reed)})` });
   if (chains > 0) out.push({ key: "chains", label: "Discard a card instead, then draw a card; with no card in hand, mill a card (Chains of Mephistopheles)" });
@@ -4216,8 +4224,10 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
     out.push({ key: `${kind ? "counter" : "mayskip"}:${id}`, label: kind ? `Put a ${kind} counter on ${nameOf(s, id)} instead` : only ? `Skip this draw; until your next turn you can't be attacked except by creatures with ${only.map((k) => k.toLowerCase()).join(" and/or ")} (${nameOf(s, id)})` : `Skip this draw (${nameOf(s, id)})` });
   }
   for (const id of piles) out.push({ key: `pthoughts:${id}`, label: pileDrawLabel(s, id) });
+  for (const id of fates)
+    for (const q of fateOpps) out.push({ key: `fate:${id}:${q}`, label: `Exile the top card of ${player(s, q).name}'s library face down instead${player(s, q).library.length ? "" : " (it's empty)"} (${nameOf(s, id)}${fates.length > 1 ? ` ${fates.indexOf(id) + 1}` : ""})` });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
+  if (!fates.length && !shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge, Parallel Thoughts): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter|pthoughts):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -4334,6 +4344,10 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
   if (key.startsWith("exiles:")) return exileInstead(s, pid, key.slice("exiles:".length));
+  if (key.startsWith("fate:")) {
+    const [, id, q] = key.split(":");
+    return sharedFateInstead(s, pid, id!, Number(q) as PlayerId);
+  }
   if (key.startsWith("mayskip:") || key.startsWith("counter:")) {
     // Obstinate Familiar: the draw doesn't happen; Pursuit of Knowledge: a counter on it instead (CR 614.1a).
     const src = key.slice(key.indexOf(":") + 1);
@@ -4495,6 +4509,7 @@ function chooseDrawInstead(s: GameState, p: Player, choice: string) {
   if (choice === "thief" && !notionThief(s, p.id)) throw new RulesError("no Notion Thief replaces that draw");
   if (choice.startsWith("tutor:") && !s.battlefield.includes(choice.slice("tutor:".length))) throw new RulesError("that permanent no longer replaces the draw");
   if (choice.startsWith("exiles:") && !drawExilers(s, p.id).includes(choice.slice("exiles:".length))) throw new RulesError("that permanent no longer replaces the draw");
+  if (choice.startsWith("fate:") && !((id) => s.battlefield.includes(id) && !!abilitiesOf(s, obj(s, id)).drawSharedFate)(choice.split(":")[1]!)) throw new RulesError("that permanent no longer replaces the draw");
   if (/^(?:sages|mayskip|counter|crypt):/.test(choice) && !s.battlefield.includes(choice.slice(choice.indexOf(":") + 1))) throw new RulesError("that permanent no longer replaces the draw");
   s.pending = null;
   const made = [...(pend.made ?? [])];
@@ -6949,6 +6964,11 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
     const h = abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste;
     return !!h && !(h === "others" && id === o.id) && controllerOf(s, obj(s, id)) === you;
   });
+}
+
+/** Drain Power (round B281): `pid` activates this mana ability of `id` for this mana, as an effect has them do (CR 605.3a). */
+export function activateManaForEffect(s: GameState, pid: PlayerId, id: ObjectId, opt: { ability: number; mana: ManaType; combo?: number; instead?: ManaType; extra?: ManaType[] }): void {
+  activateMana(s, player(s, pid), id, opt.mana, opt.ability, undefined, opt.extra ?? [], opt.combo, undefined, opt.instead);
 }
 
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType, sacrifice?: ObjectId[]) {
@@ -13430,6 +13450,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = ((r.scratch ??= {}).textWord ??= {});
     if (pend.what === "textFrom") st.from = choice;
     else st.to = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "drainLand") {
+    // Drain Power (round B281): the mana ability the target player activates for the land `about` (Effect drainPower).
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the mana abilities offered");
+    (r.scratch ??= {}).drainPick = choice;
     continueResolution(s);
     return;
   }

@@ -311,8 +311,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Shared Fate (round B282): from the opponent with the most cards in their library (an empty one exiles nothing).
       const fateLib = (k: string) => s.players[Number(k.split(":")[2]) as PlayerId]?.library.length ?? 0;
       const fate = pend.options.filter((k) => k.startsWith("fate:")).sort((a, b) => fateLib(b) - fateLib(a))[0];
+      // Unpredictable Cyclone (round B286): a spell cast free rather than a card drawn.
       // Reed Richards (round B237): its four cards before the Archive's two (once the Archive applies, Reed's first time is gone).
-      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("reed") ?? has("archive") ?? pile ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? fate ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
+      const pick = words.find((k) => (low ? w(k)?.gain !== undefined : w(k)?.token !== undefined)) ?? words[0] ?? has("cyclone") ?? has("reed") ?? has("archive") ?? pile ?? has("dig") ?? has("look") ?? has("tutor") ?? (dredge !== undefined ? `dredge:${dredge}` : undefined) ?? counter ?? skip ?? fate ?? pend.options.find((k) => !declinable(k) && !loses(k)) ?? pend.options.find((k) => !loses(k)) ?? pend.options[0]!;
       return [{ type: "drawInstead", player: pid, choice: pick }];
     }
     if (pend.kind === "dredge") {

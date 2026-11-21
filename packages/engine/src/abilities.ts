@@ -9881,6 +9881,13 @@ export interface CompiledCard {
   /** With `drawSharedFate`: "Each player may look at cards they exiled with ~, and they may play lands and cast spells from among those cards." */
   sharedFatePlay?: true;
   /**
+   * Unpredictable Cyclone (round B286): "If a cycling ability of another nonland card would cause you to draw a card, instead
+   * exile cards from the top of your library until you exile a card that shares a card type with the cycled card. You may
+   * cast that card without paying its mana cost. Then put the exiled cards that weren't cast this way on the bottom of your
+   * library in a random order." (CR 614.1a, 702.29a; game.ts cycloneInstead).
+   */
+  drawCycloneCycled?: true;
+  /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
    * each draw would happen.
@@ -11108,4 +11115,10 @@ export interface FromTop {
    * against the cards its linked "exile a card from a graveyard" ability exiled, still in exile (CR 607.2a).
    */
   sharesTypeWithLinked?: true;
+  /**
+   * Galea, Kindler of Hope (round B286): "When you cast an Equipment spell this way, it gains ...": a triggered ability of
+   * the permanent with this permission (CR 603.2), put on the stack above a spell matching `spell` cast with it (CR 601.2i,
+   * 603.3), `body` about that spell (StackItem cause).
+   */
+  castTrigger?: { spell: TargetSpec; body: AbilityBody };
 }

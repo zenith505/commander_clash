@@ -1,10 +1,11 @@
 // Lane B round B285 in the browser: Pygmy Hippo (unblocked, you say yes: Ana taps her Forest and Island and loses that
 // mana, the Hippo deals no damage, and you get {C}{C} in your postcombat main phase) and Ice Cauldron (X = 1, pick
-// Lightning Bolt from your hand to exile; a charge counter and the mana spent noted).
+// Lightning Bolt from your hand to exile; a charge counter and the mana spent noted), then, charged with {R}, Lightning Bolt
+// cast from exile with the Cauldron's mana.
 import { expect, test } from "@playwright/test";
-import { applyAction, type GameState } from "@cc/engine";
+import { applyAction, invalidateCharacteristics, type GameState } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
-import { controls, menu, modal, resolveUntil } from "./ui";
+import { clickPlayer, controls, menu, modal, resolveUntil, seat } from "./ui";
 
 /** The state once `done` holds (polled), kept: no second read after it. */
 async function settled(page: Parameters<typeof state>[0], done: (s: GameState) => boolean): Promise<GameState> {
@@ -50,5 +51,29 @@ test("Ice Cauldron: X = 1, pick Lightning Bolt to exile; a charge counter and th
   expect(charged.objects[cauldron]!.counters.charge).toBe(1);
   expect(charged.objects[cauldron]!.notedManaAll).toHaveLength(1);
   expect(charged.objects[bears]!.zone).toBe("hand");
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Ice Cauldron: charged with {R} for Lightning Bolt, cast Bolt from exile; the Cauldron pays it", async ({ page }) => {
+  const s = scene({ board: ["Ice Cauldron"], exile: ["Lightning Bolt"] });
+  const [cauldron, bolt] = [one(s, "Ice Cauldron"), one(s, "Lightning Bolt")];
+  // As its first ability left it on an earlier turn: a charge counter, {R} noted, Bolt exiled with it and castable.
+  const c = s.objects[cauldron]!;
+  const b = s.objects[bolt]!;
+  c.counters.charge = 1;
+  c.notedManaAll = ["R"];
+  c.cauldronCard = { id: bolt, zc: b.zoneChanges ?? 0, name: "Lightning Bolt" };
+  b.mayPlay = { player: 0, zc: b.zoneChanges ?? 0, until: "exiled", turn: s.turn - 1, castOnly: true };
+  invalidateCharacteristics(s);
+  const life = s.players[1]!.life;
+  await open(page, s);
+  await seat(page, 0).locator(".zone", { hasText: "Exile" }).click();
+  await modal(page).locator(".card.playable").click();
+  if (await menu(page).count()) await menu(page).getByRole("button", { name: /^Cast/ }).first().click();
+  await clickPlayer(page, 1);
+  const after = await settled(page, (st) => !st.pending && st.stack.length === 0 && st.players[1]!.life === life - 3);
+  expect(after.objects[cauldron]!.tapped).toBe(true);
+  expect(after.objects[cauldron]!.counters.charge ?? 0).toBe(0);
+  expect(after.objects[bolt]!.zone).toBe("graveyard");
   expect(pageErrors(page)).toEqual([]);
 });

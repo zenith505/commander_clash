@@ -18027,6 +18027,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "44b90948-e85a-4f69-a9e2-aba63775ba40",
+  "name": "Filigree Vector",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Artifact Creature — Phyrexian Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Construct"
+  ],
+  "oracleText": "When this creature enters, put a +1/+1 counter on each of any number of target creatures and a charge counter on each of any number of target artifacts.\n{1}, {T}, Sacrifice another artifact: Proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Proliferate"
+  ],
+  "commanderLegal": "legal",
+  "set": "moc",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ae92942b-919c-4ea9-b693-85fcef765d5a",
   "name": "Fire // Ice",
   "manaCost": "{1}{R} // {1}{U}",
@@ -29073,6 +29107,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e81da4a7-4b03-4107-b7d9-4b635faa615d",
+  "name": "Lich's Mirror",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would lose the game, instead shuffle your hand, your graveyard, and all permanents you own into your library, then draw seven cards and your life total becomes 20.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2270daaf-252d-40c4-bed5-bd46ae15f041",
   "name": "Liesa, Shroud of Dusk",
   "manaCost": "{2}{W}{W}{B}",
@@ -36739,6 +36795,32 @@
   "set": "lea",
   "releasedAt": "1993-08-05",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dafe63ef-f3d6-45e7-877a-573da92ba85e",
+  "name": "Pestilence",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of the end step, if no creatures are on the battlefield, sacrifice this enchantment.\n{B}: This enchantment deals 1 damage to each creature and each player.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

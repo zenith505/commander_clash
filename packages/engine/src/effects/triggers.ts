@@ -12,7 +12,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { crewedWith, inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { crewedWith, inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, manyOfferSizes, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -3673,7 +3673,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
   const def = restingDef(s.cards[t.sourceCardId]!);
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
   const body0 = withModes(triggerBody(s, t), t.modes);
-  const fit = fitMany(body0, chosen, manyX(s, body0.targets, t.controller, t.sourceId, t.x ?? 0));
+  const fit = fitMany(body0, chosen, manyX(s, body0.targets, t.controller, t.sourceId, t.x ?? 0), manyOfferSizes(s, body0, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId));
   if (typeof fit === "string") throw new RulesError(fit);
   const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);

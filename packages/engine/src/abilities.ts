@@ -515,7 +515,7 @@ export type Count =
   /** "The greatest mana value among cards in exile" (Ulamog, the Defiler): every player's exiled cards, a face-down one 0 (CR 708.2). */
   | { kind: "greatestMvInExile" }
   /** "There are seven or more cards in exile" (Ketramose): every player's exiled cards, face-down ones too (rulings). */
-  | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true; /** "Exiled cards with hit counters on them" (Etrata, the Silencer): only cards with that counter. */ counter?: CounterKind; /** "Foretold card you own in exile" (Alrund): only foretold ones (CR 702.143a, GameObject.foretold). */ foretold?: true }
+  | { kind: "cardsInExile"; /** "Instant and sorcery cards you own in exile and in your graveyard" (Crackling Drake): only that player's face-up cards matching `filter` (a face-down card has no characteristics, rulings), and their graveyard's too. */ who?: PlayerRef; filter?: TargetSpec; graveyardToo?: true; /** "Exiled cards with hit counters on them" (Etrata, the Silencer): only cards with that counter. */ counter?: CounterKind; /** "Foretold card you own in exile" (Alrund): only foretold ones (CR 702.143a, GameObject.foretold). */ foretold?: true; /** Ashiok, Wicked Manipulator (round B288): "the total mana value of cards you own in exile": their mana values added up instead of how many (a face-down card's 0, CR 406.3a). */ totalMv?: true }
   | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true; /** "The lowest mana value" among them (Culling Scales), 0 with none. */ least?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
@@ -1209,6 +1209,12 @@ export interface TargetSpec {
    * these targets' power, as they're chosen and again as it resolves (rulings).
    */
   powerAtMostOf?: number[];
+  /**
+   * Nihiloor (round B288): "with power less than or equal to the tapped creature's power": at most that permanent's power
+   * while it's still that object on the battlefield, else as it last existed there (rulings, CR 608.2h), `power` as it was
+   * tapped when nothing else is known. Checked as the target is chosen and again as it resolves (rulings).
+   */
+  powerAtMostOfObject?: { id: ObjectId; zc: number; power: number };
   /** "Target nonland permanent an opponent controls with equal or lesser mana value" (Puca's Mischief): its mana value is at most each of these targets', as they're chosen (as a set, rulings) and again as it resolves (CR 608.2b). */
   mvAtMostOf?: number[];
   /** With `sharesCardTypeWith`: "that shares one of those types with it" (Legerdemain), only these card types count. */
@@ -4371,6 +4377,18 @@ export type Effect =
    * just before as the last one exiled with ~ (GameObject.cauldronCard); its source only while it's the same object.
    */
   | { type: "noteCauldron" }
+  /**
+   * Sanar, Innovative First-Year (round B287): "reveal cards from the top of your library until you reveal X nonland cards,
+   * where X is the number of colors among permanents you control. For each of those colors, you may exile a card of that
+   * color from among the revealed cards. Then shuffle. You may cast the exiled cards this turn." (effects/run-laneb287.ts).
+   */
+  | { type: "revealColorsExile" }
+  /**
+   * Nihiloor (round B288): "for each opponent, tap up to one untapped creature you control. When you do, gain control of
+   * target creature that player controls with power less than or equal to the tapped creature's power for as long as you
+   * control ~." (effects/run-laneb288.ts).
+   */
+  | { type: "nihiloorTap" }
   /**
    * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
    * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the
@@ -9154,7 +9172,7 @@ export interface CompiledCard {
    * its "the exiled cards" abilities (CR 607.2b). `n`: "any" number, exactly one if there's one, or X (`instead`: all X or
    * it never enters); `counterEach`: one counter of a kind chosen from these for each card exiled.
    */
-  entersExileFromYard?: { filter: TargetSpec; n: "any" | "one" | "x"; counterEach?: CounterKind[]; /** Dermotaxi (round 423): "from a graveyard": any player's, not only its controller's. */ anyGraveyard?: true };
+  entersExileFromYard?: { filter: TargetSpec; n: "any" | "one" | "x" | /** Mimeoplasm, Revered One (round B287): up to X, X as it was cast (0 otherwise, CR 107.3m). */ "upToX"; counterEach?: CounterKind[]; /** Mimeoplasm, Revered One (round B287): "It enters with three +1/+1 counters on it for each creature card exiled this way" (CR 614.1c). */ countersEach?: { counter: CounterKind; n: number }; /** Dermotaxi (round 423): "from a graveyard": any player's, not only its controller's. */ anyGraveyard?: true };
   /**
    * Ulamog's Despoiler (round B229): "As ~ enters, you may put two cards your opponents own from exile into their owners'
    * graveyards. If you do, ~ enters with four +1/+1 counters on it.": `n` cards chosen as it enters (CR 614.12), all or none,
@@ -9889,6 +9907,11 @@ export interface CompiledCard {
    * library in a random order." (CR 614.1a, 702.29a; game.ts cycloneInstead).
    */
   drawCycloneCycled?: true;
+  /**
+   * Ashiok, Wicked Manipulator (round B288): "If you would pay life while your library has at least that many cards in it,
+   * exile that many cards from the top of your library instead." (CR 614.1a, 614.6, 119.4; game.ts payLife).
+   */
+  payLifeExiles?: true;
   /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as

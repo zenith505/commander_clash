@@ -43,6 +43,7 @@ import { roundB284Line } from "./laneb284-lines";
 import { roundB285Line } from "./laneb285-lines";
 import { roundB286Line } from "./laneb286-lines";
 import { roundB287Line } from "./laneb287-lines";
+import { roundB288Line, roundB288Loyalty } from "./laneb288-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -1380,6 +1381,8 @@ export function compile(d: CardDef): CompiledCard {
     if (d.types.includes("Planeswalker") && !isSpell && roundB244Loyalty(line, raw, out)) continue;
     // Tamiyo, Collector of Tales' +1 and Kasmina, Enigma Sage's −8 (round B251).
     if (d.types.includes("Planeswalker") && !isSpell && roundB251Loyalty(line, raw, out)) continue;
+    // Ashiok, Wicked Manipulator's +1 (round B288).
+    if (d.types.includes("Planeswalker") && !isSpell && roundB288Loyalty(line, raw, out)) continue;
     const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
     if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
@@ -2523,6 +2526,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB286Line(line, out, isSpell)) continue;
     // Mimeoplasm, Revered One, Sanar, Innovative First-Year (round B287).
     if (roundB287Line(line, out, isSpell)) continue;
+    // Nihiloor, Ashiok, Wicked Manipulator (round B288).
+    if (roundB288Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

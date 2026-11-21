@@ -749,6 +749,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Land Equilibrium (round B278): the land worth least to it, the one just put there too.
     // Lich's Mirror (round B280): our own permanents are shuffled back in, to draw again; another player's go to the graveyard.
+    // Nihiloor (round B288): for this opponent, the most valuable creature of theirs we could target and take, tapping the
+    // weakest creature of ours with at least its power; nothing when none fits.
+    if (pend.kind === "pickPermanents" && pend.nihiloor !== undefined) return [{ type: "pickPermanents", player: pid, ids: nihiloorPick(s, pid, pend.nihiloor, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.mirrorStay !== undefined) return [{ type: "pickPermanents", player: pid, ids: pend.mirrorStay === pid ? [] : pend.options }];
     if (pend.kind === "pickPermanents" && pend.equilibrium) return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "sacrifice") }];
     if (pend.kind === "pickPermanents" && pend.blockCost) {
@@ -1086,6 +1089,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Moonlight Bargain: its own cards into its hand, life paid for each: the best ones, keeping 10 life.
       if (pend.cards.every((id) => obj(s, id).owner === pid) && pend.dig.to.startsWith("into your hand")) return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, Math.max(0, Math.min(pend.max, Math.floor((player(s, pid).life - 10) / pend.dig.payLife)))) }];
       return [{ type: "searchLibrary", player: pid, found: player(s, pid).life - pend.dig.payLife >= 10 ? theirs.slice(0, pend.max) : [] }];
+    }
+    // Ashiok, Wicked Manipulator's +1 (round B288): one card exiled, the other into our hand: the one we'd want less goes.
+    if (pend.kind === "searchLibrary" && pend.dig?.to === "into exile" && pend.dig.rest === "into your hand" && pend.cards.every((id) => obj(s, id).owner === pid)) {
+      const keep = chooseSearch(s, pid, pend.cards, Math.max(0, pend.cards.length - pend.max));
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => !keep.includes(id)).slice(0, pend.max) }];
     }
     // Dubious Challenge: the exiled cards come back onto the battlefield (one maybe for the opponent): our two best.
     if (pend.kind === "searchLibrary" && pend.dig?.to === "into exile" && s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "takeOneExiled"))
@@ -9954,6 +9962,22 @@ function evenPiles(s: GameState, pid: PlayerId, cards: string[], worthOf: (id: s
     }
   }
   return cards.filter((_, i) => best & (1 << i));
+}
+
+/**
+ * Nihiloor (round B288): the creature of ours to tap for `opp`: the weakest of `options` whose power reaches the power of
+ * that player's most valuable creature we could target (a creature, controlled by them, targetable by Nihiloor's
+ * ability), or none.
+ */
+function nihiloorPick(s: GameState, pid: PlayerId, opp: PlayerId, options: ObjectId[]): ObjectId[] {
+  const src = s.resolving?.item.objectId ?? s.resolving?.item.sourceId;
+  const spec: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controlledBy: opp, text: "creature" };
+  const theirs = legalTargets(s, spec, pid, undefined, src ? botSource(s, src) : undefined, src).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
+  const mine = [...options].sort((a, b) => power(s, obj(s, a)) - power(s, obj(s, b)) || worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+  const best = theirs.filter((t) => mine.some((id) => power(s, obj(s, id)) >= power(s, t))).sort((a, b) => worth(s, pid, b) - worth(s, pid, a))[0];
+  if (!best || worth(s, pid, best) <= 0) return [];
+  const id = mine.find((m) => power(s, obj(s, m)) >= power(s, best));
+  return id ? [id] : [];
 }
 
 function chooseSearch(s: GameState, pid: PlayerId, cards: string[], max: number): string[] {

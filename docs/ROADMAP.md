@@ -1,6 +1,6 @@
 # Roadmap
 
-31,844 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,846 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
 9,979 (99%).
 
@@ -11820,6 +11820,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B288 (least played first, the two cards round B287 named next, neither in Lane A's rounds 438-439): Nihiloor's
+  "When ~ enters, for each opponent, tap up to one untapped creature you control. When you do, gain control of target
+  creature that player controls with power less than or equal to the tapped creature's power for as long as you control ~."
+  (for each opponent in turn order, up to one untapped creature of yours, Nihiloor itself too, a different one for each,
+  all tapped at once after the choices, rulings, CR 608.2c-d; then a separate reflexive trigger for each creature tapped,
+  CR 603.12, put on the stack in the order you choose, rulings; its target a creature that opponent controls with power at
+  most the tapped creature's, as it is or as it last existed on the battlefield, checked as the target is chosen and again
+  as it resolves, rulings, CR 608.2b, 608.2h, TargetSpec powerAtMostOfObject; control while you control Nihiloor, none if
+  it's gone, CR 611.2b; Effect nihiloorTap, effects/run-laneb288.ts) and "Whenever you attack with a creature an opponent
+  owns, you gain 2 life and that player loses 2 life." (each creature you declare as an attacker that an opponent owns, CR
+  508.3c, 108.3; that player its owner). Ashiok, Wicked Manipulator's "If you would pay life while your library has at
+  least that many cards in it, exile that many cards from the top of your library instead." (a replacement of its
+  controller's life payments, CR 614.1a: no life is paid or lost, so "whenever you pay life" doesn't trigger, CR 614.6; not
+  optional or split, rulings; still no more life than its controller has, rulings, CR 119.4; a shock land played from the
+  top of that library isn't one of the cards exiled, CR 614.13c; CompiledCard.payLifeExiles, game.ts payLife), its +1
+  ("Exile one of them and put the other into your hand", a dig into exile with the rest into your hand), its −2's Nightmares
+  ("if a card was put into exile this turn", the cardExiledThisTurn condition) and its −7 ("the total mana value of cards you
+  own in exile", a card exiled face down counting 0, CR 406.3a, Count cardsInExile `totalMv`). Bots tap for Nihiloor the
+  weakest creature that can take each opponent's most valuable creature, and exile the card they want less with Ashiok's
+  +1. Browser tests click through Nihiloor's three tap prompts (Serra Angel for the first opponent, none for the others) and
+  its target, and Ashiok's +1 pick and a Blood Fast activation that exiles two cards instead of paying 2 life. +2, 31,846 of
+  31,936 on B287's branch. The compiled text of every other card is unchanged.
+- Out after round B288 (looked at, not done): the lists after round B287 stay out. Judgment calls: with Ashiok, a cost that
+  pays life is still paid (the payment is what's replaced), but nothing that looks for life paid sees it (Font of Agonies,
+  Verrak's "if life was paid"), since the replaced event never happens (CR 614.6); the Phyrexian and other life parts of one
+  spell's cost are one payment, as before. Known gaps: bots don't count Ashiok when deciding whether to pay life (they
+  weigh it as life lost). Next in line, not looked at closely: Breathstealer's Crypt, Parnesse, the Subtle Brush.
 - Round B287 (least played first, from the skip lists, neither card in Lane A's rounds 437-438): Mimeoplasm, Revered One's
   "As ~ enters, exile up to X creature cards from your graveyard. It enters with three +1/+1 counters on it for each
   creature card exiled this way." (a choice as it enters, CR 614.1c, 614.12a, none too; X as it was cast, 0 otherwise, CR

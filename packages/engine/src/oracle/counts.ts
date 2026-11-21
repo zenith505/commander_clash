@@ -73,6 +73,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Cosmogoyf: "the number of cards you own in exile": face down or not, wherever ~ is (its rulings: it counts itself in
   // exile, CR 604.3).
   if (!each && /^the number of cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" } } };
+  // Ashiok, Wicked Manipulator (round B288): "the total mana value of cards you own in exile": each card's mana value as it
+  // is in exile (CR 202.3, X as 0, 202.3e), a face-down card's 0 (it has no characteristics, CR 406.3a).
+  if (!each && /^the total mana value of cards you own in exile$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, totalMv: true } };
   // Kaya, Orzhov Usurper: "the number of cards that player owns in exile" (the target player), face down or not.
   if (!each && (m = /^the number of cards (that player|target player|target opponent) owns in exile$/i.exec(p))) {
     const who = whosePlayer(`${m[1]!}'s`, ctx);

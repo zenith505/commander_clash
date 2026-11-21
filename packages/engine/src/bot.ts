@@ -1,6 +1,7 @@
 import { bindBound, cardPT, isLegalTarget, linkedCards, playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
+import { drainKey, drainOptions } from "./effects/run-laneb281";
 import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type StaticCondition, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
@@ -14,7 +15,7 @@ import { HOST_OR_NAMED_PROMPT } from "./effects/run-round321";
 import { redistributions } from "./effects/run-round362";
 import { addedAbilityCosts, addedSacrificeCandidates } from "./added-costs";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
-import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
+import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices, manaPenalty } from "./manaabilities";
 import { activatedQuality, manyX, manyOfferSizes, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, manySlots, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
@@ -2023,6 +2024,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // (those with flying can block it anyway), weighed by their power and toughness.
     // Dack Fayden, Helping Hand (round 424): each creature goes to an opponent anyway, goaded by us, so it attacks someone
     // else: the opponent with the least power on the battlefield gets it, keeping the others busy with each other.
+    // Drain Power (round B281): the mana goes to the spell's controller, so another player's Drain Power gets the least
+    // (the cheapest ability for us, then the least mana) and our own the most.
+    if (pend.kind === "chooseOption" && pend.what === "drainLand" && pend.about && s.objects[pend.about]) {
+      const o = obj(s, pend.about);
+      const abs = manaAbilitiesOn(s, o);
+      const mine = s.resolving?.item.controller === pid;
+      const opts = drainOptions(s, pid, o).filter((x) => pend.options.includes(drainKey(x)));
+      const cost = (x: (typeof opts)[number]) => manaPenalty(abs[x.ability]!);
+      const best = [...opts].sort((a, b) => cost(a) - cost(b) || (mine ? b.adds.length - a.adds.length : a.adds.length - b.adds.length))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ? drainKey(best) : pend.options[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "giveControlTo") {
       const boardPower = (pid: number) => s.battlefield.reduce((n, id) => { const o = obj(s, id); return controllerOf(s, o) === pid && objIsType(s, o, "Creature") ? n + Math.max(0, power(s, o)) : n; }, 0);
       const pick = [...pend.options].sort((a, b) => boardPower(Number(a)) - boardPower(Number(b)))[0]!;
@@ -3651,6 +3663,12 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const rest = pickTargets(s, pid, { ...printed, targets: printed.targets.map((t) => (t.chosenBy === "opponent" ? (({ chosenBy: _, ...r }) => ({ ...r, skip: true as const }))(t) : t)) }, forced, sourceId, x);
     if (!rest && chosenBy.length < printed.targets.length) return null;
     return printed.targets.map((t, i): TargetChoice => (t.chosenBy === "opponent" ? { kind: "none" } : (rest?.[i] ?? { kind: "none" })));
+  }
+  // Drain Power (round B281): the opponent whose lands make the most mana now, that mana ours; none if no one's would.
+  if (printed.effects.length === 1 && printed.effects[0]!.type === "drainPower" && printed.targets[0]?.kind === "player") {
+    const made = (q: PlayerId) => s.battlefield.reduce((n, id) => { const o = obj(s, id); if (controllerOf(s, o) !== q || !objIsType(s, o, "Land")) return n; return n + Math.max(0, ...drainOptions(s, q, o).map((x) => x.adds.length)); }, 0);
+    const opps = legalTargets(s, printed.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "player" && t.id !== pid ? [{ t, n: made(t.id) }] : [])).sort((a, b) => b.n - a.n);
+    return opps[0] && (opps[0].n > 0 || forced) ? [opps[0].t] : forced ? [{ kind: "player", id: pid }] : null;
   }
   // Radiate, Radiant Performer (round 415): the spell or ability on the stack whose copies do us the most good, none if
   // no copy would (unless the target is required).

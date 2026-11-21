@@ -1,6 +1,6 @@
 # Roadmap
 
-31,815 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,817 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
 9,979 (99%).
 
@@ -3614,7 +3614,7 @@ line blocks.
    this stacked branch. The compiled text of every other card is unchanged.
    Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
-   Killer, Celestial Dawn, Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr (done in round B263),
+   Killer, Celestial Dawn (done in round B281), Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr (done in round B263),
    Shared Fate, Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
    (still out, for the reasons in their earlier lists).
    Round 399 went back up `npm run popular` to permanents with the abilities of cards they exiled (CR 607.2a), out since
@@ -4466,7 +4466,7 @@ line blocks.
    the compiled text of every other card is unchanged.
    Out after round 431 (looked at, not done): Filigree Vector (done in round B280) and Battlefield Thaumaturge (still out, as after round
    430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
-   that creature's, checked with its last known power), Drain Power (mana abilities another player activates for each land,
+   that creature's, checked with its last known power), Drain Power (done in round B281) (mana abilities another player activates for each land,
    then that mana moved), Ertai's Meddling (delay counters, then the card put onto the stack as a copy of the spell), the
    cards rounds 425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still
    out, for the reasons in their earlier lists). Judgment calls: Hama's X is the exiled card's mana value as it is in exile,
@@ -8366,7 +8366,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Paradise (done in round B154), Hold for Ransom, Mercurial Transformation, Goblin Festival (done in round B158), Trench Gorger (done in round B154), Tatsumasa, Adipose Offspring,
   Fractal Tender, Keldon Flamesage, Sporogenesis, Kentaro, Immard, Feldon, Corruption of Towashi (done in round B163), Donnie & April, Path of
   Mettle, Rise from the Wreck, plus the multi-line and new-mechanic cards in the same range (Bomb Squad, Word of Command,
-  Celestial Dawn, Death or Glory (done in round B156), Selective Adaptation and the like).
+  Celestial Dawn (done in round B281), Death or Glory (done in round B156), Selective Adaptation and the like).
 - Round B57 (cards no earlier round wrote down, least played first, EDHREC rank about 19,800 to 15,300): "if there is an
   Elf card in your graveyard and ~ has a -1/-1 counter on it" (Creakwood Safewright), "If a permanent would be put into a
   graveyard, exile it instead" (Samurai of the Pale Curtain: from the battlefield only, tokens too), "If you put an artifact
@@ -11669,6 +11669,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B281 (least played first, the two cards round B280 named next that Lane A's rounds 432-433 don't take): Celestial
+  Dawn's "Lands you control are Plains." (each land its controller controls has the land type Plains instead of its others,
+  loses the abilities of its rules text and taps for {W}, CR 305.7, layer 4; supertypes stay and a land that would enter
+  tapped loses that ability first, rulings; land cards elsewhere don't change), "Nonland permanents you control are
+  white. The same is true for spells you control and nonland cards you own that aren't on the battlefield." (white
+  instead of their colors in layer 5, CR 105.3, 613.1e, on the battlefield and, as offFieldColorsYours / layers.ts
+  offFieldColored, for its controller's spells, copies too, and the nonland cards they own in every other zone; back to
+  their own once it's gone, rulings) and "You may spend white mana as though it were mana of any color. You may spend
+  other mana only as though it were colorless mana." (CR 609.4b: how its controller pays every cost, spend.ts dawnCost:
+  each colored or hybrid symbol is paid only with white mana, {2/R} as {2/W}, {R/P} as {W/P}, {C} by any mana but white,
+  generic by anything; a restriction no "as though it were mana of any color" permission gets past, CR 101.2; the mana
+  spent stays what it was, rulings; autopay tries the pool and mana abilities' costs against the cost as it may be paid).
+  Drain Power's "Target player activates a mana ability of each land they control. Then that player loses all unspent
+  mana and you add the mana lost this way." (each land they control, one at a time, the mana ability and its mana chosen
+  by them, rulings, a chooseOption `drainLand` with the land as `about`; a tapped land or one whose abilities can't be
+  activated or paid for is passed over, CR 101.3; lands with an ability costing no mana come first, so their mana may pay
+  a costlier one's cost, as Darkwater Catacombs' {1}; then their whole pool moves to the spell's controller, sources,
+  restrictions and riders unchanged, CR 106.13; effects/run-laneb281.ts). Bots drained pick the ability that costs them
+  least and makes the least mana (the most when it's their own Drain Power), and cast it at the opponent whose lands make
+  the most mana now. Browser tests click through Drain Power's choices for Tundra and Battlefield Forge, and Lightning
+  Bolt paid by a Forest that's a Plains. +2, 31,817 of 31,936 on B280's branch. The compiled text of every other card is
+  unchanged.
+- Out after round B281 (looked at, not done): the lists after round B280 stay out. Titania's Song (still out, as after
+  round B172). Known gaps: Drain Power doesn't offer a land's mana ability that would ask something more as it's activated
+  (a creature to tap, a permanent to sacrifice for an added cost, Rhystic Cave's "unless any player pays", a color another
+  player chooses, a card milled first), so such a land isn't activated; the drained player's order is fixed (cost-free
+  abilities first, then battlefield order). Next in line (not looked at closely yet): Shared Fate, Ertai's Meddling, Psychic Battle.
 - Round B280 (least played first, from the Lane B skip lists and the cards round B279 named next, none in Lane A's rounds
   431-432): Filigree Vector's "When this creature enters, put a +1/+1 counter on each of any number of target creatures and
   a charge counter on each of any number of target artifacts." (one triggered ability with two groups of targets, each
@@ -11696,8 +11723,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   whether one creature in two target slots counts once or twice), Psychic Paper (as after round 390), Breathstealer's
   Crypt (still out, as after round B237: which card "it" is once another replacement applies to the draw it makes).
   Known gaps: Lich's Mirror's draw of seven that pauses for a draw replacement's question finishes after the life total
-  changes (as Stunning Reversal's does). Next in line (not looked at closely yet): Titania's Song, Drain Power, Celestial
-  Dawn.
+  changes (as Stunning Reversal's does). Next in line (not looked at closely yet): Titania's Song, Drain Power (done in round B281), Celestial
+  Dawn (done in round B281).
 - Round B279 (least played first, from the Lane B skip lists and the cards round B278 named next, none in Lane A's rounds
   428-431): Emblazoned Golem's "Kicker {X}. Spend only colored mana on X. No more than one mana of each color may be spent
   this way. If this creature was kicked, it enters with X +1/+1 counters on it." (X is announced as it's cast, CR 601.2b,
@@ -12523,7 +12550,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   leaving the battlefield after the ability resolved counts as losing control of it isn't settled by its rulings) stays out.
 - Out after round B185 (looked at, not done): Aeon Engine (reversing turn order changes every "in turn
   order", APNAP and "next player" reading), Kheru Mind-Eater and Shared Fate (playing cards exiled face down by another
-  player), Drain Power (mana abilities activated for another player, then that mana moved), Dreamshaper Shaman (done in round B219) and Shifting
+  player), Drain Power (done in round B281) (mana abilities activated for another player, then that mana moved), Dreamshaper Shaman (done in round B219) and Shifting
   Shadow (see the earlier lists) stay out.
 - Out after round B183 (looked at, not done): The Fugitive Doctor (done in round B184) ("gains flashback {2}{R}{G} until end of turn": round 340's
   fixed-cost flashback grant for Archmage's Newt, now on main, does this: a next round), Elemental Resonance (done in round B252) ("add
@@ -13029,7 +13056,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   replacement, damage dealt this turn by a source); only 7 are left between 19,700 and 15,000. Then the lists below.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 480 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match (done in round B185), Reweave (done in round B215), Kheru Mind-Eater, Day of the Dragons (supported), Bloodbond March (done in round B185), Song of Inspiration (done in round B219), Countersculpt, Order of
-  Succession (supported), Drain Power, Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation (done in round B213), Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate.
+  Succession (supported), Drain Power (done in round B281), Volcano Hellion (done in round B185), Drain Life (done in round B179), Desolation (done in round B213), Urza's Sylex (done in round B185), Diabolic Servitude, Shared Fate.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 460 are still unsupported there, its skips
   included): Aeon Engine, Haunting Imitation (done in round B185), The Fugitive Doctor (done in round B184), Shifting Shadow, Prince of Thralls (done in round B185),
   Eriette, Manifold Insights (done in round B185), Fortune's Favor (supported), Curse of Inertia (done in round B184), Dreamshaper Shaman (done in round B219), Fishing Pole, Regna's Sanction (done in round B184),

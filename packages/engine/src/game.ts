@@ -6888,6 +6888,11 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
   });
 }
 
+/** Drain Power (round B281): `pid` activates this mana ability of `id` for this mana, as an effect has them do (CR 605.3a). */
+export function activateManaForEffect(s: GameState, pid: PlayerId, id: ObjectId, opt: { ability: number; mana: ManaType; combo?: number; instead?: ManaType; extra?: ManaType[] }): void {
+  activateMana(s, player(s, pid), id, opt.mana, opt.ability, undefined, opt.extra ?? [], opt.combo, undefined, opt.instead);
+}
+
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId, instead?: ManaType, sacrifice?: ObjectId[]) {
   const o = obj(s, id);
   // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
@@ -13333,6 +13338,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = ((r.scratch ??= {}).textWord ??= {});
     if (pend.what === "textFrom") st.from = choice;
     else st.to = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "drainLand") {
+    // Drain Power (round B281): the mana ability the target player activates for the land `about` (Effect drainPower).
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the mana abilities offered");
+    (r.scratch ??= {}).drainPick = choice;
     continueResolution(s);
     return;
   }

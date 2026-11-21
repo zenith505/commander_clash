@@ -584,6 +584,8 @@ interface Inst {
   offFieldLands?: true;
   /** Its type change applies to some of its controller's cards outside the battlefield too (StaticAbility.offFieldCards). */
   offFieldCards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
+  /** Its color change applies to its controller's spells and nonland cards outside the battlefield too (StaticAbility.offFieldColorsYours). */
+  offFieldColorsYours?: true;
   /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
   live?: true;
 }
@@ -691,6 +693,7 @@ function gather(s: GameState): Inst[] {
         ...(st.offFieldSpells ? { offFieldSpells: true as const } : {}),
         ...(st.offFieldLands ? { offFieldLands: true as const } : {}),
         ...(st.offFieldCards ? { offFieldCards: st.offFieldCards } : {}),
+        ...(st.offFieldColorsYours ? { offFieldColorsYours: true as const } : {}),
       }),
     );
   }
@@ -2549,6 +2552,9 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
       if (pick.offFieldAll && layer === "5" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true, ...(s.objects[pick.sourceId]?.chosen?.color ? { chosenColor: s.objects[pick.sourceId]!.chosen!.color } : {}) });
+      // Celestial Dawn (round B281): as it applied in layer 5, to its controller's spells and nonland cards too.
+      if (pick.offFieldColorsYours && layer === "5" && pick.sourceId)
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), yours: true });
     }
     // "Can't have hexproof or shroud": gone whatever gave them, after every layer 6 effect.
     if (layer === "6")
@@ -2742,12 +2748,14 @@ interface OffFieldGrant {
    * Mycosynth), for land cards in its controller's library (Rootpath Purifier), or for creature cards in its controller's
    * graveyard (Ashes of the Fallen, with `chosen`). */
   cards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
+  /** A color change for its controller's spells and the nonland cards they own outside the battlefield (Celestial Dawn). */
+  yours?: true;
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
 
 /** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
-const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands || st.offFieldCards));
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands || st.offFieldCards || st.offFieldColorsYours));
 
 function offFieldGrants(s: GameState): OffFieldGrant[] {
   if (building) return building.grants;
@@ -2831,7 +2839,10 @@ export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDe
   // The Prismatic Piper (round B249): its characteristic-defining ability works in every zone (CR 604.3), first (613.3).
   const cda = compileCard(d).pregameColorIsColor;
   if (cda) d = coloredDef(d, o.pregameColor ? [o.pregameColor] : []);
-  const gs: { timestamp: number; mods: Modification[]; chosenColor?: Color }[] = offFieldGrants(s).filter((g) => g.everyone);
+  // Celestial Dawn (round B281): "spells you control and nonland cards you own that aren't on the battlefield": a spell its
+  // controller controls (a copy too), and a nonland card its owner owns anywhere else, on the stack too (CR 108.3, 400.1).
+  const yours = (g: OffFieldGrant) => (o.zone === "stack" ? o.controller === g.controller || (o.owner === g.controller && !o.spellCopy) : o.owner === g.controller && !o.isToken && !d.types.includes("Land"));
+  const gs: { timestamp: number; mods: Modification[]; chosenColor?: Color }[] = offFieldGrants(s).filter((g) => g.everyone || (g.yours && yours(g)));
   // The Laces: "target spell becomes green", while it's that spell (CR 105.3, 613.1e).
   if (o.zone === "stack") for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "setColors" || m.kind === "addColors")) gs.push(g);
   if (!gs.length) return d;

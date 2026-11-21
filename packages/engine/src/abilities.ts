@@ -2444,6 +2444,12 @@ export interface StaticAbility {
    * in your library" (Rootpath Purifier), "each creature card in your graveyard" (Ashes of the Fallen).
    */
   offFieldCards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
+  /**
+   * Celestial Dawn (round B281): "Nonland permanents you control are white. The same is true for spells you control and
+   * nonland cards you own that aren't on the battlefield": its color change applies to its controller's spells and the
+   * nonland cards they own outside the battlefield too (layers.ts offFieldColored).
+   */
+  offFieldColorsYours?: true;
 }
 
 /**
@@ -4344,6 +4350,11 @@ export type Effect =
    * other nonland cards." (effects/run-laneb278.ts).
    */
   | { type: "keepOneOfEachColor" }
+  /**
+   * Drain Power (round B281): "Target player activates a mana ability of each land they control. Then that player loses all
+   * unspent mana and you add the mana lost this way." (CR 106.13; effects/run-laneb281.ts). The target is the spell's first.
+   */
+  | { type: "drainPower" }
   /**
    * Alaundo the Seer (round B279): "Then remove a time counter from each other card you own in exile": every card its
    * controller owns in exile with a time counter, face up or down, suspended or not (rulings), but those this resolution
@@ -10101,6 +10112,11 @@ export interface CompiledCard {
   spendAnyColor?: true;
   /** Sunglasses of Urza: "You may spend white mana as though it were red mana." (CR 609.4b): for its controller's costs, white mana pays {R}; it stays white. */
   spendWhiteAsRed?: true;
+  /**
+   * Celestial Dawn (round B281): "You may spend white mana as though it were mana of any color. You may spend other mana
+   * only as though it were colorless mana." (CR 609.4b), for every cost its controller pays with mana (spend.ts dawnCost).
+   */
+  dawnMana?: true;
   /** Averna, the Chaos Bloom: "As you cascade, you may put a land card from among the exiled cards onto the battlefield tapped." (CR 702.85a): for its controller's cascades, after the last card is exiled. */
   cascadeLand?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */

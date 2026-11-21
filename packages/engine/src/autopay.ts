@@ -9,7 +9,7 @@ import { abilityProblem, exileWaterbendCap, beholdTypeFor, costIsPaid, spellHow,
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
-import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
+import { abilityUse, boundSpend, dawnMana, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
 import type { AdditionalCost, ManaAbility, ManaSpend, SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -841,7 +841,9 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
   const start = poolFor(s, pid, use, cost0);
   if (bonus) for (const m of Object.keys(bonus) as ManaType[]) start.pool[m] += bonus[m];
   const colorOnly = start.colorOnly ?? emptyPool();
-  if (payFromPool(cost0, start.pool, extraGeneric, life, { snow: start.snow, wantSnow, colorOnly })) return [];
+  // Celestial Dawn (round B281) restricts what mana pays, so the pool is tried against the cost as it may be paid.
+  const dawn = dawnMana(s, pid);
+  if (payFromPool(dawn ? payableCost(s, pid, cost0, use) : cost0, start.pool, extraGeneric, life, { snow: start.snow, wantSnow, colorOnly })) return [];
   // K'rrik's "you may pay 2 life rather than pay that mana" for {B}: mana from the player's sources first, life once
   // they can't make it (planFree).
   const cost = payableCost(s, pid, cost0, use);
@@ -871,9 +873,11 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
       const others = unrestricted.filter((src) => src.id !== x.id);
       const free = { ...pool };
       for (const m of Object.keys(free) as ManaType[]) free[m] -= restricted[m];
-      const pay = planFree(x.cost!, 0, life, free, others, used, needColors, demand, undefined, snow);
+      // With Celestial Dawn, the mana ability's cost as its controller may pay it (spend.ts payableCost).
+      const xCost = dawn ? payableCost(s, pid, x.cost!, { ability: obj(s, x.id) }) : x.cost!;
+      const pay = planFree(xCost, 0, life, free, others, used, needColors, demand, undefined, snow);
       if (!pay) continue;
-      const paid = payFromPool(x.cost!, pay.pool, 0, Infinity, { snow: pay.snow })!;
+      const paid = payFromPool(xCost, pay.pool, 0, Infinity, { snow: pay.snow })!;
       const next = paid.pool;
       const nextSnow = { ...pay.snow };
       for (const m of Object.keys(nextSnow) as ManaType[]) nextSnow[m] -= paid.snow[m];

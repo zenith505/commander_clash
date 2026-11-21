@@ -7830,8 +7830,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const hoard = ab.sacrificeSelf && fx.length === 2 && fx[0]!.type === "discard" && fx[0]!.hand && fx[0]!.who.ref === "you" && fx[1]!.type === "draw" && fx[1]!.who.ref === "you" && typeof fx[1]!.n === "object" && "count" in fx[1]!.n && fx[1]!.n.count.kind === "counters" && fx[1]!.n.count.of?.ref === "self"
         ? ((n) => s.activePlayer === pid && s.step === "main2" && !s.stack.length && (o.counters[n.count.kind === "counters" ? n.count.counter : ""] ?? 0) >= player(s, pid).hand.length + 2)(fx[1]!.n)
         : false;
+      // Golgothian Sylex, Apocalypse Chime (round B290): a wipe of the permanents with an old set's names, weighed below.
+      const w1 = ab.body.effects.length === 1 ? ab.body.effects[0] : undefined;
+      const oldWipe = (w1?.type === "destroy" || w1?.type === "sacrifice") && w1.what.ref === "each" && !!w1.what.filter.firstPrintedIn;
+      if (oldWipe && (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length)) continue;
       // Lodestone Bauble (round 417): sacrificed when it's worth it (baubleTargets below).
-      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay && !hoard && !ab.choosesYardPlayer) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
+      if (((ab.sacrificeSelf && !cashIn && !oldWipe && !flips && !voidPlay && !hoard && !ab.choosesYardPlayer) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
       // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
       if (ab.grantSourceCost?.action === "sacrifice") continue;
       // Hankyu: "Remove all aim counters from Hankyu" for that much damage: only once three have built up.
@@ -8111,6 +8115,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
       const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
       if (!craft && !vessel && !baubleTargets && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      // Golgothian Sylex, Apocalypse Chime: only when the opponents lose more than we do, Chime's own sacrifice counted (Sylex
+      // is one of the permanents it sacrifices).
+      if (oldWipe && (groupValue(s, pid, valued, undefined, id) ?? 0) - (ab.sacrificeSelf ? worth(s, pid, o) : 0) < 3) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).

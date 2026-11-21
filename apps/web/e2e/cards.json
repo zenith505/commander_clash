@@ -2025,6 +2025,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "995e2412-3f69-4aaf-a5d6-ae0ecbb95061",
+  "name": "Apocalypse Chime",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Sacrifice this artifact: Destroy all nontoken permanents with a name originally printed in the Homelands expansion. They can't be regenerated.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "hml",
+  "releasedAt": "1995-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7849426d-895d-4dfe-a94d-b8df634618a5",
   "name": "Apple of Eden, Isu Relic",
   "manaCost": "{4}",
@@ -4329,6 +4351,42 @@
   "commanderLegal": "legal",
   "set": "mmq",
   "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc728cd7-2b5b-45f3-896a-a45648bcb61d",
+  "name": "Baron Sengir",
+  "manaCost": "{5}{B}{B}{B}",
+  "cmc": 8,
+  "typeLine": "Legendary Creature — Vampire Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Noble"
+  ],
+  "oracleText": "Flying\nWhenever a creature dealt damage by Baron Sengir this turn dies, put a +2/+2 counter on Baron Sengir.\n{T}: Regenerate another target Vampire.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Regenerate"
+  ],
+  "commanderLegal": "legal",
+  "set": "hml",
+  "releasedAt": "1995-10-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -9381,6 +9439,28 @@
   "set": "wth",
   "releasedAt": "1997-06-09",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a83f25e3-4d84-4c9b-ab12-19b8d326e459",
+  "name": "City in a Bottle",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever one or more other nontoken permanents with a name originally printed in the Arabian Nights expansion are on the battlefield, their controllers sacrifice them.\nPlayers can't cast spells or play lands with a name originally printed in the Arabian Nights expansion.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -21687,6 +21767,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "95197f8f-c24e-4d13-a106-7186b3cc59e0",
+  "name": "Golgothian Sylex",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}, {T}: Each nontoken permanent with a name originally printed in the Antiquities expansion is sacrificed by its controller.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "atq",
+  "releasedAt": "1994-03-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3fb5c9a6-3fab-4109-875b-83c92518c5eb",
   "name": "Gollum, Scheming Guide",
   "manaCost": "{1}{B}",
@@ -26937,6 +27039,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4e81596c-9225-43d1-bd35-798212144f2c",
+  "name": "Juzám Djinn",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Djinn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Djinn"
+  ],
+  "oracleText": "At the beginning of your upkeep, this creature deals 1 damage to you.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "43fbfeec-bcaf-48b8-befe-b7346fec5a3a",
   "name": "Jötun Grunt",
   "manaCost": "{1}{W}",
@@ -28003,6 +28135,36 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fbbc3acb-c917-44ff-ac6f-9dd6ebe3f4ad",
+  "name": "Kird Ape",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Ape",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ape"
+  ],
+  "oracleText": "This creature gets +1/+2 as long as you control a Forest.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

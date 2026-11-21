@@ -4,6 +4,7 @@
 
 import type { CardDef, Color, FaceDownKind, ManaType, ObjectId, PlayerId, SkipWhat, TurnRule } from "./types";
 import type { CopyExcept } from "./copies";
+import type { OldSet } from "./first-printings";
 
 /**
  * A number an effect uses: fixed, or worked out from the game. A spell or ability works out
@@ -1290,6 +1291,8 @@ export interface TargetSpec {
   notNamedAny?: string[];
   /** A search's `sameName` worked out as it resolves: one of these names (CR 201.2; none at all: nothing fits). */
   namedAny?: string[];
+  /** "Nontoken permanents with a name originally printed in the Antiquities expansion" (Golgothian Sylex, round B290): its name (a permanent's now, a copy's the one it copies, CR 707.2; a face-down one has none, CR 708.2) is one first printed in that set (first-printings.ts). */
+  firstPrintedIn?: OldSet;
   /** None of these subtypes. */
   notSubtypes?: string[];
   /** "creature with a +1/+1 counter on it", "permanents with ice counters on them"; ANY_COUNTER: "with a counter on it". */
@@ -9744,6 +9747,8 @@ export interface CompiledCard {
    * or spell having none (CR 708.2a), one name in common being the same name (CR 201.2b). Only casting and playing (rulings).
    */
   permanentNameBan?: { cast?: true; lands?: true };
+  /** City in a Bottle (round B290): "Players can't cast spells or play lands with a name originally printed in the Arabian Nights expansion." (names.ts nameCastBan, nameLandBan; a face-down spell has no name, CR 708.2). */
+  firstPrintedBan?: OldSet;
   /** Booby Trap: "The chosen player reveals each card they draw.": the player chosen as it entered (Chosen.player) shows each card as it's drawn (CR 701.20a). */
   revealsChosenPlayersDraws?: true;
   /** Circu, Dimir Lobotomist: "Your opponents can't cast spells with the same name as a card exiled with ~" (its linked exiled cards, face up). */

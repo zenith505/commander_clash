@@ -5921,7 +5921,7 @@ line blocks.
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
-   Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (names first printed in a set); Reflecting Mirror;
+   Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (done in round B290) (names first printed in a set); Reflecting Mirror;
    Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (done in round B260) (spliced
    cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
@@ -11820,6 +11820,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B290 (least played first, from the skip lists, none of them in Lane A's rounds 439-440): "a name originally printed in
+  the ... expansion" for Antiquities, Arabian Nights and Homelands. The card data keeps one printing per card (usually a recent
+  reprint), so the names first printed in those three sets are listed in the engine (first-printings.ts, from the sets'
+  checklists: 85, 77 and 115 names, each one a card in the data, and every card whose kept printing is from one of those sets
+  among them; Arabian Nights' Mountain is left out, being first printed in Alpha, City in a Bottle rulings). A permanent's
+  name is the one it has now (a copy's is the one it copies, CR 707.2; a face-down one has none, CR 708.2), a token never
+  counts (TargetSpec.firstPrintedIn). Golgothian Sylex's "Each nontoken permanent with a name originally printed in the
+  Antiquities expansion is sacrificed by its controller." (each player sacrifices theirs at once, Sylex too, CR 701.21a),
+  Apocalypse Chime's "Destroy all nontoken permanents with a name originally printed in the Homelands expansion. They can't be
+  regenerated." (CR 701.19c), and City in a Bottle's "Whenever one or more other nontoken permanents with a name originally
+  printed in the Arabian Nights expansion are on the battlefield, their controllers sacrifice them." (a state trigger, CR
+  603.8, once until it has left the stack; "them" the ones there as it resolves) and "Players can't cast spells or play
+  lands with a name originally printed in the Arabian Nights expansion." (CompiledCard.firstPrintedBan, names.ts; its
+  controller too; a face-down spell has no name). Bots activate Sylex and Chime in their second main phase when the
+  opponents lose at least 3 more worth than they do (Chime's own sacrifice counted). Browser tests activate Sylex and Chime
+  from the board and check City in a Bottle's sacrifice and that Kird Ape in hand isn't playable. +3, 31,851 of 31,936 on
+  B289's branch. The compiled text of every other card is unchanged.
+- Out after round B290 (looked at, not done): the lists after round B289 stay out. Judgment call: City in a Bottle's "them"
+  is every such permanent on the battlefield as the trigger resolves (no ruling says which; one that arrives later would
+  trigger it again anyway). Known gaps: bots cast City in a Bottle without weighing their own Arabian Nights permanents;
+  Golgothian Sylex and Apocalypse Chime are only used in a bot's own second main phase.
 - Round B289 (least played first, the two cards round B288 named next, neither in Lane A's rounds 439-440): Breathstealer's
   Crypt's "If a player would draw a card, instead they draw a card and reveal it. If it's a creature card, that player
   discards it unless they pay 3 life." (a replacement of every player's draws, CR 614.1a, mandatory, ordered among the others
@@ -12447,7 +12468,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Selective Adaptation reads a card's keywords from its printed keyword abilities (Scryfall's list), so a card whose text
   only grants a keyword to others isn't "a card with" it, and one with a conditional keyword ("has flying as long as") is;
   bots cast Brilliant Ultimatum without weighing the piles an opponent could make. Golgothian Sylex, Apocalypse Chime and
-  City in a Bottle: checked again (Nov 19): not a loader bug. tools/scryfall-extract.mjs keeps one printing per card (the
+  City in a Bottle (done in round B290, from name lists in the engine): checked again (Nov 19): not a loader bug. tools/scryfall-extract.mjs keeps one printing per card (the
   best-looking, usually a recent reprint: Mishra's Factory is from slc, Strip Mine from zne), so the set a name was first
   printed in is only known for cards never reprinted; they need a first-printing set field added to the extract on Ken's
   PC (the all-cards bulk file has every printing), then `npm run build:cards`. Apple of Eden, Isu Relic (done in round B269) ("whenever you play
@@ -12803,8 +12824,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creatures' colors are kept with a block (Sea Troll is the only reader).
 - Out after round B229 (looked at, not done): Divine Intervention (done in round B259) (still out: who removed the last counter isn't kept on
   the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel and Research // Development (nothing outside
-  the game here), Golgothian Sylex, Apocalypse Chime and City in a Bottle (the set a name was originally printed in isn't in
-  the card data). Known gaps: damage a spell deals through its own reflexive or delayed trigger (CR 603.7d, 603.12) counts for
+  the game here), Golgothian Sylex, Apocalypse Chime and City in a Bottle (done in round B290) (the set a name was originally
+  printed in isn't in the card data). Known gaps: damage a spell deals through its own reflexive or delayed trigger (CR 603.7d, 603.12) counts for
   Suffocation but isn't counted as a cast spell's for Backdraft; bots activate Vodalian War Machine's abilities without
   weighing the Merfolk its death would destroy.
 - Out after round B228 (looked at, not done): Hollow Warrior (done in round B259) (attack and block costs that tap another creature that

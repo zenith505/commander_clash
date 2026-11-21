@@ -1,4 +1,5 @@
 import { ANY_COUNTER, isRealKicker, NON_AURA_ENCHANTMENT } from "../abilities";
+import { nameFirstPrintedIn } from "../first-printings";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { PLANESWALKER_TYPES } from "../oracle/targets";
@@ -201,6 +202,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
   if (spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
   if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
+  // Golgothian Sylex, City in a Bottle, Apocalypse Chime: its name now, first printed in that set; a face-down one has none (CR 708.2).
+  if (spec.firstPrintedIn && (o.faceDown || !nameFirstPrintedIn(c.name, spec.firstPrintedIn))) return false;
   if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
@@ -650,6 +653,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
   if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
+  if (spec.firstPrintedIn && !nameFirstPrintedIn(d.name, spec.firstPrintedIn)) return false;
   if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsYourLegendary) return false; // not worked out yet (sameNameAsPermanent: bindBound; namedAsYourLegendary: bindLegendaryNames)
   if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.sharesTypeWithSelf || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;

@@ -385,7 +385,10 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   // Biophagus's mana counts for any creature spell; Guildmages' Forum's for a multicolored one (CR 105.2b), Animal
   // Attendant's for a non-Human one (a changeling is every creature type, CR 702.73a).
   const counterFits = (l: ManaLot) => creatureSpell && !!spellDef && (l.creatureCounter === true || (l.creatureCounter === "multicolored" && spellDef.colors.length >= 2) || (l.creatureCounter === "nonHuman" && !spellDef.subtypes.includes("Human") && !everyCreatureType(spellDef)));
-  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (hasteFits(l) ? -1 : 3) : 0) + (l.uncounterableInstantSorcery ? (instantOrSorcery ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.creatureCounter ? (counterFits(l) ? -1 : 3) : 0) + (l.riot ? (creatureSpell ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
+  // Sunken Palace (round 439): its mana copies a spell or an activated ability it's spent on (not a special action's cost,
+  // CR 116.2, nor a cost paid as something resolves), so it goes there first and is kept back from anything else.
+  const copyUse = use !== "other" && ("spell" in use || (!use.unlock && !use.faceUp && !use.cumulativeUpkeep && !use.foretell));
+  const rank = (l: ManaLot, plain: boolean) => (l.spentTrigger && "spellOrAbility" in l.spentTrigger ? (copyUse ? -1 : 3) : 0) + (l.keep ? 10 : 0) + (l.haste ? (hasteFits(l) ? -1 : 3) : 0) + (l.uncounterableInstantSorcery ? (instantOrSorcery ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.creatureCounter ? (counterFits(l) ? -1 : 3) : 0) + (l.riot ? (creatureSpell ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
   // Mana a basic land made and nothing else marks (Imperiosaur's "basicLand" origin) is spent as plain mana is.
   const plainLike = (l: ManaLot) => l.from?.length === 1 && l.from[0] === "basicLand" && !l.only && !l.keep && !l.spentTrigger && !l.haste && !l.commanderCounters && !l.creatureCounter && !l.uncounterableInstantSorcery && !l.source && !l.riot;
   for (const m of Object.keys(spent) as ManaType[]) {
@@ -405,7 +408,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
         if (l.creatureCounter && counterFits(l)) creatureCounters += k;
         if (l.riot && creatureSpell) for (let j = 0; j < k; j++) riot.push(l.riot);
         if (k && l.source) sources.add(l.source);
-        if (l.spentTrigger && use !== "other" && "spell" in use) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
+        if (l.spentTrigger && use !== "other" && ("spell" in use || ("spellOrAbility" in l.spentTrigger && copyUse))) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
         for (const f of l.from ?? []) if (f !== "snow" && f !== "basicLand") from[f] += k;
       }
     };

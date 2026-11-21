@@ -633,6 +633,8 @@ export interface GameObject {
     castOnly?: true;
     /** "You may cast it if it's a creature spell" (Vivien, Champion of the Wilds): only as a creature spell (CR 601.3e). */
     creatureOnly?: true;
+    /** Arvinox, the Mind Flail (round 439): "you may cast permanent spells from among them": only as an artifact, battle, creature, enchantment or planeswalker spell (CR 110.4b, 601.3e). */
+    permanentOnly?: true;
     /** Airbend's "by paying {2} rather than paying its mana cost" (CR 701.65a): an alternative cost, the only way. */
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */

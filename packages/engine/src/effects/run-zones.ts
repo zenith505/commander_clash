@@ -2515,7 +2515,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (e.from === "hand") ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => [...player(s, pid).hand]);
       else {
         // Counted for each player in turn: "all but the bottom six cards of their library" (Doomsday Excruciator).
-        ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => player(s, pid).library.slice(0, Math.max(0, e.n === undefined ? 1 : amountNow(s, e.n, { ...ctx, eachOne: pid }))));
+        // Arvinox, the Mind Flail (round 439): the bottom card instead (CR 401.1), none from an empty library.
+        if (e.from === "bottom") ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => player(s, pid).library.slice(-1));
+        else ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => player(s, pid).library.slice(0, Math.max(0, e.n === undefined ? 1 : amountNow(s, e.n, { ...ctx, eachOne: pid }))));
         if (e.pickOne) {
           // Siphon Insight: the actor looks at the cards and exiles the one they choose; the others go to the bottom of
           // their owner's library (one card left, so no order to choose). Nobody else learns which went where (rulings).
@@ -2592,7 +2594,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const n = done.length;
       const owners = [...new Set(done.map((id) => obj(s, id).owner))];
       const whose = owners.length === 1 && owners[0] === p.id ? "their" : owners.map((pid) => `${player(s, pid).name}'s`).join(" and ");
-      log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" ? `from the top of ${whose} library` : "from their hand"} face down with ${src}${e.play ? `, and may ${e.play.castOnly ? "cast" : "play"} ${n === 1 ? "it" : "them"}` : ""}${e.foretold !== undefined ? `. ${n === 1 ? "It becomes" : "They become"} foretold` : ""}.`);
+      log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" || e.from === "bottom" ? `from the ${e.from} of ${whose} library` : "from their hand"} face down with ${src}${e.play ? `, and may ${e.play.castOnly ? "cast" : "play"} ${n === 1 ? "it" : "them"}` : ""}${e.foretold !== undefined ? `. ${n === 1 ? "It becomes" : "They become"} foretold` : ""}.`);
       if ((e.look || e.play || e.pickOne) && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
       if (restBottom.length) {
         sc.faceDownBottom = restBottom;

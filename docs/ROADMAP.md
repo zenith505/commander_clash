@@ -596,7 +596,7 @@ line blocks.
    Exhale, Hyperion's Atomic Vision, Hulk's Thunderclap, Dose of Dawnglow's "it isn't your main phase"); browser
    tests click through each prompt. An optional additional cost isn't kicker (CR 601.2b): "kicked spell" triggers and
    Ertai's Trickery ignore it.
-   Out after round 197 (looked at, not done): Dawnhand Dissident (casting from exile by removing counters), Auntie Ool
+   Out after round 197 (looked at, not done): Dawnhand Dissident (done in round 438) (casting from exile by removing counters), Auntie Ool
    (done in round 266). Smaller gaps: bots blight only a creature that
    survives the counters, and never their commander.
    Round 198 went on from the top: targets "of the chosen type" on a permanent's abilities, bound to the creature type
@@ -4626,6 +4626,63 @@ line blocks.
    dropped), and the lists after round 436 (still out, for their reasons). Judgment calls: Nathan Drake has no rulings: its
    cast is made while the trigger resolves (no duration is given, as Sanwell's rulings read the same words), and a spell
    cast that way that its player can't pay for is offered but can't be cast.
+   Round 438 went on down the "Out after round N" lists and `npm run popular`, most played first, to two cast permissions
+   whose extra cost is removing counters from creatures you control. Falco Spara, Pactweaver's "You may cast spells from
+   the top of your library by removing a counter from a creature you control in addition to paying their other costs." (an
+   additional cost of each spell cast that way, CR 601.2f-h, a counter of any kind, Falco's own shield counter too, rulings;
+   Into the Pit's FromTop `costs`; with Into the Pit too, the permission whose cost the caster chose to pay is used).
+   Dawnhand Dissident's "During your turn, you may cast creature spells from among cards you own exiled with ~ by removing
+   three counters from among creatures you control in addition to paying their other costs." (the cards its "{T}, Blight 2:
+   Exile target card from a graveyard." exiled, CR 607.2a; their usual timing and costs, rulings; the counters any mix
+   from any creatures you control, CR 601.2h; under your control as the casting begins, the cost kept after that, rulings;
+   playLinkedOnly `costs`, game.ts linkedCastCosts). Browser tests click through both counter pickers. +2, 31,840 of
+   31,936 on this stacked branch (round 437 #725), 31,841 with round 437's head 34e635b (main 74e2156, B285) merged in; the
+   compiled text of every other card and face is unchanged.
+   Out after round 438 (looked at, not done): the lists after round 437 (still out, for their reasons). Known gaps: in the
+   app, with Falco Spara and Into the Pit both, the first permission's cost is the one asked for (the engine takes either);
+   bots pay with -1/-1 and other spare counters first and never take a creature's last +1/+1 counter (or a loyalty, lore
+   or time counter), skipping the cast when that's all there is.
+   Round 439 went on down the "Out after round N" lists and `npm run popular`, most played first, to the top card and one
+   more. Sunken Palace's "{1}{U}, {T}, Exile seven cards from your graveyard: Add {U}. When you spend this mana to cast a
+   spell or activate an ability, copy that spell or ability. You may choose new targets for the copy." (a mana ability
+   whose {U} makes a delayed trigger, CR 106.6, 603.7a, triggering when it pays a spell's or an activated ability's cost,
+   not a special action's or a cost paid while something resolves; the copy is made even if the original has left the
+   stack, rulings; spent on a mana ability's cost it copies nothing, as mana abilities can't be copied; Effect addMana
+   `spentTrigger`, SpentFor `spellOrAbility`). Arvinox, the Mind Flail's "~ isn't a creature unless you control three or
+   more permanents you don't own." (layer 4, CR 613.1d, 108.3) and "At the beginning of your end step, exile the bottom
+   card of each opponent's library face down. For as long as those cards remain exiled, you may look at them, you may cast
+   permanent spells from among them, and you may spend mana as though it were mana of any color to cast those spells."
+   (CR 406.3, 110.4b, 609.4b; exileFaceDown from `bottom`, FaceDownPlay `permanentOnly` and `anyColor`). Browser tests
+   click through Sunken Palace's seven-card exile and a Divination it copies, and Arvinox's face-down Ambush Viper cast
+   with Islands. +2, 31,843 of 31,936 on this stacked branch (round 438 #727); the compiled text of every other card and
+   face is unchanged.
+   Out after round 439 (looked at, not done): Ulalek, Fused Atrocity ("copy all spells you control, then copy all other
+   activated and triggered abilities you control": no rule or ruling says in what order the copies go on the stack),
+   Psychic Paper (still out: which layer the equipped creature's new name is applied in), and the lists after round 438
+   (still out, for their reasons). Known gaps: bots never activate Sunken Palace's second ability (an activated mana
+   ability with a cost to choose, which the automatic payment doesn't use); its {U} is spent first on a spell or ability
+   it can pay for, kept back from other costs.
+   Round 440 went on down the "Out after round N" lists and `npm run popular`, most played first, past Ulalek and the
+   others still out, and Nihiloor and Ashiok, Wicked Manipulator (Lane B's round B288), to two cards whose pieces are
+   there now. Forger's Foundry's "{T}: Add {U}. When you spend this mana to cast an instant or sorcery spell with mana value
+   3 or less, you may exile that spell instead of putting it into its owner's graveyard as it resolves." (a delayed
+   trigger of the mana, CR 106.6, 603.7a, that triggers whether or not the Foundry is still there, X counted as chosen,
+   rulings; the choice made as it resolves, CR 608.2d, a replacement of the spell's move as it resolves, CR 608.2n,
+   614.1a; countered, it goes to the graveyard; the card linked to the Foundry, CR 607.2a) and "{3}{U}{U}, {T}: You may
+   cast any number of spells from among cards exiled with this artifact without paying their mana costs. Activate only
+   as a sorcery." (one at a time as it resolves, timing ignored, X as 0, rulings, CR 608.2g). Calamity, Galloping
+   Inferno's "Whenever ~ attacks while saddled, choose a nonlegendary creature that saddled it this turn and create a
+   tapped and attacking token that's a copy of it. Sacrifice that token at the beginning of the next end step. Repeat this
+   process once." (CR 702.171b-c, saddled as it was declared an attacker; not targeted, the same creature or another the
+   second time; each token's attack chosen as it enters, CR 508.4, never declared, so no attack triggers; rulings).
+   Browser tests click through the Foundry's exile question and its two free casts, and Calamity's two picks and the
+   players its tokens attack. +2, 31,845 of 31,936 on this stacked branch (round 439 #729), 31,848 with round 439's head
+   f43736b (main bda6d60, B286) merged in, 31,852 with main 1e5b51e (B287, B288); the compiled text of every other card and face is unchanged.
+   Out after round 440 (looked at, not done): Nihiloor and Ashiok, Wicked Manipulator (Lane B's round B288), and the
+   lists after round 439 (still out, for their reasons). Judgment calls: a creature that saddled Calamity and is now
+   controlled by another player can still be chosen (the ability names no controller). Known gaps: bots always exile a
+   spell the Foundry's mana paid for, and tap the Foundry for mana like any other source, without keeping it for its
+   second ability.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -6096,7 +6153,7 @@ line blocks.
    toughness among your creatures: putCounter costs have no X yet).
    Out after round 261 (looked at, not done): Doors of Durin (done in round 295) (a "may reveal the top card" whose creature card enters tapped
    and attacking, then trample and hexproof by the Dwarves and Elves you control as it resolves: putOntoBattlefield has no
-   attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (casting from the top of your library
+   attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (done in round 438) (casting from the top of your library
    with "remove a counter from a creature you control" as an additional cost: a cost choice for the cast, the autopay and
    bots); Master of the Wild Hunt (done in round 328) (each tapped Wolf deals damage, then the target's controller divides its damage among those
    Wolves as it resolves); Secret of Bloodbending (controlling another player); Harold and Bob, First Numens (returns as an
@@ -7171,7 +7228,7 @@ line blocks.
    Éomer), Raphael's "deals combat damage to a player for the first time each turn", "untap it and all Samurai you
    control" (Godo), Moraug's "for each time it has attacked this turn"; "it can't be blocked this combat" (Ma Chao),
    "whenever ~ or a commander you control attacks alone"; play-from-top riders: Bolas's Citadel's life payment,
-   Elsha's flash (done in round 331), Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's and Into the Pit's (done in round 331)
+   Elsha's flash (done in round 331), Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's (done in round 438) and Into the Pit's (done in round 331)
    extra costs, historic and snow filters (Crystal Skull, The Fourth Doctor, Isu), "spells with flash or flying"
    (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's (done in round 325) "can't play cards from
    your hand", granted look-at-top (Glowcap Lantern (done in round B186)), "until end of turn, you may look at the top card" (Gwenom, The
@@ -11835,7 +11892,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   targets are chosen, the Wall first, and as it resolves, CR 601.2c, 608.2b; X its power then; the two abilities it gains
   with no duration, CR 611.2a). Bots always reveal for Kefnet (whether to cast the copy is decided as it resolves). Browser
   tests reveal Concentrate drawn by Divination and cast its copy for {U}{U}, and target a Wall then the Grizzly Bears it
-  blocked (Hill Giant not a target). +2, 31,853 of 31,936 on B290's branch. The compiled text of every other card is
+  blocked (Hill Giant not a target). +2, 31,853 of 31,936 on B290's branch, 31,859 with B290's head 5683e92
+  (main through round 440) merged in. The compiled text of every other card is
   unchanged.
 - Out after round B291 (looked at, not done): the lists after round B290 stay out. Judgment calls: Kefnet asks only about an
   instant or sorcery card (revealing another card does nothing); during a draw made inside another player's draw

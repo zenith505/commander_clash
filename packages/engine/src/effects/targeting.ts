@@ -1678,6 +1678,11 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
   // Drake Familiar: "return an enchantment to its owner's hand": any player's too.
   // The Horus Heresy: "each player chooses a creature", anyone's.
+  // Calamity, Galloping Inferno (round 440): "a nonlegendary creature that saddled it this turn", whoever controls it now.
+  if (e.anyController && e.filter.saddledSource) {
+    const { saddledSource: _, ...filter } = e.filter;
+    return pickOptions(s, { ...e, filter }, pid, sourceId, sourceZc).filter((id) => saddledSource(s, id, sourceId, sourceZc));
+  }
   if (e.anyController && (e.action === "counters" || e.action === "bounce" || (e.action === "choose" && !e.least && !e.greatest))) return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
   // Drop of Honey, Purging Scythe: "the creature with the least power" on the battlefield, anyone's, or tied for it; to be
   // destroyed, one that can be if any of those can (rulings, CR 702.12b).

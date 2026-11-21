@@ -13105,6 +13105,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6ad18589-ece4-4809-80f6-6764d2822372",
+  "name": "Desert Cerodon",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "Cycling {R} ({R}, Discard this card: Draw a card.)",
+  "power": "6",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "akh",
+  "releasedAt": "2017-04-28",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d8328d27-e27f-4c84-8ab5-cabb80a34f54",
   "name": "Desperate Gambit",
   "manaCost": "{R}",
@@ -19493,6 +19525,45 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "30c0df75-9822-4016-a52b-d2e69dd58124",
+  "name": "Galea, Kindler of Hope",
+  "manaCost": "{1}{G}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Elf Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Knight"
+  ],
+  "oracleText": "Vigilance\nYou may look at the top card of your library any time.\nYou may cast Aura and Equipment spells from the top of your library. When you cast an Equipment spell this way, it gains \"When this Equipment enters, attach it to target creature you control.\"",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -39280,6 +39351,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0d39513a-1f05-4d9a-a772-745f4f1a3471",
+  "name": "Pygmy Hippo",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Hippo",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hippo"
+  ],
+  "oracleText": "Whenever this creature attacks and isn't blocked, you may have defending player activate a mana ability of each land they control and lose all unspent mana. If you do, this creature assigns no combat damage this turn and at the beginning of your next main phase this turn, you add an amount of {C} equal to the amount of mana that player lost this way.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
   "name": "Pyroblast",
   "manaCost": "{R}",
@@ -53712,6 +53818,34 @@
   "set": "10e",
   "releasedAt": "2007-07-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5b67a944-ab0b-4155-8bc0-becb1b38b3bb",
+  "name": "Unpredictable Cyclone",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a cycling ability of another nonland card would cause you to draw a card, instead exile cards from the top of your library until you exile a card that shares a card type with the cycled card. You may cast that card without paying its mana cost. Then put the exiled cards that weren't cast this way on the bottom of your library in a random order.\nCycling {2} ({2}, Discard this card: Draw a card.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -222,6 +222,8 @@ export type Count =
   | { kind: "stackCounteredThisWay" }
   /** Leeches: "that much", the poison counters its loseAllCounters instruction removed. */
   | { kind: "poisonLostThisWay" }
+  /** Pygmy Hippo (round B285): "the amount of mana that player lost this way" (Effect drainLose, ResolvingState.manaLost). */
+  | { kind: "manaLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
   /** "Draw a card for each one they gained control of this way" (Coveted Falcon): those objects (the targets still legal, CR 608.2b) now controlled by that player. */
@@ -4357,6 +4359,12 @@ export type Effect =
    * unspent mana and you add the mana lost this way." (CR 106.13; effects/run-laneb281.ts). The target is the spell's first.
    */
   | { type: "drainPower" }
+  /**
+   * Pygmy Hippo (round B285): "you may have defending player activate a mana ability of each land they control and lose all
+   * unspent mana": `who` does what Drain Power's target does (effects/run-laneb281.ts activateEachLand), then their whole
+   * pool is lost (CR 106.4), its amount kept for "the amount of mana that player lost this way" (Count manaLostThisWay).
+   */
+  | { type: "drainLose"; who: PlayerRef }
   /**
    * Ice Cauldron (round B285): "Put a charge counter on ~ and note the type and amount of mana spent to pay this activation
    * cost": the mana spent, each one (StackItem.manaSpentTypes; GameObject.notedManaAll), and the card exiled from the hand
@@ -9875,6 +9883,13 @@ export interface CompiledCard {
   /** With `drawSharedFate`: "Each player may look at cards they exiled with ~, and they may play lands and cast spells from among those cards." */
   sharedFatePlay?: true;
   /**
+   * Unpredictable Cyclone (round B286): "If a cycling ability of another nonland card would cause you to draw a card, instead
+   * exile cards from the top of your library until you exile a card that shares a card type with the cycled card. You may
+   * cast that card without paying its mana cost. Then put the exiled cards that weren't cast this way on the bottom of your
+   * library in a random order." (CR 614.1a, 702.29a; game.ts cycloneInstead).
+   */
+  drawCycloneCycled?: true;
+  /**
    * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
    * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
    * each draw would happen.
@@ -11104,4 +11119,10 @@ export interface FromTop {
    * against the cards its linked "exile a card from a graveyard" ability exiled, still in exile (CR 607.2a).
    */
   sharesTypeWithLinked?: true;
+  /**
+   * Galea, Kindler of Hope (round B286): "When you cast an Equipment spell this way, it gains ...": a triggered ability of
+   * the permanent with this permission (CR 603.2), put on the stack above a spell matching `spell` cast with it (CR 601.2i,
+   * 603.3), `body` about that spell (StackItem cause).
+   */
+  castTrigger?: { spell: TargetSpec; body: AbilityBody };
 }

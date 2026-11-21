@@ -1,6 +1,6 @@
 # Roadmap
 
-31,837 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,842 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
 9,979 (99%).
 
@@ -4203,7 +4203,7 @@ line blocks.
    Out after round 421 (looked at, not done): The Dragon-Kami Reborn (done in round B283) (hatching counters on cards exiled face down), The
    Face of Boe (a spell cast for its suspend cost: the "Suspend X" cards' {X} in that cost isn't worked out), Skyway
    Robber, Parnesse, the Subtle Brush, Uvilda, Dean of Perfection (done in round B283), Nihiloor (a reflexive trigger for each creature tapped,
-   one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone, Redemptor
+   one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone (done in round B286), Redemptor
    Dreadnought (an optional additional cost exiling one creature card; note its Plasma Incinerator line compiles "the
    power of the exiled card" as a sacrificed cost's, which an attack trigger has none of: fix that with the cost),
    Selective Adaptation, Tahngarth, First Mate (done in round B284) and the rest of `npm run popular` above rank 15,100 (still out, for the
@@ -4306,7 +4306,7 @@ line blocks.
    text of every other card is unchanged.
    Out after round 425 (looked at, not done): Ulalek, Fused Atrocity (copies of all spells and then of all other
    abilities you control put on the stack at once: their order is their controller's choice, CR 405.3, and nothing lets a
-   player order copies yet), Galea, Kindler of Hope (its "When you cast an Equipment spell this way" needs the permission
+   player order copies yet), Galea, Kindler of Hope (done in round B286) (its "When you cast an Equipment spell this way" needs the permission
    a spell was cast with, and the ability it gives the spell kept on the permanent, CR 400.7a), Taskmaster, Mercenary
    Mimic ("target creature on the battlefield or creature card in a graveyard": one target from either zone), Codie,
    Ravenous Codex ("a prepared spell" isn't a term the Comprehensive Rules define; CR 722.3d speaks of a spell cast as a
@@ -4583,7 +4583,7 @@ line blocks.
    Out after round 435 (looked at, not done): Mimeoplasm, Revered One (its "{2}: ~ becomes a copy of target creature card
    exiled with it, except it's 0/0 and has this ability": once it's a copy, the ability it keeps is no longer printed beside
    the "As ~ enters, exile" it's linked to, CR 607.1a, 607.5, and the card has no rulings on whether it still finds those
-   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (it needs Drain
+   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (done in round B286) (it needs Drain
    Power's piece from round B281, merged after this round began), and the lists after round 434 (still out, for their reasons). Known
    gaps: bots cast March from Velis Vel only with two or more lands of one nonbasic land type and don't plan Ludevic's X
    activation.
@@ -5915,7 +5915,7 @@ line blocks.
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
-   Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
+   Pygmy Hippo (done in round B286); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
@@ -5935,7 +5935,7 @@ line blocks.
    from the cards its collect evidence exiled); Reversal of Fortune (done in round B265) (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
    attached, exiled if they'd leave); Livio, Oathsworn Sentinel (done in round B200) (aegis counters); Vision Charm (done in round B155) (land type changes);
-   Unpredictable Cyclone; Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand (done in round 424);
+   Unpredictable Cyclone (done in round B286); Bell Borca, Spectral Sergeant (done in round B239) (noted mana values); Mirror of Fate; Dack Fayden, Helping Hand (done in round 424);
    Sanar, Innovative First-Year; Mairsil, the Pretender (done in round 401) (cage counters); Spellweaver Volute; Inniaz, the Gale Force (done in round B247).
    Out after round 291 (looked at, not done): Skyway Robber (escapes with a granted trigger about the cards its escape cost
    exiled); Hama, the Bloodbender (an exiled card cast by waterbending {X} while you control it); Synthesis Pod (done in round B283) ("Exile a
@@ -5988,7 +5988,7 @@ line blocks.
    foretell each turn for {0}, and exile from hand or by your effects as one trigger); Soundwave, Sonic Spy (a copy of a
    card exiled from a graveyard by the damage dealt); Grip of Chaos and Psychic Battle (targets reselected at random).
    Out after round 284 (looked at, not done): Sin, Spira's Punishment (a token copy of a card exiled at random, repeated
-   for lands); Galea, Kindler of Hope (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
+   for lands); Galea, Kindler of Hope (done in round B286) (a cast trigger that gives the Equipment spell an enters ability); Kellan, Planar
    Trailblazer (becoming a Detective and gaining an impulse trigger, only if it's a Scout); Cloudspire Coordinator (done in round B246) (the
    Mounts and Vehicles that entered this turn, tokens that saddle and crew as though their power were 2 greater); Nashi,
    Moon's Legacy (done in round 373) (copying a graveyard card and casting the copy, paying its costs); Discover the Impossible (a face-down
@@ -11820,6 +11820,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B286 (least played first, from the skip lists, none of them in Lane A's rounds 436-437): Pygmy Hippo, which round
+  B285 left to Lane A's round 437 while round 437 left it to Lane B, is back as round B285 built it (see there; the
+  attack trigger, Effect drainLose, the delayed {C}; its browser test in laneb-round285.spec.ts). Galea, Kindler of Hope's
+  "You may cast Aura and Equipment spells from the top of your library. When you cast an Equipment spell this way, it
+  gains "When this Equipment enters, attach it to target creature you control."" (a permission at the usual timing, all
+  costs paid, rulings, FromTop; "When you cast ... this way" a triggered ability of Galea's, CR 603.2, that triggers as a
+  spell is cast with this permission, CR 601.2i, FromTop.castTrigger, and goes on the stack above it, CR 603.3; it gives
+  the spell, if still that spell, the enters trigger with no duration, kept by the permanent it becomes, CR 400.7a, 611.2a,
+  Effect spellGains `forever`; when another permission could cast the same Equipment, Galea's is the one used, its
+  caster's pick, as for Thundermane Dragon's haste). Unpredictable Cyclone's "If a cycling ability of another nonland card
+  would cause you to draw a card, instead exile cards from the top of your library until you exile a card that shares a
+  card type with the cycled card. You may cast that card without paying its mana cost. Then put the exiled cards that
+  weren't cast this way on the bottom of your library in a random order." (a replacement of its controller's draws, CR
+  614.1a, 614.6, that the resolving cycling ability of a nonland card makes, the card's types as it was cycled, StackItem
+  cycled, CR 702.29a; typecycling draws nothing; any one shared type stops it, rulings; cast as part of the replacement,
+  timing ignored, CR 608.2g, rulings, PendingDecision castFree `cyclone`, then the rest to the bottom and the draws after
+  it, so each draw a cycling ability makes is replaced, Quantum Riddler's extra one too; with none found the library goes
+  back in a random order and nothing is drawn, rulings; with other replacements, its controller picks, CR 616.1, game.ts
+  drawReplacementChoices `cyclone:<id>`, effects/run-laneb286.ts). Bots take the Cyclone's replacement over the others
+  and cast from the top with Galea as with other permissions. Browser tests click through Galea's Bonesplitter cast from
+  the top and its attach target, and the Cyclone's Hill Giant found by cycling Desert Cerodon and cast free. +3, 31,840
+  of 31,936 on B285's branch (main 32fb7a3, round 436, merged in). The compiled text of every other card is unchanged.
+- Out after round B286 (looked at, not done): the lists after round B285 stay out. Battlefield Thaumaturge stays out
+  (its ruling "{1} per target creature, even if the spell targets a creature more than once" still reads either way for
+  a creature targeted twice). Sanar, Innovative First-Year (reveal until X nonland cards, then a card of each color among
+  them, one card standing for one color) is next in line, not looked at closely yet. Judgment calls and known gaps: a
+  draw another replacement made of the cycling ability's draw (an Archive's two) isn't offered to the Cyclone, which can
+  still be chosen first for the draw itself (CR 616.1); bots don't cycle more for having a Cyclone.
 - Round B285 (least played first, from the skip lists, not in Lane A's rounds 435-437): Ice Cauldron's "{X}, {T}: You
   may exile a nonland card from your hand. You may cast that card for as long as it remains exiled. Put a charge counter
   on this artifact and note the type and amount of mana spent to pay this activation cost. Activate only if there are no
@@ -12466,7 +12494,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (both piles are empty); bots choose that opponent with the general opponent choice and cast Soul Echo through the general
   spell logic; Dimensional Breach (an effect lasting while its cards stay exiled, returning one at each player's upkeep),
   Defensive Formation (done in round B266) (the defending player assigning an attacker's combat damage), Takklemaggot (returned as a non-Aura
-  enchantment that loses "enchant creature"), Pygmy Hippo (another player activating a mana ability of each of their lands)
+  enchantment that loses "enchant creature"), Pygmy Hippo (done in round B286) (another player activating a mana ability of each of their lands)
   and North Star were looked at again and stay out for the reasons in the earlier lists.
 - Round B263 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-418): Guardian Angel
   ("Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you

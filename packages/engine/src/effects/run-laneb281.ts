@@ -1,12 +1,12 @@
 // Lane B round B281's effects: Drain Power (drainPower). Celestial Dawn's abilities are statics (layers.ts, spend.ts).
 import type { Effect } from "../abilities";
-import { activateManaForEffect, log, obj, player } from "../game";
+import { activateManaForEffect, log, manaBurn, obj, player } from "../game";
 import { controllerOf, characteristics, invalidateCharacteristics } from "../layers";
 import { manaAbilitiesOn, manaAbilityCostOf, manaAbilityProblem, manaOptions, type ManaOption } from "../manaabilities";
 import { addedAbilityCosts } from "../added-costs";
 import { emptyPool } from "../mana";
 import type { GameObject, GameState, ManaType, PlayerId } from "../types";
-import type { ResolveCtx } from "./resolve";
+import { players, type ResolveCtx } from "./resolve";
 
 type B281Effect = Extract<Effect, { type: "drainPower" }>;
 
@@ -57,8 +57,9 @@ export function runLaneB281Effect(s: GameState, e: B281Effect, ctx: ResolveCtx, 
       const sc = (r.scratch ??= {});
       const t = ctx.targets[0];
       if (!sc.drain) {
-        if (t?.kind !== "player" || ctx.legal[0] === false) return;
-        const tp = t.id;
+        // Pygmy Hippo (round 437): defending player, not a target; none left in the game, nothing happens.
+        const tp = e.who ? players(s, e.who, ctx)[0] : t?.kind === "player" && ctx.legal[0] !== false ? t.id : undefined;
+        if (tp === undefined) return;
         const lands = s.battlefield.map((id) => obj(s, id)).filter((o) => characteristics(s, o).types.includes("Land") && controllerOf(s, o) === tp);
         const free = (o: GameObject) => drainOptions(s, tp, o).some((x) => !manaAbilityCostOf(s, tp, o, manaAbilitiesOn(s, o)[x.ability]!));
         const ordered = [...lands.filter(free), ...lands.filter((o) => !free(o))];
@@ -93,6 +94,19 @@ export function runLaneB281Effect(s: GameState, e: B281Effect, ctx: ResolveCtx, 
       const from = player(s, tp);
       const to = player(s, ctx.controller);
       const lost = (Object.keys(from.manaPool) as ManaType[]).flatMap((m) => Array.from({ length: from.manaPool[m] }, () => m));
+      if (e.lose) {
+        // Pygmy Hippo (round 437): "and lose all unspent mana": their whole pool, mana that was there before too and mana
+        // kept as steps end (CR 106.4), its amount noted for "the amount of mana that player lost this way" (CR 608.2h);
+        // Yurlok of Scorch Thrash's life loss sees it as any mana lost.
+        r.notedAmount = from.lost ? 0 : lost.length;
+        if (from.lost) return;
+        from.manaPool = emptyPool();
+        from.manaLots = undefined;
+        log(s, `${from.name} loses all unspent mana (${symbols(lost)}).`);
+        manaBurn(s, [[tp, lost.length]]);
+        invalidateCharacteristics(s);
+        return;
+      }
       if (tp === ctx.controller || from.lost) {
         if (tp === ctx.controller) log(s, `${from.name} loses ${symbols(lost)} and adds it again.`);
         return;

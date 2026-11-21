@@ -34449,6 +34449,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed69b907-272c-4a87-a943-06aaad976fb1",
+  "name": "Nathan Drake, Treasure Hunter",
+  "manaCost": "{U}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "First strike\nYou may spend mana as though it were mana of any color to cast spells you don't own or to activate abilities of permanents you control but don't own.\nWhenever Nathan Drake attacks, exile the top card of each player's library. You may cast a spell from among those cards.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-10-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "613a8774-165e-4cf6-ad43-124f9ffc9980",
   "name": "Nautiloid Ship",
   "manaCost": "{4}",
@@ -39177,6 +39216,41 @@
   "commanderLegal": "legal",
   "set": "sth",
   "releasedAt": "1998-03-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0d39513a-1f05-4d9a-a772-745f4f1a3471",
+  "name": "Pygmy Hippo",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Hippo",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hippo"
+  ],
+  "oracleText": "Whenever this creature attacks and isn't blocked, you may have defending player activate a mana ability of each land they control and lose all unspent mana. If you do, this creature assigns no combat damage this turn and at the beginning of your next main phase this turn, you add an amount of {C} equal to the amount of mana that player lost this way.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -51197,6 +51271,47 @@
   "commanderLegal": "legal",
   "set": "tla",
   "releasedAt": "2025-11-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4a3fdb8e-4699-4bd9-84e6-3cc7fea0e1ef",
+  "name": "The Ur-Sphinx",
+  "manaCost": "{6}{W}{U}{B}",
+  "cmc": 9,
+  "typeLine": "Legendary Creature — Sphinx Avatar",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx",
+   "Avatar"
+  ],
+  "oracleText": "Eminence — As long as The Ur-Sphinx is in the command zone or on the battlefield, other Sphinx spells you cast cost {1} less to cast.\nFlying\nWhenever one or more Sphinxes you control attack, each player mills that many cards. For each player, you may cast a card that player milled this way without paying its mana cost.",
+  "power": "10",
+  "toughness": "10",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Eminence",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "frc",
+  "releasedAt": "2026-10-02",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

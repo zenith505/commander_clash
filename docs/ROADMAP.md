@@ -4278,7 +4278,7 @@ line blocks.
    Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f (31,767 with main 4d75ae2,
    B267, merged in); the compiled text of every other card is unchanged.
    Out after round 424 (looked at, not done): Secret Invasion (done in round B276) (the enchanted creature a copy of the creature the Aura
-   exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (its
+   exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (done in round 435) (its
    back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
    other permanents while it's untapped), Redemptor Dreadnought (its Plasma Incinerator line compiles wrongly, review
    follow-up 18: fix it with the card), Selective Adaptation, Supper for Spiders and Brilliant Ultimatum (Lane B's round
@@ -4565,6 +4565,28 @@ line blocks.
    get equip abilities (as Mairsil, an equip that couldn't attach it to anything, CR 301.5b-c, so only its activation and
    the copy trigger are missing); bots tap Apex Observatory only in their main phase with a card of the chosen type in
    hand with mana value 3 or more, and choose a card type as for any other choice.
+   Round 435 went on down the "Out after round N" lists and `npm run popular`, most played first, to two copies of a creature
+   no piece made yet. March from Velis Vel's "Choose a nonbasic land type. Each land you control of that type becomes a copy
+   of target creature you control until end of turn and gains haste until end of turn." (the type chosen as it resolves,
+   among CR 205.3i's twelve that aren't basic; the lands those of that type then, CR 611.2c; each a copy of the target's
+   copiable values, what it copies too, with no counters or tapped state and nothing entering, rulings; Effect
+   landTypeCopies, its flashback too). Ludevic, Necrogenius's "{X}{U}{U}{B}{B}, Exile X creature cards from your graveyard:
+   Transform ~. X can't be 0. Activate only as a sorcery." (X in mana and in creature cards, CR 107.3a, 602.2b; the cards
+   linked to its back face, CR 607.1b, 607.2a) and Olag, Ludevic's Hubris's "As this creature transforms into ~, it becomes a
+   copy of a creature card exiled with it, except its name is ~, it's 4/4, and it's a legendary blue and black Zombie in
+   addition to its other colors and types. Put a number of +1/+1 counters on ~ equal to the number of creature cards exiled
+   with it." (while it transforms, CR 712.20, the card chosen as it transforms when there are several, before anyone gets
+   priority, the transform's triggers seeing the copy, CR 701.27e; still a copy once the card leaves exile; with none left
+   in exile its own 4/4 self with no counters; rulings; CompiledCard.asTransformsCopyLinked). Browser tests click through
+   March's target and land type, and Ludevic's X, its two creature cards and Olag's copy. +2, 31,825 of 31,936 on this
+   stacked branch (round 434 #718); the compiled text of every other card is unchanged.
+   Out after round 435 (looked at, not done): Mimeoplasm, Revered One (its "{2}: ~ becomes a copy of target creature card
+   exiled with it, except it's 0/0 and has this ability": once it's a copy, the ability it keeps is no longer printed beside
+   the "As ~ enters, exile" it's linked to, CR 607.1a, 607.5, and the card has no rulings on whether it still finds those
+   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (Drain
+   Power's piece, in round B281's open pull request), and the lists after round 434 (still out, for their reasons). Known
+   gaps: bots cast March from Velis Vel only with two or more lands of one nonbasic land type and don't plan Ludevic's X
+   activation.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5883,7 +5905,7 @@ line blocks.
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
    Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
-   symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
+   symbols among exiled cards' costs); March from Velis Vel (done in round 435) (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
    life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
@@ -12622,7 +12644,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   before chapter III, isn't settled by its rulings), Spectral Searchlight (another player choosing a color in the middle of a
   mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (done in round B253) (sacrifices chosen in the
   middle of dealing damage), Words of Waste (done in round 383) and Fade Away (done in round B212) (see round 340's list) stay out.
-- Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
+- Out after round B181 (looked at, not done): Ludevic, Necrogenius (done in round 435) (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration (done in round B219) ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.
 - Out after round B180 (looked at, not done): Strax, Sontaran Nurse (done in round B211) (a reflexive trigger's target limited to the creatures
@@ -12939,7 +12961,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   transformed"), Wumpus Aberration (done in round B166), Roving Actuator, Kianne, Dean of Substance (done in round B189), Chong and Lily, Nomads (done in round B187), Soul Ransom (done in round B142) ("Only
   your opponents may activate this ability"), Grinning Totem (done in round B159), Failure // Comply (Comply's chosen name), Musician, Soul
   Sculptor ("until a player casts a creature spell"), Heat Wave (done in round B136) (a block cost per creature), Bane Alley Broker, Essence of
-  the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
+  the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius (done in round 435). Bot gap: bots don't use Carrionette from the graveyard.
 - Out after round B97 (looked at, not done): Wall of Caltrops (done in round B161), Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
   other legendary creatures" lands (done in round B161) (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns

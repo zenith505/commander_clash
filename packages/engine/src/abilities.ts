@@ -6157,6 +6157,13 @@ export type Effect =
    */
   | { type: "loyaltyAtInstantThisTurn"; subtype: string }
   /**
+   * March from Velis Vel (round 435): "Choose a nonbasic land type. Each land you control of that type becomes a copy of
+   * target creature you control until end of turn and gains haste until end of turn.": the type chosen as it resolves (CR
+   * 608.2d), among the land types that aren't basic (CR 205.3i); the lands are those of that type then (CR 611.2c), each a
+   * copy of `of`'s copiable values (CR 707.2, rulings) and with haste, both until end of turn.
+   */
+  | { type: "landTypeCopies"; of: ObjRef }
+  /**
    * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
    * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
    * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).
@@ -6526,7 +6533,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst" | /** Olag, Ludevic's Hubris (round 435): which creature card exiled with it it becomes a copy of as it transforms (CompiledCard.asTransformsCopyLinked). */ "transformCopy";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -8939,6 +8946,14 @@ export interface CompiledCard {
   asTransformsChoose?: "opponent";
   /** Curse of Leeches (round B267): "As this permanent transforms into ~, attach it to a player." (CR 712.20, 701.3a): a player it could enchant, chosen by its controller as it transforms (not targeted, rulings), asked before anyone gets priority. */
   asTransformsAttachPlayer?: true;
+  /**
+   * Olag, Ludevic's Hubris (round 435): "As this creature transforms into ~, it becomes a copy of a creature card exiled with
+   * it, except ... Put a number of +1/+1 counters on ~ equal to the number of creature cards exiled with it.": while it
+   * transforms (CR 712.20), a copy of one creature card its front face's cost exiled (linked across faces, CR 607.1b,
+   * 607.2a) as printed (CR 707.2), with the exceptions (CR 707.9), chosen by its controller (rulings); then that many
+   * +1/+1 counters. With none, neither (rulings).
+   */
+  asTransformsCopyLinked?: CopyExcept;
   triggers: TriggeredAbility[];
   activated: ActivatedAbility[];
   /** Mana abilities (CR 605), kept apart from the others since they don't use the stack. */

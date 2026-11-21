@@ -2,6 +2,7 @@ import { bindBound, cardPT, isLegalTarget, linkedCards, playerProtectedFrom, pla
 import { spellsGrimoireCounters } from "./effects/run-laneb189";
 import { reblockOptions } from "./effects/run-laneb256";
 import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
+import { NONBASIC_LAND_TYPE_LIST } from "./effects/run-round435";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type StaticCondition, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
@@ -2344,7 +2345,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: best !== undefined && size(best) > now ? best : "none" }];
     }
     // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
-    if (pend.kind === "chooseOption" && pend.what === "aegisCopy") {
+    // Olag, Ludevic's Hubris (round 435): likewise as it transforms.
+    if (pend.kind === "chooseOption" && (pend.what === "aegisCopy" || pend.what === "transformCopy")) {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
     }
@@ -4597,6 +4599,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Shimmer (round B226): lands of the chosen type phase out every other turn, ours too; cast only with a land type that
   // hurts opponents more than us.
   if (/^Each land of the chosen type has phasing\./m.test(d.oracleText) && phasingLandTypeScore(s, pid).best <= 0) return null;
+  // March from Velis Vel (round 435): only with two or more lands of one nonbasic land type to turn into copies.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "landTypeCopies") && !NONBASIC_LAND_TYPE_LIST.some((t) => ownLandsOfType(s, pid, t) >= 2)) return null;
   // Divine Intervention (round B259): a permanent that makes the game a draw, cast only when we're losing: 10 life or less
   // and less than every opponent.
   if (compileCard(d).triggers.some((tr) => allEffects(tr.body.effects).some((e) => e.type === "gameIsDraw"))) {
@@ -7099,6 +7103,8 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   // Illusionary Presence, Barbarian Guides, Traveler's Cloak, Giant Slug: landwalk of the chosen type, so the type most
   // opponents control a land of (a snow one for snow landwalk).
   if ((what === "landType" || what === "basicLandType") && /landwalk of the chosen type/.test(card?.oracleText ?? "")) return chooseLandwalkType(s, pid, options, /snow landwalk of the chosen type/.test(card?.oracleText ?? ""));
+  // March from Velis Vel (round 435): the nonbasic land type we control the most lands of.
+  if (what === "landType" && /^Choose a nonbasic land type\. Each land you control of that type becomes a copy/.test(card?.oracleText ?? "")) return [...options].sort((a, b) => ownLandsOfType(s, pid, b) - ownLandsOfType(s, pid, a))[0]!;
   // Roots of Life: life whenever a land of the chosen type an opponent controls becomes tapped, so the type most opponents
   // control a land of.
   if (what === "basicLandType" && /land of the chosen type an opponent controls/.test(card?.oracleText ?? "")) return chooseLandwalkType(s, pid, options, false);
@@ -8603,6 +8609,11 @@ function attackersForOpponent(s: GameState, pid: PlayerId, ap: PlayerId): Object
     if (ok(grown)) return grown;
   }
   return ids;
+}
+
+/** March from Velis Vel (round 435): how many lands of this land type we control. */
+function ownLandsOfType(s: GameState, pid: PlayerId, type: string): number {
+  return s.battlefield.filter((id) => { const o = obj(s, id); return controllerOf(s, o) === pid && objIsType(s, o, "Land") && characteristics(s, o).subtypes.includes(type); }).length;
 }
 
 /** Master Warcraft (round 379): attackers another player chose for us: a declaration that costs nothing, or we don't pay (CR 508.1h-i; rulings). */

@@ -31,6 +31,10 @@ export interface FaceDownPlay {
   ifControl?: TargetSpec;
   /** Apple of Eden, Isu Relic (round B269): "Until end of turn, whenever you play a land or cast a spell this way, its owner draws a card": this triggers, from the ability's source, as a card is played with this permission (GameObject.mayPlay.castTrigger, with `play` for lands). */
   onPlay?: AbilityBody;
+  /** Arvinox, the Mind Flail (round 439): "you may cast permanent spells from among them": with `castOnly`, only as a permanent spell (CR 110.4b; GameObject.mayPlay.permanentOnly). */
+  permanentOnly?: true;
+  /** Arvinox: "you may spend mana as though it were mana of any color to cast those spells" (CR 609.4b): any mana pays their colored symbols, {C} still only colorless (GameObject.mayPlay.anyColor). */
+  anyColor?: true;
 }
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
@@ -1521,7 +1525,7 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
  * `spell`: "When you spend this mana to cast a spell with mana value 6 or greater" (Gilanra), "a Dragon creature spell"
  * (Lapis Orb of Dragonkind), checked once the spell is on the stack; `commander`: "to cast your commander" (Study Hall).
  */
-export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color } | { spell: TargetSpec } | { commander: true };
+export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color } | { spell: TargetSpec } | { commander: true } | /** Sunken Palace (round 439): "to cast a spell or activate an ability", any spell or any activated ability, a mana ability too (CR 106.6, 602.1). */ { spellOrAbility: true };
 
 export type ObjRef =
   /** "The chosen creature" (Dauntless Bodyguard): the permanent chosen as the source entered (Chosen.object), while it's that object; the source as it last existed if it's gone (CR 608.2h). */
@@ -3149,7 +3153,7 @@ export type Effect =
    * any order (rulings).
    */
   | { type: "vault"; n: number; life: number }
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; /** "Its controller looks at ... and exiles it face down. They may play that card" (Gonti, Night Minister): who exiles, looks and may play; the ability's controller if unset. */ actor?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true; /** Ethereal Valkyrie: "It becomes foretold. Its foretell cost is its mana cost reduced by {2}.": foretold with that cost (CR 702.143), how much generic mana less. */ foretold?: number; /** "Look at the top two cards of target opponent's library. Exile one of them face down and put the other on the bottom of that library" (Siphon Insight): of the top `n`, the actor exiles the one they choose and the rest go to the bottom. */ pickOne?: true; /** With `pickOne` (Clone Shell): "then put the rest on the bottom of your library in any order", in the order the actor chooses. */ bottomAnyOrder?: true; /** With `pickOne` (Urianger Augurelt): "Look at the top card of your library. You may exile it face down.": the actor may exile none, and the cards not exiled stay where they are. */ optional?: true; /** With `look`, Grimoire Thief: "You may look at cards exiled with ~.": whoever controls the source later may look at them too, and keeps that once allowed (rulings). */ lookControllers?: true; /** With `pickOne`, Discover the Impossible: "and put the rest on the bottom of your library in a random order". */ bottomRandom?: true; /** The Dragon-Kami Reborn (round B283): "Exile one of them face down with a hatching counter on it": one counter of this kind on each card exiled. */ counter?: CounterKind; /** Discover the Impossible: "You may cast the exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card into your hand.": cast as this resolves only as a spell of one of these types with at most this mana value (rulings), otherwise into its owner's hand. */ castOrHand?: { types: string[]; maxMv: number } }
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard" | /** Arvinox, the Mind Flail (round 439): "exile the bottom card of each opponent's library face down". */ "bottom"; n?: Amount; look?: true; who?: PlayerRef; /** "Its controller looks at ... and exiles it face down. They may play that card" (Gonti, Night Minister): who exiles, looks and may play; the ability's controller if unset. */ actor?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true; /** Ethereal Valkyrie: "It becomes foretold. Its foretell cost is its mana cost reduced by {2}.": foretold with that cost (CR 702.143), how much generic mana less. */ foretold?: number; /** "Look at the top two cards of target opponent's library. Exile one of them face down and put the other on the bottom of that library" (Siphon Insight): of the top `n`, the actor exiles the one they choose and the rest go to the bottom. */ pickOne?: true; /** With `pickOne` (Clone Shell): "then put the rest on the bottom of your library in any order", in the order the actor chooses. */ bottomAnyOrder?: true; /** With `pickOne` (Urianger Augurelt): "Look at the top card of your library. You may exile it face down.": the actor may exile none, and the cards not exiled stay where they are. */ optional?: true; /** With `look`, Grimoire Thief: "You may look at cards exiled with ~.": whoever controls the source later may look at them too, and keeps that once allowed (rulings). */ lookControllers?: true; /** With `pickOne`, Discover the Impossible: "and put the rest on the bottom of your library in a random order". */ bottomRandom?: true; /** The Dragon-Kami Reborn (round B283): "Exile one of them face down with a hatching counter on it": one counter of this kind on each card exiled. */ counter?: CounterKind; /** Discover the Impossible: "You may cast the exiled card without paying its mana cost if it's an instant spell with mana value 2 or less. If you don't, put that card into your hand.": cast as this resolves only as a spell of one of these types with at most this mana value (rulings), otherwise into its owner's hand. */ castOrHand?: { types: string[]; maxMv: number } }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -5301,6 +5305,12 @@ export type Effect =
        * (rulings, CR 107.4).
        */
       costOf?: "attached";
+      /**
+       * Sunken Palace (round 439): "When you spend this mana to cast a spell or activate an ability, copy that spell or
+       * ability": a delayed triggered ability for each mana it adds, triggering when that mana is spent (CR 106.6, 603.7a),
+       * as ManaAbility.spentTrigger is for the mana abilities read there.
+       */
+      spentTrigger?: { body: AbilityBody } & SpentFor;
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
@@ -10809,8 +10819,10 @@ export interface CompiledCard {
    * With `playLinkedWhile`: "You may cast Dinosaur creature spells from among cards you own exiled with ~. If you cast a
    * spell this way, that creature enters with a finality counter on it." (Intrepid Paleontologist): only cards that match
    * `filter` and that its controller owns, the creature entering with `entersWith` (CR 614.1c).
+   * Dawnhand Dissident (round 438): "by removing three counters from among creatures you control in addition to paying
+   * their other costs": `costs`, additional costs of a spell cast with this permission (CR 601.2f-h), and no counter.
    */
-  playLinkedOnly?: { filter: TargetSpec; own: true; entersWith: { counter: CounterKind; n: number } };
+  playLinkedOnly?: { filter: TargetSpec; own: true; entersWith?: { counter: CounterKind; n: number }; costs?: AdditionalCost[] };
   /**
    * "During your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can
    * be spent to cast those spells" (Tinybones, Bauble Burglar): any such card, whoever exiled it (rulings), with the usual

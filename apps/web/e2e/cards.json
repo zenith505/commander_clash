@@ -1421,6 +1421,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8957f7c2-040c-4048-9f21-efa7c97682b7",
+  "name": "Ambush Viper",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake"
+  ],
+  "oracleText": "Flash\nDeathtouch",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Flash",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
   "name": "Aminatou's Augury",
   "manaCost": "{6}{U}{U}",
@@ -3087,6 +3120,39 @@
   "set": "ons",
   "releasedAt": "2002-10-07",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9abecd23-a2d9-43c7-8d01-f8afdc53026e",
+  "name": "Arvinox, the Mind Flail",
+  "manaCost": "{4}{B}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Legendary Enchantment Creature — Horror",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Horror"
+  ],
+  "oracleText": "Arvinox isn't a creature unless you control three or more permanents you don't own.\nAt the beginning of your end step, exile the bottom card of each opponent's library face down. For as long as those cards remain exiled, you may look at them, you may cast permanent spells from among them, and you may spend mana as though it were mana of any color to cast those spells.",
+  "power": "9",
+  "toughness": "9",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2022-03-03",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7691,6 +7757,42 @@
   "commanderLegal": "legal",
   "set": "mir",
   "releasedAt": "1996-10-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "eb37496e-374f-41b9-bd52-f52f37bdac31",
+  "name": "Calamity, Galloping Inferno",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Horse Mount",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Horse",
+   "Mount"
+  ],
+  "oracleText": "Haste\nWhenever Calamity attacks while saddled, choose a nonlegendary creature that saddled it this turn and create a tapped and attacking token that's a copy of it. Sacrifice that token at the beginning of the next end step. Repeat this process once.\nSaddle 1",
+  "power": "4",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Saddle",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -12375,6 +12477,40 @@
   "commanderLegal": "legal",
   "set": "c15",
   "releasedAt": "2015-11-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2cabf7a4-17af-45c7-b314-a84f5dc0d070",
+  "name": "Dawnhand Dissident",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Elf Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warlock"
+  ],
+  "oracleText": "{T}, Blight 1: Surveil 1.\n{T}, Blight 2: Exile target card from a graveyard.\nDuring your turn, you may cast creature spells from among cards you own exiled with this creature by removing three counters from among creatures you control in addition to paying their other costs.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Blight",
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -17608,6 +17744,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b9c1ca24-5696-4777-8465-13a8f78e4fb5",
+  "name": "Falco Spara, Pactweaver",
+  "manaCost": "{1}{G}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Bird Demon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Demon"
+  ],
+  "oracleText": "Flying, trample\nFalco Spara enters with a shield counter on it.\nYou may look at the top card of your library any time.\nYou may cast spells from the top of your library by removing a counter from a creature you control in addition to paying their other costs.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "38c5c952-8153-4d98-89b5-a75260383345",
   "name": "False Orders",
   "manaCost": "{R}",
@@ -19046,6 +19222,35 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "118da256-d1ea-44e8-9026-317e49694d29",
+  "name": "Forger's Foundry",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {U}. When you spend this mana to cast an instant or sorcery spell with mana value 3 or less, you may exile that spell instead of putting it into its owner's graveyard as it resolves.\n{3}{U}{U}, {T}: You may cast any number of spells from among cards exiled with this artifact without paying their mana costs. Activate only as a sorcery.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "otc",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -48541,6 +48746,35 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c098c507-5154-423a-a70b-f6dfd4959cf6",
+  "name": "Sunken Palace",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Cave",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Cave"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {U}.\n{1}{U}, {T}, Exile seven cards from your graveyard: Add {U}. When you spend this mana to cast a spell or activate an ability, copy that spell or ability. You may choose new targets for the copy. (Mana abilities can't be copied.)",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

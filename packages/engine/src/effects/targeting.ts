@@ -133,12 +133,25 @@ export function hasNoAbilities(s: GameState, o: GameObject, c: Characteristics):
   return !d.faces?.length && d.oracleText.replace(/\([^)]*\)/g, "").trim() === "";
 }
 
+/**
+ * Nihiloor (round B288): the power of that permanent while it's still that object on the battlefield, else as it last
+ * existed there (s.lastKnown, CR 608.2h), else the power it had when it was noted.
+ */
+export function powerOfOrLast(s: GameState, r: { id: ObjectId; zc: number; power: number }): number {
+  const t = s.objects[r.id];
+  if (t?.zone === "battlefield" && (t.zoneChanges ?? 0) === r.zc) return power(s, t);
+  const lk = s.lastKnown?.[r.id];
+  return lk && lk.zc === r.zc ? lk.power : r.power;
+}
+
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
   if (o.zone !== "battlefield") return false;
   // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
   // the source (see pickOptions, isLegalTarget).
   if (spec.bound || spec.saddledSource || spec.crewedSource || spec.drafted || spec.targetsSource) return false;
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
+  // Nihiloor (round B288): its power at most the tapped creature's, that one as it is now or as it last existed (CR 608.2h).
+  if (spec.powerAtMostOfObject && !(power(s, o) <= powerOfOrLast(s, spec.powerAtMostOfObject))) return false;
   if (spec.notId !== undefined && o.id === spec.notId) return false;
   // Dire Blunderbuss's granted "sacrifice an artifact other than Dire Blunderbuss": not the permanent that gave it, while
   // it's that object (bound as the layers give the ability, grants.ts; CR 400.7).
@@ -593,7 +606,7 @@ function targetOfAbilityFrom(s: GameState, stackId: string, from: NonNullable<Ta
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
-  if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
+  if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined || spec.powerAtMostOfObject) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
   // Fang-Druid Summoner: "a creature card with no abilities": nothing in its rules text but reminder text (CR 113.1, 207.2a).
   // Dryad Arbor: a Forest has its intrinsic mana ability (CR 305.6).
   if (spec.noAbilities && (d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;

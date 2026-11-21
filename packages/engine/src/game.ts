@@ -2804,8 +2804,23 @@ let lifePaidTally = 0;
  * A player pays life (CR 119.4): that much life is lost, and "whenever you pay life" (Font of Agonies) sees the payment.
  * Only payments use this, not life lost without the word "pay" (rulings on Font of Agonies).
  */
-export function payLife(s: GameState, pid: PlayerId, n: number) {
+export function payLife(s: GameState, pid: PlayerId, n: number, /** A card entering the battlefield from that library as this is paid (CR 614.13c): left out of it. */ entering?: ObjectId): "exiled" | void {
   if (n <= 0) return;
+  // Ashiok, Wicked Manipulator (round B288): "If you would pay life while your library has at least that many cards in it,
+  // exile that many cards from the top of your library instead." A replacement (CR 614.1a): no life is paid or lost, so
+  // nothing "whenever you pay life" sees it (CR 614.6), and the cards go at once. It isn't optional and the payment isn't
+  // split (rulings); with fewer cards, life is paid as usual. Whether the life can be paid was already checked against the
+  // life total (rulings, CR 119.4). A card entering from the library as this is paid has left it (CR 614.13c).
+  const p = player(s, pid);
+  const ashiok = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).payLifeExiles);
+  const lib = entering ? p.library.filter((id) => id !== entering) : p.library;
+  if (ashiok && lib.length >= n) {
+    const ids = lib.slice(0, n);
+    for (const id of ids) moveObject(s, id, "exile");
+    log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library instead of paying ${n} life (${nameOf(s, ashiok)}).`);
+    invalidateCharacteristics(s);
+    return "exiled";
+  }
   lifePaidTally += n;
   loseLife(s, pid, n);
   fireEvent(s, { type: "lifePaid", player: pid, amount: n });
@@ -6934,8 +6949,8 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   if (o.zone !== "hand" && !(s.turnLog?.landPlayedNotFromHand ?? []).includes(p.id)) ((s.turnLog ??= {}).landPlayedNotFromHand ??= []).push(p.id);
   if (o.zone === "exile") notePlayedFromExile(s, p.id);
   if (untapped && choice?.kind === "payLife") {
-    payLife(s, p.id, choice.n);
-    log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
+    const exiled = payLife(s, p.id, choice.n, id);
+    log(s, exiled ? `${d.name} enters untapped.` : `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
   } else if (untapped && choice?.kind === "reveal" && !controlsForEntry(s, p.id, choice, id)) {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);

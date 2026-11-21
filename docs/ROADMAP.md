@@ -1,7 +1,7 @@
 # Roadmap
 
-31,815 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,946 of
+31,821 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,948 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4475,6 +4475,67 @@ line blocks.
    copy of something else it loses it (the escape's layer 6 effect would keep it, CR 613.1f), and escaping with an escape
    another permanent gives it (Underworld Breach) links no cards to it, so nothing can be cast; bots pick for Hama the dearest
    card their lands, artifacts and creatures could pay for, and activate The Face of Boe only with a suspend card in hand.
+   Round 432 went on down the "Out after round N" lists and `npm run popular`, most played first, to a face-down card
+   exiled from your hand that a transformed permanent casts for free, a card exiled with a discovery counter you may play
+   this turn, and a clone of a Doctor milled off your library this turn. Jacob Hauken, Inspector's "{T}: Draw a card, then
+   exile a card from your hand face down. You may look at that card for as long as it remains exiled. You may pay
+   {4}{U}{U}. If you do, transform Jacob Hauken." (the payment and transform part of the resolution, after the exile,
+   rulings; face down, seen by you, CR 406.3) and Hauken's Insight's "Once during each of your turns, you may play a land
+   or cast a spell from among the cards exiled with this permanent without paying its mana cost." (the cards both faces
+   exiled, the same object, rulings, CR 607.2a; face-down ones too; once for each Hauken's Insight during your turns; a land
+   as the turn's land play and a spell with the usual timing, rulings, CR 305.1; free, CR 118.9; CompiledCard.linkedFreeOnce
+   `hauken`, game.ts linkedLandOnceSource). Lara Croft, Tomb Raider's "Whenever Lara Croft attacks, exile up to one target
+   legendary artifact card or legendary land card from a graveyard and put a discovery counter on it. You may play a card
+   from exile with a discovery counter on it this turn." (the counter on the card in exile, CR 122.1; one card for each
+   time it resolves, any face-up card in exile with a discovery counter, whoever owns it and whatever exiled it, a land as
+   the turn's land play, a spell with the usual timing and costs, CR 305.1, 601.3; the permission lasts if Lara leaves, CR
+   611.2a; Effect playCounteredThisTurn, TurnLog.playCounteredGrants). The Fourteenth Doctor's "When you cast this spell,
+   reveal the top fourteen cards of your library. Put all Doctor cards revealed this way into your graveyard and the rest on
+   the bottom of your library in a random order." and "You may have The Fourteenth Doctor enter as a copy of a Doctor card
+   in your graveyard that was put there from your library this turn. If you do, it gains haste until end of turn." (the
+   cast trigger resolves before the spell; a copy replacement, CR 707.5, 614.1c, of a card in your own graveyard by its
+   printed characteristics, CR 707.2, put there from your library this turn, GameObject.fromLibraryTurn; haste only as a
+   copy; CompiledCard.entersAsCopy `hasteIfCopied`). Browser tests click through each, Lara's twice (Ana's Mox Amber cast
+   from her exile, your Gaea's Cradle played as your land). +3, 31,812 of 31,936 on this stacked branch (round 431 #712);
+   the compiled text of every other card is unchanged.
+   Out after round 432 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
+   430), Nihiloor, Drain Power and Ertai's Meddling (still out, as after round 431), Nick Fury, Agent of S.H.I.E.L.D. (still
+   out: "If it's a double-faced card, you may transform it" for a card put onto the battlefield has no rulings, and whether
+   it enters transformed or transforms after entering, with the front face's enters triggers, isn't settled), the cards
+   rounds 425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out,
+   for the reasons in their earlier lists). Judgment calls: Lara Croft and The Fourteenth Doctor have no rulings; Lara's
+   "a card" is one card for each resolution, any card in exile with a discovery counter (another Lara's too), and The
+   Fourteenth Doctor's "Doctor card" is any card with the Doctor subtype. Known gaps: a card that both Lara's permission and
+   Evelyn, the Covetous's once-each-turn play could play uses up Lara's, even when Evelyn's any-color mana paid for it;
+   bots choose the copy for The Fourteenth Doctor as they would for any clone from a graveyard.
+   Round 433 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card a Saga's
+   chapter I exiled face down and its later chapters, a token copy with a name of its own, and loyalty abilities at instant
+   speed for one turn. The Creation of Avacyn's "I — Search your library for a card, exile it face down, then shuffle.",
+   "II — Turn the exiled card face up. If it's a creature card, you lose life equal to its mana value." and "III — You may
+   put the exiled card onto the battlefield if it's a creature card. If you don't put it onto the battlefield, put it into
+   its owner's hand." (the cards its own chapter I exiled, CR 607.2a, oracle/round433.ts linkRound433; with two or more,
+   their total mana value if one is a creature card, and all its permanent cards or none, rulings; a card still face down
+   at chapter III has no characteristics, CR 406.3a, so it goes to your hand; Effects linkedFaceUpLoseLife,
+   linkedCreatureOrHand). The Eleventh Hour's "III — Create a token that's a copy of target creature, except it's a legendary
+   Alien named Prisoner Zero." (legendary, its other supertypes kept as Benthic Anomaly's rulings say, its card types kept,
+   Alien instead of every subtype, Vehicle too, rulings; CopyExcept.allSubtypes; a copy with a name of its own now reads the
+   copied text's references to itself by name as itself, CR 201.5, which Mishra's Warform gets too, while "named <its
+   name>" stays a name). Jace's Machinations' "Until end of turn, you may activate loyalty abilities of Jace planeswalkers
+   you control on any player's turn any time you could cast an instant." (its controller's Jace planeswalkers as they are
+   when activated, the Empower Jace token too; still one loyalty ability of each a turn, CR 606.3, rulings; TurnLog
+   loyaltyAtInstantSpeed). Browser tests click through Avacyn's search and its chapter III Yes and No, and The Eleventh
+   Hour's target. +3, 31,815 of 31,936 on this stacked branch (round 432 #714), 31,821 with main 7f7b8f6 (B278-B280) merged in;
+   the compiled text of every other card is unchanged.
+   Out after round 433 (looked at, not done): Captain America, First Avenger (its "Throw" damage is divided as targets are
+   chosen, CR 601.2d, before the cost that unattaches the Equipment fixes the amount, CR 601.2h, and it has no rulings),
+   Pulmonic Sliver (still out: an optional "put it on top of its owner's library instead" asked in the middle of any move
+   to a graveyard, which zone moves can't pause for), Filigree Vector (done in round B280), Battlefield Thaumaturge, Nihiloor,
+   Drain Power, Ertai's Meddling and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds
+   425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the
+   reasons in their earlier lists). Judgment calls: The Eleventh Hour's token keeps snow and other supertypes (no ruling
+   says so for it); Jace's Machinations has rulings only on Empower Jace and the once-a-turn limit. Known gaps: bots don't
+   plan to activate a Jace's loyalty abilities on other players' turns; a copy's "named <its name>" ability that only reads
+   with "~" (Biovisionary's) isn't kept by a renamed copy.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

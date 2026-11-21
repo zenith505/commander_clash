@@ -6,6 +6,7 @@ import { defOf, lockIfRoom, ownDefOf, prototypedDef, realDefOf } from "./cards";
 import { unroomed } from "./faces";
 import { subtypeSet } from "./keywords";
 import { invalidateCharacteristics } from "./layers";
+import { normalizeSelf } from "./oracle";
 import type { CardDef, CardFace, Color, CopyEffect, GameObject, GameState } from "./types";
 
 /**
@@ -37,6 +38,8 @@ export interface CopyExcept {
    */
   setTypes?: string[];
   setSubtypes?: string[];
+  /** With `setSubtypes`: "except it's a legendary Alien named Prisoner Zero" (The Eleventh Hour, round 433): those instead of every subtype it had, of any kind (rulings: a Vehicle loses Vehicle). */
+  allSubtypes?: true;
   /** "In addition to its other types". */
   addTypes?: string[];
   addSubtypes?: string[];
@@ -118,7 +121,7 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
   const baseTypes = except.setTypes ?? base.types;
   // Subtypes of card types it no longer has go, and set subtypes replace those of the same kind (CR 205.1a).
   const sets = new Set((except.setSubtypes ?? []).map(subtypeSet));
-  const baseSubtypes = [...base.subtypes.filter((st) => { const k = subtypeSet(st); return !sets.has(k) && (!except.setTypes || (k !== null && k !== "Spell" && baseTypes.includes(k))); }), ...(except.setSubtypes ?? [])];
+  const baseSubtypes = [...base.subtypes.filter((st) => { const k = subtypeSet(st); return !except.allSubtypes && !sets.has(k) && (!except.setTypes || (k !== null && k !== "Spell" && baseTypes.includes(k))); }), ...(except.setSubtypes ?? [])];
   const types = [...baseTypes, ...(except.addTypes ?? []).filter((t) => !baseTypes.includes(t))];
   const subtypes = [...baseSubtypes, ...(except.addSubtypes ?? []).filter((t) => !baseSubtypes.includes(t))];
   const keywords = [...(base.keywords ?? []), ...(except.keywords ?? []).filter((k) => !base.keywords?.includes(k))];
@@ -129,7 +132,15 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
   // Ancient Lore is still 1/1).
   const esc = base.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const ptCda = new RegExp(`^(?:${esc}|This creature|This Vehicle)'s (?:power|toughness)\\b[^.]* (?:is|are each) equal to `);
-  const own = base.oracleText.split("\n").filter((l) => !(except.colors && / is all colors\./.test(l)) && !(except.pt && ptCda.test(l))).join("\n");
+  const own0 = base.oracleText.split("\n").filter((l) => !(except.colors && / is all colors\./.test(l)) && !(except.pt && ptCda.test(l))).join("\n");
+  // A name of its own (The Eleventh Hour's Prisoner Zero, Mishra's Warform): where the copied text refers to the object by
+  // its name, it means the copy itself, under its new name (CR 201.5); "named <its name>" is a name, not the object, and
+  // stays as written (Biovisionary's "creatures named Biovisionary").
+  const fullName = base.name.split(" // ")[0]!;
+  const renamed = except.name && except.name !== "~" && except.name !== base.name && own0;
+  const own = renamed
+    ? normalizeSelf({ ...(base as unknown as CardDef), oracleText: own0.replaceAll(`named ${fullName}`, "named \u0004") }).replaceAll("~", except.name!).replaceAll("\u0004", fullName)
+    : own0;
   const lacks = !except.unlessHas || (!(base.keywords ?? []).includes(except.unlessHas) && !new RegExp(`^${except.unlessHas}\\b`, "mi").test(base.oracleText));
   const text = [own, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(lacks ? (except.text ?? []) : []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
   const typeLine = `${[...supertypes, ...types].join(" ")}${subtypes.length ? ` — ${subtypes.join(" ")}` : ""}`;

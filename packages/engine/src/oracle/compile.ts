@@ -172,6 +172,7 @@ import { round405Line } from "./round405";
 import { round406Line } from "./round406";
 import { round407Line } from "./round407";
 import { linkTibaltExiles, round408Line } from "./round408";
+import { linkRound433 } from "./round433";
 import { round409Line } from "./round409";
 import { round410Line } from "./round410";
 import { round411Line } from "./round411";
@@ -195,6 +196,7 @@ import { round428Line } from "./round428";
 import { round429Line } from "./round429";
 import { round430Line } from "./round430";
 import { round431Line } from "./round431";
+import { round432Line } from "./round432";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1080,6 +1082,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 432: oracle/round432.ts.
+    if (round432Line(line, raw, out, isSpell)) continue;
     // Round 431: oracle/round431.ts.
     if (round431Line(line, raw, out, isSpell)) continue;
     // Round 430: oracle/round430.ts.
@@ -7949,6 +7953,8 @@ const castsTheExiled = new WeakSet<CompiledCard>();
 function linkExile(out: CompiledCard) {
   // Tibalt, Cosmic Impostor (round 408): its emblem plays the cards all its exile abilities exiled (oracle/round408.ts).
   linkTibaltExiles(out);
+  // The Creation of Avacyn (round 433): its chapters' "the exiled card" (oracle/round433.ts).
+  linkRound433(out);
   // Kylox's Voltstrider (round 401): "cards exiled with it" are those its one "Collect evidence N:" cost exiled (CR 607.2a),
   // with no other exile instruction on the card.
   const bodies0 = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
@@ -8149,7 +8155,14 @@ function linkExile(out: CompiledCard) {
   }
   // Maralen, Fae Ascendant (round 406): "cards exiled with ~ this turn" are those its one exile instruction (its enters
   // trigger's "exile the top two cards of target opponent's library") exiled this turn (CR 607.2a).
-  if (out.linkedFreeOnce) {
+  // Hauken's Insight (round 432): its one exile instruction exiles face down, linked to the permanent as it is (run-zones
+  // exileFaceDown, CR 607.2a), as its front face's does: no other exile instruction may share the link.
+  if (out.linkedFreeOnce?.hauken) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const faceDown = all.filter((e) => e.type === "exileFaceDown");
+    const others = all.some((e) => ["exile", "exileTop", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || faceDown.length !== 1 || out.exileInsteadOfDying) out.unsupported.push("(casts from cards exiled with it that it can't link to one exile ability)");
+  } else if (out.linkedFreeOnce) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && !e.putAll);
     const others = all.some((e) => ["exile", "exileGraveyard", "impulse", "takeFromHand", "hideaway", "exileFaceDown", "exileHand", "castFromAmong"].includes(e.type) || (e.type === "search" && e.dest.zone === "exile") || (e.type === "chooseFromGraveyard" && e.dest === "exile") || (e.type === "discard" && !!e.exile));

@@ -359,6 +359,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const big = here ? objIsType(s, tok!, "Creature") && power(s, tok!) >= 3 : (s.lastKnown?.[sub?.id ?? ""]?.power ?? 0) >= 3;
       return [{ type: "chooseMay", player: pid, yes: to === pid || !big }];
     }
+    // The Creation of Avacyn (round 433): the creature (and any other permanent cards with it) onto the battlefield.
+    if (pend.kind === "chooseMay" && theirMay?.type === "linkedCreatureOrHand") return [{ type: "chooseMay", player: pid, yes: true }];
     if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
       const asked = s.resolving!.scratch?.mayExile?.queue[0];
       const o = asked ? s.objects[asked.id] : undefined;

@@ -337,16 +337,6 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = gone.filter((id) => controllerOf(s, obj(s, id)) !== pid).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       return [{ type: "chooseMay", player: pid, yes: player(s, pid).life - 13 >= 7 && theirs >= ours + 4 }];
     }
-    // Pygmy Hippo (round 437): drain the defending player only when their lands and pool would give us 3 or more {C} and we
-    // hold a nonland card of mana value 2 or more to spend it on in our postcombat main phase; otherwise the combat damage.
-    const hippo = (e: Effect | undefined) => e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "drainPower" && !!e.effects[0]!.lose;
-    if (pend.kind === "chooseMay" && s.resolving && hippo(s.resolving.body.effects[s.resolving.next])) {
-      const dp = s.resolving.item.event?.player;
-      const lands = dp === undefined ? 0 : s.battlefield.reduce((n, id) => { const o = obj(s, id); return controllerOf(s, o) !== dp || !objIsType(s, o, "Land") ? n : n + Math.max(0, ...drainOptions(s, dp, o).map((x) => x.adds.length)); }, 0);
-      const pool = dp === undefined ? 0 : Object.values(player(s, dp).manaPool).reduce((a, n) => a + n, 0);
-      const spend = player(s, pid).hand.some((id) => !isType(defOf(s, obj(s, id)), "Land") && (defOf(s, obj(s, id)).cmc ?? 0) >= 2);
-      return [{ type: "chooseMay", player: pid, yes: lands + pool >= 3 && spend }];
-    }
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];

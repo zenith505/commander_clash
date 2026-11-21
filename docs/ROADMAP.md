@@ -4583,7 +4583,7 @@ line blocks.
    Out after round 435 (looked at, not done): Mimeoplasm, Revered One (its "{2}: ~ becomes a copy of target creature card
    exiled with it, except it's 0/0 and has this ability": once it's a copy, the ability it keeps is no longer printed beside
    the "As ~ enters, exile" it's linked to, CR 607.1a, 607.5, and the card has no rulings on whether it still finds those
-   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (done in round 437) (it needs Drain
+   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (it needs Drain
    Power's piece from round B281, merged after this round began), and the lists after round 434 (still out, for their reasons). Known
    gaps: bots cast March from Velis Vel only with two or more lands of one nonbasic land type and don't plan Ludevic's X
    activation.
@@ -4610,30 +4610,22 @@ line blocks.
    exile is chosen, even with no other creature to exile (CR 608.2c). Known gaps: bots always put all three lore counters
    on an Esper Terra Saga token; they keep only their own Doctors and take the exile only when the opponents lose at least
    4 more power than they do and 13 damage leaves them 7 life or more.
-   Round 437 went on down the "Out after round N" lists and `npm run popular`, most played first, to Pygmy Hippo (with round
-   B281's Drain Power piece now on main) and two cards with only one line left out. Pygmy Hippo's "Whenever ~ attacks and
-   isn't blocked, you may have defending player activate a mana ability of each land they control and lose all unspent
-   mana. If you do, ~ assigns no combat damage this turn and at the beginning of your next main phase this turn, you add an
-   amount of {C} equal to the amount of mana that player lost this way." (your choice; then that player's choice of ability
-   and mana for each of their lands, as Drain Power's, CR 605.3a; their whole pool lost, mana already there too, CR 106.4,
-   which Yurlok of Scorch Thrash sees; "if you do" holds with nothing lost, CR 608.2c; the amount remembered by the delayed
-   trigger, CR 603.7c, 608.2h; no combat damage isn't prevention, CR 510.1; Effect drainPower `who`, `lose`). The
-   Ur-Sphinx's "Whenever one or more Sphinxes you control attack, each player mills that many cards. For each player, you
-   may cast a card that player milled this way without paying its mana cost." (the cards still in their owners' graveyards
-   as those objects, CR 400.7, one of each player's, cast while it resolves, timing ignored, X 0, rulings, CR 608.2g;
-   castFromAmong `milledOnly`). Nathan Drake, Treasure Hunter's "You may spend mana as though it were mana of any color to
-   cast spells you don't own or to activate abilities of permanents you control but don't own." (the spell's owner as it's
-   cast, a permanent's owner, CR 108.3, 609.4b; colored symbols only; CompiledCard.spendAnyColorNotOwned) and "Whenever ~
-   attacks, exile the top card of each player's library. You may cast a spell from among those cards." (one spell, cast while
-   it resolves with its costs paid, CR 608.2g, as Sanwell's; the rest stay exiled). Browser tests click through Pygmy
-   Hippo's Yes, The Ur-Sphinx's milled-cards picker and Nathan Drake's paid cast of an opponent's Lightning Bolt with an
-   Island. +3, 31,834 of 31,936 on this stacked branch (round 436 #722); the compiled text of every other card and face is
-   unchanged.
-   Out after round 437 (looked at, not done): the lists after round 436 (still out, for their reasons). Judgment calls:
-   Nathan Drake has no rulings: its cast is made while the trigger resolves (no duration is given, as Sanwell's rulings
-   read the same words), and a spell cast that way that its player can't pay for is offered but refused as it's cast. Known
-   gaps: bots drain with Pygmy Hippo only when it would give them 3 or more {C} and they hold a nonland card of mana value 2
-   or more; the defending player's lands are tapped for the least mana (Drain Power's rule).
+   Round 437 went on down the "Out after round N" lists and `npm run popular`, most played first, to two cards with only one
+   line left out. The Ur-Sphinx's "Whenever one or more Sphinxes you control attack, each player mills that many cards. For
+   each player, you may cast a card that player milled this way without paying its mana cost." (the cards still in their
+   owners' graveyards as those objects, CR 400.7, one of each player's, cast while it resolves, timing ignored, X 0,
+   rulings, CR 608.2g; castFromAmong `milledOnly`). Nathan Drake, Treasure Hunter's "You may spend mana as though it were
+   mana of any color to cast spells you don't own or to activate abilities of permanents you control but don't own." (the
+   spell's owner as it's cast, a permanent's owner, CR 108.3, 609.4b; colored symbols only; CompiledCard
+   spendAnyColorNotOwned) and "Whenever ~ attacks, exile the top card of each player's library. You may cast a spell from
+   among those cards." (one spell, cast while it resolves with its costs paid, CR 608.2g, as Sanwell's; the rest stay
+   exiled). Browser tests click through The Ur-Sphinx's milled-cards picker and Nathan Drake's paid cast of an opponent's
+   Lightning Bolt with an Island. +2, 31,833 of 31,936 on this stacked branch (round 436 #722); the compiled text of every
+   other card and face is unchanged.
+   Out after round 437 (looked at, not done): Pygmy Hippo (done in round B285's pushed branch; this round's version was
+   dropped), and the lists after round 436 (still out, for their reasons). Judgment calls: Nathan Drake has no rulings: its
+   cast is made while the trigger resolves (no duration is given, as Sanwell's rulings read the same words), and a spell
+   cast that way that its player can't pay for is offered but can't be cast.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

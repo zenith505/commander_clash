@@ -4356,7 +4356,7 @@ export type Effect =
    * Drain Power (round B281): "Target player activates a mana ability of each land they control. Then that player loses all
    * unspent mana and you add the mana lost this way." (CR 106.13; effects/run-laneb281.ts). The target is the spell's first.
    */
-  | { type: "drainPower"; /** Pygmy Hippo (round 437): this player, not the target. */ who?: PlayerRef; /** Pygmy Hippo: "and lose all unspent mana": their whole pool is lost, not moved, its amount noted (ResolvingInfo.notedAmount). */ lose?: true }
+  | { type: "drainPower" }
   /**
    * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
    * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the

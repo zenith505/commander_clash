@@ -1,28 +1,8 @@
-// Round 437: Pygmy Hippo (attack unblocked, Yes to drain the defending player's lands, no combat damage, {C}{C} in your
-// postcombat main phase), The Ur-Sphinx (cast one card each player milled, from the milled-cards picker) and Nathan Drake,
-// Treasure Hunter (an opponent's exiled Lightning Bolt cast with an Island's blue mana as though it were red).
+// Round 437: The Ur-Sphinx (cast one card each player milled, from the milled-cards picker) and Nathan Drake, Treasure
+// Hunter (an opponent's exiled Lightning Bolt cast with an Island's blue mana as though it were red).
 import { expect, test } from "@playwright/test";
 import { idsOf, one, open, pageErrors, scene } from "./scene";
 import { attack, clickPlayer, controls, resolveUntil } from "./ui";
-
-test("Pygmy Hippo: unblocked, Yes drains Ana's Forest and Island, it deals no combat damage, and you get {C}{C} after combat", async ({ page }) => {
-  const s = scene({ board: ["Plains", "Pygmy Hippo"] }, [{ board: ["Forest", "Island"] }]);
-  const hippo = one(s, "Pygmy Hippo");
-  const theirs = [...idsOf(s, "Forest", "battlefield", 1), ...idsOf(s, "Island", "battlefield", 1)];
-  const life = s.players[1]!.life;
-  await open(page, s);
-  await resolveUntil(page, (st) => st.pending?.kind === "declareAttackers" && st.pending.player === 0);
-  await attack(page, [[hippo, 1]]);
-  const st = await resolveUntil(page, (x) => x.pending?.kind === "chooseMay" && x.pending.player === 0);
-  expect(st.players[1]!.life).toBe(life);
-  const bar = controls(page);
-  await expect(bar).toContainText("defending player activate a mana ability of each land they control and lose all unspent mana");
-  await bar.getByRole("button", { name: "Yes" }).click();
-  const after = await resolveUntil(page, (x) => x.step === "main2" && x.activePlayer === 0 && x.stack.length === 0 && x.triggerQueue.length === 0 && x.players[0]!.manaPool.C === 2);
-  expect(theirs.map((id) => after.objects[id]!.tapped)).toEqual([true, true]);
-  expect(after.players[1]!.life).toBe(life);
-  expect(pageErrors(page)).toEqual([]);
-});
 
 test("The Ur-Sphinx: each player mills one; cast your Divination and Ana's Lightning Bolt for free", async ({ page }) => {
   const s = scene({ board: ["Plains", "The Ur-Sphinx"], library: ["Divination"] }, [{ library: ["Lightning Bolt"] }]);

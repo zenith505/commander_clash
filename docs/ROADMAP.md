@@ -11820,6 +11820,32 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B289 (least played first, the two cards round B288 named next, neither in Lane A's rounds 439-440): Breathstealer's
+  Crypt's "If a player would draw a card, instead they draw a card and reveal it. If it's a creature card, that player
+  discards it unless they pay 3 life." (a replacement of every player's draws, CR 614.1a, mandatory, ordered among the others
+  by the drawing player, CR 616.1, drawReplacementChoices "breath"; the draw it makes is a new one this Crypt doesn't replace
+  again, CR 614.5, but another Crypt, an Archive or dredge can; only a draw made as itself reveals its card, so a Crypt draw
+  another replacement replaced, even by another draw, reveals nothing, as Sindbad's rulings say, game.ts BREATH_REVEAL; the
+  card revealed, CR 701.20a, and a creature card, as it is in the hand, discarded unless its player pays 3 life, asked only
+  if they can, CR 119.4; the discard is the Crypt controller's doing, so an opponent's Crypt can't make a Tamiyo, Collector of
+  Tales player discard, and Library of Leng applies; game.ts breathReveal, the pay question a chooseMay `breathstealer`).
+  Parnesse, the Subtle Brush's "Whenever you or a permanent you control becomes the target of a spell or ability an opponent
+  controls, counter that spell or ability unless that player pays 4 life." (Unsettled Mariner's trigger, once for you and
+  once for each permanent of yours targeted, rulings on Mariner, Leovold and Rayne; 4 life from the spell's controller) and
+  "Whenever you copy a spell, up to one target opponent may also copy that spell. They may choose new targets for that
+  copy." (The Twelfth Doctor's "copy a spell" event, a copy put on the stack under your control, CR 707.10, once for each
+  copy; "that spell" the spell copied, not the copy, TriggerEventInfo.copied from the cast event's `copyOf`; the opponent
+  targeted, none too, decides, and controls the copy and picks its new targets, CR 707.10c, copySpell `copied` and
+  `byPlayer`; their Twinning Staff adds copies for them). Bots pay 3 life for a creature card costing 3 or more while they
+  keep 10 life, and copy a spell for Parnesse unless a copy of it under their control is already on the stack. Browser
+  tests click through the Crypt's pay and don't-pay questions, the 4 life for a Bolt at a Parnesse player's creature, and
+  Parnesse's target pick after a replicated Bolt, the bot copying it. +2, 31,848 of 31,936 on B288's branch. The compiled
+  text of every other card is unchanged.
+- Out after round B289 (looked at, not done): the lists after round B288 stay out. Judgment calls: with no Parnesse rulings,
+  "copy that spell" is made as the engine's other "copy that spell" triggers make it (from the spell as it was cast if it has
+  left the stack); a copy put onto the stack as a copy of a countered spell (Minamo's Meddling) counts as copying that spell.
+  Known gaps: with two Crypts controlled by different players, the discard counts as the first one's controller's doing;
+  bots never give an opponent Parnesse's copy (they pick no target), and copy only once each spell.
 - Round B288 (least played first, the two cards round B287 named next, neither in Lane A's rounds 438-439): Nihiloor's
   "When ~ enters, for each opponent, tap up to one untapped creature you control. When you do, gain control of target
   creature that player controls with power less than or equal to the tapped creature's power for as long as you control ~."

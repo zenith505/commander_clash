@@ -6977,6 +6977,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c9a9550c-e6bb-4fe3-930f-6266024dbead",
+  "name": "Breathstealer's Crypt",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a player would draw a card, instead they draw a card and reveal it. If it's a creature card, that player discards it unless they pay 3 life.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "20283c4a-f1f0-42f0-bc08-6da87474426b",
   "name": "Breeding Pool",
   "manaCost": "",
@@ -37393,6 +37421,43 @@
   "set": "otp",
   "releasedAt": "2024-04-19",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c6040e8d-dac3-4bed-8d1d-d7d44aa10c86",
+  "name": "Parnesse, the Subtle Brush",
+  "manaCost": "{2}{U}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Vampire Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Wizard"
+  ],
+  "oracleText": "Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls, counter that spell or ability unless that player pays 4 life.\nWhenever you copy a spell, up to one target opponent may also copy that spell. They may choose new targets for that copy.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

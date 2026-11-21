@@ -110,7 +110,7 @@ export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId
   if (_byControl) delete rest.kicked;
   s.stack.push({ ...rest, id, objectId: o.id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
-  fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true }); // magecraft: "cast or copy"
+  fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true, copyOf: orig.id }); // magecraft: "cast or copy"
   fireEvent(s, { type: "targeted", stackId: id });
 }
 
@@ -567,9 +567,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
       }
       if (!sc.copies) {
-        const i = e.spell === "cause" || e.spell === "self" || e.spell === "countered" || "epic" in e.spell ? -1 : e.spell.target;
+        const i = e.spell === "cause" || e.spell === "self" || e.spell === "countered" || e.spell === "copied" || "epic" in e.spell ? -1 : e.spell.target;
         const t = i >= 0 ? ctx.targets[i] : undefined;
-        const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
+        // Parnesse, the Subtle Brush (round B289): the spell its trigger's copy was made of, as "cause" finds one.
+        const id = e.spell === "self" ? r.item.id : e.spell === "copied" ? ctx.event?.copied : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
         // "This ability can't be copied" (Gogo), "~ can't be copied" (See Double): no copy is made.
@@ -622,7 +623,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Twinning Staff: one more for each of them the player copying it controls (CR 614.1a; rulings), whose targets may
         // always be chosen anew. Only for spells: copying a card or an ability isn't copying a spell.
         // Bonus Round: "that player copies it", the spell's controller (rulings), who chooses the copy's new targets.
-        const by = e.byController && orig.kind === "spell" ? orig.controller : undefined;
+        // Parnesse, the Subtle Brush (round B289): "they may also copy that spell": that player copies it, so the copy is theirs
+        // and so are its new targets (CR 707.10, 707.10c); with no such player (no opponent targeted), no copy.
+        const byPlayer = e.byPlayer ? players(s, e.byPlayer, ctx)[0] : undefined;
+        if (e.byPlayer && byPlayer === undefined) return;
+        const by = byPlayer ?? (e.byController && orig.kind === "spell" ? orig.controller : undefined);
         const extra = orig.kind === "spell" ? extraSpellCopies(s, by ?? ctx.controller) : 0;
         sc.copies = { of: id!, left: n, ...(extra ? { extra } : {}), ...(by !== undefined ? { by } : {}) };
         }

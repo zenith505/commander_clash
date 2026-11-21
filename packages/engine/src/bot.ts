@@ -343,6 +343,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
+    // Breathstealer's Crypt (round B289): 3 life to keep a creature card costing 3 or more, while 10 life or more is left.
+    if (pend.kind === "chooseMay" && pend.breathstealer) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && mv(s, pend.card) >= 3 && player(s, pid).life - 3 >= 10 }];
+    // Parnesse, the Subtle Brush (round B289): a copy of that spell for us, once (two Parnesses copying for each other would
+    // never end): not when a copy of it under our control is already on the stack.
+    const parnesse = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "chooseMay" && parnesse?.type === "may" && parnesse.effects.length === 1 && parnesse.effects[0]!.type === "copySpell" && parnesse.effects[0]!.spell === "copied") {
+      const of = s.resolving!.item.event?.copied;
+      const orig = of !== undefined ? (s.stack.find((x) => x.id === of) ?? s.castItems?.[of]) : undefined;
+      const mine = !!orig && s.stack.some((x) => x.copy && x.controller === pid && x.description === `${orig.description.replace(/ \(copy\)$/, "")} (copy)`);
+      return [{ type: "chooseMay", player: pid, yes: !!orig && !mine }];
+    }
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Aetherplasm (round B261): back to the hand, always: the attacker stays blocked whatever is put in (rulings).

@@ -596,7 +596,7 @@ line blocks.
    Exhale, Hyperion's Atomic Vision, Hulk's Thunderclap, Dose of Dawnglow's "it isn't your main phase"); browser
    tests click through each prompt. An optional additional cost isn't kicker (CR 601.2b): "kicked spell" triggers and
    Ertai's Trickery ignore it.
-   Out after round 197 (looked at, not done): Dawnhand Dissident (casting from exile by removing counters), Auntie Ool
+   Out after round 197 (looked at, not done): Dawnhand Dissident (done in round 438) (casting from exile by removing counters), Auntie Ool
    (done in round 266). Smaller gaps: bots blight only a creature that
    survives the counters, and never their commander.
    Round 198 went on from the top: targets "of the chosen type" on a permanent's abilities, bound to the creature type
@@ -4626,6 +4626,21 @@ line blocks.
    dropped), and the lists after round 436 (still out, for their reasons). Judgment calls: Nathan Drake has no rulings: its
    cast is made while the trigger resolves (no duration is given, as Sanwell's rulings read the same words), and a spell
    cast that way that its player can't pay for is offered but can't be cast.
+   Round 438 went on down the "Out after round N" lists and `npm run popular`, most played first, to two cast permissions
+   whose extra cost is removing counters from creatures you control. Falco Spara, Pactweaver's "You may cast spells from
+   the top of your library by removing a counter from a creature you control in addition to paying their other costs." (an
+   additional cost of each spell cast that way, CR 601.2f-h, a counter of any kind, Falco's own shield counter too, rulings;
+   Into the Pit's FromTop `costs`; with Into the Pit too, the permission whose cost the caster chose to pay is used).
+   Dawnhand Dissident's "During your turn, you may cast creature spells from among cards you own exiled with ~ by removing
+   three counters from among creatures you control in addition to paying their other costs." (the cards its "{T}, Blight 2:
+   Exile target card from a graveyard." exiled, CR 607.2a; their usual timing and costs, rulings; the counters any mix
+   from any creatures you control, CR 601.2h; under your control as the casting begins, the cost kept after that, rulings;
+   playLinkedOnly `costs`, game.ts linkedCastCosts). Browser tests click through both counter pickers. +2, 31,840 of
+   31,936 on this stacked branch (round 437 #725); the compiled text of every other card and face is unchanged.
+   Out after round 438 (looked at, not done): the lists after round 437 (still out, for their reasons). Known gaps: in the
+   app, with Falco Spara and Into the Pit both, the first permission's cost is the one asked for (the engine takes either);
+   bots pay with -1/-1 and other spare counters first and never take a creature's last +1/+1 counter (or a loyalty, lore
+   or time counter), skipping the cast when that's all there is.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -6096,7 +6111,7 @@ line blocks.
    toughness among your creatures: putCounter costs have no X yet).
    Out after round 261 (looked at, not done): Doors of Durin (done in round 295) (a "may reveal the top card" whose creature card enters tapped
    and attacking, then trample and hexproof by the Dwarves and Elves you control as it resolves: putOntoBattlefield has no
-   attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (casting from the top of your library
+   attacking option and no conditional keyword grant yet); Falco Spara, Pactweaver (done in round 438) (casting from the top of your library
    with "remove a counter from a creature you control" as an additional cost: a cost choice for the cast, the autopay and
    bots); Master of the Wild Hunt (done in round 328) (each tapped Wolf deals damage, then the target's controller divides its damage among those
    Wolves as it resolves); Secret of Bloodbending (controlling another player); Harold and Bob, First Numens (returns as an
@@ -7171,7 +7186,7 @@ line blocks.
    Éomer), Raphael's "deals combat damage to a player for the first time each turn", "untap it and all Samurai you
    control" (Godo), Moraug's "for each time it has attacked this turn"; "it can't be blocked this combat" (Ma Chao),
    "whenever ~ or a commander you control attacks alone"; play-from-top riders: Bolas's Citadel's life payment,
-   Elsha's flash (done in round 331), Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's and Into the Pit's (done in round 331)
+   Elsha's flash (done in round 331), Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's (done in round 438) and Into the Pit's (done in round 331)
    extra costs, historic and snow filters (Crystal Skull, The Fourth Doctor, Isu), "spells with flash or flying"
    (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's (done in round 325) "can't play cards from
    your hand", granted look-at-top (Glowcap Lantern (done in round B186)), "until end of turn, you may look at the top card" (Gwenom, The

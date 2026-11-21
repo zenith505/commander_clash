@@ -12280,6 +12280,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2cabf7a4-17af-45c7-b314-a84f5dc0d070",
+  "name": "Dawnhand Dissident",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Elf Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warlock"
+  ],
+  "oracleText": "{T}, Blight 1: Surveil 1.\n{T}, Blight 2: Exile target card from a graveyard.\nDuring your turn, you may cast creature spells from among cards you own exiled with this creature by removing three counters from among creatures you control in addition to paying their other costs.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Blight",
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7ec3aaa4-8b6a-4046-b599-654f9844ca6c",
   "name": "Day of the Moon",
   "manaCost": "{2}{R}",
@@ -17472,6 +17506,46 @@
   "set": "cmm",
   "releasedAt": "2023-08-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b9c1ca24-5696-4777-8465-13a8f78e4fb5",
+  "name": "Falco Spara, Pactweaver",
+  "manaCost": "{1}{G}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Bird Demon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Demon"
+  ],
+  "oracleText": "Flying, trample\nFalco Spara enters with a shield counter on it.\nYou may look at the top card of your library any time.\nYou may cast spells from the top of your library by removing a counter from a creature you control in addition to paying their other costs.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

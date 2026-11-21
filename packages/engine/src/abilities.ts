@@ -10758,8 +10758,10 @@ export interface CompiledCard {
    * With `playLinkedWhile`: "You may cast Dinosaur creature spells from among cards you own exiled with ~. If you cast a
    * spell this way, that creature enters with a finality counter on it." (Intrepid Paleontologist): only cards that match
    * `filter` and that its controller owns, the creature entering with `entersWith` (CR 614.1c).
+   * Dawnhand Dissident (round 438): "by removing three counters from among creatures you control in addition to paying
+   * their other costs": `costs`, additional costs of a spell cast with this permission (CR 601.2f-h), and no counter.
    */
-  playLinkedOnly?: { filter: TargetSpec; own: true; entersWith: { counter: CounterKind; n: number } };
+  playLinkedOnly?: { filter: TargetSpec; own: true; entersWith?: { counter: CounterKind; n: number }; costs?: AdditionalCost[] };
   /**
    * "During your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can
    * be spent to cast those spells" (Tinybones, Bauble Burglar): any such card, whoever exiled it (rulings), with the usual

@@ -1662,6 +1662,8 @@ export interface LastKnown {
   attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId };
   /** Its copiable values as it last existed (CR 707.2, 608.2h), a key into GameState.cards: "becomes a copy of that creature". */
   copyKey?: string;
+  /** A cast trigger's face-down or prototyped spell: its copiable values as it was cast (CR 707.2, 718.2a), for "a copy of that spell" once it has left the stack (The Myriad Pools, round 441). */
+  spellCopyKey?: string;
   /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
   controller?: PlayerId;
   /** It was a token (Prowling Geistcatcher: "If that creature was a token"), for a "whenever you sacrifice" trigger. */

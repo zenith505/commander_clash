@@ -41,6 +41,18 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
     const o = objects(s, ref, ctx)[0];
     return o && o.zone !== "battlefield" && o.zone !== "stack" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
   }
+  // The Myriad Pools (round 441): "a copy of that spell", the one whose casting triggered this, while it's still that spell
+  // on the stack (CR 707.2: its copiable values, with the face cast and a prototype, CR 718.2a; a bestowed or mutating
+  // spell's own creature card, as a bestowed Aura that's attached to nothing is one, CR 702.103f), otherwise as it last
+  // existed there (CR 608.2h): the card it was cast as, kept with the trigger.
+  if (ref.ref === "castSpell") {
+    const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+    const o = item?.objectId ? s.objects[item.objectId] : undefined;
+    if (!item || !o) return undefined;
+    const was = ctx.event?.played;
+    if (o.zone === "stack" && (!was || (was.id === o.id && was.zc === (o.zoneChanges ?? 0))) && s.stack.some((x) => x.kind === "spell" && x.objectId === o.id)) return copiableDef(s, o.bestowed || o.mutating ? { ...o, bestowed: undefined, mutating: undefined } : o);
+    return o.isToken ? undefined : key(ctx.lki?.spellCopyKey ?? ctx.lki?.copyKey);
+  }
   if (ref.ref === "target") {
     const t = ctx.targets[ref.index];
     if (!ctx.legal[ref.index] || t?.kind !== "object") return undefined;

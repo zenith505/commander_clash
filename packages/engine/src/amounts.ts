@@ -527,8 +527,6 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.stackCountered ?? 0;
     case "poisonLostThisWay":
       return s.resolving?.poisonLost ?? 0;
-    case "manaLostThisWay":
-      return s.resolving?.manaLost ?? 0;
     case "controlGivenThisWay": {
       const to = refPlayers(s, c.to, ctx);
       return refObjects(s, c.what, ctx).filter((o) => o.zone === "battlefield" && to.includes(controllerOf(s, o))).length;
@@ -1562,8 +1560,6 @@ function describeCount(c: Count): string {
       return "#spells and abilities countered";
     case "poisonLostThisWay":
       return "#poison counters lost";
-    case "manaLostThisWay":
-      return "#mana lost";
     case "surveilTopThisWay":
       return "#cards put on top";
     case "bouncedThisWayCount":

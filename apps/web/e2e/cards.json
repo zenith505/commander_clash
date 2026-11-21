@@ -39177,41 +39177,6 @@
   "gameChanger": false
  },
  {
-  "oracleId": "0d39513a-1f05-4d9a-a772-745f4f1a3471",
-  "name": "Pygmy Hippo",
-  "manaCost": "{G}{U}",
-  "cmc": 2,
-  "typeLine": "Creature — Hippo",
-  "supertypes": [],
-  "types": [
-   "Creature"
-  ],
-  "subtypes": [
-   "Hippo"
-  ],
-  "oracleText": "Whenever this creature attacks and isn't blocked, you may have defending player activate a mana ability of each land they control and lose all unspent mana. If you do, this creature assigns no combat damage this turn and at the beginning of your next main phase this turn, you add an amount of {C} equal to the amount of mana that player lost this way.",
-  "power": "2",
-  "toughness": "2",
-  "colors": [
-   "G",
-   "U"
-  ],
-  "colorIdentity": [
-   "G",
-   "U"
-  ],
-  "keywords": [],
-  "producedMana": [
-   "C"
-  ],
-  "commanderLegal": "legal",
-  "set": "vis",
-  "releasedAt": "1997-02-03",
-  "rarity": "rare",
-  "layout": "normal",
-  "gameChanger": false
- },
- {
   "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
   "name": "Pyroblast",
   "manaCost": "{R}",

@@ -222,8 +222,6 @@ export type Count =
   | { kind: "stackCounteredThisWay" }
   /** Leeches: "that much", the poison counters its loseAllCounters instruction removed. */
   | { kind: "poisonLostThisWay" }
-  /** Pygmy Hippo (round B285): "the amount of mana that player lost this way" (Effect drainLose, ResolvingState.manaLost). */
-  | { kind: "manaLostThisWay" }
   /** Sweep: "for each Plains returned this way" after "return any number of Plains you control to their owner's hand": how many its instructions put into a hand. */
   | { kind: "bouncedThisWayCount" }
   /** "Draw a card for each one they gained control of this way" (Coveted Falcon): those objects (the targets still legal, CR 608.2b) now controlled by that player. */
@@ -4357,12 +4355,6 @@ export type Effect =
    * unspent mana and you add the mana lost this way." (CR 106.13; effects/run-laneb281.ts). The target is the spell's first.
    */
   | { type: "drainPower" }
-  /**
-   * Pygmy Hippo (round B285): "you may have defending player activate a mana ability of each land they control and lose all
-   * unspent mana": `who` does what Drain Power's target does (effects/run-laneb281.ts activateEachLand), then their whole
-   * pool is lost (CR 106.4), its amount kept for "the amount of mana that player lost this way" (Count manaLostThisWay).
-   */
-  | { type: "drainLose"; who: PlayerRef }
   /**
    * Ice Cauldron (round B285): "Put a charge counter on ~ and note the type and amount of mana spent to pay this activation
    * cost": the mana spent, each one (StackItem.manaSpentTypes; GameObject.notedManaAll), and the card exiled from the hand

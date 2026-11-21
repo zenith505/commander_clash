@@ -1,6 +1,6 @@
 # Roadmap
 
-31,836 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,835 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,949 of
 9,979 (99%).
 
@@ -4583,7 +4583,7 @@ line blocks.
    Out after round 435 (looked at, not done): Mimeoplasm, Revered One (its "{2}: ~ becomes a copy of target creature card
    exiled with it, except it's 0/0 and has this ability": once it's a copy, the ability it keeps is no longer printed beside
    the "As ~ enters, exile" it's linked to, CR 607.1a, 607.5, and the card has no rulings on whether it still finds those
-   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (done in round B285) (it needs Drain
+   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (it needs Drain
    Power's piece from round B281, merged after this round began), and the lists after round 434 (still out, for their reasons). Known
    gaps: bots cast March from Velis Vel only with two or more lands of one nonbasic land type and don't plan Ludevic's X
    activation.
@@ -5876,7 +5876,7 @@ line blocks.
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
-   Pygmy Hippo (done in round B285); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
+   Pygmy Hippo; Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
@@ -11781,32 +11781,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
-- Round B285 (least played first, from the skip lists, neither card in Lane A's rounds 435-436): Pygmy Hippo's "Whenever
-  this creature attacks and isn't blocked, you may have defending player activate a mana ability of each land they
-  control and lose all unspent mana. If you do, this creature assigns no combat damage this turn and at the beginning of
-  your next main phase this turn, you add an amount of {C} equal to the amount of mana that player lost this way." (once
-  blockers are declared, CR 509.1h, the defending player its event player, CR 506.2; that player activates their lands
-  as Drain Power's target does, their choices, its rulings, effects/run-laneb281.ts activateEachLand, now shared; then
-  their whole pool is lost, mana they had before too, CR 106.4, Effect drainLose, Count manaLostThisWay; saying yes is
-  doing it even with no lands, so it assigns no combat damage this turn, CR 510.1a, and a delayed trigger, CR 603.7,
-  adds that much {C} at the beginning of the next main phase this turn, an attacking creature's controller being the
-  active player, CR 508.1, 505.1; it uses the stack, CR 605.5a). Ice Cauldron's "{X}, {T}: You may exile a nonland card
-  from your hand. You may cast that card for as long as it remains exiled. Put a charge counter on this artifact and note
-  the type and amount of mana spent to pay this activation cost. Activate only if there are no charge counters on this
-  artifact." (a card of your choice or none, CR 609.3, castable from exile with its usual timing even once the Cauldron
-  is gone, rulings; the counter and the note happen either way, each mana spent on {X}, not X itself, rulings, X 0
-  noting none: Effect noteCauldron, GameObject.notedManaAll and cauldronCard) and "{T}, Remove a charge counter from this
-  artifact: Add this artifact's last noted type and amount of mana. Spend this mana only to cast the last card exiled
-  with this artifact." (a mana ability, CR 605.1a, ManaProduction noted `all`; the restriction bound to that card as the
-  mana is made, CR 106.6, 400.7, spend.ts ManaSpend lastExiled, any part of its total cost, rulings; autopay taps it for
-  that card only). Bots take the Hippo's deal when the defending player has at least as many untapped lands as its power.
-  Browser tests click through the Hippo's question (Ana's Forest and Island tapped, {C}{C} after combat) and the
-  Cauldron's X and hand pick. +2, 31,836 of 31,936 on B284's branch (main 85500b6, round 435, merged in). The compiled
-  text of every other card is unchanged.
+- Round B285 (least played first, from the skip lists, not in Lane A's rounds 435-437): Ice Cauldron's "{X}, {T}: You
+  may exile a nonland card from your hand. You may cast that card for as long as it remains exiled. Put a charge counter
+  on this artifact and note the type and amount of mana spent to pay this activation cost. Activate only if there are no
+  charge counters on this artifact." (X may be 0; a card of your choice or none, CR 609.3, castable from exile with its
+  usual timing even once the Cauldron is gone, rulings, MayPlay "exiled"; the counter and the note happen either way, each
+  mana spent on {X}, not X itself, so cost changes don't matter, rulings, X 0 noting none: Effect noteCauldron,
+  GameObject.notedManaAll and cauldronCard, both gone with the object, CR 400.7) and "{T}, Remove a charge counter from
+  this artifact: Add this artifact's last noted type and amount of mana. Spend this mana only to cast the last card
+  exiled with this artifact." (a mana ability, CR 605.1a, ManaProduction noted `all`; the restriction bound to that card
+  as the mana is made, CR 106.6, 400.7, spend.ts ManaSpend lastExiled and boundSpend, any part of its total cost, its
+  additional costs too, rulings; autopay taps the Cauldron for that card only). Pygmy Hippo was taken too, then left to
+  Lane A's round 437, which pushed it first. Browser tests click through the Cauldron's X and hand pick, and cast the
+  exiled Lightning Bolt from the exile pile with the Cauldron's {R}. +1, 31,835 of 31,936 on B284's branch (main 85500b6,
+  round 435, merged in). The compiled text of every other card is unchanged.
 - Out after round B285 (looked at, not done): the lists after round B284 stay out. Snowfall stays out (its "may add" in
-  a triggered mana ability, a real choice with Yurlok's mana burn, and the extra mana spendable only on cumulative upkeep).
-  Known gaps: bots never activate Ice Cauldron; a restricted lot of the Cauldron's mana is named after its card, so two
-  Cauldrons' mana for two cards of the same name show as one in the pool (they stay apart when spent).
+  a triggered mana ability is a real choice with Yurlok's mana burn, and its mana, spendable only on cumulative upkeep,
+  would need a "none" pick and a restricted part in the triggered mana that autopay keeps apart). Codie, Ravenous Codex
+  stays out ("a prepared spell" still isn't defined, CR 722). Known gaps: bots never activate Ice Cauldron; the pool shows
+  the Cauldron's restricted mana by its card's name, so two Cauldrons' mana for two cards of the same name look like one
+  lot there (they're kept apart when spent).
 - Round B284 (least played first, from the skip lists, neither card in Lane A's rounds 435-436): Tahngarth, First Mate's
   "Whenever an opponent attacks with one or more creatures, if Tahngarth is tapped, you may have that opponent gain control
   of Tahngarth until end of combat. If you do, choose a player or planeswalker that opponent is attacking. Tahngarth is
@@ -12433,7 +12427,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (both piles are empty); bots choose that opponent with the general opponent choice and cast Soul Echo through the general
   spell logic; Dimensional Breach (an effect lasting while its cards stay exiled, returning one at each player's upkeep),
   Defensive Formation (done in round B266) (the defending player assigning an attacker's combat damage), Takklemaggot (returned as a non-Aura
-  enchantment that loses "enchant creature"), Pygmy Hippo (done in round B285) (another player activating a mana ability of each of their lands)
+  enchantment that loses "enchant creature"), Pygmy Hippo (another player activating a mana ability of each of their lands)
   and North Star were looked at again and stay out for the reasons in the earlier lists.
 - Round B263 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-418): Guardian Angel
   ("Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you

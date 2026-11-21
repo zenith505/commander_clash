@@ -11139,6 +11139,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c51da69b-7fd7-43a3-be29-c44fc0c36130",
+  "name": "Cult Healer",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Doctor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Doctor"
+  ],
+  "oracleText": "Eerie — Whenever an enchantment you control enters and whenever you fully unlock a Room, this creature gains lifelink until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Eerie"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d8505d3-c8a1-4850-95d4-5ddb8ad49770",
   "name": "Cultivator Colossus",
   "manaCost": "{4}{G}{G}{G}",
@@ -13779,6 +13812,37 @@
   "set": "c14",
   "releasedAt": "2014-11-07",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d151c8ed-58bf-4b82-a993-1d81f789aa0e",
+  "name": "Dominion Supervisor",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Vorta Doctor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vorta",
+   "Doctor"
+  ],
+  "oracleText": "When this creature enters, put a +1/+1 counter on target creature.\nCreatures you control with counters on them have trample.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "not_legal",
+  "set": "trk",
+  "releasedAt": "2026-11-13",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -49694,6 +49758,112 @@
   "gameChanger": false
  },
  {
+  "oracleId": "54ca5904-9099-497a-9684-101656025487",
+  "name": "Terra, Magical Adept // Esper Terra",
+  "manaCost": "{1}{R}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Wizard Warrior // Legendary Enchantment Creature — Saga Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard",
+   "Warrior"
+  ],
+  "oracleText": "When Terra enters, mill five cards. Put up to one enchantment card milled this way into your hand.\nTrance — {4}{R}{G}, {T}: Exile Terra, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery.",
+  "power": "4",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Transform",
+   "Mill",
+   "Trance"
+  ],
+  "producedMana": [
+   "B",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Terra, Magical Adept",
+    "manaCost": "{1}{R}{G}",
+    "typeLine": "Legendary Creature — Human Wizard Warrior",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Wizard",
+     "Warrior"
+    ],
+    "oracleText": "When Terra enters, mill five cards. Put up to one enchantment card milled this way into your hand.\nTrance — {4}{R}{G}, {T}: Exile Terra, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery.",
+    "power": "4",
+    "toughness": "2",
+    "colors": [
+     "G",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/f/b/fbd447aa-588d-4c4d-925e-a7d3bdf6a65c.jpg?1783906567",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/f/b/fbd447aa-588d-4c4d-925e-a7d3bdf6a65c.jpg?1783906567"
+   },
+   {
+    "name": "Esper Terra",
+    "manaCost": "",
+    "typeLine": "Legendary Enchantment Creature — Saga Wizard",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Enchantment",
+     "Creature"
+    ],
+    "subtypes": [
+     "Saga",
+     "Wizard"
+    ],
+    "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI, II, III — Create a token that's a copy of target nonlegendary enchantment you control. It gains haste. If it's a Saga, put up to three lore counters on it. Sacrifice it at the beginning of your next end step.\nIV — Add {W}{W}, {U}{U}, {B}{B}, {R}{R}, and {G}{G}. Exile Esper Terra, then return it to the battlefield (front face up).\nFlying",
+    "power": "6",
+    "toughness": "6",
+    "colors": [
+     "G",
+     "R"
+    ],
+    "colorIndicator": [
+     "G",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/f/b/fbd447aa-588d-4c4d-925e-a7d3bdf6a65c.jpg?1783906567",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/f/b/fbd447aa-588d-4c4d-925e-a7d3bdf6a65c.jpg?1783906567"
+   }
+  ]
+ },
+ {
   "oracleId": "1bd3e453-aa21-4ee6-95c2-d6d920ee8e7a",
   "name": "Terramorphic Expanse",
   "manaCost": "",
@@ -50217,6 +50387,36 @@
   "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c2ee17b2-6119-4ade-b806-1add64513c3a",
+  "name": "The Day of the Doctor",
+  "manaCost": "{3}{R}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI, II, III — Exile cards from the top of your library until you exile a legendary card. You may play that card for as long as this Saga remains on the battlefield. Put the rest of those exiled cards on the bottom of your library in a random order.\nIV — Choose up to three Doctors. You may exile all other creatures. If you do, this Saga deals 13 damage to you.",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "saga",
   "gameChanger": false
  },
  {

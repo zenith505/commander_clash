@@ -4141,7 +4141,7 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "Put that card onto the battlefield or into your hand" (Illuna, Apex of Wishes): its controller chooses after seeing it; the other cards stay exiled. */ "battlefieldOrHand" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep" | /** With `reveal`: "Put the revealed cards on the bottom of your library in a random order" (Calibrated Blast); the nonland card's mana value is kept (Resolution.revealedUntilMv) for a reflexive "when you reveal a nonland card this way". */ "bottomRandom";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** "Put that card onto the battlefield or into your hand" (Illuna, Apex of Wishes): its controller chooses after seeing it; the other cards stay exiled. */ "battlefieldOrHand" | /** "..., then put that card into your hand" (Demonlord Belzenlok): the nonland card exiled goes to its owner's hand, the others stay exiled; how many went is Resolution.dugToHand. */ "hitToHand" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep" | /** The Day of the Doctor (round 436): "You may play that card for as long as ~ remains on the battlefield": a land too (not `castOnly`), while the source is still that object on the battlefield (mayPlay until "source", CR 611.2b, 400.7). */ "playWhileSource" | /** With `reveal`: "Put the revealed cards on the bottom of your library in a random order" (Calibrated Blast); the nonland card's mana value is kept (Resolution.revealedUntilMv) for a reflexive "when you reveal a nonland card this way". */ "bottomRandom";
       /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
       suspend?: number;
       ownerCasts?: true;
@@ -4163,6 +4163,8 @@ export type Effect =
       untilMv?: number;
       /** "A nonlegendary, nonland card" (Plargg, Dean of Chaos): a legendary card doesn't stop it. */
       untilNonlegendary?: true;
+      /** The Day of the Doctor (round 436): "until you exile a legendary card": any legendary card stops it, a land too (CR 205.4d). */
+      untilLegendary?: true;
       /** With `untilTypes`: "a nonland permanent card" (Illuna): one of those types that isn't also a land (an artifact land doesn't stop it). */
       untilNonlandType?: true;
       /** "Until you reveal a nonland card with mana value 3 or greater" (Sibylline Soothsayer): only one like this stops it. */

@@ -1,6 +1,6 @@
 # Roadmap
 
-31,831 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,837 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
 9,979 (99%).
 
@@ -5895,7 +5895,7 @@ line blocks.
    Out after round 294 (looked at, not done): Adventurers' Guildhouse, Mountain Stronghold, Unholy Citadel, Seafarer's
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
    Orders (done in round B256), Balduvian Warlord (done in round B256), General Jarkeld (done in round B258) (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
-   (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (noted
+   (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (done in round B285) (noted
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
@@ -11804,6 +11804,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B285 (least played first, from the skip lists, not in Lane A's rounds 435-437): Ice Cauldron's "{X}, {T}: You
+  may exile a nonland card from your hand. You may cast that card for as long as it remains exiled. Put a charge counter
+  on this artifact and note the type and amount of mana spent to pay this activation cost. Activate only if there are no
+  charge counters on this artifact." (X may be 0; a card of your choice or none, CR 609.3, castable from exile with its
+  usual timing even once the Cauldron is gone, rulings, MayPlay "exiled"; the counter and the note happen either way, each
+  mana spent on {X}, not X itself, so cost changes don't matter, rulings, X 0 noting none: Effect noteCauldron,
+  GameObject.notedManaAll and cauldronCard, both gone with the object, CR 400.7) and "{T}, Remove a charge counter from
+  this artifact: Add this artifact's last noted type and amount of mana. Spend this mana only to cast the last card
+  exiled with this artifact." (a mana ability, CR 605.1a, ManaProduction noted `all`; the restriction bound to that card
+  as the mana is made, CR 106.6, 400.7, spend.ts ManaSpend lastExiled and boundSpend, any part of its total cost, its
+  additional costs too, rulings; autopay taps the Cauldron for that card only). Pygmy Hippo was taken too, then left to
+  Lane A's round 437, which pushed it first. Browser tests click through the Cauldron's X and hand pick, and cast the
+  exiled Lightning Bolt from the exile pile with the Cauldron's {R}. +1, 31,835 of 31,936 on B284's branch (main 85500b6,
+  round 435, merged in). The compiled text of every other card is unchanged.
+- Out after round B285 (looked at, not done): the lists after round B284 stay out. Snowfall stays out (its "may add" in
+  a triggered mana ability is a real choice with Yurlok's mana burn, and its mana, spendable only on cumulative upkeep,
+  would need a "none" pick and a restricted part in the triggered mana that autopay keeps apart). Codie, Ravenous Codex
+  stays out ("a prepared spell" still isn't defined, CR 722). Known gaps: bots never activate Ice Cauldron; the pool shows
+  the Cauldron's restricted mana by its card's name, so two Cauldrons' mana for two cards of the same name look like one
+  lot there (they're kept apart when spent).
 - Round B284 (least played first, from the skip lists, neither card in Lane A's rounds 435-436): Tahngarth, First Mate's
   "Whenever an opponent attacks with one or more creatures, if Tahngarth is tapped, you may have that opponent gain control
   of Tahngarth until end of combat. If you do, choose a player or planeswalker that opponent is attacking. Tahngarth is

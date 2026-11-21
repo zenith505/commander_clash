@@ -4358,6 +4358,12 @@ export type Effect =
    */
   | { type: "drainPower" }
   /**
+   * Ice Cauldron (round B285): "Put a charge counter on ~ and note the type and amount of mana spent to pay this activation
+   * cost": the mana spent, each one (StackItem.manaSpentTypes; GameObject.notedManaAll), and the card exiled from the hand
+   * just before as the last one exiled with ~ (GameObject.cauldronCard); its source only while it's the same object.
+   */
+  | { type: "noteCauldron" }
+  /**
    * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
    * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the
    * stack as a copy of the original spell." (CR 603.7; its subject is the card in exile, GameState.meddled its spell as it
@@ -8286,7 +8292,7 @@ export type ManaProduce =
   | { kind: "milledSymbols" }
   | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
   /** Jeweled Amulet: "Add one mana of ~'s last noted type" (GameObject.notedMana); none if no type was noted (rulings). */
-  | { kind: "noted" }
+  | { kind: "noted"; /** Ice Cauldron (round B285): "Add ~'s last noted type and amount of mana": all of it, each mana as noted (GameObject.notedManaAll). */ all?: true }
   | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
@@ -8582,6 +8588,13 @@ export interface ManaSpend {
    * controls an ability", game.ts spellGainsAbilities), or a face-down spell, a 2/2 creature with no abilities (CR 708.2a).
    */
   noAbilitySpells?: true;
+  /**
+   * Ice Cauldron (round B285): "Spend this mana only to cast the last card exiled with ~": bound as the mana is made
+   * (spend.ts boundSpend) to `card`, the card ~ last exiled (GameObject.cauldronCard), only while it's that object in exile
+   * (CR 400.7), any cost of casting it (rulings: its additional costs too); null with none.
+   */
+  lastExiled?: true;
+  card?: { id: ObjectId; zc: number } | null;
   text: string;
 }
 

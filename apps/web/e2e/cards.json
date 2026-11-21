@@ -24315,6 +24315,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2b7e4e70-53b1-4d4f-bdcc-56c2e15f367a",
+  "name": "Ice Cauldron",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, {T}: You may exile a nonland card from your hand. You may cast that card for as long as it remains exiled. Put a charge counter on this artifact and note the type and amount of mana spent to pay this activation cost. Activate only if there are no charge counters on this artifact.\n{T}, Remove a charge counter from this artifact: Add this artifact's last noted type and amount of mana. Spend this mana only to cast the last card exiled with this artifact.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c532ecd2-feeb-41f5-bda0-b05e86f86a45",
   "name": "Ice Cave",
   "manaCost": "{3}{U}{U}",

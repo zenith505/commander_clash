@@ -4683,6 +4683,24 @@ line blocks.
    controlled by another player can still be chosen (the ability names no controller). Known gaps: bots always exile a
    spell the Foundry's mana paid for, and tap the Foundry for mana like any other source, without keeping it for its
    second ability.
+   Round 441 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   of Promise, Psychic Paper and the others still out, to two cards whose pieces are there now. Wayta, Trainer Prodigy's
+   "If a creature you control being dealt damage causes a triggered ability of a permanent you control to trigger, that
+   ability triggers an additional time." (CR 603.2d: every damage event says what it was dealt to, so a trigger on damage
+   being dealt, to it or by it, "is dealt damage", "deals damage to a creature", "deals damage", excess damage, triggers
+   once more when a creature you control was dealt that damage; not what the damage led to, as lifelink's life gain, nor
+   delayed triggers, rulings) and its "{2}{G}, {T}: Target creature you control fights another target creature. This
+   ability costs {2} less to activate if it targets two creatures you control." (CR 601.2f, the targets as the cost is
+   worked out; costLessIfTarget `count`). The Everflowing Well // The Myriad Pools' "Whenever you cast a permanent spell
+   using mana produced by ~, up to one other target permanent you control becomes a copy of that spell until end of
+   turn." (the trigger resolves first; the spell's copiable values, CR 707.2, with the face it was cast as and a prototype,
+   718.2a, a bestowed or mutating spell's creature card; X as 0, its "enters" abilities don't apply, counters stay,
+   rulings; a spell that has left the stack is copied as it last existed there, CR 608.2h). Browser tests click through
+   Wayta's {G} fight between two of your creatures and the Pools' {U} on Grizzly Bears with Sol Ring as its target. +2,
+   31,850 of 31,936 on this stacked branch (round 440 #730); the compiled text of every other card is unchanged.
+   Out after round 441 (looked at, not done): the lists after round 440 (still out, for their reasons). Known gaps: bots
+   pick their least useful permanent for the Pools' copy, none for a legendary spell (the legend rule), and never hold
+   its {U} for a permanent spell.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

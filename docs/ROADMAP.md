@@ -1,7 +1,7 @@
 # Roadmap
 
-31,823 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,949 of
+31,827 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4587,6 +4587,28 @@ line blocks.
    Power's piece, in round B281's open pull request), and the lists after round 434 (still out, for their reasons). Known
    gaps: bots cast March from Velis Vel only with two or more lands of one nonbasic land type and don't plan Ludevic's X
    activation.
+   Round 436 went on down the "Out after round N" lists and `npm run popular`, most played first, past Synthesis Pod (in
+   round B283's pushed branch) to two Sagas. Terra, Magical Adept // Esper Terra's chapters I-III, "Create a token that's a
+   copy of target nonlegendary enchantment you control. It gains haste. If it's a Saga, put up to three lore counters on
+   it. Sacrifice it at the beginning of your next end step." (the token gets its own lore counter as it enters, CR 714.3a,
+   then 0 to 3 more chosen as it resolves, CR 608.2d, each chapter they reach triggering, CR 714.2c, and with its final
+   chapter's number it's sacrificed once none of its chapter abilities is on the stack, CR 714.4; the token copies what
+   the enchantment copies, rulings), and chapter IV's "Add {W}{W}, {U}{U}, {B}{B}, {R}{R}, and {G}{G}. Exile Esper Terra,
+   then return it to the battlefield (front face up)." (not a mana ability, rulings; a new object, CR 400.7, whose enters
+   trigger mills five). The Day of the Doctor's chapters I-III, "Exile cards from the top of your library until you exile
+   a legendary card. You may play that card for as long as this Saga remains on the battlefield. Put the rest of those
+   exiled cards on the bottom of your library in a random order." (a legendary land stops it too and is played as a land,
+   CR 205.4d, 305.2; the permission ends when the Saga leaves, CR 611.2b, 400.7; Effect exileUntilNonland `untilLegendary`,
+   then "playWhileSource"), and chapter IV's "Choose up to three Doctors. You may exile all other creatures. If you do, this
+   Saga deals 13 damage to you." (anyone's Doctors, not targeted, CR 608.2d; the exile may be chosen with no Doctors
+   chosen, and then every creature goes, rulings). Browser tests click through Esper Terra's chapter I target and lore
+   counter number, and The Day of the Doctor's Doctors picker and exile question. +2, 31,827 of 31,936 on this stacked
+   branch (round 435 #720); the compiled text of every other card and face is unchanged.
+   Out after round 436 (looked at, not done): Synthesis Pod (in round B283's pushed branch), and the lists after round 435
+   (still out, for their reasons). Judgment calls: "If you do" after "You may exile all other creatures" holds once the
+   exile is chosen, even with no other creature to exile (CR 608.2c). Known gaps: bots always put all three lore counters
+   on an Esper Terra Saga token; they keep only their own Doctors and take the exile only when the opponents lose at least
+   4 more power than they do and 13 damage leaves them 7 life or more.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

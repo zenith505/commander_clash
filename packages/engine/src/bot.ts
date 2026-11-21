@@ -323,6 +323,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
     if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
+    // The Day of the Doctor (round 436): exile all the creatures not kept only when the opponents lose clearly more power than
+    // we do and 13 damage leaves us 7 life or more. (Keeping our own Doctors: see its pickPermanents below.)
+    const doctorRest = (e: Effect | undefined) => e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "exile" && e.effects[0]!.what.ref === "each" && !!e.effects[0]!.what.notCreated;
+    if (pend.kind === "chooseMay" && s.resolving && doctorRest(s.resolving.body.effects[s.resolving.next]) && s.resolving.body.effects[s.resolving.next + 1]?.type === "if") {
+      const kept = new Set(s.resolving.created ?? []);
+      const gone = s.battlefield.filter((id) => !kept.has(id) && objIsType(s, obj(s, id), "Creature"));
+      const ours = gone.filter((id) => controllerOf(s, obj(s, id)) === pid).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+      const theirs = gone.filter((id) => controllerOf(s, obj(s, id)) !== pid).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+      return [{ type: "chooseMay", player: pid, yes: player(s, pid).life - 13 >= 7 && theirs >= ours + 4 }];
+    }
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
@@ -1104,6 +1114,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // nothing attached), so they can be turned face up once more.
     if (pend.kind === "pickPermanents" && pend.action === "choose" && pend.what === "face-up creatures you control with disguise")
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => !Object.values(obj(s, id).counters ?? {}).some((n) => n > 0) && !s.battlefield.some((b) => obj(s, b).attachedTo === id)) }];
+    // The Day of the Doctor (round 436): keep our own Doctors, the strongest first (never an opponent's).
+    if (pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving && doctorRest(s.resolving.body.effects[s.resolving.next + 1]))
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a))).slice(0, pend.count) }];
     const enVec = pend.kind === "pickPermanents" && pend.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
     if (pend.kind === "pickPermanents" && enVec?.type === "chosenAttackNextTurn") return [{ type: "pickPermanents", player: pid, ids: [] }];
     // A Killer Among Us (round B233): any of the three types (which token we'd pump isn't planned for).
@@ -6897,6 +6910,9 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
  */
 function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[], card?: CardDef): string {
   const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  // Esper Terra (round 436): "put up to three lore counters on" a Saga token copy that's sacrificed at our next end step
+  // anyway: all of them, for every chapter they reach.
+  if (s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "counters" && e.counter === "lore" && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "chosenNumber")) return String(r.max);
   // Choice of Damnations, as its target: the caster then makes us lose that much life or keep only that many permanents.
   // As many as we control while losing that much life leaves us a quarter of our life (then nothing is sacrificed), else
   // the most life we can spare that way.

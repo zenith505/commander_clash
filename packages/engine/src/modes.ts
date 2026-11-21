@@ -183,14 +183,18 @@ export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.only
 /** The target entry that stands for "any number of target ..." or "up to X target ..." (TargetSpec.many), or -1. */
 export const manySlot = (specs: TargetSpec[]): number => specs.findIndex((t) => t.many);
 
+/** Every such entry (TargetSpec.many), first to last: two for Filigree Vector (round B280). */
+export const manySlots = (specs: TargetSpec[]): number[] => specs.flatMap((t, i) => (t.many ? [i] : []));
+
 /**
  * The body with its "any number of target ..." entry made into the `k` targets announced for it (CR 601.2c): each a
  * target of its own, none the same as another (115.3), and the effects' references to it covering them all; the
  * targets after it move up. With none announced it stays one target, cast as if it didn't have it (115.6), so nothing
  * is chosen for it. `optional`: each may still be left unchosen (offering the most there could be, to choose from).
  */
-export function expandMany(body: AbilityBody, k: number, optional = false): AbilityBody {
-  const i = manySlot(body.targets);
+export function expandMany(body: AbilityBody, k: number, optional = false, at?: number): AbilityBody {
+  // `at`: that entry, when the body has several (manySlots; expanded from the last, so the earlier ones keep their places).
+  const i = at ?? manySlot(body.targets);
   if (i < 0) return body;
   const n = Math.max(1, k);
   const shift = (j: number) => (j > i ? j + n - 1 : j);
@@ -253,9 +257,11 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[], able
  * targets as were chosen for it, the ones left unchosen dropped. A reason it can't be, or with nothing of the kind, as is.
  * `x`: the X announced, which "up to X target ..." can't choose more than.
  */
-export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0): { body: AbilityBody; targets: TargetChoice[] } | string {
+export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0, sizes?: number[]): { body: AbilityBody; targets: TargetChoice[] } | string {
   const i = manySlot(body.targets);
   if (i < 0) return { body, targets };
+  const slots = manySlots(body.targets);
+  if (slots.length > 1) return fitManyGroups(body, targets, slots, sizes);
   const spec = body.targets[i]!;
   const end = targets.length - (body.targets.length - 1 - i);
   if (end < i) return `choose ${body.targets.length - 1} target(s) besides ${spec.text}`;
@@ -276,6 +282,34 @@ export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0): { bo
   }
   return { body: expandMany(body, group.length), targets: [...targets.slice(0, i), ...(group.length ? group : [{ kind: "none" as const }]), ...targets.slice(end)] };
 }
+
+/**
+ * Several "any number of target ..." entries in one ability (Filigree Vector, round B280: "put a +1/+1 counter on each of
+ * any number of target creatures and a charge counter on each of any number of target artifacts"): each a word "target"
+ * of its own, so one object may be chosen once for each (CR 115.3, rulings), none within one twice. The targets come as
+ * offered (offerMany), `sizes[j]` entries for entry j (manyOfferSizes), the unchosen ones "none"; each entry becomes as
+ * many targets as were chosen for it, from the last entry to the first, so the earlier ones keep their places.
+ */
+function fitManyGroups(body: AbilityBody, targets: TargetChoice[], slots: number[], sizes?: number[]): { body: AbilityBody; targets: TargetChoice[] } | string {
+  if (slots.some((j) => !manyGroupable(body.targets[j]!))) return "these targets can't be chosen together";
+  if (!sizes || sizes.length !== slots.length || sizes.some((n) => n < 1)) return "choose the targets as they're offered";
+  if (targets.length !== body.targets.length - slots.length + sizes.reduce((a, b) => a + b, 0)) return "choose the targets as they're offered";
+  const starts = slots.map((j, g) => j + sizes.slice(0, g).reduce((a, b) => a + b - 1, 0));
+  let b = body;
+  let ts = [...targets];
+  for (let g = slots.length - 1; g >= 0; g--) {
+    const spec = body.targets[slots[g]!]!;
+    const group = ts.slice(starts[g]!, starts[g]! + sizes[g]!).filter((t) => t.kind !== "none");
+    if (spec.skip && group.length) return `${spec.text} isn't a target this has`;
+    b = expandMany(b, group.length, false, slots[g]!);
+    ts = [...ts.slice(0, starts[g]!), ...(group.length ? group : [{ kind: "none" as const }]), ...ts.slice(starts[g]! + sizes[g]!)];
+  }
+  return { body: b, targets: ts };
+}
+
+/** An "any number of target ..." entry that can be one of several in an ability (fitManyGroups): a plain one. */
+export const manyGroupable = (t: TargetSpec): boolean =>
+  t.many === "any" && !t.divided && !t.manyMin && t.manyMax === undefined && !t.manyCount && !t.differentManaValues && !t.singleGraveyard && !t.differentControllers && !t.distinctFrom && !t.chosenBy && !t.perOpponent;
 
 /** Copy of an effect with its references to target `i` covering `n` targets, and the ones after moved up. */
 function spreadRefs<T>(x: T, i: number, n: number): T {

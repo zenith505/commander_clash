@@ -14,7 +14,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, discardShieldOf, opponentForbidsDiscard, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, cardPT, inRange, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
@@ -400,6 +400,9 @@ export function applyInPlace(s: GameState, action: Action): void {
   let manaAbility = false;
   const expected = waitingOn(s);
   if (action.player !== expected) throw new RulesError(`waiting on player ${expected}, not ${action.player}`);
+  // Land Equilibrium (round B278): which land to sacrifice is a choice within a mandatory action, not an optional action
+  // (CR 104.4b): it doesn't break a loop of mandatory actions (with Sacred Ground's return, say).
+  const mandatoryChoice = s.pending?.kind === "pickPermanents" && !!s.pending.equilibrium;
   // Tezzeret, Betrayer of Flesh: whether this activates an ability of an artifact on the battlefield, as it's activated.
   const artifactAbility = artifactAbilityKind(s, action);
   // A mana ability paying for the next ability, which is begun first (rulings): it doesn't take the reduction.
@@ -574,7 +577,7 @@ export function applyInPlace(s: GameState, action: Action): void {
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
   if (artifactAbility.kind !== "none" || s.turnLog?.artifactAbility?.[p.id] === "mana") noteArtifactAbility(s, p.id, artifactAbility.artifact, artifactAbility.kind);
   afterAction(s, action.type === "activateMana" || manaAbility);
-  watchForMandatoryLoop(s, action, allPassed);
+  watchForMandatoryLoop(s, action, allPassed, mandatoryChoice);
 }
 
 /** The kind of ability `action` activates, and whether its source is an artifact on the battlefield (CR 109.2), for noteArtifactAbility. */
@@ -894,8 +897,64 @@ export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard"
  * one paying a cost with it, which is its own controller's spell or ability (`cost`), or the one whose effect is resolving
  * (CR 608.2); none for a state-based action, which happens only while nothing is resolving (CR 704.3), or a game rule.
  */
-function leaveCause(s: GameState, opts: { cost?: true; destroyedBy?: PlayerId }, controller: PlayerId): PlayerId | undefined {
-  return opts.cost ? controller : (opts.destroyedBy ?? s.resolving?.item.controller);
+function leaveCause(s: GameState, opts: { cost?: true; destroyedBy?: PlayerId; causedBy?: PlayerId }, controller: PlayerId): PlayerId | undefined {
+  return opts.cost ? controller : (opts.causedBy ?? opts.destroyedBy ?? s.resolving?.item.controller);
+}
+
+/** Land Equilibrium (round B278): the sacrifices `o` entering the battlefield now owes (see moveObject). */
+function equilibriumOwed(s: GameState, o: GameObject, opts: { controller?: PlayerId; putBy?: PlayerId; faceDown?: FaceDownKind; entersAs?: Modification[]; becomes?: { types: string[]; subtypes: string[] }; face?: number }, fromZone: GameObject["zone"]) {
+  const scales = s.battlefield.filter((b) => abilitiesOf(s, obj(s, b)).landEquilibrium);
+  if (!scales.length) return;
+  const under = opts.controller ?? o.owner;
+  const putter = opts.putBy ?? under;
+  if (player(s, putter).lost) return;
+  const mods = [...(opts.entersAs ?? []), ...(opts.becomes ? [{ kind: "setTypes" as const, types: opts.becomes.types, subtypes: opts.becomes.subtypes }] : [])];
+  if (!asFace(s, o, fromZone === "stack" ? o.face : opts.face, () => entersAsCreature(s, o, under, opts.faceDown, mods.length ? mods : undefined, "Land"))) return;
+  const lands = (pid: PlayerId) => s.battlefield.filter((b) => b !== o.id && controllerOf(s, obj(s, b)) === pid && objIsType(s, obj(s, b), "Land")).length;
+  for (const b of scales) {
+    const you = controllerOf(s, obj(s, b));
+    if (!opponents(s, you).includes(putter) || lands(putter) < lands(you)) continue;
+    (s.equilibriumDue ??= []).push({ player: putter, source: characteristics(s, obj(s, b)).name, by: you });
+  }
+}
+
+/**
+ * Land Equilibrium (round B278): the sacrifices owed (GameState.equilibriumDue), in order, each of a land its player
+ * chooses among the lands they control now, the one just put there too (rulings). True when one waits on a choice.
+ */
+export function equilibriumSacrifices(s: GameState): boolean {
+  while (s.equilibriumDue?.length) {
+    const d = s.equilibriumDue[0]!;
+    const options = player(s, d.player).lost ? [] : s.battlefield.filter((b) => controllerOf(s, obj(s, b)) === d.player && objIsType(s, obj(s, b), "Land") && canBeSacrificed(s, obj(s, b)));
+    if (options.length > 1) {
+      s.pending = { kind: "pickPermanents", player: d.player, source: d.source, action: "sacrifice", what: "land", options, count: 1, equilibrium: true, prompt: "you put a land onto the battlefield, so sacrifice a land (the new one too, if you like): click it, then sacrifice." };
+      return true;
+    }
+    s.equilibriumDue.shift();
+    if (!s.equilibriumDue.length) s.equilibriumDue = undefined;
+    if (options.length) equilibriumSacrifice(s, d, options[0]!);
+  }
+  return false;
+}
+
+function equilibriumSacrifice(s: GameState, d: { player: PlayerId; source: string; by: PlayerId }, id: ObjectId) {
+  log(s, `${player(s, d.player).name} sacrifices ${nameOf(s, id)} (${d.source}).`);
+  moveObject(s, id, "graveyard", { sacrificed: true, causedBy: d.by });
+  invalidateCharacteristics(s);
+}
+
+/** The land picked for a Land Equilibrium sacrifice (equilibriumSacrifices), then the rest owed and what was going on. */
+function chooseEquilibriumPick(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const d = s.equilibriumDue?.[0];
+  if (pend?.kind !== "pickPermanents" || !pend.equilibrium || pend.player !== p.id || !d) throw new RulesError("nothing to pick");
+  if (ids.length !== 1 || !pend.options.includes(ids[0]!)) throw new RulesError("choose one of the lands offered");
+  s.pending = null;
+  s.equilibriumDue!.shift();
+  if (!s.equilibriumDue!.length) s.equilibriumDue = undefined;
+  equilibriumSacrifice(s, d, ids[0]!);
+  if (equilibriumSacrifices(s)) return;
+  if (s.resolving) continueResolution(s);
 }
 
 export function moveObject(
@@ -929,6 +988,8 @@ export function moveObject(
     cost?: true;
     /** A spell or ability this player controls destroyed it (CR 701.8a), for Karmic Justice. */
     destroyedBy?: PlayerId;
+    /** Land Equilibrium (round B278): the player whose static ability made it leave (the "dies" event's `cause`, Sacred Ground). */
+    causedBy?: PlayerId;
     /** It was destroyed (CR 701.8a), by anything (a state-based action too, CR 704.5g-h), for Jaws, Relentless Predator. */
     destroyed?: true;
     /** Sacrificed for this creature's exploit (CR 702.110a): "if it exploited that creature" (Silumgar Scavenger). */
@@ -1086,6 +1147,13 @@ export function moveObject(
       to = "graveyard";
     }
   }
+  // Land Equilibrium (round B278): "If an opponent who controls at least as many lands as you do would put a land onto the
+  // battlefield, that player instead puts that land onto the battlefield then sacrifices a land of their choice" (CR
+  // 614.1a): a land as it would exist there (CR 614.12), put there by that player (GameObject.putter: playing it, or by a
+  // spell or ability, under anyone's control, rulings), the lands counted before it enters (entering with others, those
+  // aren't on the battlefield yet either). One sacrifice for each Land Equilibrium that applies (CR 614.5), made right after
+  // the instruction or action that put it there (equilibriumSacrifices).
+  if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged") equilibriumOwed(s, o, opts, fromZone);
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -7704,7 +7772,7 @@ export function castProblem(
   const manySpecs = specs.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
-    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x, targets));
+    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x, targets), manyOfferSizes(s, { targets: specs, effects: [], text: "" }, pid, sq, id));
     if (typeof fit === "string") return fit;
     [specs, targets] = [fit.body.targets, fit.targets];
   }
@@ -7858,6 +7926,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
   // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
+  // Emblazoned Golem (round B279): "Spend only colored mana on X. No more than one mana of each color may be spent this way."
+  const golemKicked = !!compileCard(d).kickXOneOfEachColor && kicks.includes(0) && !how.faceDown && x > 0;
   const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice) + replicateMana(s, pid, d, how.replicate) + offspringMana(s, pid, d, how.offspring);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
@@ -8022,7 +8092,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const kx = x * xCount(kicked);
     // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
     const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o, d) : 0;
-    return costAtLeast(s, { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) });
+    const r = { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) };
+    // Emblazoned Golem (round B279): its kicker's X, paid as it's cast free, one mana of each of X colors.
+    return costAtLeast(s, golemKicked ? oneOfEachColorX(r, x) : r);
   }
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o, d) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
@@ -8094,7 +8166,20 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const xPaid = (onX || onXHybrid) && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
   if (xPaid && onXHybrid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "hybrid" as const, options: [...onXHybrid] }))] }, extra: extra - xPaid });
   if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
+  // Emblazoned Golem (round B279): X's part of the generic mana, less the reductions (which may take off X, as Drain Life's
+  // rulings say), paid one mana of each of that many colors (CR 601.2g-h). Mana that may be spent as though it were mana
+  // of any type or color pays only its own color here, a payment that's legal either way.
+  if (golemKicked) return costAtLeast(s, oneOfEachColorX({ cost: reducedCost, extra }, Math.max(0, x - less)));
   return costAtLeast(s, { cost: reducedCost, extra });
+}
+
+/**
+ * Emblazoned Golem (round B279): `n` of the total cost's generic mana (its kicker's X) as hybrid symbols of the five colors,
+ * no two paid with the same color (CostSymbol `distinct`, payFromPool); more than five can't be paid.
+ */
+function oneOfEachColorX(r: { cost: ParsedCost; extra: number }, n: number): { cost: ParsedCost; extra: number } {
+  const k = Math.min(r.extra, n);
+  return k > 0 ? { cost: { ...r.cost, symbols: [...r.cost.symbols, ...Array.from({ length: k }, () => ({ kind: "hybrid" as const, options: [...COLORS], distinct: true as const }))] }, extra: r.extra - k } : r;
 }
 
 /**
@@ -8973,6 +9058,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   const madness = madnessCastOf(s, p.id, id);
   const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
+  // Alaundo the Seer (round B279): a creature spell cast with its granted trigger gains haste until end of turn (CR 400.7a).
+  const hasteEot = s.pending?.kind === "castFree" && !!s.pending.hasteEot && s.pending.objectId === id;
   const d = defOf(s, o);
   const spell = compileCard(d).spell;
   // Modes first (CR 601.2b), then the targets they need (601.2c).
@@ -9000,7 +9087,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (body && spell?.modal?.chooser) body = { ...body, targets: bindModeChooser(body.targets, choices.modeChooser) };
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
-    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x, targets)) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x, targets), manyOfferSizes(s, body, p.id, sourceQuality(s, id), id)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   // "Target creature of an opponent's choice they control" (Evangelize): the opponents' picks (askChoosers), its targets
@@ -9131,6 +9218,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     // "If you cast a creature spell this way, that creature enters with an additional +1/+1 counter on it" (CR 614.1c).
     if (how?.creatureCounter && isType(d, "Creature")) o.extraCounters = { ...o.extraCounters, "+1/+1": (o.extraCounters?.["+1/+1"] ?? 0) + 1 };
   }
+  if (hasteEot && isType(d, "Creature") && o.hasteCast !== "game") o.hasteCast = "endOfTurn";
   const via = graveyardWay(s, o, choices.via, p.id);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
   if (via?.kind === "turnPermission") {
@@ -11547,7 +11635,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const manySpecs = body.targets.filter((t) => t.many === "any" && !t.skip);
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
-    const fit = fitMany(body, targets, manyX(s, body.targets, pid, id, x));
+    const fit = fitMany(body, targets, manyX(s, body.targets, pid, id, x), manyOfferSizes(s, body, pid, activatedQuality(s, id), id));
     if (typeof fit === "string") return fit;
     [body, targets] = [fit.body, fit.targets];
   }
@@ -12032,7 +12120,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   if (manySlot(body.targets) >= 0) {
-    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x), manyOfferSizes(s, body, p.id, activatedQuality(s, id), id)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   if (chooserSlots(body.targets).length) [body, targets] = withChosenTargets(body, targets, costs);
@@ -12452,7 +12540,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
   // Another player choosing the target for the ability's controller (TargetSpec.chosenBy): legal for the controller.
   const controller = pend.controller ?? p.id;
-  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, controller, t.sourceId, t.x ?? 0));
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, controller, t.sourceId, t.x ?? 0), manyOfferSizes(s, { targets: pend.specs, effects: [], text: "" }, controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId));
   if (typeof fit === "string") throw new RulesError(fit);
   const problem = targetProblem(s, fit.body.targets, fit.targets, controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
@@ -12519,6 +12607,8 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   if (pend?.kind === "pickPermanents" && pend.wind) return chooseWindPick(s, p, ids);
+  if (pend?.kind === "pickPermanents" && pend.equilibrium) return chooseEquilibriumPick(s, p, ids);
+  if (pend?.kind === "pickPermanents" && pend.mirrorStay !== undefined) return chooseMirrorStay(s, p, ids);
   const r = s.resolving;
   if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "damageCreature" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
@@ -16949,7 +17039,7 @@ function afterAction(s: GameState, holdTriggers = false) {
   runStateBasedActions(s, holdTriggers);
 }
 
-export function runStateBasedActions(s: GameState, holdTriggers = false) {
+export function runStateBasedActions(s: GameState, holdTriggers = false, onePass = false) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
   // Temporal Aperture's grant, once its card isn't on top any more, never comes back (CR 611.2b).
   if (s.topFreePlays) endTopFreePlays(s);
@@ -16988,6 +17078,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       if (reason) changed = playerLoses(s, p.id, reason, false, true) || changed;
     }
     s.loseChoice = undefined;
+    s.mirrorStay = undefined;
     // Start your engines!: a player with no speed who controls a permanent with it gets speed 1 (704.5aa).
     for (const p of s.players)
       if (!p.lost && p.speed === undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).startYourEngines)) {
@@ -17077,6 +17168,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     }
     if (attachmentSBAs(s)) changed = true;
     if (battleSBAs(s)) changed = true; // 704.5v-y
+    // Land Equilibrium (round B278): a land put there by an action or outside a resolution (CR 614.1a).
+    if (!s.pending && s.equilibriumDue?.length && equilibriumSacrifices(s)) return;
     if (!s.pending && s.entersChoices?.length && askEntersChoice(s)) return;
     if (roleSBAs(s)) changed = true; // 704.5z
     if (sagaSBAs(s)) changed = true; // 704.5s
@@ -17099,9 +17192,12 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       delete s.objects[o.id];
       changed = true;
     }
-    if (!changed) break;
+    // `onePass`: one check's actions only (Lich's Mirror's look ahead, mirrorBound).
+    if (!changed || onePass) break;
   }
   s.leftTogether = undefined;
+  // These state-based actions are done with (Lich's Mirror's loop, playerLoses).
+  s.mirrorRepeat = undefined;
   checkGameOver(s);
   // Cards that went to a graveyard together are arranged as they get there, before triggers go on the stack (CR 404.3).
   if (!s.over && !s.pending && !holdTriggers && askGraveyardOrder(s)) return;
@@ -17382,7 +17478,7 @@ export function drawGame(s: GameState, reason: string) {
 }
 
 /** A replacement of `pid`'s game loss (CR 614.1a): `key` is the chooseOption answer, "loseReplacement". */
-type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /** It stays, to die as the same state-based actions are performed. */ graveyard?: true; reversal?: number };
+type LoseOption = { key: string; label: string; life: number; id?: ObjectId; /** It stays, to die as the same state-based actions are performed. */ graveyard?: true; reversal?: number; /** Lich's Mirror's (round B280). */ mirror?: true };
 
 /**
  * Whether a permanent dies as the state-based actions now being performed are (CR 704.5f-h): zero toughness, lethal or
@@ -17406,6 +17502,9 @@ export function loseReplacements(s: GameState, pid: PlayerId, sba = false): Lose
   const out: LoseOption[] = [];
   for (const id of s.battlefield) {
     const o = obj(s, id);
+    // Lich's Mirror (round B280): shuffle, draw seven, life 20 (lichsMirror).
+    if (controllerOf(s, o) === pid && abilitiesOf(s, o).loseGameMirror)
+      out.push({ key: `mirror:${id}`, id, life: 20, mirror: true, label: `${nameOf(s, id)}: shuffle your hand, your graveyard and all permanents you own into your library, then draw seven cards and your life total becomes 20` });
     const how = controllerOf(s, o) === pid ? abilitiesOf(s, o).loseGameExileSelf : undefined;
     if (!how) continue;
     const life = how === "startingLife" ? STARTING_LIFE : 1;
@@ -17427,18 +17526,130 @@ function lossReasonNow(s: GameState, p: Player): string | undefined {
   return p.loseDeferred;
 }
 
+/**
+ * Lich's Mirror (round B280): "shuffle your hand, your graveyard, and all permanents you own into your library, then draw
+ * seven cards and your life total becomes 20" (the life total in playerLoses). All at once, whoever controls the permanents
+ * (rulings), as Sway of the Stars does: tokens cease to exist (CR 111.7, 704.5d), a commander may go to the command zone
+ * (CR 903.9b), spells, exiled cards and permanents others own stay; `stay`: those whose controllers chose the graveyard
+ * these state-based actions put them into (askMirrorStay). Fewer than seven cards to draw, the player loses at the next
+ * check (rulings). It isn't a restart: no mulligan.
+ */
+function lichsMirror(s: GameState, pid: PlayerId, src: string, reason: string, stay: Set<ObjectId>) {
+  const p = player(s, pid);
+  log(s, `${p.name} would lose the game (${reason}), but shuffles their hand, graveyard and permanents into their library instead, then draws seven cards and their life total becomes 20 (${src}).`);
+  const leaving = s.battlefield.filter((id) => obj(s, id).owner === pid && !stay.has(id));
+  for (const id of leaving) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "library");
+  for (const id of [...p.hand, ...p.graveyard]) moveObject(s, id, "library");
+  shuffleLibrary(s, p);
+  invalidateCharacteristics(s);
+  // A draw that pauses for a replacement choice finishes after it (as for Stunning Reversal).
+  draw(s, pid, 7);
+}
+
+/**
+ * Lich's Mirror (round B280): whether its replacement of `pid`'s loss in these state-based actions has left them just as
+ * the last one did: the same loss comes back at the next check and the Mirror (one they control but don't own, so it
+ * stayed) replaces it the same way, forever, a loop no one can stop: the game is a draw (CR 104.4b; rulings).
+ */
+function mirrorLoops(s: GameState, pid: PlayerId, mirror: ObjectId, reason: string): boolean {
+  const p = player(s, pid);
+  const key = JSON.stringify([mirror, reason, p.life, p.poison ?? 0, p.commanderDamage, p.hand.length, p.graveyard.length, p.library.length, s.battlefield.filter((id) => obj(s, id).owner === pid).length]);
+  const before = s.mirrorRepeat?.find((r) => r.player === pid);
+  if (before?.key === key) return true;
+  s.mirrorRepeat = [...(s.mirrorRepeat ?? []).filter((r) => r.player !== pid), { player: pid, key }];
+  return false;
+}
+
 /** Ask a player who would lose the game now which of several replacements applies (CR 616.1), before the state-based actions are performed. */
 function askLoseReplacement(s: GameState): boolean {
   for (const p of s.players) {
-    if (p.lost || s.loseChoice?.player === p.id) continue;
+    if (p.lost) continue;
     const reason = lossReasonNow(s, p);
     if (!reason || gameEndBlocked(s, p.id, "lose")) continue;
     const opts = loseReplacements(s, p.id, true);
-    if (opts.length < 2) continue;
-    s.pending = { kind: "chooseOption", player: p.id, source: "Losing the game", what: "loseReplacement", options: opts.map((o) => o.key), labels: opts.map((o) => o.label), prompt: `you would lose the game (${reason}). Which replacement applies?` };
+    const chosen = s.loseChoice?.player === p.id ? s.loseChoice.choice : undefined;
+    if (opts.length >= 2 && chosen === undefined) {
+      s.pending = { kind: "chooseOption", player: p.id, source: "Losing the game", what: "loseReplacement", options: opts.map((o) => o.key), labels: opts.map((o) => o.label), prompt: `you would lose the game (${reason}). Which replacement applies?` };
+      return true;
+    }
+    // Lich's Mirror (round B280): the permanents this player owns that these state-based actions put into a graveyard too.
+    const pick = opts.length === 1 ? opts[0] : opts.find((o) => o.key === chosen);
+    if (pick?.mirror && askMirrorStay(s, p.id, pick.id!)) return true;
+  }
+  return false;
+}
+
+/**
+ * Lich's Mirror (round B280): a player would lose the game as the state-based actions are performed, and the Mirror's
+ * replacement applies, while the same check would put some of the permanents they own into a graveyard (dying, the legend
+ * rule, ...): both can't happen, so each one's controller chooses which (rulings: "the creature's controller chooses"; one
+ * put into the graveyard isn't shuffled in, and its "dies" abilities trigger only then). Asked of each such controller in
+ * turn order from the active player (CR 101.4), before this check's actions are performed (CR 704.3).
+ */
+function askMirrorStay(s: GameState, pid: PlayerId, mirror: ObjectId): boolean {
+  let entry = s.mirrorStay?.find((e) => e.player === pid);
+  if (!entry) {
+    entry = { player: pid, bound: mirrorBound(s, pid), asked: [], stay: [] };
+    (s.mirrorStay ??= []).push(entry);
+  }
+  for (const c of turnOrderFrom(s, s.activePlayer)) {
+    if (entry.asked.includes(c) || player(s, c).lost) continue;
+    const mine = entry.bound.filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === c);
+    if (!mine.length) continue;
+    const loser = c === pid ? "you" : player(s, pid).name;
+    s.pending = {
+      kind: "pickPermanents",
+      player: c,
+      source: nameOf(s, mirror),
+      action: "choose",
+      what: "permanent",
+      options: mine,
+      count: mine.length,
+      min: 0,
+      mirrorStay: pid,
+      prompt: `${c === pid ? "you would lose the game" : `${loser} would lose the game`}, so ${c === pid ? "your" : "their"} hand, graveyard and permanents are shuffled into ${c === pid ? "your" : "their"} library instead. These ${c === pid ? "" : `permanents ${loser} owns that you control `}would also be put into a graveyard now: click the ones that go to the graveyard instead (the rest are shuffled in).`,
+    };
     return true;
   }
   return false;
+}
+
+/**
+ * The permanents `pid` owns that this check of the state-based actions would destroy or put into a graveyard (Lich's
+ * Mirror, round B280): those it would destroy (lethal damage or deathtouch, so regeneration could still apply) or with no
+ * toughness, and every one the rest of this pass moves off the battlefield (no loyalty, the legend and world rules,
+ * Auras, Sagas, battles, roles), found by performing one pass on a copy of the game in which no player loses.
+ */
+function mirrorBound(s: GameState, pid: PlayerId): ObjectId[] {
+  const owned = s.battlefield.filter((id) => obj(s, id).owner === pid);
+  const c = structuredClone(s);
+  c.pending = null;
+  c.loseChoice = undefined;
+  c.mirrorStay = undefined;
+  for (const q of c.players) {
+    if (q.lost) continue;
+    q.life = Math.max(q.life, 1);
+    q.poison = 0;
+    q.commanderDamage = {};
+    q.drewFromEmptyLibrary = false;
+    q.loseDeferred = undefined;
+  }
+  invalidateCharacteristics(c);
+  runStateBasedActions(c, true, true);
+  return owned.filter((id) => diesThisCheck(s, obj(s, id)) || c.objects[id]?.zone !== "battlefield" || (c.objects[id]!.zoneChanges ?? 0) !== (obj(s, id).zoneChanges ?? 0));
+}
+
+/** Lich's Mirror's answer (askMirrorStay): the permanents picked go to the graveyard with these state-based actions instead. */
+function chooseMirrorStay(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  if (pend?.kind !== "pickPermanents" || pend.mirrorStay === undefined || pend.player !== p.id) throw new RulesError("nothing to pick");
+  const entry = s.mirrorStay?.find((e) => e.player === pend.mirrorStay);
+  if (!entry) throw new RulesError("nothing to pick");
+  if (ids.some((id) => !pend.options.includes(id)) || new Set(ids).size !== ids.length) throw new RulesError("choose among the permanents offered");
+  entry.asked.push(p.id);
+  entry.stay.push(...ids);
+  log(s, ids.length ? `${p.name} has ${ids.map((id) => nameOf(s, id)).join(", ")} go to the graveyard instead (${pend.source}).` : `${p.name} has every one of them shuffled into the library (${pend.source}).`);
+  s.pending = null;
 }
 
 /**
@@ -17465,7 +17676,13 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   }
   if (pick) {
     const src = pick.reversal !== undefined ? p.loseInstead![pick.reversal]!.source : nameOf(s, pick.id!);
-    if (pick.reversal !== undefined) {
+    if (pick.mirror) {
+      // Lich's Mirror (round B280): the life total below.
+      const entry = sba ? s.mirrorStay?.find((e) => e.player === pid) : undefined;
+      s.mirrorStay = s.mirrorStay?.filter((e) => e.player !== pid);
+      if (!s.mirrorStay?.length) s.mirrorStay = undefined;
+      lichsMirror(s, pid, src, reason, new Set(entry?.stay ?? []));
+    } else if (pick.reversal !== undefined) {
       // Stunning Reversal: one shield used up; the seven draws, then the life total (with fewer than seven cards, the
       // player loses at the next check, rulings). A draw that pauses for a replacement choice finishes after it.
       p.loseInstead = p.loseInstead!.filter((_, i) => i !== pick.reversal);
@@ -17480,6 +17697,7 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
     if (p.life < pick.life && canGainLife(s, pid)) gainLife(s, pid, pick.life - p.life, { controller: pid });
     else if (p.life > pick.life && canLoseLife(s, pid)) loseLife(s, pid, p.life - pick.life);
     invalidateCharacteristics(s);
+    if (pick.mirror && sba && mirrorLoops(s, pid, pick.id!, reason)) drawGame(s, `${src} replaces ${p.name}'s loss again and again, and nothing can stop it`);
     return true;
   }
   p.lost = true;

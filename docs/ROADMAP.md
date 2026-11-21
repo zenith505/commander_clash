@@ -1,7 +1,7 @@
 # Roadmap
 
-31,817 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,984 of 4,988 (99%), top 10,000: 9,948 of
+31,823 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,949 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -58,7 +58,7 @@ line blocks.
    Heroes' Advocate ("Heroes" in the plural isn't read as a creature type) and Rashel ("Auras you control have exalted"
    on noncreature permanents). Out after round 160: Zenos yae Galvus // Shinryu (a creature chosen as it enters,
    remembered on the permanent; "as this transforms, choose an opponent"; "when the chosen player loses the game, you
-   win"); Filigree Vector (two "any number of target" slots in one ability: only one per ability is modeled); Kaito,
+   win"); Filigree Vector (done in round B280) (two "any number of target" slots in one ability: only one per ability is modeled); Kaito,
    Bane of Nightmares (a planeswalker that's a creature during your turn, with ninjutsu onto its loyalty); Elenda,
    Saint of Dusk ("hexproof from instants": hexproof from a card type isn't modeled, only from colors); Xu-Ifit,
    Osteoharmonist (the creature "has no abilities" as it enters, so its own enters-tapped, enters-with-counters and "as
@@ -1335,7 +1335,7 @@ line blocks.
    you may cast it this turn" (Conspiracy Theorist); "ward {X}, where X is the number of experience counters you have"
    (Minthara, Merciless Soul); "All damage is dealt as though its source had wither" (Everlasting Torment). +12 (28,710
    of 31,936).
-   Out after round 229 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability, only one
+   Out after round 229 (looked at, not done): Filigree Vector (done in round B280) (two "any number of target" sets in one ability, only one
    is supported); Mariposa Military Base (an opt-in "enter tapped with rad counters" choice when the land is played;
    "rad counters you have" now counts); Font of Agonies (no "whenever you pay life" event yet); Tromokratis ("can't be
    blocked unless all creatures defending player controls block it": a block legality rule and bot blocking).
@@ -2441,7 +2441,7 @@ line blocks.
    an attacker's defender after attacks are declared); Flickerform (exiled Auras returned attached to the card that comes
    back, those that can't enchant it staying exiled, rulings); Breath of Fury (the Aura attached to another creature after
    its own is sacrificed, then an extra combat after this phase); Captain America, First Avenger ("Unattach an Equipment
-   from ~" as a cost, its mana value the damage divided among one to three targets); Filigree Vector (still out, as after
+   from ~" as a cost, its mana value the damage divided among one to three targets); Filigree Vector (done in round B280) (still out, as after
    round 345).
    Round 352 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards with four or
    more card types among them, casualty X and imprinting for X: Nethergoyf's "Escape—{2}{B}, Exile any number of other
@@ -2960,7 +2960,7 @@ line blocks.
    it isn't a mana ability, CR 605.1a, rulings; the mana may pay for anything but a nonartifact spell, rulings). Browser
    tests click through Averna's land pick, Reap's targets and Rift Elemental's counter picker. No new prompts. +4, 31,400
    of 31,936 with rounds 369-371 and Lane B's B209-B212. The compiled text of every other card is unchanged.
-   Out after round 372 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 372 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability); Kraven the Hunter (the greatest power among a player's creatures immediately before several die at once, CR
    603.10a: the creatures that stay are read as they are after); Abstruse Appropriation ("spend colorless mana as though it
    were mana of any color": a hybrid symbol can't hold {C} yet); Pulmonic Sliver, Spectral Searchlight and Mysterious
@@ -3201,7 +3201,7 @@ line blocks.
    permanent entering); Wayta, Trainer Prodigy ("If a creature you control being dealt damage causes a triggered ability
    ... to trigger": only abilities whose trigger condition is about damage dealt to a creature you control, rulings,
    which needs every damage trigger event to say which creatures were dealt damage; and its fight's cost reduction "if it
-   targets two creatures you control"); Filigree Vector (still out: two "any number of target" sets in one ability);
+   targets two creatures you control"); Filigree Vector (done in round B280) (still out: two "any number of target" sets in one ability);
    Guff Rewrites History, Sunken Palace, Ulalek, Possibility Storm, Gale, Waterdeep Prodigy and the rest above rank 5,500
    (still out, for the reasons in their earlier lists).
    Polish: Sokrates's prevention and draws log under the creature's name ("prevented (Craw Wurm)"), not Sokrates's; a
@@ -3263,7 +3263,7 @@ line blocks.
    Out after round 383 (looked at, not done): Reed Richards, Smartest Man (still out: with Alhammarret's Archive replacing
    the same first draw, whether the Archive's two draws are still "the first time you would draw" isn't settled, CR 614.6,
    616.1); Lodestone Bauble (still out: a player chosen as it's activated even with no target, rulings); Pulmonic Sliver,
-   Filigree Vector, Lich's Mirror, Over the Top (done in round 389), Vault 11: Voter's Dilemma (done in round 416), Riddles in the Dark and the rest above rank
+   Filigree Vector (done in round B280), Lich's Mirror (done in round B280), Over the Top (done in round 389), Vault 11: Voter's Dilemma (done in round 416), Riddles in the Dark and the rest above rank
    14,000 (still out, for the reasons in their earlier lists).
    Polish: Explosion of Riches's reflexive triggers log the target before "triggers ... targeting" (two lines for each).
    Round 384 went on down `npm run popular` and the "Out after round N" lists, most played first, to a council's dilemma
@@ -3366,7 +3366,7 @@ line blocks.
    can't be blocked this turn" (counted once as it resolves, CR 608.2h, 611.2c). A browser test clicks through Oko's −6
    and its creature type pick. +4, 31,498 of 31,936. The compiled text of every other card is unchanged. Bots use their
    usual creature type pick (the type most common among their creatures and cards in hand) for Oko's emblem.
-   Out after round 387 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 387 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability); Abstruse Appropriation (still out: colorless mana spent as though it were any color, which hybrid payment
    options can't hold); The Pandorica (done in round 389) (its phasing lock needs main's round B223 code, not on this branch's chain yet: next
    round after the chain merges); Kraven the Hunter (still out: the greatest power among a player's creatures immediately
@@ -3414,7 +3414,7 @@ line blocks.
    Brawl's targets (Ben's creature refused) and Over the Top's Aura host pick; no new prompts. +3, 31,542 of 31,936. The
    compiled text of every other card is unchanged.
    Out after round 389 (looked at, not done): Lodestone Bauble (still out: a player chosen as it's activated even with
-   no target); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror, Immortal
+   no target); Daring Thief (done in round 393) and Lagrella, the Magpie (still out, as in their earlier lists); Lich's Mirror (done in round B280), Immortal
    Coil (done in round B262), Supper for Spiders, Verdant Mastery (done in round 390), Duelist's Flame (done in round 402), Wizard's Spellbook and the rest above rank 15,000 (still
    out, for the reasons in their earlier lists).
    Round 390 went on down `npm run popular` and the "Out after round N" lists, most played first: Glimpse of Tomorrow's
@@ -3438,7 +3438,7 @@ line blocks.
    opponent and the three-way search, and Sanctuary Blade's color as it's equipped. +4, 31,546 of 31,936. The compiled text
    of every other card is unchanged.
    Out after round 390 (looked at, not done): Psychic Paper (still out: a name and a creature type chosen as it becomes
-   attached, the equipped creature's name changed); Lich's Mirror, Immortal Coil (done in round B262), Supper for Spiders, Duelist's Flame (done in round 402),
+   attached, the equipped creature's name changed); Lich's Mirror (done in round B280), Immortal Coil (done in round B262), Supper for Spiders, Duelist's Flame (done in round 402),
    Wizard's Spellbook, Lodestone Bauble and the rest above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 391 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards exiled in a
    face-down pile, shuffled, then manifested or cloaked, and every creature a player controls attacking during their next
@@ -3487,7 +3487,7 @@ line blocks.
    compiled text of every other card is unchanged. Known limit: a token creature exiled by Lukka's −2 is gone, so its
    mana value reads as 0.
    Out after round 392 (looked at, not done): Jasmine Boreal of the Seven (done in round 426) (every effect that gives spells abilities);
-   Filigree Vector (two "any number of target" slots in one ability); Kraven the Hunter (the greatest power among
+   Filigree Vector (done in round B280) (two "any number of target" slots in one ability); Kraven the Hunter (the greatest power among
    creatures that died at once); Battlefield Thaumaturge (a creature targeted twice by one spell, rulings unclear for the
    discount); Celestial Reunion (done in round 426) (a creature type chosen as it's cast and behold two as an optional cost); Capricopian,
    Wayta, Archelos, Metamorphic Alteration, Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
@@ -3512,7 +3512,7 @@ line blocks.
    exiles a permanent isn't recorded on zone moves); Lodestone Bauble (a player chosen as it's activated even with no
    target); Whims of the Fates (three piles of permanents); C.A.M.P. (the colors of the mana its land produced);
    Abandoned Sarcophagus (done in round B240) ("it wasn't cycled"); Helm of Kaldra (which Equipment when you control several with a name);
-   Kraven the Hunter, Jasmine Boreal, Filigree Vector and the rest above rank 15,000 (still out, for the reasons in their
+   Kraven the Hunter, Jasmine Boreal, Filigree Vector (done in round B280) and the rest above rank 15,000 (still out, for the reasons in their
    earlier lists).
    Round 394 went on down `npm run popular` and the "Out after round N" lists, most played first, to tokens created under
    another player's control, attacking creatures that died coming back, and Curses moving between players: Crafty
@@ -3573,7 +3573,7 @@ line blocks.
    (CR 611.2b). Browser tests click through Zygon's ability, the Blade's target and "you may", and the Aegis's pick. +3,
    31,584 of 31,936. The compiled text of every other card is unchanged.
    Out after round 396 (looked at, not done): Secret Invasion (done in round B276) (still out: the enchanted creature a copy of the creature
-   the Aura exiled, until the Aura leaves); Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility
+   the Aura exiled, until the Aura leaves); Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Filigree Vector (done in round B280), Possibility
    Storm, Arvinox and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 397 went on down `npm run popular` and the "Out after round N" lists, most played first, below rank 15,479:
    Jeskai Infiltrator's "When this creature deals combat damage to a player, exile it and the top card of your library in a
@@ -3707,7 +3707,7 @@ line blocks.
    abilities, an opponent's first, or nothing; they no longer keep a permanent tapped for an effect on that permanent
    itself. Browser tests click through Fence's choice (a permanent, and nothing) and the Net's activation. +3, 31,637 of
    31,936 on this stacked branch. The compiled text of every other card is unchanged.
-   Out after round 402 (looked at, not done): Filigree Vector (two "any number of target" slots), Helm of Kaldra (which
+   Out after round 402 (looked at, not done): Filigree Vector (done in round B280) (two "any number of target" slots), Helm of Kaldra (which
    Equipment "those Equipment" are with more than one of a name), Archelos, Lagoon Mystic, Pulmonic Sliver, Capricopian,
    Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular`
    above rank 15,000 (still out, for the reasons in their earlier lists).
@@ -3761,7 +3761,7 @@ line blocks.
    card compiling as on main but the seven of rounds 403 and 404.
    Out after round 404 (looked at, not done): Jasmine Boreal of the Seven (done in round 426) ("Spend this mana only to cast creature spells
    with no abilities": abilities given to a spell, such as a granted convoke, cascade or offspring, count, rulings, and the
-   mana spending check sees only the card's printed text); Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales,
+   mana spending check sees only the card's printed text); Pulmonic Sliver, Filigree Vector (done in round B280), Tamiyo, Collector of Tales,
    Wayta, Trainer Prodigy, Celestial Reunion (done in round 426), Helm of Kaldra, Guff Rewrites History, Sunken Palace, Ulalek, Surge to
    Victory, Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their
    earlier lists).
@@ -3790,7 +3790,7 @@ line blocks.
    branch (with round 404, B248 and B249). The compiled text of every other card is unchanged.
    Out after round 405 (looked at, not done): Spirit of Resilience copies a card judged by its printed types, not by an
    effect that changed them in the graveyard (Encroaching Mycosynth; no ruling either way); Jasmine Boreal of the Seven (done in round 426),
-   Pulmonic Sliver, Filigree Vector, Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion (done in round 426), Helm of Kaldra,
+   Pulmonic Sliver, Filigree Vector (done in round B280), Tamiyo, Collector of Tales, Wayta, Trainer Prodigy, Celestial Reunion (done in round 426), Helm of Kaldra,
    Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists).
    Round 406 went on down `npm run popular`, most played first, to three cards left out before. Lazav, Dimir Mastermind's
@@ -3815,7 +3815,7 @@ line blocks.
    Out after round 406 (looked at, not done): Taskmaster, Mercenary Mimic ("up to one target creature on the battlefield or
    creature card in a graveyard" with "he's a legendary Human Mercenary Villain creature" and no rulings on which types it
    keeps); Niko, Light of Hope (done in round 426) ("until the next end step" copies); Abstruse Appropriation, Jasmine Boreal of the Seven (done in round 426),
-   Pulmonic Sliver, Filigree Vector, Wayta, Trainer Prodigy, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory,
+   Pulmonic Sliver, Filigree Vector (done in round B280), Wayta, Trainer Prodigy, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory,
    Possibility Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier
    lists).
    Round 407 went on down `npm run popular`, most played first, to four cards left out before. The Flood of Mars's "Whenever
@@ -3837,7 +3837,7 @@ line blocks.
    on this stacked branch. The compiled text of every other card is unchanged.
    Out after round 407 (looked at, not done): Havengul Laboratory // Havengul Mystery (its back face's link to "the creature
    put onto the battlefield with ~" across transforming, no rulings), Taskmaster, Niko, Abstruse Appropriation, Pulmonic
-   Sliver, Filigree Vector, Wayta, Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the
+   Sliver, Filigree Vector (done in round B280), Wayta, Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the
    reasons in their earlier lists).
    Round 408 went on down `npm run popular`, most played first, to two cards left out before. Abstruse Appropriation's
    "Exile target nonland permanent. You may cast that card for as long as it remains exiled, and you may spend colorless
@@ -3861,7 +3861,7 @@ line blocks.
    and its {X} copy pick, Abstruse Appropriation's cast from exile with Wastes, and Tibalt's back face, +2 and the Bolt its
    emblem casts. +2, 31,666 of 31,936 on this stacked branch. The compiled text of every other card is unchanged.
    Out after round 408 (looked at, not done): Xanathar, Guild Kingpin (done in round 412) (playing the top card of another player's library,
-   which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta,
+   which only you may look at); Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector (done in round B280), Wayta,
    Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 409 went on down `npm run popular`, most played first, past cards left out before to three it could do whole.
    Portent of Calamity's "Reveal the top X cards of your library. For each card type, you may exile a card of that type
@@ -3886,7 +3886,7 @@ line blocks.
    Out after round 409 (looked at, not done): God-Eternal Kefnet ("You may reveal the first card you draw each turn as you
    draw it": a choice in the middle of any draw, before the card joins the hand, rulings; draws don't pause yet); Karn
    Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
-   Triplets (done in round 412), Xanathar (done in round 412), Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector, Wayta and the rest
+   Triplets (done in round 412), Xanathar (done in round 412), Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector (done in round B280), Wayta and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 410 took two cards back off the "Out after round N" lists, most played first: keyword costs a permanent gives the
    spells you cast "as you cast them". Zinnia, Valley's Voice's "Creature spells you cast gain offspring {2} as you cast
@@ -3932,7 +3932,7 @@ line blocks.
    Out after round 411 (looked at, not done): Cryptic Spires ("as you create your deck, circle two of the colors": the
    circled colors are copiable values, rulings, and whether they count toward a Commander deck's color identity isn't
    settled); Nephalia Academy (an optional replacement at every discard an opponent's spell or ability causes, which
-   would need a pause inside every discard); Sunken Palace, Ulalek, Surge to Victory, Filigree Vector, Possibility Storm
+   would need a pause inside every discard); Sunken Palace, Ulalek, Surge to Victory, Filigree Vector (done in round B280), Possibility Storm
    and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 412 went on down `npm run popular`, most played first, past cards left out before to two upkeep triggers that let
    you play another player's cards for the turn. Xanathar, Guild Kingpin's "At the beginning of your upkeep, choose
@@ -4043,7 +4043,7 @@ line blocks.
    target and the copy's new one). +5, 31,705 of 31,936 on this stacked branch (31,711 with round 414's main 99e27a4 merge, B257 and
    B258). The compiled text of every other card is unchanged.
    Out after round 415 (looked at, not done): Sunken Palace (its mana's copy trigger for an ability it's spent on: spent
-   mana triggers only spells now), Filigree Vector (two "any number of target" groups in one ability), Ulalek, Possibility
+   mana triggers only spells now), Filigree Vector (done in round B280) (two "any number of target" groups in one ability), Ulalek, Possibility
    Storm and the rest of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known
    gaps: with many copies (Radiate on a Lightning Bolt in a full game) you answer the copy-order prompt once per copy; bots
    weigh each copy's target by a rough value, not what the spell actually does to it.
@@ -4071,7 +4071,7 @@ line blocks.
    click through Vault 11's "Vote for no creature" and a vote at chapter III, Blim's target after it hits Ana, Aragorn's
    Ring-bearer, deathtouch counter and target, and Invisible Woman's one Yes for Inspiring Roar. +4, 31,715 of 31,936 on
    this stacked branch. The compiled text of every other card is unchanged.
-   Out after round 416 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 416 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability), Jasmine Boreal of the Seven (done in round 426), Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular` above
    rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: counters put outside a resolving
    instruction are each their own event (a cost, combat damage with wither or infect, replacement-made counters as
@@ -4100,7 +4100,7 @@ line blocks.
    Ana's lands, Arcee's X counters and target, Giant Growth on the Coupe, and Helm of Kaldra's Kaldra. +3, 31,724 of
    31,936 with round 416 and main (B259, B260). The compiled text of every other card is unchanged.
    Out after round 417 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
-   counts once or twice), Lara Croft, Tomb Raider, Filigree Vector, Sunken Palace, Ulalek, Possibility Storm and the rest
+   counts once or twice), Lara Croft, Tomb Raider, Filigree Vector (done in round B280), Sunken Palace, Ulalek, Possibility Storm and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: a converted or transformed
    permanent shows a "Copy" chip in the UI (App.tsx compares its face's key with its card's; on main too); bots don't
    use Arcee's counters or aim spells at it for the trigger on purpose; Lodestone's bot use ignores which lands matter.
@@ -4122,7 +4122,7 @@ line blocks.
    with a kick counter, the copies cast paying their costs since nothing says otherwise, CR 601.2f-h, in the order you
    choose). Browser tests click through Surge's free copy, Gale's graveyard pick and paid cast, Zethi kicked twice and
    its attack. +3, 31,727 of 31,936 on this stacked branch with main 9b0c8ca (B259, B260) merged in; the compiled text of every other card is unchanged.
-   Out after round 418 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 418 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability; fitMany can't tell where the first group ends in the chosen targets), Captain America, First Avenger (its
    damage "divided as you choose" is announced before the cost that picks the Equipment, CR 601.2d, 601.2h, and no ruling
    settles it), Jasmine Boreal of the Seven (done in round 426) (a spell's abilities granted by effects, which its mana can't be spent on per
@@ -4153,7 +4153,7 @@ line blocks.
    and its upkeep trigger, and Balthier and Fran crewing Sky Skiff, attacking and paying for the extra combat. +3, 31,730
    of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
    Out after round 419 (looked at, not done): Supper for Spiders (still out: whether the cards are Food artifacts as they
-   enter), C.A.M.P. (the colors of the mana its land produced), Filigree Vector, Captain America, First Avenger, Jasmine
+   enter), C.A.M.P. (the colors of the mana its land produced), Filigree Vector (done in round B280), Captain America, First Avenger, Jasmine
    Boreal of the Seven, Wayta, Trainer Prodigy, Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular`
    above rank 15,100 (still out, for the reasons in their earlier lists). Known gaps: bots don't save Shifting Shadow for
    a weak creature or a creature-heavy library, nor crew with Balthier and Fran on purpose for its trigger.
@@ -4179,7 +4179,7 @@ line blocks.
    main ba0e12b (B261 to B264) merged in; every other card compiles as on main or on the Lane A chain.
    Out after round 420 (looked at, not done): Lady Loki, Agent of Chaos (exiling the spell that triggered it, then damage
    by the difference of two mana values; next in line), Parnesse, the Subtle Brush, Tahngarth, First Mate, Squall,
-   Gunblade Duelist, Supper for Spiders, C.A.M.P., Filigree Vector and the rest of `npm run popular` above rank 15,100
+   Gunblade Duelist, Supper for Spiders, C.A.M.P., Filigree Vector (done in round B280) and the rest of `npm run popular` above rank 15,100
    (still out, for the reasons in their earlier lists). Known gaps: bots exile the card with the highest mana value with
    Cloak and Dagger and target the first opponent; Kotose's bot use takes any graveyard card.
    Round 421 went on down the "Out after round N" lists and `npm run popular`, most played first. Lady Loki, Agent of
@@ -4228,7 +4228,7 @@ line blocks.
    TriggeredAbility.activates `costSacrificed`). Browser tests click through Possibility Storm's free cast, Knowledge
    Pool's pick of Ana's Lightning Bolt and Ashnod's copy of a Mogg Fanatic's ability. +3, 31,751 of 31,936 on this
    stacked branch with main ba0e12b; the compiled text of every other card is unchanged.
-   Out after round 422 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 422 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability; the targeting code, the browser's target picker and the bots all assume one), Verrak, Warped Sengir (the
    same trigger as Ashnod's on the life paid to activate it, then that much life paid again: looked at, not started), The Seventh Doctor (a card chosen face down
    from the hand and the defending player's guess) and the rest of `npm run popular` above rank 17,500 (still out, for
@@ -4331,7 +4331,7 @@ line blocks.
    `ifKicked`). Browser tests click through Celestial Reunion's offered cost, its type pick and behold pick, and the
    declined cost. +3, 31,784 of 31,936 with main 06f3efa (B268-B271) merged in; the compiled text of every other card is
    unchanged.
-   Out after round 426 (looked at, not done): Filigree Vector ("each of any number of target creatures and ... each of any
+   Out after round 426 (looked at, not done): Filigree Vector (done in round B280) ("each of any number of target creatures and ... each of any
    number of target artifacts": two any-number target groups in one ability, one permanent possibly in both, rulings),
    Arvinox, the Mind Flail ("isn't a creature unless you control three or more permanents you don't own", and cards
    exiled face down from the bottom of each opponent's library that you may look at and cast), Saruman of Many Colors
@@ -4388,7 +4388,7 @@ line blocks.
    is, CR 605.3a, while paying costs and in every payment prompt, which the automatic payment would need to know about),
    Captain America, First Avenger ("deals damage equal to that Equipment's mana value divided as you choose among one,
    two, or three targets": the division is announced, CR 601.2d via 602.2b, before the cost that sets the amount is paid,
-   601.2h, and no ruling says how), Ashiok, Wicked Manipulator, Lich's Mirror, Breathstealer's Crypt and Titania's Song
+   601.2h, and no ruling says how), Ashiok, Wicked Manipulator, Lich's Mirror (done in round B280), Breathstealer's Crypt and Titania's Song
    (still out, for the reasons in their earlier lists), the cards rounds 425-427 left out (still out, for their reasons),
    and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
    bots activate Dynaheir's ability only with an ability of four or more mana they could also pay for; bots sneak a card
@@ -4412,7 +4412,7 @@ line blocks.
    Evelyn object, CompiledCard.playExiledCounteredOnce). A browser test clicks through each. +3, 31,798 of 31,936
    on this stacked branch (round 428 #705, with round 427's head 037bca2 and main 73cb89a in it), 31,802 with main f60fd58
    (Lane B B275-B276) merged in; the compiled text of every other card is unchanged.
-   Out after round 429 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 429 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability, only one per ability is modeled), the cards rounds 425-428 left out (still out, for their reasons), and the
    rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known gaps:
    Metamorphic Alteration's copy effect begins at the next state-based action check after it becomes attached, so an
@@ -4438,7 +4438,7 @@ line blocks.
    Academy's question for an opponent's Chains (twice, the second prompt starting with nothing picked) and C.A.M.P.'s
    trigger. +2, 31,804 of 31,936 on this stacked branch (round 429 #707, with main f60fd58, B275-B276, in it); the compiled text of every other card is
    unchanged.
-   Out after round 430 (looked at, not done): Filigree Vector (still out: two "any number of target" groups in one
+   Out after round 430 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
    ability, only one per ability is modeled), Battlefield Thaumaturge (still out, as after round 386), the cards rounds
    425-429 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for
    the reasons in their earlier lists). Known gaps: bots put back on top with the Academy what they would with Library
@@ -4464,7 +4464,7 @@ line blocks.
    "whenever you waterbend" sees it). Browser tests click through each, Hama's twice (mana, then waterbending). +3, 31,803
    of 31,936 on this stacked branch (round 430 #709), 31,809 with round 430's head 7b21a52 (main 6388275, B277) merged in;
    the compiled text of every other card is unchanged.
-   Out after round 431 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
+   Out after round 431 (looked at, not done): Filigree Vector (done in round B280) and Battlefield Thaumaturge (still out, as after round
    430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
    that creature's, checked with its last known power), Drain Power (mana abilities another player activates for each land,
    then that mana moved), Ertai's Meddling (delay counters, then the card put onto the stack as a copy of the spell), the
@@ -4524,8 +4524,8 @@ line blocks.
    you control on any player's turn any time you could cast an instant." (its controller's Jace planeswalkers as they are
    when activated, the Empower Jace token too; still one loyalty ability of each a turn, CR 606.3, rulings; TurnLog
    loyaltyAtInstantSpeed). Browser tests click through Avacyn's search and its chapter III Yes and No, and The Eleventh
-   Hour's target. +3, 31,815 of 31,936 on this stacked branch (round 432 #714); the compiled text of every other card is
-   unchanged.
+   Hour's target. +3, 31,815 of 31,936 on this stacked branch (round 432 #714), 31,821 with main 7f7b8f6 (B278-B280) merged in;
+   the compiled text of every other card is unchanged.
    Out after round 433 (looked at, not done): Captain America, First Avenger (its "Throw" damage is divided as targets are
    chosen, CR 601.2d, before the cost that unattaches the Equipment fixes the amount, CR 601.2h, and it has no rulings),
    Pulmonic Sliver (still out: an optional "put it on top of its owner's library instead" asked in the middle of any move
@@ -4553,8 +4553,8 @@ line blocks.
    `withLoyalty`) and "Whenever you activate an ability that isn't a mana ability, copy it. You may choose new targets for
    the copy." (Rowan Kenrith's emblem's trigger; the copy isn't activated, rulings). Browser tests click through Eye's
    picker (Done only once the two share a type) and Apex Observatory's card type, its free Colossal Dreadmaw, and The Enigma
-   Jewel's picker and Locus's copied ping. +2, 31,817 of 31,936 on this stacked branch (round 433 #716); the compiled text of
-   every other card is unchanged.
+   Jewel's picker and Locus's copied ping. +2, 31,817 of 31,936 on this stacked branch (round 433 #716), 31,823 with round 433's head 412ee5a (main
+   7f7b8f6, B278-B280) merged in; the compiled text of every other card is unchanged.
    Out after round 434 (looked at, not done): Captain America, First Avenger and Pulmonic Sliver (still out, as after round
    433), Filigree Vector (done in round B280), Drain Power (done in round B281), Battlefield Thaumaturge, Nihiloor,
    Ertai's Meddling and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds 425-430 left out (still out, for their
@@ -4671,7 +4671,7 @@ line blocks.
    +4, 31,107 of 31,936 with B185 and B186. The compiled text of every other card is unchanged. Bots exile the dearest permanent card for
    The Aesir Escape Valhalla and give Extract Brain the cards least useful to its caster. Bot gap: a bot holding Extract
    Brain with mana to spare didn't cast it in a scripted check (it cast its commander and passed).
-   Out after round 345 (looked at, not done): Filigree Vector (still out: "on each of any number of target creatures and
+   Out after round 345 (looked at, not done): Filigree Vector (done in round B280) (still out: "on each of any number of target creatures and
    ... each of any number of target artifacts" is two variable target groups in one ability, and a flat target list
    (fitMany) can't say where the first ends; the UI, bots and fitMany need group boundaries first); Bre of Clan Stoutarm
    (still out: no ruling says whether "Otherwise, put it into your hand" applies when you decline to cast); Pulmonic
@@ -4983,7 +4983,7 @@ line blocks.
    next time you would lose the game this turn, instead draw seven cards and your life total becomes 1." (Stunning
    Reversal, a shield for the turn, for any way of losing but conceding; with fewer than seven cards the player loses at
    the next check, rulings): with several replacements of one loss (these and The Golden Throne), the player chooses one
-   (CR 616.1), a new prompt with browser tests, and one replaces every reason of that check (rulings on Lich's Mirror); an
+   (CR 616.1), a new prompt with browser tests, and one replaces every reason of that check (rulings on Lich's Mirror (done in round B280)); an
    Archangel that dies in the same check may go to the graveyard instead of exile, the life total set either way
    (rulings); a loss an effect causes waits for that choice until the state-based actions are next performed, and a draw
    from an empty library during the replacement counts at the next check; "Surveil 1. If you put a noncreature, nonland
@@ -5002,7 +5002,7 @@ line blocks.
    Not modeled: with Krark's Thumb, Fighting Chance keeps a won flip of each pair for its controller (CR 705.3 is their
    choice); if one of Stunning Reversal's seven draws pauses for a replacement choice (dredge), the life total becomes 1
    before the rest of the draws.
-   Out after round 329 (looked at, not done): Lich's Mirror (the loss replacement now has its choice, but a creature its
+   Out after round 329 (looked at, not done): Lich's Mirror (done in round B280) (the loss replacement now has its choice, but a creature its
    owner controls that dies in the same check may go to the graveyard or be shuffled in, its controller's choice for each,
    rulings); Soul-Scar Mage (damage replaced by -1/-1 counters, in an order against prevention and other replacements the
    creature's controller chooses, rulings); Knowledge Exploitation (still out, for the reason in its earlier list).
@@ -5148,7 +5148,7 @@ line blocks.
    31,936 with round 322, B163 and B164.
    Out after round 323 (looked at, not done): Last Night Together ("only the chosen creatures can attack during that
    combat phase": an attack restriction for one added combat phase), Island Sanctuary (done in round 328) (a draw-step draw skipped for an
-   attack restriction until your next turn), Filigree Vector (still out: two "any number of target" sets in one ability).
+   attack restriction until your next turn), Filigree Vector (done in round B280) (still out: two "any number of target" sets in one ability).
    Bots: they tap lands under Overabundance and Barbflare Gremlin without weighing the damage, remove Overseer of Vault 76's
    counters whenever they can, take Night Soil's cards from an opponent's graveyard first, and don't activate Taii Wakeen's
    {X} ability.
@@ -5313,7 +5313,7 @@ line blocks.
    Out after round 317 (looked at, not done): Encroaching Mycosynth and Biotransference (types in every zone and on
    spells), Crucible of the Spirit Dragon (storage counters with spend-only mana), Jinnie Fay, Mirrormind Crown and
    Moonlit Meditation (token replacement choices), Guff Rewrites History, Possibility Storm, Sokrates, Sunken Palace,
-   Ulalek, Surge to Victory, Norman Osborn, Filigree Vector and the rest above rank 6,800 (still out, for the reasons in
+   Ulalek, Surge to Victory, Norman Osborn, Filigree Vector (done in round B280) and the rest above rank 6,800 (still out, for the reasons in
    their earlier lists); Kusari-Gama, Urgent Necropsy (done in round B247), Spectral Searchlight and Glowcap Lantern (done in round B186) (still out). Bots haven't been
    taught when The Legend of Yangchen's chapter II is worth it (they give it the usual answer to a "you may").
    Round 316 took cards back off the "Out after round N" lists, most played first: a named Equipment token whose granted
@@ -5500,7 +5500,7 @@ line blocks.
    Out after round 309 (looked at, not done): Jinnie Fay, Jetmir's Second, Mirrormind Crown, Moonlit Meditation and Esix,
    Fractal Bloom (still the optional token replacement: "you may instead create ..." needs a choice that can pause token
    creation, which about a dozen effects do without pausing today); Spectral Searchlight and Radiant Lotus (mana for
-   another player, chosen inside a mana ability); Filigree Vector (still two "any number of target" groups in one
+   another player, chosen inside a mana ability); Filigree Vector (done in round B280) (still two "any number of target" groups in one
    ability); Breathkeeper Seraph (a granted "you may return it ... at the beginning of your next upkeep", whose "your" is
    the paired creature's controller); Espers to Magicite (a reflexive target among the cards exiled this way).
    Round 308 took cards back off the "Out after round N" lists, most played first: "For each opponent, choose up to one
@@ -5900,7 +5900,7 @@ line blocks.
    Aura's copy effect of a chosen creature); Nick Fury, Agent of S.H.I.E.L.D. (a double-faced card put onto the
    battlefield transformed); The Day of the Doctor; Yannik, Scavenging Sentinel (done in round B200); The Spot, Living Portal (done in round 397).
    Out after round 289 (looked at, not done): Lara Croft, Tomb Raider ("You may play a card from exile with a discovery
-   counter on it this turn": one card, not each); Filigree Vector (two "any number of target" groups in one ability);
+   counter on it this turn": one card, not each); Filigree Vector (done in round B280) (two "any number of target" groups in one ability);
    Sidequest: Play Blitzball (done in round 427) (combat damage dealt to each player this turn, then transform and attach); Memory Vessel
    (each player plays their own exiled cards and can't play cards from their hand); Ian Chesterton (done in round B248) and Hatchery Sliver (done in round B248)
    (replicate granted to Saga or Sliver spells, its cost equal to the spell's mana cost); Rashmi and Ragavan (cast free
@@ -5967,7 +5967,7 @@ line blocks.
    a creature); Fraying Line (done in round B199) (rope counters each upkeep, or everything without one is exiled); Whims of the Fates (three
    piles of permanents and one chosen at random); Glimpse of Tomorrow (done in round 390) (non-Aura permanents first, then Auras attached as
    they enter); Abstract Performance (done in round B270) (a face-down pile exiled from the library, then a free cast from the other pile);
-   Lich's Mirror (a replacement of losing the game); Chains of Mephistopheles (done in round B237) (a draw replacement that depends on which
+   Lich's Mirror (done in round B280) (a replacement of losing the game); Chains of Mephistopheles (done in round B237) (a draw replacement that depends on which
    draw it is in the draw step).
    Out after round 279 (looked at, not done): Game of Chaos (done in round 298) (each next flip's stakes double and the winner or loser
    decides whether to flip again); Grothama, All-Devouring (done in round 295) (damage dealt to it by each player's sources this turn);
@@ -5984,7 +5984,7 @@ line blocks.
    another player from your mana ability); Primordial Mist ("Exile a face-down permanent you control face up" as a
    cost); Toggo, Goblin Weaponsmith (a Rock token whose granted ability sacrifices the Rock by name); Ninja Teen (granted
    sneak from the graveyard).
-   Out after round 273 (looked at, not done): Filigree Vector (two "any number of target" groups in one ability: the
+   Out after round 273 (looked at, not done): Filigree Vector (done in round B280) (two "any number of target" groups in one ability: the
    target picker expands only one); Mirrormind Crown and Moonlit Meditation ("you may instead create that many tokens
    that are copies of ...": an optional token replacement, the same gap as Jinnie Fay's); Doors of Durin ("you may
    reveal the top card of your library. If a creature card is revealed this way, put it onto the battlefield tapped and
@@ -10601,7 +10601,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("If X is 1, ... If X is 4 or more, do all of the above.": the X it was cast with, 0 if cast without paying its mana cost,
   CR 107.3a, rulings; the player is chosen as it resolves, not targeted, and that player chooses which creature they return,
   none if they control none, CR 608.2d; a browser test). +6, 31,146 of 31,936 with B188 to B190.
-- Out after round B191 (looked at, not done): Filigree Vector, Lodestone Bauble, Infernal Offering (done in round B204) and Open the Omenpaths (done in round 362)
+- Out after round B191 (looked at, not done): Filigree Vector (done in round B280), Lodestone Bauble, Infernal Offering (done in round B204) and Open the Omenpaths (done in round 362)
   stay out for the reasons in the earlier lists.
 - Round B192 (least played first, from the Lane B skip lists): The Kingpin of Crime ("Whenever you attack, you may pay 2
   life. If you do, until end of turn, creatures you control with toughness greater than their power assign combat damage
@@ -10765,7 +10765,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   is due, CR 508.8; Noctis "can't be blocked that combat"; a token doesn't come back, CR 111.8). The punisher prompt for
   "you" and "that player" now reads "If you do". +6, 31,251 of 31,936 with B189 to B198 and rounds 348 to 357.
 - Out after round B199 (looked at, not done): Over the Top (done in round 389) (each player's revealed permanent cards onto the battlefield at
-  once, Auras among them attached as they enter), Lich's Mirror (losing the game replaced by shuffling your hand, graveyard
+  once, Auras among them attached as they enter), Lich's Mirror (done in round B280) (losing the game replaced by shuffling your hand, graveyard
   and every permanent you own, even ones others control, into your library), Mana Cache (a mana ability any player may
   activate during their turn before the end step), Cultivator Drone (mana spendable only on colorless spells, abilities of
   colorless permanents and costs with {C}, including costs paid as abilities resolve), Sharkey, Tyrant of the Shire (done in round B251) (all
@@ -11759,6 +11759,89 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B280 (least played first, from the Lane B skip lists and the cards round B279 named next, none in Lane A's rounds
+  431-432): Filigree Vector's "When this creature enters, put a +1/+1 counter on each of any number of target creatures and
+  a charge counter on each of any number of target artifacts." (one triggered ability with two groups of targets, each
+  "any number of target ...", CR 115.6, 601.2c, 603.3d; each "target" a word of its own, so an artifact creature may be
+  chosen for both and gets both counters, CR 115.3 and its ruling, none twice within one group; modes.ts manySlots and
+  fitManyGroups, targeting.ts manyOfferSizes: with several such groups the targets come laid out as offered, one entry
+  for each object a group could be, and each group keeps the ones chosen for it, from the last group to the first; only
+  plain "any number" groups, `manyGroupable`). Lich's Mirror's "If you would lose the game, instead shuffle your hand,
+  your graveyard, and all permanents you own into your library, then draw seven cards and your life total becomes 20."
+  (a replacement effect of losing the game, any way but conceding, CR 104.3a, 614.1a, one of the player's choices beside
+  The Golden Throne and the like, CR 616.1, one for however many reasons a check has; permanents they own whoever controls
+  them, all at once, tokens ceasing to exist, a commander to the command zone, CR 903.9b; spells, exiled cards and
+  permanents others own stay; the life total gained or lost, CR 119.5, so poison, commander damage, "can't gain life" or
+  fewer than seven cards lose at the next check, rulings; game.ts lichsMirror). From its rulings: a permanent the player
+  owns that the same check would also put into a graveyard (dying, no loyalty, the legend rule, ...) is its controller's
+  choice, the graveyard (its "dies" abilities trigger) or the library, asked before the check's actions (askMirrorStay,
+  pickPermanents `mirrorStay`; game.ts mirrorBound finds them by performing one pass on a copy of the game in which no
+  one loses); and one its controller doesn't own stays, so a loss it can't fix comes back the same way at every check, a
+  loop no one can stop: the game is a draw (CR 104.4b, mirrorLoops). Bots put their counters on their own creatures and
+  artifacts, take the Mirror over another replacement by life less their board (never with fewer than seven cards), shuffle
+  their own dying permanents in and send another player's to the graveyard. Browser tests click through the Vector's two
+  groups and the Mirror's graveyard question. +2, 31,805 of 31,936 on B279's branch, 31,815 with its head f21fd3a (main
+  e33b145, round 431) merged in. The compiled text of every other card is unchanged.
+- Out after round B280 (looked at, not done): the lists after round B279 stay out. Battlefield Thaumaturge (still out:
+  whether one creature in two target slots counts once or twice), Psychic Paper (as after round 390), Breathstealer's
+  Crypt (still out, as after round B237: which card "it" is once another replacement applies to the draw it makes).
+  Known gaps: Lich's Mirror's draw of seven that pauses for a draw replacement's question finishes after the life total
+  changes (as Stunning Reversal's does). Next in line (not looked at closely yet): Titania's Song, Drain Power, Celestial
+  Dawn.
+- Round B279 (least played first, from the Lane B skip lists and the cards round B278 named next, none in Lane A's rounds
+  428-431): Emblazoned Golem's "Kicker {X}. Spend only colored mana on X. No more than one mana of each color may be spent
+  this way. If this creature was kicked, it enters with X +1/+1 counters on it." (X is announced as it's cast, CR 601.2b,
+  generic mana in the total cost, CR 107.4b, paid only with colored mana, each of a different color, CR 601.2g-h: so X is
+  at most 5, less any reductions that take it off, as Drain Life's rulings say they may; spellCost's oneOfEachColorX
+  makes that part of the cost hybrid symbols of the five colors marked `distinct`, which payFromPool pays as each choice
+  of that many colors and autopay's planCast taps for the same way; mana that may be spent as though it were any type or
+  color still pays only its own color there, a payment legal either way; its counters are the X announced, a replacement
+  effect, CR 614.1c). Alaundo the Seer's "{T}: Draw a card, then exile a card from your hand and put a number of time
+  counters on it equal to its mana value. It gains "When the last time counter is removed from this card, if it's exiled,
+  you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn."
+  Then remove a time counter from each other card you own in exile." (the card gains a triggered ability that works in
+  exile while it's that object, CR 113.6, 400.7, GameObject.alaundoCast; a card with mana value 0 gets no counters and the
+  ability never triggers, and the card isn't suspended, so no upkeep removes them, rulings; the ability triggers whatever
+  removes the last counter, beside suspend's own on a suspended card, rulings; "if it's exiled" again as it resolves,
+  CR 603.4; cast free then, timing ignored, CR 608.2g, a creature spell and the creature it becomes having haste until end
+  of turn, CR 400.7a, castFree `hasteEot`; then each other card its controller owns in exile with a time counter loses
+  one, face up or down, suspended or not, rulings, Effect timeCounterFromOwnExiled, run-laneb279.ts). Bots kick the Golem
+  with the most colors they can pay, use Alaundo before combat rather than attack with it, and exile their cheapest card
+  with a mana value. Browser tests click through kicking the Golem with X = 5 (and X up to 2 with only two colors of
+  lands) and Alaundo's exile and the free cast with haste it leads to (its prompt now says the last time counter is
+  gone). +2, 31,803 of 31,936 on B278's branch. The compiled text of every other card is unchanged.
+- Out after round B279 (looked at, not done): the lists after round B278 stay out. Chorus of the Conclave (still out, as
+  after round B240), Guardian Beast (as after round B257). The Face of Boe, Skyway Robber and Hama, the Bloodbender are
+  Lane A's round 431. Known gaps: a bot exiles a land or a card with mana value 0 with Alaundo (it never comes back)
+  only when its hand holds nothing else; a bot's Golem X counts cost reductions only against its {2}. Next in line (not looked
+  at closely yet): Filigree Vector (done in round B280) (two "any number of target" groups), Battlefield Thaumaturge, Psychic Paper.
+- Round B278 (least played first, from the Lane B skip lists, neither in Lane A's rounds 428-430): Land Equilibrium's "If
+  an opponent who controls at least as many lands as you do would put a land onto the battlefield, that player instead puts
+  that land onto the battlefield then sacrifices a land of their choice." (a replacement effect, CR 614.1a: a land as it
+  would exist there, CR 614.12, put there by that opponent, by playing it or by a spell or ability, under anyone's control,
+  rulings, GameObject.putter; the lands counted before it enters, lands entering together counted before them all; one
+  sacrifice for each Land Equilibrium that applies, CR 614.5, of any land that player controls, the new one too, rulings;
+  made right after the instruction or action that put it there, game.ts equilibriumOwed / equilibriumSacrifices; the
+  sacrifice is caused by Land Equilibrium's controller, for Sacred Ground). Noxious Vapors' "Each player reveals their
+  hand, chooses one card of each color from it, then discards all other nonland cards." (each reveals, CR 701.20a, then
+  chooses in APNAP order, CR 101.4, a different card for each color, a multicolored card counting for whichever one of
+  its colors its player picks, and a card for each color there's one left for, as the rulings on Conflux and Selective
+  Adaptation read "a white card, a blue card, ..." and "a card with flying, a card with first strike, and so on"; a green
+  land card may be the green card; then all discard their other nonland cards at once, CR 701.9b; Effect
+  keepOneOfEachColor, run-laneb278.ts). Bots sacrifice the land worth least to them and keep their best cards that fit one
+  of each color. Browser tests click through sacrificing your Mountain or the Forest just played, and keeping Lightning
+  Helix and Lightning Bolt while Shivan Dragon is discarded. +2, 31,801 of 31,936 on B277's branch (with main through
+  B276). The compiled text of every other card is unchanged.
+- Out after round B278 (looked at, not done): the lists after round B277 stay out. Swirl the Mists stays out: its text
+  change reaches every spell and permanent, and 65 lines of supported cards are read as whole fixed sentences, so with
+  their color words changed they'd stop working (Defilers' "C permanent spells", the Mimics' "both C and C", Mangara's
+  Equity, Specter's Shriek and others); each of those needs reading with any color word first. Word of Command stays out
+  (another player plays a card while you control them, with only their lands' mana). Judgment calls and known gaps: a
+  land put onto the battlefield partway through a mana ability waits for Land Equilibrium's sacrifice until that ability
+  is done; Land Equilibrium and Sacred Ground together make a loop no one can stop (a draw, CR 104.4b): the choice of
+  land doesn't restart the loop's count, but the counts of cards put into graveyards this turn change each time round, so
+  the draw comes only after shortcuts.ts MAX_UNBROKEN resolutions (no shortcut offered). Next in line
+  (not looked at closely yet): Chorus of the Conclave, Emblazoned Golem, Guardian Beast, from the earlier skip lists.
 - Round B277 (least played first, two of the three cards round B276 named next in line, neither in Lane A's rounds
   428-429): Lightning Storm's "Discard a land card: Put two charge counters on Lightning Storm. You may choose a new target
   for it. Any player may activate this ability but only if Lightning Storm is on the stack." (an ability of the spell that
@@ -12237,7 +12320,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Nefarious Lich and Immortal Coil each take a different source's damage in one damage event, the Lich's cards are
   chosen first (for one source's damage only the one applied first applies: the damage is gone after it); bots' other ways of exiling their own graveyard (delve,
   escape, Nefarious Lich) don't look at Immortal Coil; Winter's Chill's three-way choice is asked as two questions, {2}
-  first, then {1}; Snowblind, Noxious Vapors, Land Equilibrium, Glyph of Delusion and Lich's Mirror were looked at again
+  first, then {1}; Snowblind, Noxious Vapors, Land Equilibrium, Glyph of Delusion and Lich's Mirror (done in round B280) were looked at again
   and stay out for the reasons in the earlier lists.
 - Out after round B261 (looked at, not done): the lists after round B260 stay out. Judgment calls and known gaps: Turf
   War's has no rulings of its own, so with a player who controls no land its enters ability follows Vaevictis Asmadi's
@@ -12308,8 +12391,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   option has a Tamiyo player discard is still offered to them (CR 701.55b: an option that can't be done is still a choice;
   no ruling says which applies); bots don't aim discard spells away from a player with Tamiyo, nor weigh Kasmina's lent
   abilities or Sharkey's borrowed ones beyond their usual worth.
-- Out after round B250 (looked at, not done): the lists after round B249 stay out, and Filigree Vector (two "any number of
-  target" slots in one ability), Lich's Mirror (each creature's own choice of graveyard or library as the game restarts),
+- Out after round B250 (looked at, not done): the lists after round B249 stay out, and Filigree Vector (done in round B280) (two "any number of
+  target" slots in one ability), Lich's Mirror (done in round B280) (each creature's own choice of graveyard or library as the game restarts),
   Lodestone Bauble (a player chosen on activation and a delayed draw), Pulmonic Sliver, Breathstealer's Crypt, Land
   Equilibrium, Elemental Resonance (done in round B252) and Ashiok, Wicked Manipulator (none of whose lines parse yet). Kraven the Hunter is
   Lane A round 404's (PR #656). Known gaps: bots cast Gather Specimens only in response to an opponent's creature spell; a
@@ -12509,7 +12592,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B208 (looked at, not done): Back from the Brink ("Exile a creature card from your graveyard and pay its
   mana cost": the activation's mana cost is set by the card the cost exiles, and activationCost doesn't see the cost's
   choices yet), Blood of the Martyr (done in round B263), Piracy (done in round B238), Mana Cache and Rhystic Cave stay out for the reasons in the earlier lists.
-- Out after round B206 (looked at, not done): Filigree Vector (two "any number of target" sets in one ability: only one
+- Out after round B206 (looked at, not done): Filigree Vector (done in round B280) (two "any number of target" sets in one ability: only one
   per ability is modeled), Reap (a target count set by another target as it's cast), Pulmonic Sliver (an optional
   granted "put it on top of its owner's library instead", with several Slivers ordered at once), Day of the Moon (the
   names chosen for the Saga kept on it), Spectral Searchlight (mana another player adds, in a color they choose) stay out.
@@ -12562,7 +12645,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the earlier lists.
 - Out after round B177 (looked at, not done): Divine Intervention (done in round B259) (only its controller removing the last counter triggers it,
   rulings: who removes counters isn't tracked), Rain of Gore (whether lifelink damage from a spell is that spell causing its
-  controller to gain life isn't settled by its rulings), Lich's Mirror, Blood Scrivener, Snowblind and Garruk, Curse Breaker (done in round B219)
+  controller to gain life isn't settled by its rulings), Lich's Mirror (done in round B280), Blood Scrivener, Snowblind and Garruk, Curse Breaker (done in round B219)
   stay out for the reasons in the earlier lists.
 - Out after round B176 (looked at, not done): Battlefield Thaumaturge ("{1} less for each creature it targets": whether a
   creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (done in round B213) (soulshift X counted

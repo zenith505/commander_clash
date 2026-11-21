@@ -12,7 +12,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { crewedWith, inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { crewedWith, inRange, opponentOrTheirsTarget, objectMatches, bindBound, manyX, manyOfferSizes, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsMatchCount, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -2208,6 +2208,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
+    // Alaundo the Seer (round B279): the trigger the card gained in exile, whatever removed the counter, with an intervening
+    // "if it's exiled" (CR 603.4); its owner controls it (CR 113.8). Beside suspend's own if it has that too (rulings).
+    if (o?.zone === "exile" && ev.counter === "time" && o.alaundoCast === (o.zoneChanges ?? 0))
+      s.triggerQueue.push({
+        sourceId: o.id,
+        sourceCardId: cardIdOf(o),
+        controller: o.owner,
+        index: -1,
+        subject: { id: o.id, zc: o.zoneChanges ?? 0 },
+        body: { targets: [], effects: [{ type: "alaundoCast" }], text: "When the last time counter is removed from ~, if it's exiled, you may cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn." },
+      });
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
     if (o?.zone === "exile" && ev.counter === "time" && hasSuspend(s, o))
       s.triggerQueue.push({
@@ -3662,7 +3673,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
   const def = restingDef(s.cards[t.sourceCardId]!);
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
   const body0 = withModes(triggerBody(s, t), t.modes);
-  const fit = fitMany(body0, chosen, manyX(s, body0.targets, t.controller, t.sourceId, t.x ?? 0));
+  const fit = fitMany(body0, chosen, manyX(s, body0.targets, t.controller, t.sourceId, t.x ?? 0), manyOfferSizes(s, body0, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId));
   if (typeof fit === "string") throw new RulesError(fit);
   const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);

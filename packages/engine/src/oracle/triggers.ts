@@ -1461,6 +1461,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // Captain Marvel, Shooting Star: "Whenever a creature other than ~ is exiled from the battlefield": another creature.
   line = line.replace(/^(When(?:ever)?) an? (creature|permanent|artifact) other than ~ (dies|is exiled from the battlefield|is put into exile from the battlefield|leaves the battlefield), /, "$1 another $2 $3, ");
+  // Dragon-Kami's Egg (round B283): "Whenever this creature or a Dragon you control dies": ~ dying is one event however
+  // many of its types it has, as with "~ or another" (CR 603.10a), so a Dragon you control other than ~.
+  line = line.replace(/^(When(?:ever)?) ~ or an? ([A-Z][a-z]+ you control) dies, /, "$1 ~ or another $2 dies, ");
   // Psychomancer, Shard of the Void Dragon: "is put into a graveyard from the battlefield or is put into exile from the
   // battlefield" is dying or being put into exile from it (CR 700.4).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into a graveyard from the battlefield or is put into exile from the battlefield, /, "$1 dies or is put into exile, ");

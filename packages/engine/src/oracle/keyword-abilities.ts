@@ -780,8 +780,7 @@ export function parseCostKeyword(
   // Craft (CR 702.167a): "[Cost], Exile this permanent, Exile [materials] from among permanents you control and/or cards in
   // your graveyard: Return this card to the battlefield transformed under its owner's control. Activate only as a sorcery."
   // Materials named by a card type or subtype alone ("creature", "two artifacts", "Island") are permanents of that type
-  // or cards of it in your graveyard (702.167b). Other materials ("one or more creatures", "two that share a card type")
-  // aren't modeled.
+  // or cards of it in your graveyard (702.167b). Other materials are read one by one below.
   if ((m = /^Craft with (.+?) ((?:\{[^}]+\})+)$/.exec(line))) {
     const cost = m[2]!;
     const craftAbility = (c: Extract<AdditionalCost, { kind: "craft" }>): { activated: ActivatedAbility } => ({
@@ -806,6 +805,21 @@ export function parseCostKeyword(
     // any other permanents you control and/or cards in your graveyard (its reminder text). "Four or more red instant
     // and/or sorcery cards" (Ore-Rich Stalactite): the word "card" makes them cards in your graveyard only (CR 702.167b is
     // for a type without "card"; 109.2).
+    // Eye of Ojer Taq (round 434): "Craft with two that share a card type": any two of them, a permanent by its card types
+    // and a card by its printed ones, with a card type in common (CR 702.167a; rulings: kindred counts, supertypes and
+    // subtypes don't). CostChoices.craft checked by craftSlotsFit.
+    if (m[1] === "two that share a card type") {
+      if (!plainMana(cost)) return "fail";
+      return craftAbility({ kind: "craft", n: 2, shareCardType: true, filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanents and/or cards" } });
+    }
+    // The Enigma Jewel (round 434): "Craft with four or more nonlands with activated abilities": nonland permanents you
+    // control and nonland cards in your graveyard, each with an activated ability as it is now (mana abilities and ones
+    // that work only from another zone too, CR 602.1, 605.1a; rulings: "activated abilities contain a colon").
+    const withActivated = /^(one|two|three|four|five|six) or more nonlands with activated abilities$/.exec(m[1]!);
+    if (withActivated) {
+      if (!plainMana(cost)) return "fail";
+      return craftAbility({ kind: "craft", n: num(withActivated[1]!), orMore: true, withActivated: true, filter: { kind: "object", types: [], notTypes: ["Land"], notColors: [], text: "nonlands with activated abilities" } });
+    }
     const more = /^(one|two|three|four|five|six) or more(?: (.+))?$/.exec(m[1]!);
     if (more) {
       if (!plainMana(cost)) return "fail";

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,819 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,947 of
+31,827 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,949 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4278,7 +4278,7 @@ line blocks.
    Emissary turning Ana's Lightning Bolt back on her. +3, 31,763 of 31,936 on this stacked branch with main 4038d7f (31,767 with main 4d75ae2,
    B267, merged in); the compiled text of every other card is unchanged.
    Out after round 424 (looked at, not done): Secret Invasion (done in round B276) (the enchanted creature a copy of the creature the Aura
-   exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (its
+   exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (done in round 435) (its
    back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
    other permanents while it's untapped), Redemptor Dreadnought (its Plasma Incinerator line compiles wrongly, review
    follow-up 18: fix it with the card), Selective Adaptation, Supper for Spiders and Brilliant Ultimatum (Lane B's round
@@ -4475,6 +4475,118 @@ line blocks.
    copy of something else it loses it (the escape's layer 6 effect would keep it, CR 613.1f), and escaping with an escape
    another permanent gives it (Underworld Breach) links no cards to it, so nothing can be cast; bots pick for Hama the dearest
    card their lands, artifacts and creatures could pay for, and activate The Face of Boe only with a suspend card in hand.
+   Round 432 went on down the "Out after round N" lists and `npm run popular`, most played first, to a face-down card
+   exiled from your hand that a transformed permanent casts for free, a card exiled with a discovery counter you may play
+   this turn, and a clone of a Doctor milled off your library this turn. Jacob Hauken, Inspector's "{T}: Draw a card, then
+   exile a card from your hand face down. You may look at that card for as long as it remains exiled. You may pay
+   {4}{U}{U}. If you do, transform Jacob Hauken." (the payment and transform part of the resolution, after the exile,
+   rulings; face down, seen by you, CR 406.3) and Hauken's Insight's "Once during each of your turns, you may play a land
+   or cast a spell from among the cards exiled with this permanent without paying its mana cost." (the cards both faces
+   exiled, the same object, rulings, CR 607.2a; face-down ones too; once for each Hauken's Insight during your turns; a land
+   as the turn's land play and a spell with the usual timing, rulings, CR 305.1; free, CR 118.9; CompiledCard.linkedFreeOnce
+   `hauken`, game.ts linkedLandOnceSource). Lara Croft, Tomb Raider's "Whenever Lara Croft attacks, exile up to one target
+   legendary artifact card or legendary land card from a graveyard and put a discovery counter on it. You may play a card
+   from exile with a discovery counter on it this turn." (the counter on the card in exile, CR 122.1; one card for each
+   time it resolves, any face-up card in exile with a discovery counter, whoever owns it and whatever exiled it, a land as
+   the turn's land play, a spell with the usual timing and costs, CR 305.1, 601.3; the permission lasts if Lara leaves, CR
+   611.2a; Effect playCounteredThisTurn, TurnLog.playCounteredGrants). The Fourteenth Doctor's "When you cast this spell,
+   reveal the top fourteen cards of your library. Put all Doctor cards revealed this way into your graveyard and the rest on
+   the bottom of your library in a random order." and "You may have The Fourteenth Doctor enter as a copy of a Doctor card
+   in your graveyard that was put there from your library this turn. If you do, it gains haste until end of turn." (the
+   cast trigger resolves before the spell; a copy replacement, CR 707.5, 614.1c, of a card in your own graveyard by its
+   printed characteristics, CR 707.2, put there from your library this turn, GameObject.fromLibraryTurn; haste only as a
+   copy; CompiledCard.entersAsCopy `hasteIfCopied`). Browser tests click through each, Lara's twice (Ana's Mox Amber cast
+   from her exile, your Gaea's Cradle played as your land). +3, 31,812 of 31,936 on this stacked branch (round 431 #712);
+   the compiled text of every other card is unchanged.
+   Out after round 432 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
+   430), Nihiloor (still out, as after round 431), Drain Power (done in round B281), Ertai's Meddling (done in round B282), Nick Fury, Agent of S.H.I.E.L.D. (still
+   out: "If it's a double-faced card, you may transform it" for a card put onto the battlefield has no rulings, and whether
+   it enters transformed or transforms after entering, with the front face's enters triggers, isn't settled), the cards
+   rounds 425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out,
+   for the reasons in their earlier lists). Judgment calls: Lara Croft and The Fourteenth Doctor have no rulings; Lara's
+   "a card" is one card for each resolution, any card in exile with a discovery counter (another Lara's too), and The
+   Fourteenth Doctor's "Doctor card" is any card with the Doctor subtype. Known gaps: a card that both Lara's permission and
+   Evelyn, the Covetous's once-each-turn play could play uses up Lara's, even when Evelyn's any-color mana paid for it;
+   bots choose the copy for The Fourteenth Doctor as they would for any clone from a graveyard.
+   Round 433 went on down the "Out after round N" lists and `npm run popular`, most played first, to a card a Saga's
+   chapter I exiled face down and its later chapters, a token copy with a name of its own, and loyalty abilities at instant
+   speed for one turn. The Creation of Avacyn's "I — Search your library for a card, exile it face down, then shuffle.",
+   "II — Turn the exiled card face up. If it's a creature card, you lose life equal to its mana value." and "III — You may
+   put the exiled card onto the battlefield if it's a creature card. If you don't put it onto the battlefield, put it into
+   its owner's hand." (the cards its own chapter I exiled, CR 607.2a, oracle/round433.ts linkRound433; with two or more,
+   their total mana value if one is a creature card, and all its permanent cards or none, rulings; a card still face down
+   at chapter III has no characteristics, CR 406.3a, so it goes to your hand; Effects linkedFaceUpLoseLife,
+   linkedCreatureOrHand). The Eleventh Hour's "III — Create a token that's a copy of target creature, except it's a legendary
+   Alien named Prisoner Zero." (legendary, its other supertypes kept as Benthic Anomaly's rulings say, its card types kept,
+   Alien instead of every subtype, Vehicle too, rulings; CopyExcept.allSubtypes; a copy with a name of its own now reads the
+   copied text's references to itself by name as itself, CR 201.5, which Mishra's Warform gets too, while "named <its
+   name>" stays a name). Jace's Machinations' "Until end of turn, you may activate loyalty abilities of Jace planeswalkers
+   you control on any player's turn any time you could cast an instant." (its controller's Jace planeswalkers as they are
+   when activated, the Empower Jace token too; still one loyalty ability of each a turn, CR 606.3, rulings; TurnLog
+   loyaltyAtInstantSpeed). Browser tests click through Avacyn's search and its chapter III Yes and No, and The Eleventh
+   Hour's target. +3, 31,815 of 31,936 on this stacked branch (round 432 #714), 31,821 with main 7f7b8f6 (B278-B280) merged in;
+   the compiled text of every other card is unchanged.
+   Out after round 433 (looked at, not done): Captain America, First Avenger (its "Throw" damage is divided as targets are
+   chosen, CR 601.2d, before the cost that unattaches the Equipment fixes the amount, CR 601.2h, and it has no rulings),
+   Pulmonic Sliver (still out: an optional "put it on top of its owner's library instead" asked in the middle of any move
+   to a graveyard, which zone moves can't pause for), Filigree Vector (done in round B280), Battlefield Thaumaturge, Nihiloor,
+   Drain Power (done in round B281), Ertai's Meddling (done in round B282) and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds
+   425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the
+   reasons in their earlier lists). Judgment calls: The Eleventh Hour's token keeps snow and other supertypes (no ruling
+   says so for it); Jace's Machinations has rulings only on Empower Jace and the once-a-turn limit. Known gaps: bots don't
+   plan to activate a Jace's loyalty abilities on other players' turns; a copy's "named <its name>" ability that only reads
+   with "~" (Biovisionary's) isn't kept by a renamed copy.
+   Round 434 went on down the "Out after round N" lists and `npm run popular`, most played first, to the two craft cards
+   whose materials weren't modeled. Eye of Ojer Taq's "Craft with two that share a card type {6}" (any two other permanents
+   you control and/or cards in your graveyard with a card type in common, a permanent's as it is now and a card's printed
+   ones, CR 702.167a-b; two lands do, rulings; AdditionalCost craft `shareCardType`, checked by craftSlotsFit) and Apex
+   Observatory's "This artifact enters tapped. As it enters, choose a card type shared among two exiled cards used to craft
+   it." and "{T}: The next spell you cast this turn of the chosen type can be cast without paying its mana cost." (the cards
+   the craft cost exiled, still in exile, CR 702.167c, 607.2a; a token isn't one, so with a token among them no type is
+   chosen and the ability does nothing, rulings; entersChoose `craftedShared`, game.ts craftedSharedTypes; then World War
+   Hulk's alternative cost for the first spell of that type this turn, CR 118.9). The Enigma Jewel's "Craft with four or
+   more nonlands with activated abilities {8}{U}" (nonland permanents and cards with an activated ability as they are now,
+   mana abilities and ones that work only from a hand or graveyard too, CR 602.1, 605.1a; craft `withActivated`,
+   game.ts hasActivatedAbility) and Locus of Enlightenment's "Locus of Enlightenment has each activated ability of the
+   exiled cards used to craft it. You may activate each of those abilities only once each turn." (as Mairsil's: each card's
+   an instance of its own, once each turn each, their mana and loyalty abilities too, CR 606.3; borrows `crafted`,
+   `withLoyalty`) and "Whenever you activate an ability that isn't a mana ability, copy it. You may choose new targets for
+   the copy." (Rowan Kenrith's emblem's trigger; the copy isn't activated, rulings). Browser tests click through Eye's
+   picker (Done only once the two share a type) and Apex Observatory's card type, its free Colossal Dreadmaw, and The Enigma
+   Jewel's picker and Locus's copied ping. +2, 31,817 of 31,936 on this stacked branch (round 433 #716), 31,823 with round 433's head 412ee5a (main
+   7f7b8f6, B278-B280) merged in; the compiled text of every other card is unchanged.
+   Out after round 434 (looked at, not done): Captain America, First Avenger and Pulmonic Sliver (still out, as after round
+   433), Filigree Vector (done in round B280), Drain Power (done in round B281), Ertai's Meddling (done in round B282), Battlefield Thaumaturge, Nihiloor
+   and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds 425-430 left out (still out, for their
+   reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists).
+   Judgment calls: a permanent with cycling, unearth or another ability that works only from another zone has an
+   activated ability for The Enigma Jewel's craft (it has the ability where it doesn't function, CR 113.6); a craft material's card types for Eye of
+   Ojer Taq are a double-faced card's front face's in a graveyard (CR 712.8a). Known gaps: Locus of Enlightenment doesn't
+   get equip abilities (as Mairsil, an equip that couldn't attach it to anything, CR 301.5b-c, so only its activation and
+   the copy trigger are missing); bots tap Apex Observatory only in their main phase with a card of the chosen type in
+   hand with mana value 3 or more, and choose a card type as for any other choice.
+   Round 435 went on down the "Out after round N" lists and `npm run popular`, most played first, to two copies of a creature
+   no piece made yet. March from Velis Vel's "Choose a nonbasic land type. Each land you control of that type becomes a copy
+   of target creature you control until end of turn and gains haste until end of turn." (the type chosen as it resolves,
+   among CR 205.3i's twelve that aren't basic; the lands those of that type then, CR 611.2c; each a copy of the target's
+   copiable values, what it copies too, with no counters or tapped state and nothing entering, rulings; Effect
+   landTypeCopies, its flashback too). Ludevic, Necrogenius's "{X}{U}{U}{B}{B}, Exile X creature cards from your graveyard:
+   Transform ~. X can't be 0. Activate only as a sorcery." (X in mana and in creature cards, CR 107.3a, 602.2b; the cards
+   linked to its back face, CR 607.1b, 607.2a) and Olag, Ludevic's Hubris's "As this creature transforms into ~, it becomes a
+   copy of a creature card exiled with it, except its name is ~, it's 4/4, and it's a legendary blue and black Zombie in
+   addition to its other colors and types. Put a number of +1/+1 counters on ~ equal to the number of creature cards exiled
+   with it." (while it transforms, CR 712.20, the card chosen as it transforms when there are several, before anyone gets
+   priority, the transform's triggers seeing the copy, CR 701.27e; still a copy once the card leaves exile; with none left
+   in exile its own 4/4 self with no counters; rulings; CompiledCard.asTransformsCopyLinked). Browser tests click through
+   March's target and land type, and Ludevic's X, its two creature cards and Olag's copy. +2, 31,825 of 31,936 on this
+   stacked branch (round 434 #718); the compiled text of every other card is unchanged.
+   Out after round 435 (looked at, not done): Mimeoplasm, Revered One (its "{2}: ~ becomes a copy of target creature card
+   exiled with it, except it's 0/0 and has this ability": once it's a copy, the ability it keeps is no longer printed beside
+   the "As ~ enters, exile" it's linked to, CR 607.1a, 607.5, and the card has no rulings on whether it still finds those
+   cards), Cryptic Spires (two colors circled as the deck is built, which no deck in the game records), Pygmy Hippo (it needs Drain
+   Power's piece from round B281, merged after this round began), and the lists after round 434 (still out, for their reasons). Known
+   gaps: bots cast March from Velis Vel only with two or more lands of one nonbasic land type and don't plan Ludevic's X
+   activation.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5793,7 +5905,7 @@ line blocks.
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
    Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
-   symbols among exiled cards' costs); March from Velis Vel (lands of a chosen type become copies); Judgment of Alexander;
+   symbols among exiled cards' costs); March from Velis Vel (done in round 435) (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
    life payment replaced by exiling); Parallel Thoughts (a draw replaced by the exiled pile's top card); Nathan Drake,
@@ -12651,7 +12763,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   before chapter III, isn't settled by its rulings), Spectral Searchlight (another player choosing a color in the middle of a
   mana ability), Day of the Moon (every name chosen for the Saga kept on it), Dralnu, Lich Lord (done in round B253) (sacrifices chosen in the
   middle of dealing damage), Words of Waste (done in round 383) and Fade Away (done in round B212) (see round 340's list) stay out.
-- Out after round B181 (looked at, not done): Ludevic, Necrogenius (its back face becomes a copy of a creature card exiled
+- Out after round B181 (looked at, not done): Ludevic, Necrogenius (done in round 435) (its back face becomes a copy of a creature card exiled
   with it as it transforms), Song of Inspiration (done in round B219) ("add the total mana value of those cards" to a d20 roll: whether a target
   that became illegal still counts isn't settled by its rulings) stay out.
 - Out after round B180 (looked at, not done): Strax, Sontaran Nurse (done in round B211) (a reflexive trigger's target limited to the creatures
@@ -12968,7 +13080,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   transformed"), Wumpus Aberration (done in round B166), Roving Actuator, Kianne, Dean of Substance (done in round B189), Chong and Lily, Nomads (done in round B187), Soul Ransom (done in round B142) ("Only
   your opponents may activate this ability"), Grinning Totem (done in round B159), Failure // Comply (Comply's chosen name), Musician, Soul
   Sculptor ("until a player casts a creature spell"), Heat Wave (done in round B136) (a block cost per creature), Bane Alley Broker, Essence of
-  the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius. Bot gap: bots don't use Carrionette from the graveyard.
+  the Wild, Dreams of the Dead (done in round B136), Ludevic, Necrogenius (done in round 435). Bot gap: bots don't use Carrionette from the graveyard.
 - Out after round B97 (looked at, not done): Wall of Caltrops (done in round B161), Nature's Blessing (done in round B142), Master of the Hunt and the "bands with
   other legendary creatures" lands (done in round B161) (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns

@@ -6193,6 +6193,38 @@ export type Effect =
    */
   | { type: "mayCastExiledWaterbend" }
   /**
+   * Lara Croft, Tomb Raider (round 432): "You may play a card from exile with a discovery counter on it this turn.": the
+   * ability's controller may play one face-up card in exile with this kind of counter on it this turn, any such card
+   * (TurnLog.playCounteredGrants), a land as the turn's land play, a spell with its usual timing and costs (CR 305.1, 601.3).
+   */
+  | { type: "playCounteredThisTurn"; counter: CounterKind }
+  /**
+   * Jace's Machinations (round 433): "Until end of turn, you may activate loyalty abilities of Jace planeswalkers you control
+   * on any player's turn any time you could cast an instant.": for the spell's controller this turn (TurnLog
+   * loyaltyAtInstantSpeed), still one loyalty ability of each permanent each turn (CR 606.3, rulings).
+   */
+  | { type: "loyaltyAtInstantThisTurn"; subtype: string }
+  /**
+   * March from Velis Vel (round 435): "Choose a nonbasic land type. Each land you control of that type becomes a copy of
+   * target creature you control until end of turn and gains haste until end of turn.": the type chosen as it resolves (CR
+   * 608.2d), among the land types that aren't basic (CR 205.3i); the lands are those of that type then (CR 611.2c), each a
+   * copy of `of`'s copiable values (CR 707.2, rulings) and with haste, both until end of turn.
+   */
+  | { type: "landTypeCopies"; of: ObjRef }
+  /**
+   * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
+   * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
+   * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).
+   */
+  | { type: "linkedFaceUpLoseLife" }
+  /**
+   * The Creation of Avacyn (round 433), chapter III: "You may put the exiled card onto the battlefield if it's a creature
+   * card. If you don't put it onto the battlefield, put it into its owner's hand.": if any linked card still in exile is a
+   * creature card (a face-down one has no characteristics, CR 406.3a), its controller may put all the permanent cards among
+   * them onto the battlefield; every other one goes to its owner's hand (rulings).
+   */
+  | { type: "linkedCreatureOrHand" }
+  /**
    * Allure of the Unknown (round 420): "Reveal the top six cards of your library. An opponent exiles a nonland card from
    * among them, then you put the rest into your hand. That opponent may cast the exiled card without paying its mana
    * cost.": the opponent chosen as it resolves (CR 608.2d), who picks; cast by them as this resolves or never (rulings,
@@ -6549,7 +6581,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst" | /** Olag, Ludevic's Hubris (round 435): which creature card exiled with it it becomes a copy of as it transforms (CompiledCard.asTransformsCopyLinked). */ "transformCopy";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -8770,6 +8802,10 @@ export type AdditionalCost =
        * each of these, `filter` their union (rulings: one changeling isn't enough).
        */
       slots?: TargetSpec[];
+      /** Eye of Ojer Taq (round 434): "two that share a card type": the `n` objects have a card type in common (craftSlotsFit). */
+      shareCardType?: true;
+      /** The Enigma Jewel (round 434): "nonlands with activated abilities": each one with an activated ability as it is now (craftCandidates). */
+      withActivated?: true;
     };
 
 /**
@@ -8947,7 +8983,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true; /** "All cards in exile with brain counters on them" (Rex, Cyber-Hound): every player's exiled cards with a counter of this kind, however they got it. */ exiledWithCounter?: CounterKind; /** "All activated and triggered abilities" (Idris, Soul of the TARDIS; Koh, the Face Stealer; round 399): the lenders' triggered abilities too, those that work on the battlefield. */ triggered?: true; /** With `linked`, Koh: "of the last chosen card": only the card its "choose a creature card exiled with ~" chose last (Chosen.card, CR 607.2d), while it's still that card in exile. */ chosen?: true; /** Mairsil, the Pretender (round 401): "all cards you own in exile with cage counters on them": with `exiledWithCounter`, only cards its controller owns (rulings: another player controlling it gets that player's). */ owned?: true; /** Mairsil: "You may activate each of those abilities only once each turn" (ActivatedAbility.onceKey). */ oncePerTurn?: true; /** Scheming Fence (round 402): "of the chosen permanent": the permanent chosen as it entered (Chosen.object), while it's still that object on the battlefield (CR 400.7). */ chosenObject?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true; /** "All cards exiled with it" (Myr Welder, Dark Impostor, Patchwork Crawler): the cards matching `filter` still exiled with this object by its one exile ability (CR 607.2a, 400.7). */ linked?: true; /** "All cards in exile with brain counters on them" (Rex, Cyber-Hound): every player's exiled cards with a counter of this kind, however they got it. */ exiledWithCounter?: CounterKind; /** "All activated and triggered abilities" (Idris, Soul of the TARDIS; Koh, the Face Stealer; round 399): the lenders' triggered abilities too, those that work on the battlefield. */ triggered?: true; /** With `linked`, Koh: "of the last chosen card": only the card its "choose a creature card exiled with ~" chose last (Chosen.card, CR 607.2d), while it's still that card in exile. */ chosen?: true; /** Mairsil, the Pretender (round 401): "all cards you own in exile with cage counters on them": with `exiledWithCounter`, only cards its controller owns (rulings: another player controlling it gets that player's). */ owned?: true; /** Mairsil: "You may activate each of those abilities only once each turn" (ActivatedAbility.onceKey). */ oncePerTurn?: true; /** Locus of Enlightenment (round 434): "each activated ability": the lenders' loyalty abilities too (CR 606.3). */ withLoyalty?: true; /** Locus of Enlightenment: with `linked`, "the exiled cards used to craft it": the cards its craft cost exiled (CR 702.167c), linked as it entered. */ crafted?: true; /** Scheming Fence (round 402): "of the chosen permanent": the permanent chosen as it entered (Chosen.object), while it's still that object on the battlefield (CR 400.7). */ chosenObject?: true };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while
@@ -8958,6 +8994,14 @@ export interface CompiledCard {
   asTransformsChoose?: "opponent";
   /** Curse of Leeches (round B267): "As this permanent transforms into ~, attach it to a player." (CR 712.20, 701.3a): a player it could enchant, chosen by its controller as it transforms (not targeted, rulings), asked before anyone gets priority. */
   asTransformsAttachPlayer?: true;
+  /**
+   * Olag, Ludevic's Hubris (round 435): "As this creature transforms into ~, it becomes a copy of a creature card exiled with
+   * it, except ... Put a number of +1/+1 counters on ~ equal to the number of creature cards exiled with it.": while it
+   * transforms (CR 712.20), a copy of one creature card its front face's cost exiled (linked across faces, CR 607.1b,
+   * 607.2a) as printed (CR 707.2), with the exceptions (CR 707.9), chosen by its controller (rulings); then that many
+   * +1/+1 counters. With none, neither (rulings).
+   */
+  asTransformsCopyLinked?: CopyExcept;
   triggers: TriggeredAbility[];
   activated: ActivatedAbility[];
   /** Mana abilities (CR 605), kept apart from the others since they don't use the stack. */
@@ -9149,7 +9193,7 @@ export interface CompiledCard {
   entersTappedIfXAtMost?: number;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; /** Callous Oppressor (round B221): "an opponent chooses a creature type": its controller chooses an opponent (Chosen.player), who makes this choice. */ byOpponent?: true; /** With "cardName": "each opponent reveals their hand. You choose the name of a nonland card revealed this way" (Alhammarret, High Arbiter): only the names of the cards matching `names` in its controller's opponents' hands, revealed as it enters; none chosen if there's none. */ opponentHands?: true; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
+  entersChoose?: { what: ChoiceKind; except?: string; /** Callous Oppressor (round B221): "an opponent chooses a creature type": its controller chooses an opponent (Chosen.player), who makes this choice. */ byOpponent?: true; /** With "cardName": "each opponent reveals their hand. You choose the name of a nonland card revealed this way" (Alhammarret, High Arbiter): only the names of the cards matching `names` in its controller's opponents' hands, revealed as it enters; none chosen if there's none. */ opponentHands?: true; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** Apex Observatory (round 434): "a card type shared among two exiled cards used to craft it": only those of `options` (craftedSharedTypes), none chosen with none. */ craftedShared?: true; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
   /** "Noncreature spells with mana value equal to the chosen number can't be cast." (Sanctum Prelate): anyone's. */
   noncreatureChosenMvCantBeCast?: true;
   /** "You may cast ~ as though it had flash if it targets a commander." (Timely Ward) */
@@ -9287,7 +9331,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Wall of Stolen Identity: "When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control ~": a reflexive trigger about the permanent it copied (CR 603.12, 611.2b). */ tapCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true; /** The Mimeoplasm: "you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card": two cards in graveyards are chosen (the one copied first), both exiled. */ exileTwo?: true };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true; /** Superior Spider-Man: "When you do, exile that card": a reflexive trigger exiling the card it copied (CR 603.12). */ exileCopied?: true; /** Wall of Stolen Identity: "When you do, tap the copied creature and it doesn't untap during its controller's untap step for as long as you control ~": a reflexive trigger about the permanent it copied (CR 603.12, 611.2b). */ tapCopied?: true; /** Protean Raider's raid: only if its controller attacked this turn, as it enters. */ ifAttacked?: true; /** The Mimeoplasm: "you may exile two creature cards from graveyards. If you do, it enters as a copy of one of those cards with a number of additional +1/+1 counters on it equal to the power of the other card": two cards in graveyards are chosen (the one copied first), both exiled. */ exileTwo?: true; /** The Fourteenth Doctor (round 432): "If you do, it gains haste until end of turn": the permanent it became, only if it entered as a copy. */ hasteIfCopied?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "With two +1/+1 counters and a lifelink counter on it" (Dust Animus): a second kind, under the same condition. */ also?: { counter: CounterKind; n: number }; /** "With a +1/+1 counter, a flying counter, a deathtouch counter, and a shield counter on it" (Agent's Toolkit): the kinds after the first two. */ more?: { counter: CounterKind; n: number }[]; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind; /** "As ~ enters, choose an opponent. ~ enters with a -1/-1 counter on it for each creature that player controls" (Canker Abomination): counted once the player is chosen, the same way. */ afterPlayer?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
@@ -10595,7 +10639,16 @@ export interface CompiledCard {
    * one exile ability exiled this turn (GameState.linkedExile entries with `turn`), once each turn for this object
    * (GameObject.linkedFreeOnceTurn), the spell's mana value at most `maxMv` (game.ts linkedFreeOnceSource).
    */
-  linkedFreeOnce?: { maxMv: AmountExpr };
+  linkedFreeOnce?: {
+    maxMv?: AmountExpr;
+    /**
+     * Hauken's Insight (round 432): "Once during each of your turns, you may play a land or cast a spell from among the
+     * cards exiled with ~ without paying its mana cost.": during its controller's turns only, any card its exile abilities
+     * exiled (its front face's too, rulings), whenever exiled, face-down ones included, and a land as the turn's land play
+     * with the usual timing (rulings), the once shared by both (game.ts linkedFreeOnceSource, linkedLandOnceSource).
+     */
+    hauken?: true;
+  };
   /**
    * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
    * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).

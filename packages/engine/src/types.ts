@@ -2115,6 +2115,10 @@ export interface TurnLog {
   tappedLandForMana?: PlayerId[];
   /** Hedonist's Trove (CompiledCard.playLinkedSpellOnce): the sources ("id@zoneChanges") whose cards a spell was cast from this turn with that permission. */
   linkedSpellOnce?: string[];
+  /** Lara Croft, Tomb Raider (round 432, Effect playCounteredThisTurn): each permission to play one card from exile with this kind of counter on it this turn, `used` once a card was played with it. */
+  playCounteredGrants?: { player: PlayerId; counter: string; used?: true }[];
+  /** Jace's Machinations (round 433, Effect loyaltyAtInstantThisTurn): players who may activate loyalty abilities of their planeswalkers of this subtype any time they could cast an instant, on any player's turn, this turn. */
+  loyaltyAtInstantSpeed?: { player: PlayerId; subtype: string }[];
   /** Predatory Focus: the players whose creatures assign their combat damage this turn as though they weren't blocked (CR 510.1c). */
   unblockedDamage?: PlayerId[];
   /** Power Surge: the untapped lands the active player controlled as this turn began, before its untap step (CR 502.3); left out when none. */
@@ -2917,7 +2921,7 @@ export interface GameState {
   mirrorStay?: { player: PlayerId; bound: ObjectId[]; asked: PlayerId[]; stay: ObjectId[] }[];
   /** Lich's Mirror (round B280): the losing player's state after a Mirror replaced their loss in these state-based actions, to see the same loss come back the same way (CR 104.4b). */
   mirrorRepeat?: { player: PlayerId; key: string }[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption | /** Curse of Leeches (round B267): a player to attach it to as it transforms (CompiledCard.asTransformsAttachPlayer). */ "attachPlayer"; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; /** With "copyLast": what makes each option's copy (Essence of the Wild, Mystic Reflection). */ copySources?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean; /** Round B250: the Gather Specimens instances (GameState.gatherSpecimens ids) already applied to it as it enters (CR 614.5). */ gatherUsed?: string[] } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption | /** Curse of Leeches (round B267): a player to attach it to as it transforms (CompiledCard.asTransformsAttachPlayer). */ "attachPlayer"; except?: string; /** CompiledCard.entersChoose's `byOpponent`: the opponent chosen just before (Chosen.player) makes this choice. */ byOpponent?: true; /** CompiledCard.entersChoose's `opponentHands`; `revealedHands` once they're revealed. */ opponentHands?: true; revealedHands?: true; many?: true; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; /** Apex Observatory (round 434): CompiledCard.entersChoose craftedShared. */ craftedShared?: true; /** With "copyLast": what makes each option's copy (Essence of the Wild, Mystic Reflection). */ copySources?: string[]; range?: { min: number; max: number }; random?: number[]; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; /** Null Chamber: the first or second of two card names, chosen by its controller and the opponent it chose, in turn order from the active player (CR 101.4). */ pairName?: 0 | 1; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean; /** Round B250: the Gather Specimens instances (GameState.gatherSpecimens ids) already applied to it as it enters (CR 614.5). */ gatherUsed?: string[] } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -3545,6 +3549,8 @@ export interface Resolving {
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
+    /** The Creation of Avacyn (round 433, Effect linkedCreatureOrHand): the linked cards as they were when it began, the ones that may be put onto the battlefield, and whether that is done. */
+    avacyn?: { cards: { id: ObjectId; zc: number }[]; put: ObjectId[]; entered?: true };
     /** A "you may" declined whose `otherwise` asks another "you may" (Gathering Stone): that one's text, while it's asked. */
     mayOtherwise?: string;
     /** Scholar of New Horizons (Effect search `mayInstead`): asked whether the found card goes there instead (the answer is `may`). */

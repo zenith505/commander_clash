@@ -428,6 +428,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = parseSearchFilter(`${c[1]} card`);
       if (!filter) return "fail";
       extra.push({ kind: "exileFromGraveyard", n: 1, filter: { ...filter, text: `${c[1]} card with mana value X` }, mvX: true });
+    } else if ((c = /^Exile X (artifact|creature) cards from your graveyard$/.exec(part)) && /\{X\}/.test(costs)) {
+      // Ludevic, Necrogenius (round 435): "{X}{U}{U}{B}{B}, Exile X creature cards from your graveyard": the one X announced as
+      // it's activated, paid in mana and in that many cards of that type (CR 107.3a, 602.2b), as Necropolis Fiend's below.
+      const filter = parseSearchFilter(`${c[1]} card`);
+      if (!filter) return "fail";
+      extra.push({ kind: "exileFromGraveyard", n: 0, x: true, filter: { ...filter, text: `${c[1]} card` } });
     } else if (/^Exile X cards from your graveyard$/.test(part)) {
       // Necropolis Fiend: "{X}, {T}, Exile X cards from your graveyard": the one X announced as it's activated, paid in
       // mana and in that many cards (CR 107.3a, 602.2b).

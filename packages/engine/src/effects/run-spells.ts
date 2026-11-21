@@ -914,7 +914,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const untilTypes = causeTypes ?? e.untilTypes;
         const fits = (id: ObjectId) =>
           (lessThan === undefined || defMv(defOf(s, obj(s, id))) < lessThan) &&
-          (untilTypes ? untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
+          // The Day of the Doctor (round 436): "a legendary card", its printed supertype (a land too, CR 205.4d).
+          (e.untilLegendary ? !!defOf(s, obj(s, id)).supertypes?.includes("Legendary") : untilTypes ? untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) && !(e.untilNonlandType && isType(defOf(s, obj(s, id)), "Land")) : !isType(defOf(s, obj(s, id)), "Land")) &&
           (e.untilMv === undefined || defMv(defOf(s, obj(s, id))) <= e.untilMv) &&
           (e.untilMvAtLeast === undefined || defMv(defOf(s, obj(s, id))) >= e.untilMvAtLeast) &&
           !(e.untilNonlegendary && defOf(s, obj(s, id)).supertypes?.includes("Legendary"));
@@ -947,7 +948,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${causeTypes ? `${causeTypes.map((x) => x.toLowerCase()).join(" or ") || "such"}` : e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilLegendary ? "legendary" : causeTypes ? `${causeTypes.map((x) => x.toLowerCase()).join(" or ") || "such"}` : e.untilTypes ? "instant or sorcery" : "nonland"} card${e.untilMv !== undefined ? ` with mana value ${e.untilMv} or less` : ""}${e.untilMvAtLeast !== undefined ? ` with mana value ${e.untilMvAtLeast} or greater` : ""}`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;
@@ -1003,6 +1004,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           const name = defOf(s, obj(s, hit)).name;
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: ["0", "1"], labels: [`Put ${name} onto the battlefield`, `Put ${name} into your hand`], prompt: "choose one" };
           return "paused";
+        }
+        if (e.then === "playWhileSource") {
+          // The Day of the Doctor (round 436): played with its usual timing (and a land play for a land, CR 305.2) while
+          // the source is still on the battlefield as this object (CR 611.2b, 400.7); the rest to the bottom at random.
+          const o = obj(s, hit);
+          if (ctx.sourceId !== undefined) o.mayPlay = { player: caster, zc: o.zoneChanges ?? 0, until: "source", turn: s.turn, source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } };
+          if (e.restBottom) bottomRest(s, (sc.untilNonland.seen ?? []).filter((id) => id !== hit));
+          return;
         }
         if (e.then !== "castFree") {
           // "Until end of turn, you may cast that card (without paying its mana cost)": with its usual timing (rulings).

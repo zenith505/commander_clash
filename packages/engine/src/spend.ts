@@ -96,6 +96,13 @@ export const costHasC = (cost?: ParsedCost): boolean => !!cost?.symbols.some((x)
 
 /** Can mana restricted this way be spent on `use`? `cost`: the cost being paid, when it's known. */
 export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse, cost?: ParsedCost): boolean {
+  // Ice Cauldron (round B285): "Spend this mana only to cast the last card exiled with ~": casting that card, the object
+  // it was in exile as the mana was made (CR 400.7), any part of its total cost (rulings: additional costs too).
+  if (only.lastExiled) {
+    if (use === "other" || !("spell" in use) || !only.card) return false;
+    const o = use.castObject ?? use.object;
+    return !!o && o.id === only.card.id && o.zone === "exile" && (o.zoneChanges ?? 0) === only.card.zc;
+  }
   // Cultivator Drone (round B254): "Spend this mana only to cast a colorless spell, activate an ability of a colorless
   // permanent, or pay a cost that contains {C}" (CR 106.6): any cost with a {C} symbol (CR 107.4c), all of it, its generic
   // mana too, a cost paid as something resolves among them (rulings: Bearer of Silence's "you may pay {1}{C}"); otherwise a
@@ -422,6 +429,8 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
 export function boundSpend(o: GameObject, only: ManaSpend): ManaSpend;
 export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpend | undefined;
 export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpend | undefined {
+  // Ice Cauldron (round B285): the last card exiled with it as this mana is made, kept with the mana.
+  if (only?.lastExiled) return { ...only, card: o.cauldronCard ?? null, text: `${only.text.replace(/\.$/, "")} (${o.cauldronCard?.name ?? "none"}).` };
   const abilities = typeof only?.abilities === "object" ? only.abilities : undefined;
   if (only?.spells?.chosen === "color")
     // With no color chosen, no spell is of it: colorless and white at once.
@@ -450,7 +459,7 @@ export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { on
   for (const m of mana) {
     p.manaPool[m]++;
     if (!how.only && !from && !how.keep && !how.spentTrigger && !how.haste && !how.commanderCounters && !how.creatureCounter && !how.uncounterableInstantSorcery && !how.source && !how.riot) continue;
-    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.hasteType === how.hasteType && l.commanderCounters === how.commanderCounters && l.creatureCounter === how.creatureCounter && l.uncounterableInstantSorcery === how.uncounterableInstantSorcery && l.source === how.source && l.riot === how.riot);
+    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && l.only?.card?.id === how.only?.card?.id && l.only?.card?.zc === how.only?.card?.zc && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.hasteType === how.hasteType && l.commanderCounters === how.commanderCounters && l.creatureCounter === how.creatureCounter && l.uncounterableInstantSorcery === how.uncounterableInstantSorcery && l.source === how.source && l.riot === how.riot);
     if (same) same.n++;
     else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste, ...(how.hasteType ? { hasteType: how.hasteType } : {}) } : {}), ...(how.commanderCounters ? { commanderCounters: true as const } : {}), ...(how.creatureCounter ? { creatureCounter: how.creatureCounter } : {}), ...(how.uncounterableInstantSorcery ? { uncounterableInstantSorcery: true as const } : {}), ...(how.source ? { source: how.source } : {}), ...(how.riot ? { riot: how.riot } : {}) });
   }

@@ -343,6 +343,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
+    // Breathstealer's Crypt (round B289): 3 life to keep a creature card costing 3 or more, while 10 life or more is left.
+    if (pend.kind === "chooseMay" && pend.breathstealer) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && mv(s, pend.card) >= 3 && player(s, pid).life - 3 >= 10 }];
+    // Parnesse, the Subtle Brush (round B289): a copy of that spell for us, once (two Parnesses copying for each other would
+    // never end): not when a copy of it under our control is already on the stack.
+    const parnesse = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "chooseMay" && parnesse?.type === "may" && parnesse.effects.length === 1 && parnesse.effects[0]!.type === "copySpell" && parnesse.effects[0]!.spell === "copied") {
+      const of = s.resolving!.item.event?.copied;
+      const orig = of !== undefined ? (s.stack.find((x) => x.id === of) ?? s.castItems?.[of]) : undefined;
+      const mine = !!orig && s.stack.some((x) => x.copy && x.controller === pid && x.description === `${orig.description.replace(/ \(copy\)$/, "")} (copy)`);
+      return [{ type: "chooseMay", player: pid, yes: !!orig && !mine }];
+    }
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     // Aetherplasm (round B261): back to the hand, always: the attacker stays blocked whatever is put in (rulings).
@@ -7827,8 +7838,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const hoard = ab.sacrificeSelf && fx.length === 2 && fx[0]!.type === "discard" && fx[0]!.hand && fx[0]!.who.ref === "you" && fx[1]!.type === "draw" && fx[1]!.who.ref === "you" && typeof fx[1]!.n === "object" && "count" in fx[1]!.n && fx[1]!.n.count.kind === "counters" && fx[1]!.n.count.of?.ref === "self"
         ? ((n) => s.activePlayer === pid && s.step === "main2" && !s.stack.length && (o.counters[n.count.kind === "counters" ? n.count.counter : ""] ?? 0) >= player(s, pid).hand.length + 2)(fx[1]!.n)
         : false;
+      // Golgothian Sylex, Apocalypse Chime (round B290): a wipe of the permanents with an old set's names, weighed below.
+      const w1 = ab.body.effects.length === 1 ? ab.body.effects[0] : undefined;
+      const oldWipe = (w1?.type === "destroy" || w1?.type === "sacrifice") && w1.what.ref === "each" && !!w1.what.filter.firstPrintedIn;
+      if (oldWipe && (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length)) continue;
       // Lodestone Bauble (round 417): sacrificed when it's worth it (baubleTargets below).
-      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay && !hoard && !ab.choosesYardPlayer) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
+      if (((ab.sacrificeSelf && !cashIn && !oldWipe && !flips && !voidPlay && !hoard && !ab.choosesYardPlayer) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
       // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
       if (ab.grantSourceCost?.action === "sacrifice") continue;
       // Hankyu: "Remove all aim counters from Hankyu" for that much damage: only once three have built up.
@@ -8108,6 +8123,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
       const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
       if (!craft && !vessel && !baubleTargets && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      // Golgothian Sylex, Apocalypse Chime: only when the opponents lose more than we do, Chime's own sacrifice counted (Sylex
+      // is one of the permanents it sacrifices).
+      if (oldWipe && (groupValue(s, pid, valued, undefined, id) ?? 0) - (ab.sacrificeSelf ? worth(s, pid, o) : 0) < 3) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).

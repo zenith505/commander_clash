@@ -3450,7 +3450,8 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
     if (choices) {
       const entry = fromMade ? made.shift()! : 0;
       const archives = archivesOfMade(entry);
-      const scriv = scrivsOfMade(entry);
+      // Breathstealer's Crypt (round B289): this draw is replaced, so whatever replaces it isn't the Crypt's draw.
+      const scriv = scrivsOfMade(entry) % BREATH_REVEAL;
       if (!fromMade) n--;
       if (!fromMade) player(s, pid).firstWouldDraw = s.turn; // the turn's first would-be draw, whatever replaces it
       if (choices.length > 1) {
@@ -3481,6 +3482,8 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
     let archives: number;
     // Blood Scrivener (round B235): how many already replaced a draw this one was made of (CR 614.5).
     let scriv = 0;
+    // Breathstealer's Crypt (round B289): this is the Crypt's own draw (see BREATH_REVEAL).
+    let reveal = false;
     if (!made.length) {
       n--;
       const look = firstDrawLook(s, pid, n, after);
@@ -3490,6 +3493,8 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
       const entry = made.shift()!;
       archives = archivesOfMade(entry);
       scriv = scrivsOfMade(entry);
+      reveal = scriv >= BREATH_REVEAL;
+      scriv %= BREATH_REVEAL;
     }
     const dig = digInstead(s, pid, n, after, made, archives, undefined, scriv);
     if (dig === "paused") return false;
@@ -3500,7 +3505,7 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
     if (options.length || abundance) {
       // Dredge and an Archive could both replace this draw: the player picks which applies first (CR 616.1, Archive
       // ruling). Not dredging means the Archive's "draw two instead", which isn't optional.
-      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(scriv ? { scriv } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}), ...(after ? { after } : {}) };
+      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(scriv ? { scriv } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}), ...(reveal ? { breath: true as const } : {}), ...(after ? { after } : {}) };
       return false;
     }
     if (archives) {
@@ -3510,9 +3515,13 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
       made.unshift(...Array<number>(2 ** archives).fill(madeEntry(0, scriv)));
       continue;
     }
+    const before = player(s, pid).lastDrawn;
     const one = drawOne(s, pid, { left: n, made, ...(after ? { after } : {}) });
     if (one === "paused") return false;
     if (!one) break;
+    // Breathstealer's Crypt (round B289): the card its draw drew (none when an empty library's replacement applied).
+    const drawn = player(s, pid).lastDrawn;
+    if (reveal && drawn && drawn !== before && breathReveal(s, pid, drawn.id, n, after, made) === "paused") return false;
   }
   return true;
 }
@@ -3840,6 +3849,14 @@ const SCRIVENER_UNIT = 1000;
 const RENEWAL_UNIT = 100;
 const CHAINS_UNIT = 10_000;
 const WEIRDING_UNIT = 1_000_000;
+/** Breathstealer's Crypt (round B289): its digit of the Scriveners' number, as for Chains and Weirding. */
+const BREATH_UNIT = 100_000_000;
+/**
+ * Breathstealer's Crypt's own draw, a flag above the digits (scrivs of at least this much): a card it draws is revealed, and
+ * a creature card discarded unless 3 life is paid (breathReveal). Taken off as the draw is made or replaced, so a draw another
+ * replacement makes of it doesn't carry it (Sindbad rulings: a draw replaced, even by another draw, isn't that draw).
+ */
+const BREATH_REVEAL = 10_000_000_000;
 /** How many of one kind (its unit above, 1 for Blood Scriveners) already replaced a draw this one was made of. */
 const appliedOf = (scriv: number, unit: number) => Math.floor(scriv / unit) % 100;
 const madeEntry = (archives: number, scrivs: number) => archives + SCRIVENER_UNIT * scrivs;
@@ -4184,6 +4201,9 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
   const chains = firstInDrawStep ? 0 : s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawChains).length - appliedOf(madeScriv, CHAINS_UNIT);
   const weirdings = s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawWeirding).length - appliedOf(madeScriv, WEIRDING_UNIT);
+  // Breathstealer's Crypt (round B289): anyone's, for every player's draws, mandatory; as for Chains, one choice stands for those
+  // that haven't replaced a draw this one was made of (CR 614.5).
+  const breaths = s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).drawBreathstealer).length - appliedOf(madeScriv, BREATH_UNIT);
   // Reed Richards (round B237): an instruction's draw (not one a replacement made, as for Scion of Halaster's look), the turn's
   // first one but the first card drawn in its player's own draw step.
   const reed = madeArchives === undefined ? reedRichards(s, pid) : undefined;
@@ -4219,12 +4239,13 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   // Unpredictable Cyclone (round B286): an instruction's draw (one no replacement made, CR 614.5) that the resolving cycling
   // ability of a nonland card causes its controller to make. All of them do the same, so one stands for them.
   const cyclone = madeArchives === undefined ? cycloneFor(s, pid) : undefined;
-  if (!cyclone && !fates.length && !shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed) return undefined;
+  if (!cyclone && !fates.length && !shields.length && digs.length < 2 && !thief && !portal && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && breaths <= 0 && !reed) return undefined;
   const out = [...shields];
   if (cyclone !== undefined) out.push({ key: `cyclone:${cyclone}`, label: `Exile cards from the top of your library until one shares a card type with the cycled card instead; you may cast it without paying its mana cost (${nameOf(s, cyclone)})` });
   if (reed !== undefined) out.push({ key: "reed", label: `Draw four cards instead (${nameOf(s, reed)})` });
   if (chains > 0) out.push({ key: "chains", label: "Discard a card instead, then draw a card; with no card in hand, mill a card (Chains of Mephistopheles)" });
   if (weirdings > 0) out.push({ key: "weirding", label: "Reveal the card instead; any other player may pay 2 life to put it into your graveyard, otherwise you draw it (Zur's Weirding)" });
+  if (breaths > 0) out.push({ key: "breath", label: "Draw a card and reveal it instead; if it's a creature card, discard it unless you pay 3 life (Breathstealer's Crypt)" });
   if (scriveners > 0) out.push({ key: "scrivener", label: "Draw two cards and lose 1 life instead (Blood Scrivener)" });
   if (renewals > 0) out.push({ key: "renewal", label: "Reveal the top card of your library instead: a creature card goes into your graveyard, any other card is drawn (Enduring Renewal)" });
   for (const id of crypts) out.push({ key: `crypt:${id}`, label: `Return a card from your graveyard to your hand instead; with none, you lose the game (${nameOf(s, id)})` });
@@ -4256,7 +4277,7 @@ function drawReplacementChoices(s: GameState, pid: PlayerId, madeArchives?: numb
   for (const id of fates)
     for (const q of fateOpps) out.push({ key: `fate:${id}:${q}`, label: `Exile the top card of ${player(s, q).name}'s library face down instead${player(s, q).library.length ? "" : " (it's empty)"} (${nameOf(s, id)}${fates.length > 1 ? ` ${fates.indexOf(id) + 1}` : ""})` });
   // A Notion Thief with nothing else to choose from goes on as before.
-  if (!cyclone && !fates.length && !shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
+  if (!cyclone && !fates.length && !shields.length && !exilers.length && !tutors.length && !sages.length && !skippers.length && !crypts.length && !piles.length && scriveners <= 0 && renewals <= 0 && chains <= 0 && weirdings <= 0 && breaths <= 0 && !reed && digs.length < 2 && out.length < 2) return undefined;
   // Only replacements its player may decline (dredge, Abundance, Archmage Ascension, Obstinate Familiar, Pursuit of
   // Knowledge, Parallel Thoughts): or none of them, the draw itself.
   if (out.every((x) => /^(?:dredge|abundance|tutor|mayskip|counter|pthoughts):/.test(x.key))) out.push({ key: "draw", label: "Draw the card" });
@@ -4369,6 +4390,15 @@ function applyDrawReplacement(s: GameState, pid: PlayerId, key: string, left: nu
   }
   if (key === "chains") return chainsInstead(s, pid, left, after, made, madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + CHAINS_UNIT));
   if (key === "weirding") return weirdingInstead(s, pid, left, after, made, madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + WEIRDING_UNIT));
+  if (key === "breath") {
+    // Breathstealer's Crypt (round B289): "instead they draw a card and reveal it" (CR 614.1a): a new draw this Crypt doesn't
+    // replace again (CR 614.5), which another Crypt, the Archives that could replace this draw and the rest still can; only if
+    // it's drawn as itself is the card revealed (BREATH_REVEAL, breathReveal).
+    log(s, `${p.name} draws a card and reveals it instead (${nameOf(s, s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawBreathstealer)!)}).`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
+    made.unshift(madeEntry(madeArchives ?? archivesFor(s, pid), madeScriv + BREATH_UNIT + BREATH_REVEAL));
+    return;
+  }
   if (key === "exile" || key.startsWith("words:")) return applyDrawShield(s, pid, key, left, after, made, madeArchives, madeScriv);
   if (key === "thief") return stealDraw(s, pid, notionThief(s, pid)!);
   if (key === "skip") return skipDraw(s, pid, drawSkipper(s)!);
@@ -4600,10 +4630,12 @@ function chainsInstead(s: GameState, pid: PlayerId, left: number, after: DrawAft
  * discard a card") or, for another player's Chains, a Nephalia Academy (round 430), first whether it goes on top of their
  * library instead (CR 614.1a, 616.1): "paused" while they choose, `then` the draws to go on with after that.
  */
-function chainsDiscardOrAsk(s: GameState, pid: PlayerId, id: ObjectId, src: string, then: { left: number; made: number[]; after?: DrawAfter }): "paused" | void {
+function chainsDiscardOrAsk(s: GameState, pid: PlayerId, id: ObjectId, src: string, then: { left: number; made: number[]; after?: DrawAfter; by?: PlayerId; breath?: true }): "paused" | void {
   const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
-  const by = toTopName(s, pid, chains ? controllerOf(s, obj(s, chains)) : undefined, false);
-  if (!by) return chainsDiscard(s, pid, id, src);
+  // Breathstealer's Crypt (round B289): its controller's, `then.by`.
+  const maker = then.breath ? then.by : chains ? controllerOf(s, obj(s, chains)) : undefined;
+  const by = toTopName(s, pid, maker, false);
+  if (!by) return chainsDiscard(s, pid, id, src, [], then.breath ? { by: maker } : undefined);
   s.pending = { kind: "handToTop", player: pid, count: 1, source: src, upTo: true, discarding: [id], chains: then, ...(by !== lengName(s, pid) ? { revealing: by } : {}) };
   return "paused";
 }
@@ -4613,12 +4645,14 @@ function chainsDiscardOrAsk(s: GameState, pid: PlayerId, id: ObjectId, src: stri
  * part of what's resolving ("discarded this way" means that spell's own discards). `toTop`: put on top of the library instead
  * (see chainsDiscardOrAsk).
  */
-function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string, toTop: ObjectId[] = []) {
+function chainsDiscard(s: GameState, pid: PlayerId, id: ObjectId, src: string, toTop: ObjectId[] = [], breath?: { by?: PlayerId }) {
   const chains = s.battlefield.find((x) => abilitiesOf(s, obj(s, x)).drawChains);
   const r = s.resolving;
   s.resolving = null;
   try {
-    discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined, undefined, toTop);
+    // Breathstealer's Crypt (round B289): by its controller, as part of the draw it replaced.
+    if (breath) discardCards(s, pid, [id], ` (${src})`, false, false, breath.by, undefined, toTop);
+    else discardCards(s, pid, [id], ` instead of drawing (${src})`, false, false, chains ? controllerOf(s, obj(s, chains)) : undefined, undefined, toTop);
   } finally {
     s.resolving = r;
   }
@@ -4653,6 +4687,55 @@ function askWeirding(s: GameState, w: NonNullable<Extract<PendingDecision, { kin
     return "paused";
   }
   w.made.unshift(w.entry);
+}
+
+/**
+ * Breathstealer's Crypt (round B289), the rest of its replacement once its draw drew `card` (CR 614.1a): `pid` reveals it (CR
+ * 701.20a); a creature card (as it is in the hand) they discard unless they pay 3 life, their choice, only if they can pay it
+ * (CR 119.4). The discard is the Crypt's controller's doing (an opponent's Crypt can't make a Tamiyo, Collector of Tales player
+ * discard; Library of Leng applies). "Paused" while they choose; then the draws after it go on (`left`, `made`, `after`).
+ */
+function breathReveal(s: GameState, pid: PlayerId, card: ObjectId, left: number, after: DrawAfter | undefined, made: number[]): "paused" | void {
+  const p = player(s, pid);
+  const o = s.objects[card];
+  if (!o || o.zone !== "hand") return;
+  const crypt = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).drawBreathstealer);
+  const src = crypt ? nameOf(s, crypt) : "Breathstealer's Crypt";
+  const by = crypt ? controllerOf(s, obj(s, crypt)) : pid;
+  const name = defOf(s, o).name;
+  const creature = objIsType(s, o, "Creature");
+  log(s, `${p.name} reveals ${name}${creature ? ", a creature card" : ""} (${src}).`);
+  if (!creature) return;
+  if (payableLife(s, pid) >= 3) {
+    s.pending = { kind: "chooseMay", player: pid, source: src, prompt: `pay 3 life to keep ${name} (otherwise you discard it)`, card, pay: { life: 3 }, breathstealer: { left, made: [...made], ...(after ? { after } : {}), by } };
+    return "paused";
+  }
+  return breathDiscard(s, pid, card, src, { left, made, ...(after ? { after } : {}), by, breath: true });
+}
+
+/** Breathstealer's Crypt's discard (breathReveal): `then` the draws after it, for a Library of Leng question that pauses. */
+function breathDiscard(s: GameState, pid: PlayerId, card: ObjectId, src: string, then: { left: number; made: number[]; after?: DrawAfter; by: PlayerId; breath: true }): "paused" | void {
+  const p = player(s, pid);
+  if (opponentForbidsDiscard(s, pid, then.by)) {
+    log(s, `${p.name} can't be made to discard ${nameOf(s, card)} by another player's ${src} (${nameOf(s, discardShieldOf(s, pid)!.id)}).`);
+    return;
+  }
+  if (chainsDiscardOrAsk(s, pid, card, src, then) === "paused") return "paused";
+}
+
+/** Answers Breathstealer's Crypt's question (breathReveal): pay 3 life or discard the card; then the draws go on. */
+function answerBreath(s: GameState, p: Player, yes: boolean) {
+  const pend = s.pending;
+  if (pend?.kind !== "chooseMay" || !pend.breathstealer || pend.card === undefined) throw new RulesError("nothing to decide");
+  const b = pend.breathstealer;
+  if (yes && payableLife(s, p.id) < 3) throw new RulesError("you can't pay 3 life"); // CR 119.4
+  s.pending = null;
+  const made = [...b.made];
+  if (yes) {
+    payLife(s, p.id, 3);
+    log(s, `${p.name} pays 3 life and keeps ${nameOf(s, pend.card)} (${pend.source}).`);
+  } else if (breathDiscard(s, p.id, pend.card, pend.source, { left: b.left, made, ...(b.after ? { after: b.after } : {}), by: b.by, breath: true }) === "paused") return;
+  continueDraws(s, p.id, b.left, b.after, made);
 }
 
 /** Answers Zur's Weirding's offer (askWeirding); then the draws go on. */
@@ -4739,7 +4822,13 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     log(s, `${p.name} draws two cards instead of one.`);
     if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
     made.unshift(madeEntry(pend.archive - 1, pend.scriv ?? 0), madeEntry(pend.archive - 1, pend.scriv ?? 0));
-  } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
+  } else {
+    const before = p.lastDrawn;
+    const one = drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) });
+    if (one === "paused") return;
+    // Breathstealer's Crypt (round B289): not dredging, the Crypt's own draw drew this card.
+    if (one && pend.breath && p.lastDrawn && p.lastDrawn !== before && breathReveal(s, p.id, p.lastDrawn.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made) === "paused") return;
+  }
   if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made, true)) return;
   drawsDone(s, pend.after);
 }
@@ -12740,7 +12829,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
     if (new Set(ids).size !== ids.length || ids.some((id) => !pend.discarding!.includes(id))) throw new RulesError("choose from the cards being discarded");
     const then = pend.chains;
     s.pending = null;
-    chainsDiscard(s, p.id, pend.discarding[0]!, pend.source, ids);
+    chainsDiscard(s, p.id, pend.discarding[0]!, pend.source, ids, then.breath ? { by: then.by } : undefined);
     continueDraws(s, p.id, then.left, then.after, [...then.made]);
     return;
   }
@@ -14934,6 +15023,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     return;
   }
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.weirding) return answerWeirding(s, p, yes);
+  if (pend?.kind === "chooseMay" && pend.player === p.id && pend.breathstealer) return answerBreath(s, p, yes);
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.skipDraw) {
     const { from, declined } = pend.skipDraw;
     s.pending = null;

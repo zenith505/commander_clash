@@ -42,6 +42,7 @@ import { roundB283Chapter, roundB283Line } from "./laneb283-lines";
 import { roundB284Line } from "./laneb284-lines";
 import { roundB285Line } from "./laneb285-lines";
 import { roundB286Line } from "./laneb286-lines";
+import { roundB287Line } from "./laneb287-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2517,6 +2518,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB285Line(line, out, isSpell)) continue;
     // Galea, Kindler of Hope, Unpredictable Cyclone (round B286).
     if (roundB286Line(line, out, isSpell)) continue;
+    // Mimeoplasm, Revered One, Sanar, Innovative First-Year (round B287).
+    if (roundB287Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).
@@ -8204,8 +8207,11 @@ function linkExile(out: CompiledCard) {
     // Bronzebeak Foragers: "exile ... until ~ leaves the battlefield" when that's its only exile ability.
     const exiles = all.some((e) => !e.until) ? all.filter((e) => !e.until) : all.filter((e) => e.until === "sourceLeaves");
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
-    else if (exiles[0]) exiles[0].linked = true;
+    // Mimeoplasm, Revered One (round B287): "target creature card exiled with it" is one its "As ~ enters, exile ... from your
+    // graveyard" exiled (CR 607.2b; enters-yard.ts links them), when nothing else exiles.
+    const yardOnly = !!out.entersExileFromYard && !all.length && !out.exileInsteadOfDying && yardEntersLinkOnly(out, bodies);
+    if (!yardOnly && (others || out.spell || out.entersExileFromYard || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1)) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
+    else if (!yardOnly && exiles[0]) exiles[0].linked = true;
   }
   // Duplicant: "the last creature card exiled with it" is one its one exile ability exiled (CR 607.2a).
   if (out.statics.some((st) => st.mods.some((m) => m.kind === "linkedCreature"))) {

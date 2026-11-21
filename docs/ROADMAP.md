@@ -1,6 +1,6 @@
 # Roadmap
 
-31,840 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,842 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
 9,979 (99%).
 
@@ -11804,6 +11804,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B287 (least played first, from the skip lists, neither card in Lane A's rounds 437-438): Mimeoplasm, Revered One's
+  "As ~ enters, exile up to X creature cards from your graveyard. It enters with three +1/+1 counters on it for each
+  creature card exiled this way." (a choice as it enters, CR 614.1c, 614.12a, none too; X as it was cast, 0 otherwise, CR
+  107.3m; the counters for the cards that got to exile; entersExileFromYard `upToX`, `countersEach`, enters-yard.ts) and
+  "{2}: ~ becomes a copy of target creature card exiled with it, except it's 0/0 and has this ability." (the cards its
+  enters replacement exiled, CR 607.2b, its only exile; a copy effect with its counters kept, CR 707.9b; compile.ts
+  linkExile). Sanar, Innovative First-Year's "Vivid — At the beginning of your first main phase, reveal cards from the top
+  of your library until you reveal X nonland cards, where X is the number of colors among permanents you control. For each
+  of those colors, you may exile a card of that color from among the revealed cards. Then shuffle. You may cast the exiled
+  cards this turn." (X and the colors counted once as it resolves, rulings; the revealed cards stay in the library, CR
+  701.20a; a different card for each color, a multicolored card standing for one of its colors, any colors left out; a
+  colored land may be exiled but is never cast, CR 305.1; the casts follow their usual timing and costs, rulings; Effect
+  revealColorsExile, searchLibrary `colorsToCast`, effects/run-laneb287.ts). Bots cast Mimeoplasm with no more X than
+  their creature cards in the graveyard (at least 1) and exile them all, and take for Sanar the nonland cards they could
+  pay for, the greatest mana value first. Browser tests click through Mimeoplasm's "up to 2" exile and its copy of the
+  exiled Serra Angel, and Sanar's red and blue picks among the revealed cards, then the cast of Hill Giant from exile. +2,
+  31,842 of 31,936 on B286's branch. The compiled text of every other card is unchanged.
+- Out after round B287 (looked at, not done): the lists after round B286 stay out. Judgment call: after Mimeoplasm becomes
+  a copy, the "this ability" it keeps still refers to the cards its own enters replacement exiled (the ability is printed on
+  it, CR 607.1a, and the card has no rulings saying otherwise); the copy is a 0/0 with its +1/+1 counters. Known gaps: bots
+  don't use Mimeoplasm's copy ability on purpose (only as the generic "becomes a copy" activation); Nihiloor (a reflexive
+  trigger for each creature tapped, each with its own power cap) and Ashiok, Wicked Manipulator (every life payment
+  replaced) are next in line, not looked at closely yet.
 - Round B286 (least played first, from the skip lists, none of them in Lane A's rounds 436-437): Pygmy Hippo, which round
   B285 left to Lane A's round 437 while round 437 left it to Lane B, is back as round B285 built it (see there; the
   attack trigger, Effect drainLose, the delayed {C}; its browser test in laneb-round285.spec.ts). Galea, Kindler of Hope's
@@ -11829,7 +11852,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B286 (looked at, not done): the lists after round B285 stay out. Battlefield Thaumaturge stays out
   (its ruling "{1} per target creature, even if the spell targets a creature more than once" still reads either way for
   a creature targeted twice). Sanar, Innovative First-Year (reveal until X nonland cards, then a card of each color among
-  them, one card standing for one color) is next in line, not looked at closely yet. Judgment calls and known gaps: a
+  them, one card standing for one color) was next in line (done in round B287). Judgment calls and known gaps: a
   draw another replacement made of the cycling ability's draw (an Archive's two) isn't offered to the Cyclone, which can
   still be chosen first for the draw itself (CR 616.1); bots don't cycle more for having a Cyclone.
 - Round B285 (least played first, from the skip lists, not in Lane A's rounds 435-437): Ice Cauldron's "{X}, {T}: You

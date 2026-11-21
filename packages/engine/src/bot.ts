@@ -734,6 +734,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Hollow Warrior (round B259): a cost to block, the same way.
     // Noxious Vapors (round B278): the best cards of its hand that still fit one of each color (built greedily, as big as
     // any: a transversal matroid), so a card is chosen for each color there's one left for.
+    // Sanar, Innovative First-Year (round B287): the nonland cards we can cast this turn (no more mana value than our lands),
+    // the greatest first, one for each color; an exiled card not cast is lost.
+    if (pend.kind === "searchLibrary" && pend.colorsToCast && pend.oneOfEach) {
+      const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+      const found: string[] = [];
+      for (const id of pend.cards.filter((x) => !isType(defOf(s, obj(s, x)), "Land") && mv(s, x) <= lands).sort((a, b) => mv(s, b) - mv(s, a))) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     if (pend.kind === "searchLibrary" && pend.keepColors && pend.oneOfEach) {
       const found: string[] = [];
       for (const id of [...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
@@ -1842,6 +1850,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "exileFromYard") {
       const how = pend.objectId && s.objects[pend.objectId] ? compileCard(defOf(s, obj(s, pend.objectId))).entersExileFromYard : undefined;
       const cards = pend.options.filter((x) => x !== "done");
+      // Mimeoplasm, Revered One (round B287): every card is three +1/+1 counters and one more creature to become a copy of,
+      // so as many as it may, the greatest mana value first.
+      if (how?.n === "upToX") return [{ type: "chooseOption", player: pid, choice: [...cards].sort((a, b) => mv(s, b) - mv(s, a))[0] ?? "done" }];
       if (how?.n === "any") {
         const add = (x: string) => characteristics(s, obj(s, x)).power + characteristics(s, obj(s, x)).toughness;
         const best = cards.filter((x) => add(x) > 0).sort((a, b) => add(b) - add(a))[0];
@@ -4596,7 +4607,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Sutured Ghoul and Living Lore with nothing to exile that gives them toughness would die at once (CR 704.5f);
   // Frankenstein's Monster's X is capped below by our creature cards in the graveyard (see the X choices).
   const yard = compileCard(d).entersExileFromYard;
-  if (yard && yard.n !== "x") {
+  if (yard && yard.n !== "x" && yard.n !== "upToX") {
     // Dermotaxi (round 423): a creature card from any graveyard, worth casting only with one there.
     const yards = yard.anyGraveyard ? s.turnOrder.flatMap((p) => player(s, p).graveyard) : player(s, pid).graveyard;
     const cards = yards.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c))));
@@ -4714,7 +4725,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     xs = xs.filter((x) => x !== undefined && x >= 1 && x <= lands);
   }
   // Frankenstein's Monster: no more X than our creature cards in the graveyard (or it never enters), and at least 1.
-  if (cost.hasX && yard?.n === "x") {
+  // Mimeoplasm, Revered One (round B287): the same, as a 0/0 with nothing exiled dies (CR 704.5f) and more X exiles nothing more.
+  if (cost.hasX && (yard?.n === "x" || yard?.n === "upToX")) {
     const cards = player(s, pid).graveyard.filter((c) => c !== id && printedMatches(yard.filter, defOf(s, obj(s, c)))).length;
     const top = Math.min(cards, Math.max(0, ...xs.filter((x): x is number => x !== undefined)));
     xs = Array.from({ length: top }, (_, i) => top - i);

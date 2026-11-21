@@ -4372,6 +4372,12 @@ export type Effect =
    */
   | { type: "noteCauldron" }
   /**
+   * Sanar, Innovative First-Year (round B287): "reveal cards from the top of your library until you reveal X nonland cards,
+   * where X is the number of colors among permanents you control. For each of those colors, you may exile a card of that
+   * color from among the revealed cards. Then shuffle. You may cast the exiled cards this turn." (effects/run-laneb287.ts).
+   */
+  | { type: "revealColorsExile" }
+  /**
    * Ertai's Meddling (round B282): the delayed triggered ability "At the beginning of each of that player's upkeeps, if that
    * card is exiled, remove a delay counter from it. If the card has no delay counters on it, the player puts it onto the
    * stack as a copy of the original spell." (CR 603.7; its subject is the card in exile, GameState.meddled its spell as it
@@ -9154,7 +9160,7 @@ export interface CompiledCard {
    * its "the exiled cards" abilities (CR 607.2b). `n`: "any" number, exactly one if there's one, or X (`instead`: all X or
    * it never enters); `counterEach`: one counter of a kind chosen from these for each card exiled.
    */
-  entersExileFromYard?: { filter: TargetSpec; n: "any" | "one" | "x"; counterEach?: CounterKind[]; /** Dermotaxi (round 423): "from a graveyard": any player's, not only its controller's. */ anyGraveyard?: true };
+  entersExileFromYard?: { filter: TargetSpec; n: "any" | "one" | "x" | /** Mimeoplasm, Revered One (round B287): up to X, X as it was cast (0 otherwise, CR 107.3m). */ "upToX"; counterEach?: CounterKind[]; /** Mimeoplasm, Revered One (round B287): "It enters with three +1/+1 counters on it for each creature card exiled this way" (CR 614.1c). */ countersEach?: { counter: CounterKind; n: number }; /** Dermotaxi (round 423): "from a graveyard": any player's, not only its controller's. */ anyGraveyard?: true };
   /**
    * Ulamog's Despoiler (round B229): "As ~ enters, you may put two cards your opponents own from exile into their owners'
    * graveyards. If you do, ~ enters with four +1/+1 counters on it.": `n` cards chosen as it enters (CR 614.12), all or none,

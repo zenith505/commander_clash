@@ -1,8 +1,9 @@
 // "As ~ enters, exile ... from your graveyard" (CompiledCard.entersExileFromYard): Sutured Ghoul, Living Lore,
-// Frankenstein's Monster. Lane B round B171.
+// Frankenstein's Monster (Lane B round B171); Mimeoplasm, Revered One (round B287).
 import { compileCard } from "./oracle";
 import { defOf } from "./cards";
 import { fireEvent, printedMatches } from "./effects";
+import { putCounters } from "./counters";
 import { log, moveObject, nameOf, neverEnters, obj, player } from "./game";
 import { controllerOf, invalidateCharacteristics } from "./layers";
 import { RulesError, type GameObject, type GameState, type ObjectId } from "./types";
@@ -23,10 +24,15 @@ export function yardExileOptions(s: GameState, o: GameObject, chosen: readonly s
   return yardsOf(s, o).filter((id) => id !== o.id && !chosen.includes(id) && printedMatches(how.filter, defOf(s, obj(s, id))));
 }
 
-/** How many cards it must exile: "one" (or none with none there), X, or undefined for "any number". */
+/** How many cards it must exile: "one" (or none with none there), X, or undefined for "any number" (and "up to X"). */
 function needed(s: GameState, o: GameObject, c: Entry): number | undefined {
   const how = compileCard(defOf(s, o)).entersExileFromYard!;
-  return how.n === "any" ? undefined : how.n === "one" ? 1 : (c.enterOpts?.x ?? 0);
+  return how.n === "any" || how.n === "upToX" ? undefined : how.n === "one" ? 1 : (c.enterOpts?.x ?? 0);
+}
+
+/** Mimeoplasm, Revered One: "up to X", X as it was cast (CR 107.3m: 0 if it wasn't). Undefined with no such cap. */
+function capOf(s: GameState, o: GameObject, c: Entry): number | undefined {
+  return compileCard(defOf(s, o)).entersExileFromYard!.n === "upToX" ? (c.enterOpts?.x ?? 0) : undefined;
 }
 
 /**
@@ -43,7 +49,8 @@ export function askYardExile(s: GameState, o: GameObject, c: Entry): boolean {
   // Frankenstein's Monster: with fewer creature cards than X, all of them are exiled (CR 609.3) and it never enters; so with
   // exactly as many as it needs, or none left to choose, there's nothing to ask.
   const allLeft = need !== undefined && chosen.length + options.length <= need;
-  if (!options.length || allLeft || (need !== undefined && chosen.length >= need)) {
+  const cap = capOf(s, o, c);
+  if (!options.length || allLeft || (need !== undefined && chosen.length >= need) || (cap !== undefined && chosen.length >= cap)) {
     s.entersChoices!.shift();
     finishYardExile(s, o, c, allLeft ? [...chosen, ...options] : chosen);
     return false;
@@ -51,7 +58,8 @@ export function askYardExile(s: GameState, o: GameObject, c: Entry): boolean {
   const left = need === undefined ? undefined : need - chosen.length;
   const counted = how.counterEach ? `, each one a ${how.counterEach.slice(0, -1).join(", ")}, or ${how.counterEach.at(-1)} counter` : "";
   const yardWord = how.anyGraveyard ? "a" : "your";
-  const prompt = need === undefined ? `exile any number of ${how.filter.text}s from ${yardWord} graveyard as it enters${chosen.length ? ` (${chosen.length} so far)` : ""}` : need === 1 ? `exile ${/^[aeiou]/.test(how.filter.text) ? "an" : "a"} ${how.filter.text} from ${yardWord} graveyard as it enters` : `exile ${need} ${how.filter.text}s from ${yardWord} graveyard as it enters${counted} (${left} more to choose)`;
+  const each = how.countersEach ? ` (${how.countersEach.n} ${how.countersEach.counter} counters for each)` : "";
+  const prompt = cap !== undefined ? `exile up to ${cap} ${how.filter.text}${cap === 1 ? "" : "s"} from ${yardWord} graveyard as it enters${each}${chosen.length ? ` (${chosen.length} so far)` : ""}` : need === undefined ? `exile any number of ${how.filter.text}s from ${yardWord} graveyard as it enters${chosen.length ? ` (${chosen.length} so far)` : ""}` : need === 1 ? `exile ${/^[aeiou]/.test(how.filter.text) ? "an" : "a"} ${how.filter.text} from ${yardWord} graveyard as it enters` : `exile ${need} ${how.filter.text}s from ${yardWord} graveyard as it enters${counted} (${left} more to choose)`;
   s.pending = { kind: "chooseOption", player: you, source: name, what: "exileFromYard", options: [...options, ...(need === undefined ? ["done"] : [])], labels: [...options.map((id) => `Exile ${nameOf(s, id)}${how.anyGraveyard && obj(s, id).owner !== you ? ` (${player(s, obj(s, id).owner).name}'s graveyard)` : ""}`), ...(need === undefined ? [chosen.length ? "That's all" : "Exile none"] : [])], objectId: o.id, prompt };
   return true;
 }
@@ -92,6 +100,12 @@ function finishYardExile(s: GameState, o: GameObject, c: Entry, ids: string[]) {
     log(s, `${defOf(s, o).name} couldn't exile ${need} ${how.filter.text}s, so it goes to its owner's graveyard instead.`);
     neverEnters(s, o);
     return;
+  }
+  // Mimeoplasm, Revered One: the counters for the cards exiled this way (those that got to exile), as it enters (CR 614.1c).
+  const gone = cards.filter((id) => s.objects[id]?.zone === "exile");
+  if (how.countersEach && gone.length) {
+    const put = putCounters(s, o, how.countersEach.counter, how.countersEach.n * gone.length, true);
+    log(s, `${defOf(s, o).name} enters with ${put ? `${put} ${how.countersEach.counter} counter${put === 1 ? "" : "s"}` : `no ${how.countersEach.counter} counters`} on it.`);
   }
   if (how.counterEach && cards.length) {
     // One counter choice for each card exiled, asked before anything else about it (CR 614.12a).

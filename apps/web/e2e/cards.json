@@ -32492,6 +32492,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2b8c2882-dbca-466a-a0af-dd1d65edfe7c",
+  "name": "Mimeoplasm, Revered One",
+  "manaCost": "{X}{B}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Ooze",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ooze"
+  ],
+  "oracleText": "As Mimeoplasm enters, exile up to X creature cards from your graveyard. It enters with three +1/+1 counters on it for each creature card exiled this way.\n{2}: Mimeoplasm becomes a copy of target creature card exiled with it, except it's 0/0 and has this ability.",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dft",
+  "releasedAt": "2025-02-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d8377869-f8f7-4b4b-93ad-3ad3c4826b1a",
   "name": "Mind Bend",
   "manaCost": "{U}",
@@ -42451,6 +42487,43 @@
   "commanderLegal": "legal",
   "set": "cmr",
   "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2676ba6d-e7a7-48cf-9c86-6e2a11f03096",
+  "name": "Sanar, Innovative First-Year",
+  "manaCost": "{2}{U/R}{U/R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Goblin Sorcerer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Sorcerer"
+  ],
+  "oracleText": "Vivid — At the beginning of your first main phase, reveal cards from the top of your library until you reveal X nonland cards, where X is the number of colors among permanents you control. For each of those colors, you may exile a card of that color from among the revealed cards. Then shuffle. You may cast the exiled cards this turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Vivid"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

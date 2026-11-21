@@ -2512,7 +2512,7 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB283Line(line, out, isSpell)) continue;
     // Tahngarth, First Mate, Chorus of the Conclave (round B284).
     if (roundB284Line(line, out, isSpell)) continue;
-    // Ice Cauldron (round B285).
+    // Pygmy Hippo, Ice Cauldron (round B285).
     if (roundB285Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one

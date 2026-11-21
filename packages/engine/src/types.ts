@@ -3284,6 +3284,8 @@ export interface Resolving {
   stackCountered?: number;
   /** How many poison counters its loseAllCounters instruction removed (Leeches). */
   poisonLost?: number;
+  /** Pygmy Hippo (round B285): how much mana its drainLose instruction's player lost (Count manaLostThisWay). */
+  manaLost?: number;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
   endTurn?: true;
   /** Its endCombatPhase instruction ran during a combat phase: that phase ends once it's done resolving (CR 724.2). */
@@ -3396,7 +3398,7 @@ export interface Resolving {
   handPutOnTop?: number;
   scratch?: {
     /** Effect "drainPower" (round B281): the target player's lands still to activate a mana ability of, in order, and whether its mana has moved. */
-    drain?: { player: PlayerId; queue: { id: ObjectId; zc: number }[]; done?: true };
+    drain?: { player: PlayerId; queue: { id: ObjectId; zc: number }[]; /** Every land in the queue has been asked (activateEachLand). */ activated?: true; done?: true };
     /** PendingDecision chooseOption "drainLand" (round B281): the mana ability option chosen for the land asked about (drainKey). */
     drainPick?: string;
     /** Effect "revealOpponentExilesCasts" (Allure of the Unknown, round 420): the cards revealed, the card the opponent exiled (null for none) and who that opponent is, and whether they were asked to cast it. */

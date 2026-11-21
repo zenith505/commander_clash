@@ -6376,6 +6376,18 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const to = r.item.event?.player;
     return to !== undefined && to !== pid && attackedNow(s, to, r.item.sourceId).some((a) => a.player !== pid);
   }
+  // Pygmy Hippo (round B285): the defending player's mana for its combat damage, when they have at least as many untapped
+  // lands as its power (the mana comes back to us as {C} after combat, and they can't use it this turn).
+  if (r && e?.type === "may" && e.effects.some((x) => x.type === "drainLose")) {
+    const to = r.item.event?.player;
+    const me = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
+    if (to === undefined || to === pid || !me || me.zone !== "battlefield") return false;
+    const lands = s.battlefield.filter((id) => {
+      const o = obj(s, id);
+      return !o.tapped && controllerOf(s, o) === to && objIsType(s, o, "Land");
+    }).length;
+    return lands > 0 && lands >= power(s, me);
+  }
   // Captain Marvel, Apex Avenger: "you may put the same number and kind of counters on ~": not -1/-1, stun or the like.
   const sameKind = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "counters" && e.effects[0]!.eventCounter ? r?.item.event?.counter : undefined;
   if (sameKind !== undefined) return !harmfulCounter(sameKind);

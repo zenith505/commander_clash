@@ -44,51 +44,62 @@ export function drainLabel(s: GameState, pid: PlayerId, o: GameObject, x: ManaOp
   return `Add ${symbols(x.adds)}${costs.length ? ` (${costs.join(", ")})` : ""}`;
 }
 
+/**
+ * Drain Power's "Target player activates a mana ability of each land they control" (also Pygmy Hippo's, round B285): each
+ * land `tp` controls as this begins, one at a time, its mana ability chosen by them along with what it makes (rulings): a
+ * tapped land, or one whose abilities can't be activated or paid for, isn't (CR 101.3); lands with an ability costing no
+ * mana come first, so mana they make may pay a costlier one's cost (the order is theirs to choose; this one activates the
+ * most). Kept in the resolution's scratch (`drain`, `drainPick`), so it goes on where it paused.
+ */
+export function activateEachLand(s: GameState, tp: PlayerId, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  if (!sc.drain) {
+    const lands = s.battlefield.map((id) => obj(s, id)).filter((o) => characteristics(s, o).types.includes("Land") && controllerOf(s, o) === tp);
+    const free = (o: GameObject) => drainOptions(s, tp, o).some((x) => !manaAbilityCostOf(s, tp, o, manaAbilitiesOn(s, o)[x.ability]!));
+    const ordered = [...lands.filter(free), ...lands.filter((o) => !free(o))];
+    sc.drain = { player: tp, queue: ordered.map((o) => ({ id: o.id, zc: o.zoneChanges ?? 0 })) };
+  }
+  const d = sc.drain;
+  if (d.done || d.activated) return;
+  while (d.queue.length && !player(s, tp).lost) {
+    const next = d.queue[0]!;
+    const o = s.objects[next.id];
+    if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== next.zc || controllerOf(s, o) !== tp) {
+      d.queue.shift();
+      sc.drainPick = undefined;
+      continue;
+    }
+    const opts = drainOptions(s, tp, o);
+    const pick = sc.drainPick !== undefined ? opts.find((x) => drainKey(x) === sc.drainPick) : opts.length === 1 ? opts[0] : undefined;
+    sc.drainPick = undefined;
+    if (!opts.length) {
+      d.queue.shift();
+      continue;
+    }
+    if (!pick) {
+      s.pending = { kind: "chooseOption", player: tp, source: src, what: "drainLand", options: opts.map(drainKey), labels: opts.map((x) => drainLabel(s, tp, o, x)), about: o.id, prompt: `choose the mana ability of ${characteristics(s, o).name} you activate` };
+      return "paused";
+    }
+    d.queue.shift();
+    activateManaForEffect(s, tp, o.id, pick);
+  }
+  d.activated = true;
+}
+
 export function runLaneB281Effect(s: GameState, e: B281Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     case "drainPower": {
-      // Drain Power: "Target player activates a mana ability of each land they control." Each land they control as this
-      // resolves, one at a time, its mana ability chosen by them along with what it makes (rulings): a tapped land, or one
-      // whose abilities can't be activated or paid for, isn't (CR 101.3); lands with an ability costing no mana come first,
-      // so mana they make may pay a costlier one's cost (the order is theirs to choose; this one activates the most).
+      // Drain Power: "Target player activates a mana ability of each land they control." (activateEachLand).
       // "Then that player loses all unspent mana and you add the mana lost this way": their whole pool, its restrictions,
       // riders and sources unchanged (CR 106.13), to the spell's controller (the same player, nothing changes).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       const t = ctx.targets[0];
-      if (!sc.drain) {
-        if (t?.kind !== "player" || ctx.legal[0] === false) return;
-        const tp = t.id;
-        const lands = s.battlefield.map((id) => obj(s, id)).filter((o) => characteristics(s, o).types.includes("Land") && controllerOf(s, o) === tp);
-        const free = (o: GameObject) => drainOptions(s, tp, o).some((x) => !manaAbilityCostOf(s, tp, o, manaAbilitiesOn(s, o)[x.ability]!));
-        const ordered = [...lands.filter(free), ...lands.filter((o) => !free(o))];
-        sc.drain = { player: tp, queue: ordered.map((o) => ({ id: o.id, zc: o.zoneChanges ?? 0 })) };
-      }
-      const d = sc.drain;
+      if (!sc.drain && (t?.kind !== "player" || ctx.legal[0] === false)) return;
+      if (activateEachLand(s, sc.drain?.player ?? (t as { id: PlayerId }).id, src) === "paused") return "paused";
+      const d = sc.drain!;
       if (d.done) return;
       const tp = d.player;
-      while (d.queue.length && !player(s, tp).lost) {
-        const next = d.queue[0]!;
-        const o = s.objects[next.id];
-        if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== next.zc || controllerOf(s, o) !== tp) {
-          d.queue.shift();
-          sc.drainPick = undefined;
-          continue;
-        }
-        const opts = drainOptions(s, tp, o);
-        const pick = sc.drainPick !== undefined ? opts.find((x) => drainKey(x) === sc.drainPick) : opts.length === 1 ? opts[0] : undefined;
-        sc.drainPick = undefined;
-        if (!opts.length) {
-          d.queue.shift();
-          continue;
-        }
-        if (!pick) {
-          s.pending = { kind: "chooseOption", player: tp, source: src, what: "drainLand", options: opts.map(drainKey), labels: opts.map((x) => drainLabel(s, tp, o, x)), about: o.id, prompt: `choose the mana ability of ${characteristics(s, o).name} you activate` };
-          return "paused";
-        }
-        d.queue.shift();
-        activateManaForEffect(s, tp, o.id, pick);
-      }
       d.done = true;
       const from = player(s, tp);
       const to = player(s, ctx.controller);

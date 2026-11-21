@@ -34,6 +34,7 @@ import { runRound420Effect } from "./run-round420";
 import { runMayCastExiledWaterbendEffect } from "./run-round431";
 import { runPlayCounteredThisTurnEffect } from "./run-round432";
 import { runLinkedCreatureOrHandEffect, runLinkedFaceUpLoseLifeEffect, runLoyaltyAtInstantThisTurnEffect } from "./run-round433";
+import { runLandTypeCopiesEffect } from "./run-round435";
 import { runRound421Effect } from "./run-round421";
 import { runRound424Effect } from "./run-round424";
 import { runChooseSourceNowEffect } from "./run-round364";
@@ -2045,6 +2046,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runPlayCounteredThisTurnEffect(s, ctx, e.counter);
     case "loyaltyAtInstantThisTurn":
       return runLoyaltyAtInstantThisTurnEffect(s, ctx, e.subtype);
+    case "landTypeCopies":
+      return runLandTypeCopiesEffect(s, e, ctx, src);
     case "linkedFaceUpLoseLife":
       return runLinkedFaceUpLoseLifeEffect(s, ctx, src);
     case "linkedCreatureOrHand":

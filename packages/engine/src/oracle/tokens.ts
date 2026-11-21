@@ -283,8 +283,11 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
   // Echoing Equation: "except those creatures aren't legendary" (each creature that becomes a copy).
   t = t.replace(/^(?:it|they|he|she|the tokens?|those creatures) /, "");
   const parts = t.split(/,? and (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)|, (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)/).map((p) => p.trim().replace(/^(?:it|they|he|she) /, ""));
-  for (const p of parts) {
+  for (const p0 of parts) {
     let m: RegExpExecArray | null;
+    // Olag, Ludevic's Hubris (round 435): "it's a legendary blue and black Zombie in addition to its other colors and types"
+    // reads as "a blue and black legendary Zombie" below (legendary a supertype, CR 205.4a).
+    const p = p0.replace(/^(it's an? )legendary ((?:white|blue|black|red|green)(?: and (?:white|blue|black|red|green))?) (?=[A-Z][a-z]+ in addition to its other colors and types$)/, "$1$2 legendary ");
     // "Except it's not legendary" (Delina, Wild Mage) says the same.
     if (/^(?:isn't|aren't|is not|are not|it's not|they're not) legendary$/.test(p)) out.notLegendary = true;
     // Jace, Mirror Mage: "except it's not legendary and its starting loyalty is 1" (a copiable value, CR 707.9b, 306.5b).

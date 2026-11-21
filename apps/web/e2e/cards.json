@@ -30478,6 +30478,97 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f6f684f6-0c8a-4676-ba4e-d3e064293128",
+  "name": "Ludevic, Necrogenius // Olag, Ludevic's Hubris",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Wizard // Legendary Creature — Zombie",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Whenever Ludevic enters or attacks, mill a card.\n{X}{U}{U}{B}{B}, Exile X creature cards from your graveyard: Transform Ludevic. X can't be 0. Activate only as a sorcery.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Transform",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Ludevic, Necrogenius",
+    "manaCost": "{U}{B}",
+    "typeLine": "Legendary Creature — Human Wizard",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Wizard"
+    ],
+    "oracleText": "Whenever Ludevic enters or attacks, mill a card.\n{X}{U}{U}{B}{B}, Exile X creature cards from your graveyard: Transform Ludevic. X can't be 0. Activate only as a sorcery.",
+    "power": "2",
+    "toughness": "3",
+    "colors": [
+     "B",
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/6/1/61a15b38-30f9-4d8e-9511-57a1c11304d0.jpg?1783924344",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/6/1/61a15b38-30f9-4d8e-9511-57a1c11304d0.jpg?1783924344"
+   },
+   {
+    "name": "Olag, Ludevic's Hubris",
+    "manaCost": "",
+    "typeLine": "Legendary Creature — Zombie",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Zombie"
+    ],
+    "oracleText": "As this creature transforms into Olag, Ludevic's Hubris, it becomes a copy of a creature card exiled with it, except its name is Olag, Ludevic's Hubris, it's 4/4, and it's a legendary blue and black Zombie in addition to its other colors and types. Put a number of +1/+1 counters on Olag equal to the number of creature cards exiled with it.",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "B",
+     "U"
+    ],
+    "colorIndicator": [
+     "B",
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/6/1/61a15b38-30f9-4d8e-9511-57a1c11304d0.jpg?1783924344",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/6/1/61a15b38-30f9-4d8e-9511-57a1c11304d0.jpg?1783924344"
+   }
+  ]
+ },
+ {
   "oracleId": "1ca97394-4e8c-4698-bea1-554f9b10927b",
   "name": "Lukka, Coppercoat Outcast",
   "manaCost": "{3}{R}{R}",
@@ -31082,6 +31173,34 @@
   "commanderLegal": "legal",
   "set": "ecl",
   "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "25ba6f57-3d50-4c3e-ab55-284e91d684a6",
+  "name": "March from Velis Vel",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a nonbasic land type. Each land you control of that type becomes a copy of target creature you control until end of turn and gains haste until end of turn.\nFlashback {4}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -44515,6 +44634,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e8705df9-6439-4930-91b6-229f818559af",
+  "name": "Simic Guildgate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {G} or {U}.",
+  "colors": [],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8b70d296-2756-4bda-b51e-f93be395fce7",
   "name": "Simic Guildmage",
   "manaCost": "{G/U}{G/U}",
@@ -53327,6 +53477,34 @@
   "releasedAt": "2022-09-09",
   "rarity": "rare",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "33e85a8a-86df-4cdc-a9cc-8cbabe92c3c0",
+  "name": "Urza's Mine",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Urza's Mine",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Urza's",
+   "Mine"
+  ],
+  "oracleText": "{T}: Add {C}. If you control an Urza's Power-Plant and an Urza's Tower, add {C}{C} instead.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "2xm",
+  "releasedAt": "2020-08-07",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

@@ -18,6 +18,7 @@ import { describeMods } from "./describe";
 import { bent, evolves, fireEvent } from "./triggers";
 import { cantPhaseIn, phaseIn, phaseOut } from "../phasing";
 import { isSuspended } from "./run-zones";
+import { olagTransforms } from "./run-round435";
 import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
 
 /**
@@ -34,6 +35,9 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   o.transforms = (o.transforms ?? 0) + 1;
   invalidateCharacteristics(s);
   log(s, `${was} ${convert ? "converts" : "transforms"} into ${defOf(s, o).name}.`);
+  // Olag, Ludevic's Hubris (round 435): a copy of a creature card exiled with it, made while it transforms (CR 712.20); with
+  // several to choose from, its event waits for the choice (effects/run-round435.ts).
+  const waits = olagTransforms(s, o);
   // "As this creature transforms into ~, you get an emblem with ..." (CR 712.20): part of transforming.
   const as = compileCard(defOf(s, o)).asTransforms;
   if (as) {
@@ -47,7 +51,7 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   if (compileCard(defOf(s, o)).asTransformsAttachPlayer) {
     (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "attachPlayer" });
   }
-  fireEvent(s, { type: "transformed", id: o.id, face: to });
+  if (!waits) fireEvent(s, { type: "transformed", id: o.id, face: to });
   return true;
 }
 

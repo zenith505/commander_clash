@@ -25,6 +25,7 @@ import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
+import { costExileLinksAcrossFaces, olagCandidates, olagCopyChosen } from "./effects/run-round435";
 import { sharedFateInstead } from "./effects/run-laneb282";
 import { chooseWasteDiscard, chooseWasteToTop, wasteInstead } from "./effects/run-round383";
 import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead } from "./effects/run-round385";
@@ -12273,7 +12274,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costCardNames: string[] = [];
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const extraCosts = extraCosts0;
+  // Ludevic, Necrogenius (round 435): the cards its cost exiles are kept for its back face, Olag (linked below).
+  const acrossFaces = o.zone === "battlefield" && extraCosts0.some((c) => c.kind === "exileFromGraveyard") && costExileLinksAcrossFaces(s, o);
+  const extraCosts = acrossFaces ? extraCosts0.map((c) => (c.kind === "exileFromGraveyard" ? { ...c, costCards: true as const } : c)) : extraCosts0;
   // Ashnod the Uncaring (round 422): the sacrifices its costs make from here (CR 602.2b), counted as moveObject logs them:
   // ones its costs name, this permanent itself or the one granting it. Mana was paid before (rulings: a Treasure
   // sacrificed for mana doesn't count).
@@ -12282,6 +12285,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Kylox's Voltstrider (round 401): the cards its collect evidence cost exiled are "exiled with it" (CR 607.2a), the
   // object it is now (CR 400.7).
   if (costExiled.length && extraCosts.some((c) => c.kind === "collectEvidence" && c.linkSource) && o.zone === "battlefield") ((s.linkedExile ??= {})[`${o.id}@${sourceZc}`] ??= []).push(...costExiled);
+  // Ludevic, Necrogenius (round 435): the cards its cost exiles are "exiled with it" for its back face, Olag (CR 607.1b, 607.2a).
+  if (costExiled.length && acrossFaces && o.zone === "battlefield") ((s.linkedExile ??= {})[`${o.id}@${sourceZc}`] ??= []).push(...costExiled);
   // Vodalian War Machine (round B229): the permanents tapped to pay for its abilities this turn, by the source as the
   // permanent it is (CR 400.7), for its dies trigger.
   if (compileCard(d).logsCostTapped && extraCosts.some((c) => c.kind === "tap" && !c.untap) && costs?.tap?.length) {
@@ -13122,6 +13127,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
+    if (pend.what === "transformCopy") {
+      // Olag, Ludevic's Hubris (round 435): the creature card it becomes a copy of as it transforms.
+      if (!pend.options.includes(choice)) throw new RulesError("choose a creature card exiled with it");
+      olagCopyChosen(s, o, choice);
+      return;
+    }
     if (pend.what === "copyLast") {
       if (!pend.options.includes(choice)) throw new RulesError("choose a copy offered");
       enterCopying(s, o, choice);
@@ -14009,6 +14020,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   // Curse of Leeches's player is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
   if (pend.what === "attachPlayer") throw new RulesError("nothing to attach");
+  // Olag's copy (round 435) is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
+  if (pend.what === "transformCopy") throw new RulesError("nothing to choose");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
@@ -14320,6 +14333,17 @@ function askEntersChoice(s: GameState): boolean {
       }
       const per = compileCard(defOf(s, o)).entersRemoveCounters?.per ?? 1;
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "choose", what: "artifact, creature, or enchantment", options, count: options.length, min: 0, objectId: o.id, prompt: `remove all counters from any number of artifacts, creatures, and enchantments as it enters (${per === 1 ? "a +1/+1 counter" : `${per} +1/+1 counters`} for each counter removed): click them, then choose.` };
+      return true;
+    }
+    if (c.what === "transformCopy") {
+      // Olag, Ludevic's Hubris (round 435): asked as it transforms, before anyone gets priority (effects/run-round435.ts).
+      const cards = olagCandidates(s, o);
+      if (cards.length < 2) {
+        q.shift();
+        olagCopyChosen(s, o, cards[0]?.id);
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "transformCopy", options: cards.map((x) => x.id), labels: cards.map((x) => restingDef(s.cards[x.cardId]!).name), objectId: o.id, prompt: `choose a creature card exiled with it for ${defOf(s, o).name} to become a copy of as it transforms` };
       return true;
     }
     if (c.what === "exileFromYard") {

@@ -4292,6 +4292,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6b75b94e-83b7-457e-ac41-7ca90b5a59aa",
+  "name": "Battlefield Forge",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{T}: Add {R} or {W}. This land deals 1 damage to you.",
+  "colors": [],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C",
+   "R",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoc",
+  "releasedAt": "2025-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "92ac7531-10bb-47a2-9dd0-378d547b4ed6",
   "name": "Battlefield Scrounger",
   "manaCost": "{3}{G}{G}",
@@ -8233,6 +8263,32 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b4d27fad-9a94-4760-80a6-6a2948109864",
+  "name": "Celestial Dawn",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Lands you control are Plains.\nNonland permanents you control are white. The same is true for spells you control and nonland cards you own that aren't on the battlefield.\nYou may spend white mana as though it were mana of any color. You may spend other mana only as though it were colorless mana.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -14089,6 +14145,39 @@
   "set": "mir",
   "releasedAt": "1996-10-08",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0669172d-396b-4f5a-9703-129c5c849b55",
+  "name": "Drain Power",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player activates a mana ability of each land they control. Then that player loses all unspent mana and you add the mana lost this way.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -43700,6 +43789,32 @@
   "set": "sld",
   "releasedAt": "2026-09-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e23bf5fe-e494-473e-8502-606106ee1820",
+  "name": "Shared Fate",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a player would draw a card, that player exiles the top card of one of their opponents' libraries face down instead.\nEach player may look at cards they exiled with this enchantment, and they may play lands and cast spells from among those cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

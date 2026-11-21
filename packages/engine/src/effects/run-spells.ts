@@ -1,3 +1,4 @@
+import { meddleExile } from "./run-laneb282";
 import { allEffects, isRealKicker, type AbilityBody, type Amount, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type TriggeredAbility, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, opponentForbidsDiscard } from "../cards";
@@ -1400,6 +1401,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (e.cause) return (ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src, undefined, e.bounce ? "hand" : undefined, e.bounce) : undefined) ?? offerGuileCasts(s, src);
+      // Ertai's Meddling (round B282): "Target spell's controller exiles it with X delay counters on it."
+      if (e.exileSpell && e.meddle) return meddleExile(s, e, ctx, src);
       // "Exile any number of target spells" (Mindbreak Trap): each target still legal.
       if (e.exileSpell) {
         for (let k = e.index; k < e.index + (e.n ?? 1); k++) {

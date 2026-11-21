@@ -189,6 +189,8 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     if (!("what" in e) || typeof e.what !== "object" || e.what.ref !== "each") continue;
     const objs = group(e.what);
     if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary" || e.type === "phaseOut") add(objs, true);
+    // Golgothian Sylex, City in a Bottle (round B290): each sacrificed by its controller, the same loss for them.
+    else if (e.type === "sacrifice" && e.byController && e.what.filter.firstPrintedIn) add(objs, true);
     else if (e.type === "untap") add(objs.filter((o) => o.tapped), false, () => 0.5);
     else if (e.type === "counters") add(objs, harmfulCounter(e.counter), () => estimate(e.n) / 2);
     else if (e.type === "continuous") {

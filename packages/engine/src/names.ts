@@ -8,6 +8,7 @@ import { abilitiesOf, defOf } from "./cards";
 import { characteristics, controllerOf } from "./layers";
 import { printedMatches } from "./effects/targeting";
 import { faceDef, hasName, sameName } from "./faces";
+import { nameFirstPrintedIn, OLD_SET_NAME } from "./first-printings";
 
 /**
  * An object's name now: a permanent's from its characteristics (a copy has the name it copies, CR 707.2), a card
@@ -69,6 +70,8 @@ export function exiledWithNamed(s: GameState, o: GameObject, name: string): bool
 export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef, faceDown?: boolean): string | null {
   const market = faceDown ? null : permanentNameBan(s, d, "cast");
   if (market) return market;
+  const city = faceDown ? null : firstPrintedBan(s, d, "spells");
+  if (city) return city;
   for (const b of s.namedBansUntil ?? []) if (hasName(d.name, b.name) && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
   // Circu, Dimir Lobotomist: the names of the cards exiled with it, still exiled and face up (a face-down card has none,
   // CR 708.2a); a name in common is the same name (CR 201.2a).
@@ -112,10 +115,25 @@ function permanentNameBan(s: GameState, d: CardDef, what: "cast" | "lands"): str
   return twin ? `${characteristics(s, market).name}: ${what === "cast" ? "spells" : "nonbasic lands"} with the same name as a nontoken permanent (${characteristics(s, twin).name}) can't be ${what === "cast" ? "cast" : "played"}` : null;
 }
 
+/**
+ * City in a Bottle (CompiledCard.firstPrintedBan): "Players can't cast spells or play lands with a name originally printed
+ * in the Arabian Nights expansion": every player, its controller too. Why this card can't be cast or played, or null.
+ */
+function firstPrintedBan(s: GameState, d: CardDef, what: "spells" | "lands"): string | null {
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    const set = abilitiesOf(s, o).firstPrintedBan;
+    if (set && nameFirstPrintedIn(d.name, set)) return `${characteristics(s, o).name}: players can't ${what === "spells" ? "cast spells" : "play lands"} with a name originally printed in the ${OLD_SET_NAME[set]} expansion (${d.name})`;
+  }
+  return null;
+}
+
 /** "Lands with the chosen name can't be played" (Conjurer's Ban): why `pid` can't play this land card, or null. */
 export function nameLandBan(s: GameState, pid: PlayerId, d: CardDef): string | null {
   const market = permanentNameBan(s, d, "lands");
   if (market) return market;
+  const city = firstPrintedBan(s, d, "lands");
+  if (city) return city;
   const b = (s.namedBansUntil ?? []).find((x) => x.lands && hasName(d.name, x.name) && (!x.players || x.players.includes(pid)));
   if (b) return `${b.source}: lands named ${d.name} can't be played until ${s.players[b.controller]!.name}'s next turn`;
   // Null Chamber: "lands with the chosen names can't be played", anyone's (CR 305.1).

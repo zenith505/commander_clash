@@ -737,6 +737,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         filter = { ...filter, subtypes: [...(filter.subtypes ?? []), noted], text: `${noted} creature spell` };
       }
       if (e.flash) log(s, `${src}: ${player(s, ctx.controller).name} may cast ${e.text.replace(/^the next (.+?) you cast this turn can be cast .*$/, (_, w: string) => (w === "spell of the chosen type" ? `their next ${filter.subtypes?.join(" ") ?? ""} spell` : `their next ${w}`))} this turn as though it had flash.`);
+      // Apex Observatory (round 434): "of the chosen type": the card type, said.
+      if (e.filter.chosen === "cardType" && filter.types?.length) filter = { ...filter, text: `${filter.types.map((t) => t.toLowerCase()).join(" ")} spell` };
       if (e.alt) log(s, `${src}: ${player(s, ctx.controller).name} may cast their next ${filter.text.replace(/^target /, "")} this turn ${e.alt === "free" ? "without paying its mana cost" : "for life equal to its mana value"}.`);
       if (e.counter) log(s, `${src}: the next ${filter.text.replace(/^target /, "")} ${player(s, ctx.controller).name} casts this turn enters with an additional ${e.counter} counter.`);
       for (const caster of e.who ? players(s, e.who, ctx) : [ctx.controller])

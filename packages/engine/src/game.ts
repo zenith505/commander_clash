@@ -2025,7 +2025,9 @@ export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec):
   // Activated Sleeper: only one put there from the battlefield this turn.
   // The Master, Formed Anew: a face-up card in exile with that kind of counter on it, by its printed characteristics.
   if (filter.kind === "card" && filter.exiledWithCounter) return s.players.flatMap((p) => p.exile).filter((id) => id !== o.id && !obj(s, id).faceDown && !obj(s, id).isToken && (obj(s, id).counters[filter.exiledWithCounter!] ?? 0) > 0 && printedMatches(filter, defOf(s, obj(s, id))));
-  if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
+  // The Fourteenth Doctor (round 432): "in your graveyard that was put there from your library this turn": the graveyard of
+  // the player it enters under, a card put there from their library this turn (GameObject.fromLibraryTurn).
+  if (filter.kind === "card") return livingPlayers(s).filter((pid) => !filter.owner || (filter.owner === "you") === (pid === o.controller)).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))) && (!filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && (!filter.fromLibraryThisTurn || obj(s, id).fromLibraryTurn === s.turn)));
   // Mockingbird's "with mana value less than or equal to the amount of mana spent to cast ~": the spell it was.
   const bound = filter.bound ? bindBound(s, filter, { controller: controllerOf(s, o), sourceId: o.id, manaSpent: o.manaSpent ?? 0 }) : filter;
   // Worms of the Earth (round B258): entering as a copy of a land, it couldn't enter at all (CR 608.3e's example: Clone and
@@ -2087,6 +2089,12 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
+    // The Fourteenth Doctor (round 432): "If you do, it gains haste until end of turn": the permanent it's becoming (CR
+    // 400.7), only as a copy.
+    if (own.hasteIfCopied) {
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: realDefOf(s, o).name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      invalidateCharacteristics(s);
+    }
     // Superior Spider-Man: "When you do, exile that card" (CR 603.12): that card, if it's still the same object then.
     if (own.exileCopied && target.zone === "graveyard")
       s.triggerQueue.push({ sourceId: o.id, sourceCardId: cardIdOf(o), controller: o.controller, index: -1, subject: { id: target.id, zc: target.zoneChanges ?? 0 }, body: { targets: [], effects: [{ type: "exile", what: { ref: "subjectCard", zone: "graveyard" } }], text: "When you do, exile that card." } });
@@ -6115,8 +6123,31 @@ function useExiledOnce(s: GameState, o: GameObject, pid: PlayerId): void {
   ((s.turnLog ??= {}).linkedSpellOnce ??= []).push(key);
 }
 
-function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOnce?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
+/**
+ * Lara Croft, Tomb Raider (round 432): the index of an unused permission of `pid`'s this turn (TurnLog.playCounteredGrants)
+ * to play this card: face up in exile with that kind of counter on it, whoever owns it and whatever exiled it.
+ */
+function counteredGrantFor(s: GameState, o: GameObject, pid: PlayerId): number {
+  if (o.zone !== "exile" || o.faceDown || o.hiddenExile || o.isToken) return -1;
+  return (s.turnLog?.playCounteredGrants ?? []).findIndex((g) => g.player === pid && !g.used && (o.counters[g.counter] ?? 0) > 0);
+}
+
+/**
+ * Lara Croft, Tomb Raider (round 432): playing this exiled card with no other lasting permission of `pid`'s that lets them
+ * (Evelyn's once-each-turn play gives way to this one) uses up one of their permissions for this turn.
+ */
+function useCounteredGrant(s: GameState, o: GameObject, pid: PlayerId): void {
+  const i = counteredGrantFor(s, o, pid);
+  if (i < 0 || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || preparedCopyCastable(s, o, pid) || ownLinkedPlayPermission(s, o, pid, true, true)) return;
+  s.turnLog!.playCounteredGrants![i]!.used = true;
+}
+
+function ownLinkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOnce?: true, notGrant?: true, notHauken?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   let how: false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" = false;
+  // Lara Croft, Tomb Raider (round 432): a permission this turn for one card with that counter, paying as usual.
+  if (!notGrant && counteredGrantFor(s, o, pid) >= 0) how = "plain";
+  // Hauken's Insight (round 432): a land card exiled with it, once during each of your turns.
+  if (!notHauken && !how && linkedLandOnceSource(s, o, pid)) how = "plain";
   // Tibalt, Cosmic Impostor's emblem (round 408): the cards exiled with the Tibalt it's linked to, wherever that Tibalt is
   // now (rulings), mana of any color for the spells (CR 609.4b).
   for (const em of liveEmblems(s))
@@ -6305,12 +6336,41 @@ export function linkedFreeOnceSource(s: GameState, o: GameObject, pid: PlayerId,
     if (!p || controllerOf(s, p) !== pid) continue;
     const once = compileCard(defOf(s, p)).linkedFreeOnce;
     if (!once || (p.linkedFreeOnceUsed?.turn === s.turn && p.linkedFreeOnceUsed.zc === (p.zoneChanges ?? 0))) continue;
-    if (!(s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0) && l.turn === s.turn)) continue;
-    const max = evalAmount(s, once.maxMv, { controller: pid, sourceId: p.id });
+    // Hauken's Insight (round 432): during its controller's turns, any card exiled with it, whenever.
+    if (once.hauken && s.activePlayer !== pid) continue;
+    if (!(s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0) && (once.hauken || l.turn === s.turn))) continue;
+    const max = once.maxMv ? evalAmount(s, once.maxMv, { controller: pid, sourceId: p.id }) : Infinity;
     const fits = (d: CardDef) => !isType(d, "Land") && defMv(d) <= max;
     if (face ? fits(face) : fits(defOf(s, o)) || castableFaces(s, o).some((f) => asFace(s, o, f, () => fits(defOf(s, o))))) return p;
   }
   return undefined;
+}
+
+/**
+ * Hauken's Insight (round 432): a permanent `pid` controls whose "Once during each of your turns, you may play a land ...
+ * from among the cards exiled with ~" lets them play this exiled land card now: during their turn, one its exile abilities
+ * exiled (CR 607.2a), still that object (CR 400.7), its once not used this turn. Played as the turn's land play with the
+ * usual timing (rulings).
+ */
+function linkedLandOnceSource(s: GameState, o: GameObject, pid: PlayerId): GameObject | undefined {
+  if (o.zone !== "exile" || !s.linkedExile || o.faceDown || s.activePlayer !== pid || !isType(defOf(s, o), "Land")) return undefined;
+  for (const id of s.battlefield) {
+    const p = s.objects[id];
+    if (!p || controllerOf(s, p) !== pid || !compileCard(defOf(s, p)).linkedFreeOnce?.hauken) continue;
+    if (p.linkedFreeOnceUsed?.turn === s.turn && p.linkedFreeOnceUsed.zc === (p.zoneChanges ?? 0)) continue;
+    if ((s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) return p;
+  }
+  return undefined;
+}
+
+/**
+ * Hauken's Insight (round 432): playing this land with no other lasting permission of `pid`'s uses up that permanent's once
+ * this turn (Evelyn's and Lara Croft's give way to it).
+ */
+function useLinkedLandOnce(s: GameState, o: GameObject, pid: PlayerId): void {
+  const p = linkedLandOnceSource(s, o, pid);
+  if (!p || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || ownLinkedPlayPermission(s, o, pid, true, true, true)) return;
+  p.linkedFreeOnceUsed = { turn: s.turn, zc: p.zoneChanges ?? 0 };
 }
 
 /** Court of Locthwain's grant or Maralen's permission (round 406): `pid` may cast this exiled card without paying its mana cost. */
@@ -6817,6 +6877,8 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429), before any other permission is used up
+  useCounteredGrant(s, o, p.id); // Lara Croft, Tomb Raider (round 432): after Evelyn's, which gives way to it
+  useLinkedLandOnce(s, o, p.id); // Hauken's Insight (round 432): after the others, which it gives way to
   useLinkedPlay(s, o, p.id);
   useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
@@ -9150,6 +9212,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const linkedRider = castFrom === "exile" && choices.alt !== "linkedFree" && isType(d, "Creature") ? linkedEntersWith(s, o, p.id) : undefined;
   if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
   if (choices.alt !== "linkedFree") useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429)
+  if (choices.alt !== "linkedFree") useCounteredGrant(s, o, p.id); // Lara Croft, Tomb Raider (round 432): after Evelyn's
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);
   if (choices.alt !== "linkedFree") useLinkedSpellOnce(s, o, p.id);
   useOneOf(s, o, p.id, choices.asType);
@@ -10507,10 +10570,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       const what = craftWhat(c);
       const chosen = choices?.craft;
       if (!chosen) {
-        if (pool.length < c.n || (c.slots && !craftSlotsFit(s, pid, c, pool, true))) return `you need to exile ${what} ${c.cardsOnly ? "from your graveyard" : "you control or in your graveyard"} to ${doing}`;
+        if (pool.length < c.n || ((c.slots || c.shareCardType) && !craftSlotsFit(s, pid, c, pool, true))) return `you need to exile ${what} ${c.cardsOnly ? "from your graveyard" : "you control or in your graveyard"} to ${doing}`;
         continue;
       }
-      if ((c.orMore ? chosen.length < c.n : chosen.length !== c.n) || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (c.slots && !craftSlotsFit(s, pid, c, chosen))) return `choose ${what} to exile`;
+      if ((c.orMore ? chosen.length < c.n : chosen.length !== c.n) || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || ((c.slots || c.shareCardType) && !craftSlotsFit(s, pid, c, chosen))) return `choose ${what} to exile`;
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
@@ -10998,13 +11061,27 @@ export function processExiled(s: GameState, pid: PlayerId, chosen: ObjectId[], m
 export function craftCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "craft" }>): ObjectId[] {
   const field = c.cardsOnly ? [] : s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false));
   const yard = player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
-  return [...field, ...yard];
+  // The Enigma Jewel (round 434): "with activated abilities": the abilities each one has now, granted ones too (CR 613.1f).
+  return c.withActivated ? [...field, ...yard].filter((id) => hasActivatedAbility(s, obj(s, id))) : [...field, ...yard];
+}
+
+/** Whether `o` has an activated ability (CR 602.1), a mana ability among them (CR 605.1a), as it is now in its zone. */
+export function hasActivatedAbility(s: GameState, o: GameObject): boolean {
+  const ab = abilitiesOf(s, o);
+  return ab.activated.length > 0 || ab.mana.length > 0;
+}
+
+/** Eye of Ojer Taq (round 434): the card types of a craft material, a permanent's as it is now, a card's printed ones (CR 702.167b, 109.2). */
+function craftCardTypes(s: GameState, id: ObjectId): string[] {
+  const o = obj(s, id);
+  return o.zone === "battlefield" ? characteristics(s, o).types : defOf(s, o).types;
 }
 
 /** "A Dinosaur", "two artifacts", "one or more creatures", "four or more red instant and/or sorcery cards". */
 export function craftWhat(c: Extract<AdditionalCost, { kind: "craft" }>): string {
   if (c.slots) return c.slots.map((f) => `${/^[aeiou]/i.test(f.text) ? "an" : "a"} ${f.text}`).join(", ").replace(/, (an? \w+)$/, ", and $1");
-  if (c.orMore) return c.filter.types?.length || c.filter.subtypes?.length ? `${c.n} or more ${c.filter.text}` : `${c.n} or more permanents and/or cards`;
+  if (c.shareCardType) return `${numberWord(c.n)} that share a card type`;
+  if (c.orMore) return c.filter.types?.length || c.filter.subtypes?.length || c.withActivated ? `${c.n} or more ${c.filter.text}` : `${c.n} or more permanents and/or cards`;
   return `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`;
 }
 
@@ -11014,6 +11091,13 @@ export function craftWhat(c: Extract<AdditionalCost, { kind: "craft" }>): string
  * printed ones (CR 109.2).
  */
 export function craftSlotsFit(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "craft" }>, ids: ObjectId[], some = false): boolean {
+  // Eye of Ojer Taq (round 434): "two that share a card type": `n` of them with a card type in common (`some`: whether
+  // `n` of `ids` have one).
+  if (c.shareCardType) {
+    if (!some && ids.length !== c.n) return false;
+    const types = new Set(ids.flatMap((id) => craftCardTypes(s, id)));
+    return [...types].some((t) => ids.filter((id) => craftCardTypes(s, id).includes(t)).length >= (some ? c.n : ids.length));
+  }
   const slots = c.slots ?? [];
   if (!some && ids.length !== slots.length) return false;
   const fits = (id: ObjectId, f: TargetSpec) => {
@@ -11340,7 +11424,9 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
 const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   // Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant."
   (!!o && (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === true || (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === "enteredThisTurn" && o.enteredTurn === s.turn))) ||
-  [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
+  [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed) ||
+  // Jace's Machinations (round 433): this turn, for its controller's planeswalkers of that subtype as they are now.
+  (!!o && !!s.turnLog?.loyaltyAtInstantSpeed?.some((g) => g.player === pid && controllerOf(s, o) === pid && objIsType(s, o, "Planeswalker") && characteristics(s, o).subtypes.includes(g.subtype)));
 
 /**
  * Spoils of War: the X a spell's own text sets as it's cast (CR 107.3c), from the opponent chosen then (CostChoices.xOpponent):
@@ -14184,6 +14270,16 @@ function enterAttachedTo(s: GameState, o: GameObject, host: ObjectId) {
   askAttachColor(s, o);
 }
 
+/**
+ * Apex Observatory (round 434): the card types that two or more of the exiled cards used to craft `o` have in common, by
+ * their printed characteristics in exile (CR 702.167c, 607.2a): the cards its craft cost exiled, still in exile.
+ */
+export function craftedSharedTypes(s: GameState, o: GameObject): string[] {
+  const cards = (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).map((l) => s.objects[l.id]).filter((x): x is GameObject => !!x && x.zone === "exile" && !x.faceDown);
+  const types = [...new Set(cards.flatMap((x) => defOf(s, x).types))];
+  return types.filter((t) => cards.filter((x) => defOf(s, x).types.includes(t)).length >= 2);
+}
+
 function askEntersChoice(s: GameState): boolean {
   const q = s.entersChoices;
   while (q?.length) {
@@ -14629,11 +14725,19 @@ function askEntersChoice(s: GameState): boolean {
       if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
       continue;
     }
+    // Apex Observatory (round 434): only a card type two of the exiled cards used to craft it share; none, no choice.
+    const shared = c.craftedShared ? craftedSharedTypes(s, o).filter((t) => (c.options ?? []).includes(t)) : undefined;
+    if (shared && !shared.length) {
+      log(s, `${defOf(s, o).name}: no two exiled cards used to craft it share a card type, so no card type is chosen.`);
+      q.shift();
+      if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+      continue;
+    }
     if (c.byOpponent) {
       s.pending = { kind: "chooseOption", player: chooser, source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id, prompt: `choose a creature type for ${player(s, controllerOf(s, o)).name}'s ${defOf(s, o).name}` };
       return true;
     }
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: shared ?? many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(shared ? { prompt: "choose a card type shared among two exiled cards used to craft it" } : c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;

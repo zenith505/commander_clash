@@ -363,6 +363,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const big = here ? objIsType(s, tok!, "Creature") && power(s, tok!) >= 3 : (s.lastKnown?.[sub?.id ?? ""]?.power ?? 0) >= 3;
       return [{ type: "chooseMay", player: pid, yes: to === pid || !big }];
     }
+    // The Creation of Avacyn (round 433): the creature (and any other permanent cards with it) onto the battlefield.
+    if (pend.kind === "chooseMay" && theirMay?.type === "linkedCreatureOrHand") return [{ type: "chooseMay", player: pid, yes: true }];
     if (pend.kind === "chooseMay" && theirMay?.type === "controllersMayExile") {
       const asked = s.resolving!.scratch?.mayExile?.queue[0];
       const o = asked ? s.objects[asked.id] : undefined;
@@ -2681,6 +2683,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (ignore) return ignore;
     const fetch = chooseFetch(s, pid);
     if (fetch) return fetch;
+    // Apex Observatory (round 434): its next spell of the chosen type free, before we cast spells (see chooseActivation).
+    const apex = chooseActivation(s, pid, (ab) => ab.body.effects.some((e) => e.type === "nextCast" && e.alt === "free" && !!e.filter.chosen));
+    if (apex) return apex;
     // Turn face-down creatures face up when we can pay for it (CR 702.37e).
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -7839,6 +7844,17 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
+      // Apex Observatory (round 434): only in our main phase with the stack empty, with a card of the chosen type in hand
+      // that costs 3 or more and isn't free already; with no type chosen, never.
+      const freeNext = ab.body.effects.find((e): e is Extract<Effect, { type: "nextCast" }> => e.type === "nextCast" && e.alt === "free" && !!e.filter.chosen);
+      if (freeNext) {
+        const f = bindChosen(freeNext.filter, o.chosen);
+        if (f.chosen || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length || s.nextCast?.some((r) => r.controller === pid && r.alt === "free" && r.turn === s.turn)) continue;
+        if (!player(s, pid).hand.some((h) => printedMatches(f, defOf(s, obj(s, h))) && !isType(defOf(s, obj(s, h)), "Land") && defMv(defOf(s, obj(s, h))) >= 3)) continue;
+        const plan = planActivate(s, pid, id, i);
+        if (plan) return plan;
+        continue;
+      }
       // Pit Automaton: only with an exhaust ability of ours still to activate this turn and the mana for both.
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.exhaust) && !exhaustReady(s, pid, id, manaValue(parseManaCost(ab.manaCost)))) continue;
       // Dynaheir, Invoker Adept (round 428): only with an ability of ours costing four or more mana that we could pay for too.
@@ -8843,8 +8859,9 @@ function ownAbilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Activat
       const field = pool.filter((x) => obj(s, x).zone === "battlefield" && obj(s, x).isToken && worth(s, pid, obj(s, x)) <= 3).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
       const picks = [...yard, ...field];
       if (picks.length < c.n) return null;
-      if (c.slots) {
-        // Throne of the Grim Captain: the first picks that give each slot its own object.
+      if (c.slots || c.shareCardType) {
+        // Throne of the Grim Captain: the first picks that give each slot its own object. Eye of Ojer Taq (round 434): the
+        // first two that share a card type.
         const fit = craftSlotPicks(s, pid, c, picks);
         if (!fit) return null;
         out.craft = fit;
@@ -10682,7 +10699,7 @@ function powerFloorSet(s: GameState, pid: PlayerId, options: ObjectId[], min: nu
 
 /** Throne of the Grim Captain's materials from `picks`, in order of preference: one for each slot (craftSlotsFit). */
 function craftSlotPicks(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "craft" }>, picks: ObjectId[]): ObjectId[] | null {
-  const n = c.slots!.length;
+  const n = c.slots?.length ?? c.n;
   const go = (start: number, chosen: ObjectId[]): ObjectId[] | null => {
     if (chosen.length === n) return craftSlotsFit(s, pid, c, chosen) ? chosen : null;
     for (let i = start; i < picks.length; i++) {

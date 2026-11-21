@@ -40,6 +40,7 @@ import { roundB281Line } from "./laneb281-lines";
 import { roundB282Line } from "./laneb282-lines";
 import { roundB283Chapter, roundB283Line } from "./laneb283-lines";
 import { roundB284Line } from "./laneb284-lines";
+import { roundB285Line } from "./laneb285-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2517,6 +2518,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB283Line(line, out, isSpell)) continue;
     // Tahngarth, First Mate, Chorus of the Conclave (round B284).
     if (roundB284Line(line, out, isSpell)) continue;
+    // Ice Cauldron (round B285).
+    if (roundB285Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

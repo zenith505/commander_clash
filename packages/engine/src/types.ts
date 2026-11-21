@@ -937,6 +937,10 @@ export interface GameObject {
   chosenTypeAside?: string;
   /** Jeweled Amulet: the type of mana last noted for it ("note the type of mana spent to pay this activation cost"). */
   notedMana?: ManaType;
+  /** Ice Cauldron (round B285): the mana last noted for it, each one ("note the type and amount of mana spent"). */
+  notedManaAll?: ManaType[];
+  /** Ice Cauldron (round B285): the last card exiled with it, as that object in exile. */
+  cauldronCard?: { id: ObjectId; zc: number; name: string };
   /** A battle's protector (CR 310.9), chosen as it enters (310.9a) and again when that player can't be (704.5x-y). */
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */

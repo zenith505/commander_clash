@@ -1511,6 +1511,8 @@ export function moveObject(
   // Caller of the Hunt (round B245): the type chosen as it was cast stays with the permanent it becomes (CR 400.7d, 607.2d).
   if (o.castType) o.chosen = { type: o.castType };
   o.notedMana = undefined; // a new object (CR 400.7)
+  o.notedManaAll = undefined;
+  o.cauldronCard = undefined;
   o.protector = undefined;
   // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
   // rulings). On the battlefield it's the whole card, its doors locked or unlocked, not a half (709.5).

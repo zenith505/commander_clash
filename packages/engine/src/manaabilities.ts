@@ -151,6 +151,8 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o, !!p.monocolored, !!p.linked);
   if (p.kind === "devotion") return [...COLORS];
   if (p.kind === "doublePool") return [...COLORS, "C"];
+  // Ice Cauldron (round B285): every mana noted at once, nothing to choose; "C" names the activation.
+  if (p.kind === "noted" && p.all) return ["C"];
   if (p.kind === "noted") return [o.notedMana ?? "C"];
   // Charmed Pendant: nothing to choose as it's activated (what it adds is known after the mill); "C" names the activation.
   if (p.kind === "milledSymbols") return ["C"];
@@ -420,6 +422,9 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   // Jeweled Amulet: no mana if no type was noted (rulings).
+  // Ice Cauldron (round B285): the type and amount last noted, each mana (rulings: {C}{C}{R}{R} spent on {X} adds
+  // {C}{C}{R}{R}); none if nothing was noted or the X was 0.
+  if (p.kind === "noted" && p.all) return [...(o.notedManaAll ?? [])];
   if (p.kind === "noted") return o.notedMana ? [o.notedMana] : [];
   if (p.kind === "milledSymbols") return []; // known only after the mill (activateMana)
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];

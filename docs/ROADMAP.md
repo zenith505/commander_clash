@@ -4642,6 +4642,26 @@ line blocks.
    app, with Falco Spara and Into the Pit both, the first permission's cost is the one asked for (the engine takes either);
    bots pay with -1/-1 and other spare counters first and never take a creature's last +1/+1 counter (or a loyalty, lore
    or time counter), skipping the cast when that's all there is.
+   Round 439 went on down the "Out after round N" lists and `npm run popular`, most played first, to the top card and one
+   more. Sunken Palace's "{1}{U}, {T}, Exile seven cards from your graveyard: Add {U}. When you spend this mana to cast a
+   spell or activate an ability, copy that spell or ability. You may choose new targets for the copy." (a mana ability
+   whose {U} makes a delayed trigger, CR 106.6, 603.7a, triggering when it pays a spell's or an activated ability's cost,
+   not a special action's or a cost paid while something resolves; the copy is made even if the original has left the
+   stack, rulings; spent on a mana ability's cost it copies nothing, as mana abilities can't be copied; Effect addMana
+   `spentTrigger`, SpentFor `spellOrAbility`). Arvinox, the Mind Flail's "~ isn't a creature unless you control three or
+   more permanents you don't own." (layer 4, CR 613.1d, 108.3) and "At the beginning of your end step, exile the bottom
+   card of each opponent's library face down. For as long as those cards remain exiled, you may look at them, you may cast
+   permanent spells from among them, and you may spend mana as though it were mana of any color to cast those spells."
+   (CR 406.3, 110.4b, 609.4b; exileFaceDown from `bottom`, FaceDownPlay `permanentOnly` and `anyColor`). Browser tests
+   click through Sunken Palace's seven-card exile and a Divination it copies, and Arvinox's face-down Ambush Viper cast
+   with Islands. +2, 31,843 of 31,936 on this stacked branch (round 438 #727); the compiled text of every other card and
+   face is unchanged.
+   Out after round 439 (looked at, not done): Ulalek, Fused Atrocity ("copy all spells you control, then copy all other
+   activated and triggered abilities you control": no rule or ruling says in what order the copies go on the stack),
+   Psychic Paper (still out: which layer the equipped creature's new name is applied in), and the lists after round 438
+   (still out, for their reasons). Known gaps: bots never activate Sunken Palace's second ability (an activated mana
+   ability with a cost to choose, which the automatic payment doesn't use); its {U} is spent first on a spell or ability
+   it can pay for, kept back from other costs.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

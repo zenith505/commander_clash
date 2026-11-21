@@ -7047,6 +7047,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : manaAbilityCostOf(s, p.id, o, ab);
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o, ...(ab.blueAsAny ? { blueAny: true as const } : {}) }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
+  queueSpentOnAbility(s, p.id, manaPaid?.spentTriggers); // Sunken Palace (round 439): nothing to copy
   // Rhystic Cave (round B254): "unless any player pays {1}": the other players are asked below, once its cost is paid; it's
   // tapped for mana only if none of them pays (rulings), when its mana is added (manaUnlessDone).
   const unless = ab.unlessAnyPays && adds.length ? ab.unlessAnyPays : undefined;
@@ -7728,6 +7729,12 @@ export function castProblem(
   if (!free && !via && o.zone === "exile" && o.mayPlay?.creatureOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && !linkedFreeAny(s, o, pid)) {
     const cast = choices?.face !== undefined && d.faces?.length ? faceDef(d, choices.face) : d;
     if (!isType(cast, "Creature")) return `${cast.name} can be cast from exile only as a creature spell`;
+  }
+  // Arvinox, the Mind Flail (round 439): "you may cast permanent spells from among them", the spell as it would be cast
+  // (its face or Adventure, CR 601.3e), a permanent spell (CR 110.4b), unless something else lets it be cast from exile.
+  if (!free && !via && o.zone === "exile" && o.mayPlay?.permanentOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && !linkedFreeAny(s, o, pid)) {
+    const cast = choices?.face !== undefined && d.faces?.length ? faceDef(d, choices.face) : d;
+    if (!["Artifact", "Battle", "Creature", "Enchantment", "Planeswalker"].some((t) => isType(cast, t))) return `${cast.name} can be cast from exile only as a permanent spell`;
   }
   // "A spell with mana value X or less", "the same mana value": the spell as cast, a split card's half or a prototyped
   // spell, not the card (CR 202.3, 709.3, 718.3b; rulings on Powerbalance).
@@ -9246,7 +9253,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     // "Your commander": a commander you own (CR 903.3).
     else if ("commander" in t) {
       if (o.isCommander && o.owner === p.id) spentQueue.push(t);
-    } else if ((isType(d, "Instant") || isType(d, "Sorcery")) && (!t.color || characteristics(s, o).colors.includes(t.color))) spentQueue.push(t);
+    } else if ("spellOrAbility" in t) spentQueue.push(t); // Sunken Palace (round 439): any spell
+    else if ((isType(d, "Instant") || isType(d, "Sorcery")) && (!t.color || characteristics(s, o).colors.includes(t.color))) spentQueue.push(t);
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
@@ -12429,11 +12437,13 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
+    queueSpentOnAbility(s, p.id, paid.spentTriggers);
     resolveManaAbility(s, item, body, manaPick.mana);
     fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}) });
     return true;
   }
   s.stack.push(item);
+  queueSpentOnAbility(s, p.id, paid.spentTriggers, stackId);
   // The creatures tapped for a saddle cost saddled it (CR 702.171c), whether or not the ability resolves.
   // The creatures tapped for a crew cost crewed it (CR 702.122d), the same way.
   if (ab.crew !== undefined && !ab.tapPower && tapCreatures?.length) {
@@ -12468,6 +12478,16 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   fireEvent(s, { type: "activated", player: p.id, stackId, ...(manaSpentOnCosts > 0 ? { manaSpent: manaSpentOnCosts } : {}), ...(costSacrificed ? { costSacrificed: true as const } : {}), ...(costLifePaid > 0 ? { costLifePaid } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Embalm" || ab.keyword === "Eternalize" ? { embalm: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}), ...(loyaltyRemoved !== undefined ? { loyalty: { removed: loyaltyRemoved } } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
+}
+
+/**
+ * Sunken Palace (round 439): "When you spend this mana to cast a spell or activate an ability, copy that spell or ability":
+ * each such mana spent on an activated ability's costs triggers once (CR 106.6, 603.7a), "that ability" being the one
+ * activated (`cause`), put on the stack the next time a player would receive priority (CR 603.3). A mana ability's (CR
+ * 605.1a) never is on the stack, and mana abilities can't be copied (its reminder text), so that one copies nothing.
+ */
+function queueSpentOnAbility(s: GameState, pid: PlayerId, spent: ManaSpentTrigger[] | undefined, cause?: string): void {
+  for (const t of spent ?? []) if ("spellOrAbility" in t) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: pid, index: -1, body: t.body, ...(cause ? { cause } : {}) });
 }
 
 /**

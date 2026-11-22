@@ -7828,6 +7828,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Lesser Werewolf (round B225): "If ~'s power is 1 or more, ...": nothing at all while it isn't.
       const w0 = ab.body.effects.length === 1 ? ab.body.effects[0] : undefined;
       if (w0?.type === "if" && w0.cond.kind === "state" && w0.cond.cond.kind === "amount" && typeof w0.cond.cond.amount === "object" && w0.cond.cond.amount.count.kind === "power" && w0.cond.cond.amount.count.of.ref === "self" && !staticConditionNow(s, w0.cond.cond, id, pid)) continue;
+      // Balduvian Shaman (round B292): a text change that also gives our own enchantment cumulative upkeep: not without a plan.
+      if (ab.body.effects.some((e) => e.type === "changeText") && ab.body.effects.some((e) => e.type === "continuous" && e.mods.some((m) => m.kind === "addAbility" && /^Cumulative upkeep\b/.test(m.text)))) continue;
       // Goblin Artisans (round B223): losing the flip counters a spell of our own: never worth the card.
       if (ab.body.targets.some((t) => t.kind === "spell" && t.controller === "you") && allEffects(ab.body.effects).some((e) => e.type === "counterSpell")) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.

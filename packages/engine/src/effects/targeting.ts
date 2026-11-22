@@ -1,5 +1,6 @@
 import { ANY_COUNTER, isRealKicker, NON_AURA_ENCHANTMENT } from "../abilities";
 import { nameFirstPrintedIn } from "../first-printings";
+import { controlBlocked } from "../guardian";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { PLANESWALKER_TYPES } from "../oracle/targets";
@@ -205,10 +206,12 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // Golgothian Sylex, City in a Bottle, Apocalypse Chime: its name now, first printed in that set; a face-down one has none (CR 708.2).
   if (spec.firstPrintedIn && (o.faceDown || !nameFirstPrintedIn(c.name, spec.firstPrintedIn))) return false;
   if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
-  const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
+  // A keyword ability an effect gave it as text ('gains "Cumulative upkeep {1}"', Balduvian Shaman, round B292) counts too.
+  const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase()) || c.grantedAbilities.some((g) => g.toLowerCase() === k.toLowerCase() || (g.toLowerCase().startsWith(k.toLowerCase()) && /^(?: |—|\.$)/.test(g.slice(k.length))));
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.toxic && !c.keywords.some((x) => /^toxic\b/i.test(x))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;
+  if (spec.gainableControl && controlBlocked(s, o, controller)) return false;
   // Power and toughness only exist for creatures (CR 208.3); a noncreature has neither.
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
   if (spec.toughness && (!c.types.includes("Creature") || !inRange(c.toughness, spec.toughness))) return false;

@@ -843,6 +843,8 @@ export interface TargetSpec {
   /** "Creatures you control with toxic" (Skrelv's Hive): any toxic ability, whatever its number (CR 702.164). */
   toxic?: true;
   notKeywords?: string[]; // "creature without flying"
+  /** Guardian Beast (round B292): only a permanent whose control the player it's checked for can gain (guardian.ts controlBlocked). */
+  gainableControl?: true;
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
   /** "With total power and toughness 5 or less" (Cut Down): its power plus its toughness (rulings). */
@@ -2346,7 +2348,19 @@ export type Modification =
   /** "Can't be enchanted by other Auras" (Anti-Magic Aura, Consecrate Land): Auras other than this effect's source. */
   | { kind: "cantBeEnchantedByOthers" }
   /** Tetravus's tokens: "This token can't be enchanted": by no Aura at all (an Aura attached to it is put into its owner's graveyard, CR 704.5m). */
-  | { kind: "cantBeEnchanted" }
+  | {
+      kind: "cantBeEnchanted";
+      /**
+       * Guardian Beast (round B292): "can't be enchanted ... This effect doesn't remove Auras already attached to those
+       * artifacts": no Aura can become attached to it (CR 303.4, 303.4j), but an Aura attached to it stays (no CR 704.5m).
+       */
+      newOnly?: true;
+    }
+  /**
+   * Guardian Beast (round B292): "other players can't gain control of them": a control-changing effect that would give it
+   * to a player other than its controller doesn't do that (CR 101.2), checked as the effect would begin (guardian.ts).
+   */
+  | { kind: "othersCantGainControl" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this"; /** "Must be blocked by an Eldrazi if able" (Slayer's Cleaver): by at least one creature that fits this, if one is able to block it (CR 509.1c). */ by?: TargetSpec; /** Gorm the Great: "and ~ must be blocked by two or more creatures if able": a second requirement beside being blocked (CR 509.1c). */ twoOrMore?: true; /** Nacatl War-Pride: "must be blocked by exactly one creature if able": one requirement, blocked by one creature, none past it while one alone could block it (CR 509.1c, rulings). */ exactlyOne?: true }
   | { kind: "allMustBlock"; /** "All Walls able to block ~ do so" (Marble Priest): only blockers that fit this (CR 509.1c). */ by?: TargetSpec }

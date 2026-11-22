@@ -11976,8 +11976,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (CR 712.9: Peter Parker becomes Amazing Spider-Man); only a card that could transform is asked about (SpellCondition
   createdDoubleFaced), since transforming any other does nothing (CR 701.27c-d, 712.10). Browser tests: Harold and Bob dies to
   Murder, returns on the Forest chosen, which taps for {U}{U}{U} and two rad counters; Nick Fury puts Peter Parker onto the
-  battlefield and transforms him. +2, 31,873 of 31,936 with B294's head a8c90879 (main cf06b92, B293). The compiled
-  text of every other card is unchanged.
+  battlefield and transforms him. +2, 31,875 of 31,936 with main f277baf (through round 444) and B293-B294.
+  The compiled text of every other card is unchanged.
 - Out after round B295 (looked at, not done): the lists after round B294 stay out. Battlefield Thaumaturge (its ruling's
   "even if the spell targets a creature more than once" still reads either way for one creature in two target slots), North
   Star, Arna Kennerüd, Skycaptain and Psychic Paper were looked at again and stay out for the reasons in the earlier lists;

@@ -3,6 +3,7 @@
 // Delusion's "target creature that target Wall blocked this turn".
 import type { AbilityBody, CompiledCard } from "../abilities";
 import { parseBody } from "./body";
+import { roundB294Spell } from "./laneb294-lines";
 
 const KEFNET =
   "You may reveal the first card you draw each turn as you draw it. Whenever you reveal an instant or sorcery card this way, copy that card and you may cast the copy. That copy costs {2} less to cast.";
@@ -57,5 +58,6 @@ export function roundB291Spell(text: string): AbilityBody | null | undefined {
       text,
     };
   }
-  return undefined;
+  // Round B294 (Channel, False Dawn): the same.
+  return roundB294Spell(text);
 }

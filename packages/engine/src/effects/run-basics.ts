@@ -7,7 +7,7 @@ import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, hitsBy, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, damageUnalterableTo, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
-import { addMana, manaOriginsOf } from "../spend";
+import { addMana, falseDawnMana, manaOriginsOf } from "../spend";
 import { emptyPool } from "../mana";
 import { tappedForMana } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, runEffectInner, damageRecipients, ctxSource } from "./resolve";
@@ -472,6 +472,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
         return;
       }
+      // Channel, False Dawn (round B294).
+      if (e.rules[0] === "channel") {
+        log(s, `Until end of turn, ${player(s, ctx.controller).name} may pay 1 life to add {C} any time they could activate a mana ability.`);
+        return;
+      }
+      if (e.rules[0] === "whiteMana") {
+        log(s, `Until end of turn, spells and abilities ${player(s, ctx.controller).name} controls that would add colored mana add that much white mana instead${e.rules.includes("whiteAnyColor") ? `, and ${player(s, ctx.controller).name} may spend white mana as though it were mana of any color` : ""}.`);
+        return;
+      }
       log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "castFromHandFree" ? " may cast spells from their hand without paying their mana costs" : r === "spellsUncounterable" ? `'s spells can't be countered${e.byColors ? ` by ${e.byColors.map((c) => COLOR_NAMES[c].toLowerCase()).join(" or ")} spells` : ""}` : r === "creatureSpellsUncounterable" ? "'s creature spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
       return;
     case "flashUntilNextTurn":
@@ -832,8 +841,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           // Radiant Lotus: "three mana of the chosen color for each artifact sacrificed this way": that many times over.
           const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen * (e.times === undefined ? 1 : amountNow(s, e.times, ctx))) : "";
           const from = manaSourceOrigins(s, ctx);
-          for (const m of added.matchAll(/\{([WUBRGC])\}/g)) addMana(s, pid, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
-          if (added) log(s, `${player(s, pid).name} adds ${added}.`);
+          // False Dawn (round B294): mana from a spell or ability whose controller is under it, whoever's pool it goes to.
+          const made = falseDawnMana(s, ctx.controller, [...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType));
+          for (const m of made) addMana(s, pid, [m], { from, by: ctx.controller, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
+          if (made.length) log(s, `${player(s, pid).name} adds ${made.map((m) => `{${m}}`).join("")}.`);
         }
         return;
       }
@@ -852,7 +863,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: could.map((_, i) => String(i)), labels: could.map((m) => `Add {${m}}`), prompt: "choose the type of mana" };
           return "paused";
         }
-        const made = could[could.length > 1 ? Math.max(0, Math.min(could.length - 1, sc.either!)) : 0]!;
+        const made = falseDawnMana(s, ctx.controller, [could[could.length > 1 ? Math.max(0, Math.min(could.length - 1, sc.either!)) : 0]!])[0]!;
         delete sc.either;
         const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
         addMana(s, p.id, [made], { from });
@@ -872,7 +883,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: could.map((_, i) => String(i)), labels: could.map((m) => `Add {${m}}`), prompt: "choose the type of mana" };
           return "paused";
         }
-        const made = could[could.length > 1 ? Math.max(0, Math.min(could.length - 1, sc.either!)) : 0]!;
+        const made = falseDawnMana(s, ctx.controller, [could[could.length > 1 ? Math.max(0, Math.min(could.length - 1, sc.either!)) : 0]!])[0]!;
         delete sc.either;
         const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
         addMana(s, p.id, [made], { from });
@@ -912,7 +923,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: options.map((_, i) => String(i)), labels: options.map((ms) => `Add ${label(ms)}`), prompt: "choose the mana" };
           return "paused";
         }
-        const made = options[options.length > 1 ? Math.max(0, Math.min(options.length - 1, sc.either!)) : 0] ?? [];
+        const made = falseDawnMana(s, ctx.controller, options[options.length > 1 ? Math.max(0, Math.min(options.length - 1, sc.either!)) : 0] ?? []);
         delete sc.either;
         if (!made.length) {
           log(s, `${src}: the mana cost adds no mana.`);
@@ -938,7 +949,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.either;
         // Tapped for mana (Orcish Lumberjack): Mana Reflection's replacement multiplies it (CR 106.12b).
         const made = [...mix(k).matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType);
-        const added = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made, s.resolving.item.manaAbility.instead) : made;
+        const added = falseDawnMana(s, ctx.controller, s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, made, s.resolving.item.manaAbility.instead) : made);
         // Domri, Chaos Bringer: a creature spell it's spent on gains riot (ManaLot.riot).
         for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx), ...(e.riot ? { riot: src } : {}) });
         log(s, `${p.name} adds ${added.map((m) => `{${m}}`).join("")}.`);
@@ -967,7 +978,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.manaMix;
         const from = manaSourceOrigins(s, ctx);
         const mixed = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
-        const colors = s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, mixed, s.resolving.item.manaAbility.instead) : mixed;
+        const colors = falseDawnMana(s, ctx.controller, s.resolving?.item.manaAbility?.tapped ? tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, mixed, s.resolving.item.manaAbility.instead) : mixed);
         for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: e.keep } : {}) });
         if (colors.length) log(s, `${p.name} adds ${colors.map((c) => `{${c}}`).join("")}.`);
         return;
@@ -979,6 +990,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).
       if (s.resolving?.item.manaAbility?.tapped) added = tappedForMana(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined, [...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), s.resolving.item.manaAbility.instead).map((m) => `{${m}}`).join("");
+      // False Dawn (round B294): white instead of colored, after what replaces tapping it for mana (falseDawnMana).
+      added = falseDawnMana(s, ctx.controller, [...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType)).map((m) => `{${m}}`).join("");
       // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
       // ability's source (snow mana, CR 107.4h; mana from a creature).
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
@@ -1060,8 +1073,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
       const n = amountNow(s, e.n, ctx);
       const p = player(s, ctx.controller);
-      addMana(s, p.id, Array(n).fill("R"), { from: manaSourceOrigins(s, ctx), keep: "combat" });
-      if (n) log(s, `${p.name} adds ${"{R}".repeat(n)} (until end of combat).`);
+      const fire = falseDawnMana(s, ctx.controller, Array<ManaType>(n).fill("R"));
+      addMana(s, p.id, fire, { from: manaSourceOrigins(s, ctx), keep: "combat" });
+      if (n) log(s, `${p.name} adds ${fire.map((m) => `{${m}}`).join("")} (until end of combat).`);
       // "Whenever you firebend": a firebending ability of yours resolved (CR 702.189b), round 427.
       if (e.firebending) bent(s, ctx.controller, "fire");
       return;

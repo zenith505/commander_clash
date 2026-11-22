@@ -238,7 +238,10 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
     const anyType = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell && use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendAnyTypeOwnAbilities;
     return dawnCost(c0, anyType);
   }
-  const c1 = mine.some((o) => !!abilitiesOf(s, o).spendWhiteAsRed) ? whiteAsRed(c0) : c0;
+  const c1r = mine.some((o) => !!abilitiesOf(s, o).spendWhiteAsRed) ? whiteAsRed(c0) : c0;
+  // False Dawn (round B294): "Until end of turn, you may spend white mana as though it were mana of any color." (CR 609.4b):
+  // for every cost this player pays with mana this turn.
+  const c1 = (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "whiteAnyColor") ? colorAsAny(c1r, "W") : c1r;
   // Quicksilver Elemental (round 400): "You may spend blue mana as though it were mana of any color to pay the activation
   // costs of ~'s abilities.", as Manascape Refractor's; Grell Philosopher: its gained abilities' (ManaUse blueAny).
   const activation = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell;
@@ -306,13 +309,18 @@ function whiteAsRed(cost: ParsedCost): ParsedCost {
  * Sunglasses of Urza's white mana pays {R}; not {C} (colorless isn't a color, CR 105.1). The mana spent stays blue.
  */
 function blueAsAny(cost: ParsedCost): ParsedCost {
+  return colorAsAny(cost, "U");
+}
+
+/** Mana of `color` spent as though it were mana of any color (CR 609.4b), as blueAsAny's blue mana; False Dawn's white (round B294). */
+function colorAsAny(cost: ParsedCost, color: Color): ParsedCost {
   return {
     ...cost,
     symbols: cost.symbols.map((x): CostSymbol => {
-      if (x.kind === "colored" && x.color !== "C" && x.color !== "U") return { kind: "hybrid", options: [x.color, "U"] };
-      if (x.kind === "hybrid" && !x.options.includes("U")) return { ...x, options: [...x.options, "U"] };
-      if (x.kind === "twoHybrid" && x.color !== "U" && !x.also) return { ...x, also: "U" };
-      if (x.kind === "phyrexian" && x.color !== "U" && !x.krrik && !x.any) return { kind: "hybrid", options: [x.color, "U"], life: true, phyrexian: true };
+      if (x.kind === "colored" && x.color !== "C" && x.color !== color) return { kind: "hybrid", options: [x.color, color] };
+      if (x.kind === "hybrid" && !x.options.includes(color)) return { ...x, options: [...x.options, color] };
+      if (x.kind === "twoHybrid" && x.color !== color && !x.also) return { ...x, also: color };
+      if (x.kind === "phyrexian" && x.color !== color && !x.krrik && !x.any) return { kind: "hybrid", options: [x.color, color], life: true, phyrexian: true };
       return x;
     }),
   };
@@ -452,11 +460,26 @@ export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpen
 }
 
 /**
+ * False Dawn (round B294): "Until end of turn, spells and abilities you control that would add colored mana instead add that
+ * much white mana." A replacement effect on mana production (CR 614.1a, 106.6a: the same amount, any restrictions and riders
+ * of the spell or ability staying with it), for spells and abilities `by` controls, whoever's pool the mana goes to; colorless
+ * mana stays colorless (CR 105.1). It changes no permanent's color or land type (rulings). With other replacements of the
+ * same mana (Contamination's {B}, a choice of color), it's applied last, an order its controller may choose (CR 616.1), and
+ * the one that gives the mana its "any color" spending (TurnRule "whiteAnyColor").
+ */
+export function falseDawnMana(s: GameState, by: PlayerId, mana: ManaType[]): ManaType[] {
+  if (!mana.some((m) => m !== "C" && m !== "W") || !(s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === by && r.rule === "whiteMana")) return mana;
+  return mana.map((m) => (m === "C" ? m : "W"));
+}
+
+/**
  * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
  * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; hasteType?: string; commanderCounters?: true; creatureCounter?: ManaLot["creatureCounter"]; uncounterableInstantSorcery?: true; source?: string; riot?: string } = {}): void {
+export function addMana(s: GameState, pid: PlayerId, mana0: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; hasteType?: string; commanderCounters?: true; creatureCounter?: ManaLot["creatureCounter"]; uncounterableInstantSorcery?: true; source?: string; riot?: string; /** Who controls the spell or ability adding it, when that isn't `pid` (False Dawn, round B294). */ by?: PlayerId } = {}): void {
   const p = s.players[pid]!;
+  // False Dawn (round B294): the callers have already replaced it for their logs; done here too so that none is missed.
+  const mana = falseDawnMana(s, how.by ?? pid, mana0);
   const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;
   const trig = (t: ManaSpentTrigger | undefined) => (t ? `${t.sourceId}#${t.sourceZc}` : "");
   for (const m of mana) {

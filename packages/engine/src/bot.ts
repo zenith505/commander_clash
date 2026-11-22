@@ -177,6 +177,7 @@ import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, restingDef, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { prepareSpellOf } from "./prepare";
+import { channelling, channelProblem } from "./channel";
 import { castingBody, castTimeTargets, compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem, type DeferredAct } from "./types";
 import { evalAmount } from "./amounts";
@@ -2791,7 +2792,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (expiring) return expiring.plan;
     if (options[0]) return cubeInstead(s, pid, options[0].plan) ?? options[0].plan;
     // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
-    const fed = chooseCreatureForMana(s, pid) ?? chooseForageForMana(s, pid) ?? chooseUntapForMana(s, pid);
+    const fed = chooseCreatureForMana(s, pid) ?? chooseForageForMana(s, pid) ?? chooseUntapForMana(s, pid) ?? chooseChannelForMana(s, pid);
     if (fed) return fed;
     // A loyalty ability of each planeswalker we control, once spells are cast (CR 606.3).
     const loyalty = chooseLoyalty(s, pid);
@@ -8415,6 +8416,27 @@ function chooseManaMix(s: GameState, pid: PlayerId, n: number, colors?: Color[])
     out[best] = (out[best] ?? 0) + left;
   }
   return out;
+}
+
+/**
+ * Channel (round B294): with its permission this turn and nothing castable otherwise, the fewest life payments for {C} that
+ * let us cast a card from our hand or command zone, keeping at least 10 life (and never more than 8 at once). Checked by
+ * paying them: only when a card can then be cast.
+ */
+function chooseChannelForMana(s: GameState, pid: PlayerId): Action[] | null {
+  if (!channelling(s, pid) || channelProblem(s, pid)) return null;
+  let after = s;
+  const most = Math.min(8, player(s, pid).life - 10);
+  for (let k = 1; k <= most; k++) {
+    try {
+      after = applyAction(after, { type: "channelMana", player: pid });
+    } catch {
+      return null;
+    }
+    if (after.pending || after.triggerQueue.length) return null;
+    if (castableNow(after, pid)[0] !== undefined) return Array.from({ length: k }, () => ({ type: "channelMana", player: pid }) as Action);
+  }
+  return null;
 }
 
 function castableNow(s: GameState, pid: PlayerId): ObjectId[] {

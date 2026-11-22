@@ -9348,6 +9348,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d1b815d1-2848-40d4-a555-66822d1becbc",
+  "name": "Channel",
+  "manaCost": "{G}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, any time you could activate a mana ability, you may pay 1 life. If you do, add {C}.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "banned",
+  "set": "sta",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4b3d1cfb-9f1d-4e4e-a15a-2e248ff5bdfc",
   "name": "Channel Harm",
   "manaCost": "{5}{W}",
@@ -18160,6 +18189,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "efd9cc25-f445-4de0-9a69-adab9f8878f4",
+  "name": "False Dawn",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, spells and abilities you control that would add colored mana instead add that much white mana. Until end of turn, you may spend white mana as though it were mana of any color.\nDraw a card.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "38c5c952-8153-4d98-89b5-a75260383345",
   "name": "False Orders",
   "manaCost": "{R}",
@@ -23850,6 +23905,49 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d0ecea04-9768-4b09-8718-dd59135251e3",
+  "name": "Harold and Bob, First Numens",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Treefolk Mutant",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Treefolk",
+   "Mutant"
+  ],
+  "oracleText": "Reach, vigilance\nWhen Harold and Bob dies, if it was a creature, return it to the battlefield. It's an Aura enchantment with enchant Forest you control and \"Enchanted Forest has '{T}: Add three mana of any one color. You get two rad counters.'\" Harold and Bob loses all other abilities.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach",
+   "Vigilance"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -35935,6 +36033,47 @@
   "gameChanger": false
  },
  {
+  "oracleId": "62916107-14c0-4516-9fed-a032b1a80e5d",
+  "name": "Nick Fury, Agent of S.H.I.E.L.D.",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Legendary Creature — Human Spy Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Spy",
+   "Hero"
+  ],
+  "oracleText": "Power-up — {W}{U}{B}{R}{G}: Put two +1/+1 counters on Nick Fury, then look at the top seven cards of your library. You may put a Hero, Equipment, or Vehicle card from among them onto the battlefield. If it's a double-faced card, you may transform it. Put the rest on the bottom of your library in a random order. (Activate each power-up ability only once. Reduce the cost by his mana cost if he entered this turn.)",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Power-up",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "581eedc4-efe4-4ae4-baf2-88071e7e6f6d",
   "name": "Nicol Bolas, Dragon-God",
   "manaCost": "{U}{B}{B}{B}{R}",
@@ -47324,6 +47463,98 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "cc18e782-a965-404f-96f1-348f3ed799fd",
+  "name": "Soundwave, Sonic Spy // Soundwave, Superior Captain",
+  "manaCost": "{1}{W}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {2}{W}{U}{B} (You may cast this card converted for {2}{W}{U}{B}.)\nWhenever one or more creature tokens you control deal combat damage to a player, exile target instant or sorcery card with mana value equal to the damage dealt from their graveyard. Copy it. You may cast the copy without paying its mana cost. If you do, convert Soundwave.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Convert",
+   "More Than Meets the Eye"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Soundwave, Sonic Spy",
+    "manaCost": "{1}{W}{U}{B}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {2}{W}{U}{B} (You may cast this card converted for {2}{W}{U}{B}.)\nWhenever one or more creature tokens you control deal combat damage to a player, exile target instant or sorcery card with mana value equal to the damage dealt from their graveyard. Copy it. You may cast the copy without paying its mana cost. If you do, convert Soundwave.",
+    "power": "5",
+    "toughness": "4",
+    "colors": [
+     "B",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/8/7/8733cd6f-37e1-4e3a-bb25-7a238f04657e.jpg?1783919896",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/8/7/8733cd6f-37e1-4e3a-bb25-7a238f04657e.jpg?1783919896"
+   },
+   {
+    "name": "Soundwave, Superior Captain",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "Whenever you cast a spell with an odd mana value, convert Soundwave. If you do, create Ravage, a legendary 3/3 black Robot artifact creature token with menace and deathtouch.\nWhenever you cast a spell with an even mana value, convert Soundwave. If you do, create Laserbeak, a legendary 2/2 blue Robot artifact creature token with flying and hexproof.",
+    "colors": [
+     "B",
+     "U",
+     "W"
+    ],
+    "colorIndicator": [
+     "B",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/8/7/8733cd6f-37e1-4e3a-bb25-7a238f04657e.jpg?1783919896",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/8/7/8733cd6f-37e1-4e3a-bb25-7a238f04657e.jpg?1783919896"
+   }
+  ]
  },
  {
   "oracleId": "c6aadaf0-eb47-4228-95e2-48e3ff7b6e2f",
@@ -59052,6 +59283,77 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "d9068051-b51c-4700-b492-30b148e3a72c",
+  "name": "Yavimaya Bloomsage // Channel",
+  "manaCost": "{2}{G} // {G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Dryad Druid // Sorcery",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dryad",
+   "Druid"
+  ],
+  "oracleText": "At the beginning of your end step, put a +1/+1 counter on target creature you control. Then if that creature has power 7 or greater, this creature becomes prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Prepared"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "prepare",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Yavimaya Bloomsage",
+    "manaCost": "{2}{G}",
+    "typeLine": "Creature — Dryad Druid",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Dryad",
+     "Druid"
+    ],
+    "oracleText": "At the beginning of your end step, put a +1/+1 counter on target creature you control. Then if that creature has power 7 or greater, this creature becomes prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
+    "power": "2",
+    "toughness": "2",
+    "colors": [
+     "G"
+    ]
+   },
+   {
+    "name": "Channel",
+    "manaCost": "{G}{G}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Until end of turn, any time you could activate a mana ability, you may pay 1 life. If you do, add {C}.",
+    "colors": [
+     "G"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "322f0459-f394-44f0-977b-55fd0cbe0712",

@@ -4841,8 +4841,8 @@ line blocks.
    each target that's a creature counts, one creature in two target slots twice (CompiledCard.perTargetCost `creatures`,
    `spellTypes`; worked out after targets, CR 601.2c, 601.2f; creatures on the battlefield, CR 109.2; generic mana only).
    Browser tests click through Captain America's Equipment buttons ("Sword of Fire and Ice (3 damage)", then two targets and
-   the division, and "Bonesplitter (1 damage)" at Ana). +2, 31,883 of 31,936 on this stacked branch (round 446 #745); the
-   compiled text of every other card is unchanged.
+   the division, and "Bonesplitter (1 damage)" at Ana). +2, 31,883 of 31,936 on this stacked branch (round 446 #745), 31,884
+   with round 446's head ae5ba1d (main 499a31a, B297) merged in; the compiled text of every other card is unchanged.
    Out after round 447 (looked at, not done): the lists after round 446 (still out, for their reasons). Judgment call:
    Battlefield Thaumaturge's reading above (a creature targeted twice counts twice). Known gaps: bots throw an Equipment only
    in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
@@ -4861,8 +4861,8 @@ line blocks.
    card's enters abilities don't trigger, and counters stay; CompiledCard.equippedCopiesChosen, kept by game.ts
    syncAuraCopies as Metamorphic Alteration's). A browser test clicks through the craft, the card picker after its enters
    trigger attaches it to Grizzly Bears (Serra Angel), and the picker again when it's equipped to a Hill Giant (Llanowar
-   Elves). +1, 31,885 of 31,936 on this stacked branch (round 447 #748, with round 446's head ae5ba1d, main 499a31a, B297,
-   merged in); the compiled text of every other card and face is unchanged.
+   Elves). +1, 31,885 of 31,936 on this stacked branch (round 447 #748, with its head 025b31d, main c8a3332, round
+   446 #745 and B297, merged in); the compiled text of every other card and face is unchanged.
    Out after round 448 (looked at, not done): Baron Helmut Zemo (Lane B's round B299), Codie, Ravenous Codex (still out:
    "a prepared spell" isn't a term of CR 722, which speaks of "a spell cast as a prepare spell", 722.3d), Spy Kit (still out:
    every nonlegendary creature card's name at once), and the lists after round 447 (still out, for their reasons). Judgment

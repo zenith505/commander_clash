@@ -18,8 +18,11 @@ test("Havengul Laboratory: three Clues sacrificed, it transforms at your end ste
   await pick.locator(`[data-pick="${bears}"]`).click();
   const back = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[bears]!.zone === "battlefield");
   expect(back.objects[lab]!.face).toBe(1);
-  // On to your next turn's first main phase, with Havengul Mystery still face up.
-  const main = await passTo(page, "main1", back.turn + 4);
+  // On to your next first main phase, with Havengul Mystery still face up. Not tied to one turn number: a Pass click that
+  // lands just as the game reaches that main phase moves it on, and then only a later turn of yours stops it (round 447:
+  // with the exact turn it passed on until the hand-size discard).
+  const main = await passTo(page, "main1");
+  expect(main.turn).toBeGreaterThanOrEqual(back.turn + 4);
   expect(main.objects[lab]!.face).toBe(1);
   await card(page, "Murder", main).click();
   await page.locator(`[data-obj="${bears}"]`).first().click();

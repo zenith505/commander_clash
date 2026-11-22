@@ -1156,6 +1156,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? revealedMv(s) === amountNow(s, e.cond.mv, ctx)
             : e.cond.kind === "createdNone"
             ? !s.resolving!.created?.length
+            : e.cond.kind === "createdDoubleFaced"
+            ? (s.resolving!.created ?? []).some((id) => !!s.objects[id] && canTransform(s, s.objects[id]!))
             : e.cond.kind === "putThisWayIs"
             ? (s.resolving!.created ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "revealedNameInYard"

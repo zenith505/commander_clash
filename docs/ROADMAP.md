@@ -11896,6 +11896,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B295 (least played first, two cards off the skip lists, neither in Lane A's rounds 443-444): Harold and Bob, First
+  Numens's "When ~ dies, if it was a creature, return it to the battlefield. It's an Aura enchantment with enchant Forest you
+  control and "Enchanted Forest has '{T}: Add three mana of any one color. You get two rad counters.'" ~ loses all other
+  abilities." (out after round 344): Bronzehide Lion's and Old-Growth Troll's return as an Aura (CR 303.4f, 614.1c, 205.1a: its
+  name, colors and supertypes stay, rulings; nothing to enchant, it stays in the graveyard), its "loses all other abilities"
+  a sentence of its own, and a mana ability whose rider gives its activator two rad counters as it resolves (CR 605.3b, 122.1,
+  728; ManaAbility.radCounters). Paying for a spell uses the Forest's own {G} first. Nick Fury, Agent of S.H.I.E.L.D.'s
+  power-up "... You may put a Hero, Equipment, or Vehicle card from among them onto the battlefield. If it's a double-faced
+  card, you may transform it. ..." (out after round B85 and in Lane A's lists): the card enters front face up (CR 712.14), so
+  its front face's enters abilities trigger, then its controller may transform it (CR 701.27a), modal double-faced cards too
+  (CR 712.9: Peter Parker becomes Amazing Spider-Man); only a card that could transform is asked about (SpellCondition
+  createdDoubleFaced), since transforming any other does nothing (CR 701.27c-d, 712.10). Browser tests: Harold and Bob dies to
+  Murder, returns on the Forest chosen, which taps for {U}{U}{U} and two rad counters; Nick Fury puts Peter Parker onto the
+  battlefield and transforms him. +2, 31,869 of 31,936 on B294's branch. The compiled text of every other card is unchanged.
+- Out after round B295 (looked at, not done): the lists after round B294 stay out. Battlefield Thaumaturge (its ruling's
+  "even if the spell targets a creature more than once" still reads either way for one creature in two target slots), North
+  Star, Arna Kennerüd, Skycaptain and Psychic Paper were looked at again and stay out for the reasons in the earlier lists;
+  about 67 unsupported cards remain, all of them hard. Known gaps: the mana menu labels the Forest's granted ability by its
+  mana ("add U U U"), not its rad counters (the card shows the granted text); bots don't weigh the two faces before
+  answering Nick Fury's transform question.
 - Round B294 (least played first, two cards off the skip lists, neither in Lane A's rounds 442-443): Yavimaya Bloomsage //
   Channel, whose prepare spell is Channel's "Until end of turn, any time you could activate a mana ability, you may pay 1 life.
   If you do, add {C}." (out after round 293): a permission for the rest of the turn (TurnRule "channel", ended in the cleanup

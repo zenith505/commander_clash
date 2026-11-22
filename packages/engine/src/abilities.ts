@@ -6956,6 +6956,12 @@ export type SpellCondition =
   | { kind: "impulsedIs"; filter: TargetSpec }
   /** "If you didn't create a token this way" (Springheart Nantuko): this resolution hasn't created any. */
   | { kind: "createdNone" }
+  /**
+   * Nick Fury, Agent of S.H.I.E.L.D. (round B295): "If it's a double-faced card, you may transform it": the card the
+   * instruction before put onto the battlefield (ResolvingState.created) is a double-faced card still on the battlefield
+   * that could transform now (canTransform: CR 701.27c-d, 712.9-712.10). Otherwise transforming it would do nothing.
+   */
+  | { kind: "createdDoubleFaced" }
   /** "If you put a Town card into your hand this way" (Town Greeter): a card the instruction before put into your hand from among the milled cards is one, still in the hand. */
   | { kind: "putIntoHandIs"; filter: TargetSpec; /** Cache Grab: "If you control a Squirrel or returned a Squirrel card to your hand this way": or this holds as it resolves. */ orState?: StaticCondition }
   /** "If you return a nonland card to your hand this way" (Vengeful Rebirth): a card this resolution returned to its owner's hand is one, still there. */
@@ -8528,6 +8534,8 @@ export interface ManaAbility {
   nextCast?: Extract<Effect, { type: "nextCast" }>;
   /** Foraging Wickermaw: "~ becomes that color until end of turn." after it adds one mana of a color: its colors become that one (layer 5, CR 105.3, 613.1e) as the ability resolves (CR 605.3b). */
   becomesManaColor?: true;
+  /** Harold and Bob, First Numens (round B295): "You get two rad counters." after the mana is added, its activator getting them (CR 605.3b, 728). */
+  radCounters?: number;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */

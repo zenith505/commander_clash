@@ -7374,6 +7374,12 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
   // sacrifice it" (checked after the cost removed one).
   if (ab.putCounter && o.zone === "battlefield") putCounters(s, o, ab.putCounter, 1);
+  // Harold and Bob, First Numens (round B295): "You get two rad counters." The activator, as the ability resolves (CR
+  // 605.3b, 122.1): whether or not the permanent is still there.
+  if (ab.radCounters && !unless) {
+    const got = putPlayerCounters(s, p.id, "rad", ab.radCounters);
+    if (got) log(s, `${p.name} gets ${got === 1 ? "a rad counter" : `${got} rad counters`} (${name}).`);
+  }
   // Foraging Wickermaw: "~ becomes that color until end of turn": the color of the mana it added (CR 605.3b), in layer 5.
   if (ab.becomesManaColor && o.zone === "battlefield" && adds[0] && adds[0] !== "C") {
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "setColors", colors: [adds[0]] }] });

@@ -23757,6 +23757,49 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d0ecea04-9768-4b09-8718-dd59135251e3",
+  "name": "Harold and Bob, First Numens",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Treefolk Mutant",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Treefolk",
+   "Mutant"
+  ],
+  "oracleText": "Reach, vigilance\nWhen Harold and Bob dies, if it was a creature, return it to the battlefield. It's an Aura enchantment with enchant Forest you control and \"Enchanted Forest has '{T}: Add three mana of any one color. You get two rad counters.'\" Harold and Bob loses all other abilities.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach",
+   "Vigilance"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6f82b01d-8975-42a1-87e2-99782272bbea",
   "name": "Harvest Mage",
   "manaCost": "{G}",
@@ -35833,6 +35876,47 @@
   "commanderLegal": "legal",
   "set": "ncc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "62916107-14c0-4516-9fed-a032b1a80e5d",
+  "name": "Nick Fury, Agent of S.H.I.E.L.D.",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Legendary Creature — Human Spy Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Spy",
+   "Hero"
+  ],
+  "oracleText": "Power-up — {W}{U}{B}{R}{G}: Put two +1/+1 counters on Nick Fury, then look at the top seven cards of your library. You may put a Hero, Equipment, or Vehicle card from among them onto the battlefield. If it's a double-faced card, you may transform it. Put the rest on the bottom of your library in a random order. (Activate each power-up ability only once. Reduce the cost by his mana cost if he entered this turn.)",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Power-up",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

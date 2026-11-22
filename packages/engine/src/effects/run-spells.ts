@@ -557,6 +557,47 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         sc.copyManyAt = undefined;
         return;
       }
+      // Finale of Promise (round 450): "copy each of those spells twice. You may choose new targets for the copies.": each
+      // spell this resolution cast (ResolvingState.castThisWay) still on the stack, `n` copies of it (Twinning Staff's
+      // more, CR 614.1a), put on the stack in any order (rulings): while two spells have copies to make, their controller
+      // chooses which one the next copy is of (copies put on the stack later resolve first). A copy isn't cast (CR 707.10).
+      if (e.spell === "castThisWay") {
+        if (!sc.wayLeft) {
+          const n = typeof e.n === "string" ? 0 : amountNow(s, e.n, ctx);
+          sc.wayLeft = {};
+          for (const id of r.castThisWay ?? []) {
+            const item = s.stack.find((x) => x.id === id);
+            if (n <= 0 || item?.kind !== "spell") continue;
+            // "~ can't be copied" (See Double): no copy of it is made.
+            const card = item.objectId ? s.objects[item.objectId] : undefined;
+            if (item.body?.uncopyable || (card && compileCard(s.cards[cardIdOf(card)]!).spell?.uncopyable)) {
+              log(s, `${item.description} can't be copied.`);
+              continue;
+            }
+            sc.wayLeft[id] = n + extraSpellCopies(s, ctx.controller);
+          }
+        }
+        for (;;) {
+          if (sc.wayCur === undefined) {
+            const left = Object.keys(sc.wayLeft).filter((id) => sc.wayLeft![id]! > 0 && s.stack.some((x) => x.id === id));
+            if (!left.length) break;
+            if (left.length > 1 && (sc.wayPick === undefined || !left.includes(sc.wayPick))) {
+              const label = (id: string) => `${s.stack.find((x) => x.id === id)!.description} (${sc.wayLeft![id]} ${sc.wayLeft![id] === 1 ? "copy" : "copies"} left)`;
+              s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "copyNextOf", options: left, labels: left.map(label), prompt: "choose the spell the next copy is of (copies put on the stack later resolve first)" };
+              return "paused";
+            }
+            sc.wayCur = left.length > 1 ? sc.wayPick! : left[0]!;
+            sc.wayPick = undefined;
+            sc.copies = { of: sc.wayCur, left: 1 };
+          }
+          if (runSpellsEffect(s, { ...e, spell: { epic: sc.wayCur }, n: 1 }, ctx, src) === "paused") return "paused";
+          sc.wayLeft[sc.wayCur] = sc.wayLeft[sc.wayCur]! - 1;
+          sc.wayCur = undefined;
+          sc.copies = undefined;
+        }
+        sc.wayLeft = undefined;
+        return;
+      }
       if (!sc.copies) {
         // Psychic Rebuttal: the spell countered this way, as it last was on the stack (none if it wasn't countered).
         if (e.spell === "countered") {

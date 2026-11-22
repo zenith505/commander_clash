@@ -720,8 +720,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     else if (pending?.kind === "newTargets") setTargeting({ mode: "retarget", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source}: new targets for ${pending.spell}${pending.allOrNone ? " (change all of them, or keep them)" : ""}` });
     else setTargeting((t) => (answering(t) ? null : t));
     // (Two identical triggers in a row, Lucy MacLean's for two tokens entering at once, round B269: the next one is asked
-    // once the first is on the stack, so the stack's size tells them apart.)
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? `${pending.description}#${s?.stack.length ?? 0}#${s?.triggerQueue.length ?? 0}` : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : pending?.kind === "handToTop" && pending.discarding ? `${pending.discarding.join(",")}#${s?.log.length ?? 0}` : ""]);
+    // once the first is on the stack, so the stack's size tells them apart. So for two copies' targets in a row with one
+    // text, Ulalek, Fused Atrocity's copies of two Prodigal Sorcerer abilities, round 451.)
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? `${pending.description}#${s?.stack.length ?? 0}#${s?.triggerQueue.length ?? 0}` : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}#${s?.stack.length ?? 0}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : pending?.kind === "pickPermanents" ? `${pending.action}#${pending.what}#${pending.options.join(",")}#${pending.prompt ?? ""}` : pending?.kind === "handToTop" && pending.discarding ? `${pending.discarding.join(",")}#${s?.log.length ?? 0}` : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
   // Who defends a permanent that can be attacked: a planeswalker's controller, a battle's protector (CR 506.2, 310.9b).

@@ -45,6 +45,9 @@ export function parseManaCost(cost: string): ParsedCost {
     else if (parts.length === 2 && parts[1] === "P" && isColor(parts[0]!)) symbols.push({ kind: "phyrexian", color: parts[0] });
     else if (parts.length === 2 && parts[0] === "2" && isColor(parts[1]!)) symbols.push({ kind: "twoHybrid", color: parts[1] });
     else if (parts.length === 2 && isColor(parts[0]!) && isColor(parts[1]!)) symbols.push({ kind: "hybrid", options: [parts[0], parts[1]] });
+    // A colorless hybrid symbol, {C/W} (Ulalek, Fused Atrocity, round 451): one mana of its color or one colorless mana (CR
+    // 107.4, 107.4e); a colored symbol of that color, as a hybrid symbol is (devotion, CR 700.5), with mana value 1 (202.3).
+    else if (parts.length === 2 && parts[0] === "C" && isColor(parts[1]!)) symbols.push({ kind: "hybrid", options: [parts[1]], orC: true });
     // Hybrid Phyrexian {G/W/P}: either color or 2 life (CR 107.4f).
     else if (parts.length === 3 && parts[2] === "P" && isColor(parts[0]!) && isColor(parts[1]!)) symbols.push({ kind: "hybrid", options: [parts[0], parts[1]], life: true, phyrexian: true });
     else symbols.push({ kind: "unsupported", raw });
@@ -409,7 +412,7 @@ export function reduceSymbolsByManaCost(cost: ParsedCost, by: ParsedCost): { cos
   // The symbol of the cost a mana of one of `colors` can stand for: one of exactly that type first.
   const take = (colors: readonly ManaType[]): boolean => {
     let i = symbols.findIndex((sym) => sym.kind === "colored" && colors.includes(sym.color));
-    if (i < 0) i = symbols.findIndex((sym) => (sym.kind === "hybrid" && sym.options.some((c) => colors.includes(c))) || ((sym.kind === "phyrexian" || sym.kind === "twoHybrid") && colors.includes(sym.color)));
+    if (i < 0) i = symbols.findIndex((sym) => (sym.kind === "hybrid" && (sym.options.some((c) => colors.includes(c)) || (!!sym.orC && colors.includes("C")))) || ((sym.kind === "phyrexian" || sym.kind === "twoHybrid") && colors.includes(sym.color)));
     if (i < 0) return false;
     symbols.splice(i, 1);
     return true;

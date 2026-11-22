@@ -14049,6 +14049,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b93732e4-7aeb-4c37-a415-2b0ff46e2056",
+  "name": "Dimensional Infiltrator",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Eldrazi",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "Devoid (This card has no color.)\nFlash\nFlying\n{1}{C}: Target opponent exiles the top card of their library. If it's a land card, you may return this creature to its owner's hand. ({C} represents colorless mana.)",
+  "power": "2",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Devoid",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "ogw",
+  "releasedAt": "2016-01-22",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "52d14717-0cbc-4d7e-b546-54ea91580338",
   "name": "Dimir Guildgate",
   "manaCost": "",
@@ -40662,6 +40694,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5e961d15-5972-4e4b-9385-1cd7cd7c6bbe",
+  "name": "Prodigal Sorcerer",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Wizard Sorcerer",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard",
+   "Sorcerer"
+  ],
+  "oracleText": "{T}: This creature deals 1 damage to any target.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "10180e2f-90c5-4d41-ba44-16b14948f923",
   "name": "Protean Hulk",
   "manaCost": "{5}{G}{G}",
@@ -55746,6 +55810,42 @@
   "set": "cns",
   "releasedAt": "2014-06-06",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9f6828e3-39d9-45d9-9bf1-0e3737a0321e",
+  "name": "Ulalek, Fused Atrocity",
+  "manaCost": "{C/W}{C/U}{C/B}{C/R}{C/G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Eldrazi",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "Devoid (This card has no color.)\nWhenever you cast an Eldrazi spell, you may pay {C}{C}. If you do, copy all spells you control, then copy all other activated and triggered abilities you control. You may choose new targets for the copies. (Mana abilities can't be copied.)",
+  "power": "2",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Devoid"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

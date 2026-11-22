@@ -1,7 +1,7 @@
 # Roadmap
 
-31,889 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,972 of
+31,890 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,973 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4913,6 +4913,30 @@ line blocks.
    Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: bots cast the cards in
    the order targeted and make the copies in the order cast.
+   Round 451 went on down `npm run popular`, most played first, to the top of it: Ulalek, Fused Atrocity (rank 4,747), out
+   since round 425. Its mana cost's colorless hybrid symbols, {C/W}{C/U}{C/B}{C/R}{C/G} (CR 107.4, 107.4e: one mana of the
+   symbol's color or one colorless mana; a colored symbol for devotion, CR 700.5), parse as a one-color hybrid symbol that
+   colorless mana pays too (CostSymbol `orC`, as Abstruse Appropriation's), Celestial Dawn letting any mana pay one. Its
+   "Whenever you cast an Eldrazi spell, you may pay {C}{C}. If you do, copy all spells you control, then copy all other
+   activated and triggered abilities you control. You may choose new targets for the copies." (a whole line in
+   oracle/round451.ts): copySpell "allYours" copies each spell its controller controls on the stack (copies too, CR
+   707.10; Twinning Staff's one more of each, CR 614.1a), then each other ability they control there as that instruction
+   begins (CR 608.2c; mana abilities are never there, CR 605.3b); each instruction's copies go on the stack in the order its
+   controller chooses (CR 405.3: chooseOption "copyNextOf" while two have copies to make, as Finale of Promise's), each with
+   new targets if they like (CR 707.10c). Copies aren't cast (CR 707.10), so a copied Eldrazi spell doesn't trigger it
+   again. The UI's copy-target prompt now also tells two prompts apart by the stack's size (two abilities with one text).
+   Browser test: two Prodigal Sorcerer abilities and Lightning Bolt on the stack, then Dimensional Infiltrator: Pay, the
+   Infiltrator's copy first, Bolt's copy at Ben, then the second Sorcerer's copy first, both keeping their targets; Ana
+   takes 5, Ben 3, Cy 2, and a token Infiltrator enters. +1, 31,890 of 31,936 on this stacked branch (round 450 #754); the
+   compiled text of every other card and face is unchanged. The top 5,000 are all supported now.
+   Out after round 451 (looked at, not done): the lists after round 450 (still out, for their reasons): Share the Spoils
+   (Lane B's round B300), Chef's Kiss ("reselect the targets at random": whether the current target is among them, no rule
+   or ruling), Karn Liberated (restarting the game), Secret of Bloodbending and The Dominion Bracelet (controlling another
+   player), Pulmonic Sliver (an optional replacement in the middle of any move to a graveyard), Mastermind's Acquisition and
+   Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: the human's own
+   simultaneous triggers are ordered automatically (no prompt), so Ulalek's may go below another trigger of yours from the
+   same spell; the automatic payment for the Eldrazi spell may tap the colorless sources Ulalek's {C}{C} would need, and a
+   trigger whose payment can't be made isn't asked about; bots always pay, and copy in the order the stack holds.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

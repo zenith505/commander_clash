@@ -3992,6 +3992,8 @@ export interface Resolving {
     wayLeft?: Record<string, number>;
     wayCur?: string;
     wayPick?: string;
+    /** Copy "allYours" (Ulalek, round 451): the abilities are being copied (the spells were). */
+    wayAbilities?: true;
     /** castLinkedCopy: the copy of the exiled card offered to be cast. */
     linkedCopy?: ObjectId;
     /** Effect copyEnchantedCard (Spellweaver Volute): the copy offered to be cast and the card it copies; `cast` once it was cast. */

@@ -309,6 +309,10 @@ export interface Characteristics {
    * Aura can't be attached to it (CR 303.4, 303.4f, 303.4j), and one that is goes to the graveyard (704.5m).
    */
   enchantedOnlyBy: ObjectId[];
+  /** Guardian Beast (round B292): no Aura can become attached to it, while one attached already stays (attachableBy). */
+  noNewAuras?: true;
+  /** Guardian Beast (round B292): players other than its controller can't gain control of it (guardian.ts controlBlocked). */
+  controlLocked?: true;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
@@ -2341,8 +2345,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (e.sourceId !== undefined) c.enchantedOnlyBy = [...c.enchantedOnlyBy, e.sourceId];
       return;
     case "cantBeEnchanted":
+      // Guardian Beast: Auras already attached stay; none can become attached (attachableBy).
+      if (m.newOnly) {
+        c.noNewAuras = true;
+        return;
+      }
       // No object's id is "", so no Aura can enchant it (enchantableBy).
       c.enchantedOnlyBy = [...c.enchantedOnlyBy, ""];
+      return;
+    case "othersCantGainControl":
+      c.controlLocked = true;
       return;
     case "cantBeBlockedByGreaterPower":
     case "cantBlockGreaterPower":
@@ -2921,3 +2933,8 @@ export function mostCommonColors(s: GameState, view: (id: ObjectId) => Character
 
 /** An Aura `auraId` may be attached to a permanent with these characteristics: no other Aura's "can't be enchanted by other Auras" says no. */
 export const enchantableBy = (hc: Characteristics, auraId: ObjectId): boolean => hc.enchantedOnlyBy.every((x) => x === auraId);
+/**
+ * An Aura `auraId` may become attached to a permanent with these characteristics (CR 303.4j): as enchantableBy, and no
+ * "can't be enchanted" that spares the Auras already attached (Guardian Beast, round B292) applies to it.
+ */
+export const attachableBy = (hc: Characteristics, auraId: ObjectId): boolean => enchantableBy(hc, auraId) && !hc.noNewAuras;

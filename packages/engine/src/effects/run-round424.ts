@@ -7,6 +7,7 @@ import { defOf } from "../cards";
 import { freeCastable, log, opponents, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import type { GameState } from "../types";
+import { controlGainable } from "../guardian";
 import type { ResolveCtx } from "./resolve";
 import { counterOnStack } from "./run-spells";
 
@@ -94,6 +95,7 @@ export function runRound424Effect(s: GameState, e: R424Effect, ctx: ResolveCtx, 
       for (const x of g.given) {
         const o = s.objects[x.id];
         if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== x.zc || player(s, x.to).lost) continue;
+        if (!controlGainable(s, [o.id], x.to, src).length) continue; // Guardian Beast (round B292)
         s.effects.push({ id: `e${s.nextId++}`, timestamp, controller: x.to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
         log(s, `${player(s, x.to).name} gains control of ${defOf(s, o).name}.`);
       }

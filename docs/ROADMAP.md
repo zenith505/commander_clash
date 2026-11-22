@@ -4738,8 +4738,8 @@ line blocks.
    identity, CR 903.4; it stays colorless; an object that only gained the ability adds no mana, CR 607.2, rulings;
    CardDef.circledColors, deck.ts circleColors and circledProblem, checked by validateCommanderDeck and createGame).
    A browser test clicks through Etrata's ability on a cloaked Lightning Bolt: exiled, then cast for free at an
-   opponent. +2, 31,863 of 31,936 on this stacked branch (round 442 #736); the compiled text of every other card is
-   unchanged.
+   opponent. +2, 31,863 of 31,936 on this stacked branch (round 442 #736), 31,865 with round 442's head 17779e3 (main
+   aca5d42, B291) merged in; the compiled text of every other card is unchanged.
    Out after round 443 (looked at, not done): Battlefield Thaumaturge and Saruman of Many Colors (still out, as after
    round 442), Titania's Song (still out: whether its effect, continuing until end of turn after it leaves, keeps to the
    artifacts it applied to then), Pulmonic Sliver (still out: a granted optional replacement on every Sliver's move to a

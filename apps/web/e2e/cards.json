@@ -24108,6 +24108,73 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e71ac446-02a4-4468-8d29-f28b21617665",
+  "name": "Havengul Laboratory // Havengul Mystery",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land // Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{4}, {T}: Investigate. (Create a colorless Clue artifact token with \"{2}, Sacrifice this artifact: Draw a card.\")\nAt the beginning of your end step, if you sacrificed three or more Clues this turn, transform Havengul Laboratory.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Investigate",
+   "Transform"
+  ],
+  "producedMana": [
+   "B",
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2022-03-03",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Havengul Laboratory",
+    "manaCost": "",
+    "typeLine": "Legendary Land",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "{T}: Add {C}.\n{4}, {T}: Investigate. (Create a colorless Clue artifact token with \"{2}, Sacrifice this artifact: Draw a card.\")\nAt the beginning of your end step, if you sacrificed three or more Clues this turn, transform Havengul Laboratory.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/front/8/2/823b019e-10c0-4712-8167-d4f37a71e782.jpg?1783923615",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/8/2/823b019e-10c0-4712-8167-d4f37a71e782.jpg?1783923615"
+   },
+   {
+    "name": "Havengul Mystery",
+    "manaCost": "",
+    "typeLine": "Legendary Land",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "When this land transforms into Havengul Mystery, return target creature card from your graveyard to the battlefield.\nWhen the creature put onto the battlefield with Havengul Mystery leaves the battlefield, transform Havengul Mystery.\n{T}, Pay 1 life: Add {B}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/8/2/823b019e-10c0-4712-8167-d4f37a71e782.jpg?1783923615",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/8/2/823b019e-10c0-4712-8167-d4f37a71e782.jpg?1783923615"
+   }
+  ]
+ },
+ {
   "oracleId": "1fb02bad-0d1f-437f-a269-f51cc19b280f",
   "name": "Havengul Lich",
   "manaCost": "{3}{U}{B}",
@@ -50589,6 +50656,44 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dcd97730-b793-4c0c-b158-625ac3656b4a",
+  "name": "Taskmaster, Mercenary Mimic",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Mercenary Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Mercenary",
+   "Villain"
+  ],
+  "oracleText": "Photographic Reflexes — At the beginning of your first main phase, until your next turn, Taskmaster becomes a copy of up to one target creature on the battlefield or creature card in a graveyard, except his name is Taskmaster, Mercenary Mimic and he's a legendary Human Mercenary Villain creature.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Photographic Reflexes"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -50,6 +50,7 @@ import { roundB291Line } from "./laneb291-lines";
 import { roundB292Line } from "./laneb292-lines";
 import { roundB293Line } from "./laneb293-lines";
 import { roundB295Line } from "./laneb295-lines";
+import { roundB296Line } from "./laneb296-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -2567,6 +2568,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB293Line(line, out, isSpell)) continue;
     // Nick Fury, Agent of S.H.I.E.L.D. (round B295).
     if (roundB295Line(line, out, isSpell)) continue;
+    // Havengul Laboratory // Havengul Mystery, Taskmaster, Mercenary Mimic (round B296).
+    if (roundB296Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

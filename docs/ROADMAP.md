@@ -779,7 +779,7 @@ line blocks.
    Yamazaki); "switch the power and toughness of each of up to two / any number of target creatures" (Invert // Invent
    with "an instant card and/or a sorcery card", Inversion Behemoth); "each creature you control that didn't attack or
    enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
-   Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
+   Out after round 206 (looked at, not done): Havengul Laboratory (done in round B296) (its back face's "the creature put onto the
    battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist (done in round 300) ("remove all
    counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Sivitri, Dragon Master (done in round 302) (an attack tax paid in life), Obsidian Charmaw (done in round 367) ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
@@ -3812,7 +3812,7 @@ line blocks.
    is now, and cast Maralen's cards for free. Browser tests click through Lazav's copy, Quintorius's target, sacrifice and
    free cast, and Maralen's free cast. +3, 31,660 of 31,936 on this stacked branch. The compiled text of every other card is
    unchanged.
-   Out after round 406 (looked at, not done): Taskmaster, Mercenary Mimic ("up to one target creature on the battlefield or
+   Out after round 406 (looked at, not done): Taskmaster, Mercenary Mimic (done in round B296) ("up to one target creature on the battlefield or
    creature card in a graveyard" with "he's a legendary Human Mercenary Villain creature" and no rulings on which types it
    keeps); Niko, Light of Hope (done in round 426) ("until the next end step" copies); Abstruse Appropriation, Jasmine Boreal of the Seven (done in round 426),
    Pulmonic Sliver, Filigree Vector (done in round B280), Wayta, Trainer Prodigy, Guff Rewrites History, Sunken Palace, Ulalek, Surge to Victory,
@@ -3835,7 +3835,7 @@ line blocks.
    rulings yet). Browser tests click through the Flood's target, Grub's blight pick and the token's attack choice,
    Optimus's bolster and convert, and Find New Host from the graveyard with the gained trigger's pick. +4, 31,664 of 31,936
    on this stacked branch. The compiled text of every other card is unchanged.
-   Out after round 407 (looked at, not done): Havengul Laboratory // Havengul Mystery (its back face's link to "the creature
+   Out after round 407 (looked at, not done): Havengul Laboratory // Havengul Mystery (done in round B296) (its back face's link to "the creature
    put onto the battlefield with ~" across transforming, no rulings), Taskmaster, Niko, Abstruse Appropriation, Pulmonic
    Sliver, Filigree Vector (done in round B280), Wayta, Trainer Prodigy and the rest of `npm run popular` above rank 15,000 (still out, for the
    reasons in their earlier lists).
@@ -11963,6 +11963,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B296 (least played first, two cards off the skip lists, neither in Lane A's rounds 444-445; Flamewar was left to
+  round 445 and Starrix was already done in round 442): Havengul Laboratory // Havengul Mystery's "When the creature put onto
+  the battlefield with ~ leaves the battlefield, transform ~." (out after rounds 206 and 407): linked to the back face's
+  "When this land transforms into Havengul Mystery, return target creature card from your graveyard to the battlefield."
+  (CR 607.2c; Effect putWithLink, GameState.putWith, by the land's id and zone changes), both printed on the same card, so
+  the link holds whichever face is up (CR 607.1b) while the land stays the same object (CR 400.7); it triggers when that
+  creature leaves for any zone with Mystery's face up (CR 603.10a; TriggeredAbility.dies putWithSelf) and transforms it
+  only if it hasn't transformed since (CR 701.27f). Taskmaster, Mercenary Mimic's "Photographic Reflexes — At the beginning
+  of your first main phase, until your next turn, ~ becomes a copy of up to one target creature on the battlefield or
+  creature card in a graveyard, except his name is ~ and he's a legendary Human Mercenary Villain creature." (out after
+  rounds 406 and 425): one target from either zone (TargetSpec.orCard, the "From a graveyard" button), a card copied as
+  printed (CR 707.2); the exception isn't "in addition to its other types" (CR 205.1b), so it sets them (CR 205.1a, 707.9b):
+  creature only (a copy of an artifact creature isn't an artifact), Human Mercenary Villain instead of the copied creature
+  types, a changeling's every creature type not copied (CR 707.9d; CopyExcept setSubtypes now drops it for every card that
+  sets creature types), and legendary in addition to any supertypes copied, like snow (CR 205.4b; rulings on Machine God's
+  Effigy, Benthic Anomaly). Browser tests: Havengul Laboratory transforms, returns Grizzly Bears, which dies to Murder and
+  turns it back; Taskmaster copies Ana's Serra Angel card from her graveyard, then her Ornithopter. +2, 31,877 of 31,936
+  with main f277baf (through round 444) and B293-B295. The compiled text of every other card is unchanged.
+- Out after round B296 (looked at, not done): the lists after round B295 stay out; about 65 unsupported cards remain, all
+  of them hard. Known gap: bots pick Taskmaster's target as they pick any copy target, not weighing that it ends at their
+  next turn.
 - Round B295 (least played first, two cards off the skip lists, neither in Lane A's rounds 443-444): Harold and Bob, First
   Numens's "When ~ dies, if it was a creature, return it to the battlefield. It's an Aura enchantment with enchant Forest you
   control and "Enchanted Forest has '{T}: Add three mana of any one color. You get two rad counters.'" ~ loses all other

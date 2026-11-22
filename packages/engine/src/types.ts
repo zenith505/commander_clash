@@ -2464,6 +2464,11 @@ export interface GameState {
    * leaves trigger).
    */
   animated?: Record<string, { id: ObjectId; zc: number }>;
+  /**
+   * Havengul Mystery (round B296): the objects a permanent's ability put onto the battlefield, by `${its id}@${its zone
+   * changes}`, for its "the creature put onto the battlefield with ~" (CR 607.2c); every one of them, if it put more than one.
+   */
+  putWith?: Record<string, { id: ObjectId; zc: number }[]>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   /** Cursecloth Wrappings: "Target creature card in your graveyard gains embalm until end of turn. The embalm cost is equal to its mana cost.": that card, while it's the same object, has the keyword ability with its own mana cost until the cleanup step (CR 514.2). */
   yardKeywordGrants?: { id: ObjectId; zc: number; keyword: "Embalm" | "Encore" | "Unearth"; /** Ghost Ark's "unearth {3}": this cost, not the card's mana cost. */ cost?: string }[];

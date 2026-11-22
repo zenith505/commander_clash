@@ -3,7 +3,7 @@ import { exiledWithNamed } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type BendKind, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
-import { abilitiesOf, borrowedTriggersOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, pairedWith, power, toughness } from "../cards";
+import { abilitiesOf, borrowedTriggersOf, cardIdOf, castCardAs, defOf, NO_ABILITIES, withGranted, describeAbility, gainedInExileNow, objIsType, pairedWith, power, toughness } from "../cards";
 import { whileTappedHolds, checkAscend, isEmerge, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, spellHasFlash, conspireGranted, casualtyGranted, inCombatPhase, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, modeRange, withModes } from "../modes";
@@ -784,7 +784,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (player(s, pid).lost) continue;
       for (const id of player(s, pid).exile) {
         const o = obj(s, id);
-        if (o.faceDown || o.owner !== pid || !compileCard(defOf(s, o)).triggers.some((t) => t.zone === "exile")) continue;
+        // Cosima, God of the Voyage (round 445): a triggered ability it gained in exile works there too (CR 113.6k).
+        if (o.faceDown || o.owner !== pid || !(compileCard(defOf(s, o)).triggers.some((t) => t.zone === "exile") || gainedInExileNow(o).length)) continue;
         fromExile = true;
         try {
           f(o, pid);
@@ -945,6 +946,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
+    // Cosima's gained "Whenever a land you control enters, if Cosima is exiled" (round 445): a card in exile (CR 113.6k).
+    fromExiled(entersWatch);
     fromEmblems(entersWatch);
     // "This turn, whenever a creature or enchantment you control enters" (Rite of Harmony; CR 603.7b).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, src, entering, ctrl), triggers, undefined, entering));

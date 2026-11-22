@@ -340,6 +340,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const theirs = gone.filter((id) => controllerOf(s, obj(s, id)) !== pid).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       return [{ type: "chooseMay", player: pid, yes: player(s, pid).life - 13 >= 7 && theirs >= ours + 4 }];
     }
+    // Cosima, God of the Voyage (round 445): exiled at our upkeep for the voyage, unless it's our commander (it would go to
+    // the command zone, CR 903.9a, and lose the ability it gains); then a voyage counter for each land until it has three,
+    // and back it comes with them, drawing as many (sooner with few cards left in the library).
+    const voyageMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "chooseMay" && voyageMay?.type === "may" && voyageMay.effects.length === 1 && voyageMay.effects[0]!.type === "exile" && s.resolving!.body.effects[s.resolving!.next + 1]?.type === "if" && allEffects(s.resolving!.body.effects).some((e) => e.type === "gainInExile")) {
+      const me = s.resolving!.item.sourceId ? s.objects[s.resolving!.item.sourceId] : undefined;
+      return [{ type: "chooseMay", player: pid, yes: !!me && !me.isCommander && !me.isToken }];
+    }
+    if (pend.kind === "chooseMay" && voyageMay?.type === "exiledSelfCounterOrReturn") {
+      const n = pend.card !== undefined ? (s.objects[pend.card]?.counters[voyageMay.counter] ?? 0) : 0;
+      return [{ type: "chooseMay", player: pid, yes: n < 3 && player(s, pid).library.length > n + 5 }];
+    }
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
@@ -7820,6 +7832,28 @@ function animusPlan(s: GameState, pid: PlayerId, id: ObjectId, i: number, ab: Ac
   return best ? planActivate(s, pid, id, i, [{ kind: "object", id: best.c.id }, { kind: "object", id: best.card.id }]) : null;
 }
 
+/**
+ * Flamewar, Brash Veteran (round 445). "{1}, Discard your hand: Put all exiled cards you own with intel counters on them into
+ * your hand.": in our second main phase with the stack empty, once that's at least two more cards than the hand we'd give
+ * up (as for Hoarder's Overflow). "Sacrifice another artifact: Put a +1/+1 counter on ~ and convert it.": in our first main
+ * phase with the stack empty, for a noncreature artifact token (a Treasure, Clue or Food), so it attacks as the menace and
+ * deathtouch Vehicle and exiles intel cards; never a nontoken artifact. Undefined for any other ability, null for no plan.
+ */
+function flamewarPlan(s: GameState, pid: PlayerId, o: GameObject, i: number, ab: ActivatedAbility): Action[] | null | undefined {
+  const fx = ab.body.effects;
+  const main = (step: string) => s.activePlayer === pid && s.step === step && !s.stack.length;
+  if (fx.length === 1 && fx[0]!.type === "exiledWithCounterToHand") {
+    const counter = fx[0]!.counter;
+    const back = player(s, pid).exile.filter((x) => obj(s, x).owner === pid && (obj(s, x).counters[counter] ?? 0) > 0).length;
+    return main("main2") && back >= player(s, pid).hand.length + 2 ? planActivate(s, pid, o.id, i) : null;
+  }
+  const sac = ab.costs?.length === 1 ? ab.costs[0]! : undefined;
+  if (fx.length !== 2 || fx[0]!.type !== "counters" || fx[1]!.type !== "transform" || !fx[1]!.convert || sac?.kind !== "sacrifice" || !sac.other) return undefined;
+  if (!main("main1")) return null;
+  const token = s.battlefield.map((x) => obj(s, x)).find((x) => x.id !== o.id && x.isToken && controllerOf(s, x) === pid && objIsType(s, x, "Artifact") && !objIsType(s, x, "Creature") && objectMatches(s, sac.filter, x, pid, false) && canSacrificeForCost(s, x));
+  return token ? planActivate(s, pid, o.id, i, undefined, undefined, undefined, undefined, { sacrifice: [token.id] }) : null;
+}
+
 function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility, o: GameObject) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -7848,6 +7882,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (copy0?.type === "becomeCopy" && copy0.of.ref === "target" && ab.body.targets[copy0.of.index]?.exiledWithCounter) {
         const plan = animusPlan(s, pid, id, i, ab);
         if (plan) return plan;
+        continue;
+      }
+      // Flamewar, Brash Veteran (round 445): its cards with intel counters back for our hand, and its convert for a token
+      // artifact we don't need (flamewarPlan).
+      const fw = flamewarPlan(s, pid, o, i, ab);
+      if (fw !== undefined) {
+        if (fw) return fw;
         continue;
       }
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.

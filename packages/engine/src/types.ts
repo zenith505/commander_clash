@@ -641,6 +641,8 @@ export interface GameObject {
     creatureOnly?: true;
     /** Arvinox, the Mind Flail (round 439): "you may cast permanent spells from among them": only as an artifact, battle, creature, enchantment or planeswalker spell (CR 110.4b, 601.3e). */
     permanentOnly?: true;
+    /** The Omenkeel (round 445): "You may play lands from among those cards": only played as a land, never cast (CR 305.1). */
+    landOnly?: true;
     /** Airbend's "by paying {2} rather than paying its mana cost" (CR 701.65a): an alternative cost, the only way. */
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
@@ -969,6 +971,11 @@ export interface GameObject {
   suspendHaste?: PlayerId;
   /** "If it doesn't have suspend, it gains suspend" (Delay, Jhoira of the Ghitu): it has suspend while it's this object, by its zone changes (CR 702.62, 400.7). */
   gainedSuspend?: number;
+  /**
+   * Cosima, God of the Voyage (round 445): the triggered abilities it gained in exile (Effect gainInExile), for as long as
+   * it stays there as the object it was then (`zc`, CR 400.7); see cards.ts abilitiesOf.
+   */
+  gainedInExile?: { zc: number; texts: string[] };
   /**
    * Alaundo the Seer (round B279): it gained "When the last time counter is removed from this card, if it's exiled, you may
    * cast it without paying its mana cost. If you cast a creature spell this way, it gains haste until end of turn." while
@@ -3431,6 +3438,8 @@ export interface Resolving {
     castRevealedAsked?: true;
     /** Etrata, Deadly Fugitive (round 443): its exiled card's cast was asked about (effects/run-round443.ts). */
     exileSelfCastAsked?: true;
+    /** Cosima, God of the Voyage's gained ability (round 445): 1 once it has returned (then `x` cards are drawn), 2 once the draw has begun. */
+    voyage?: { step: number; x: number };
     /** Effect "revealTopCounterSharing" (Swindler's Scheme, round 424): the card revealed and whether its caster was asked. */
     scheme?: { id: ObjectId; zc: number; asked?: true };
     /** Effect "giveEachToDifferentOpponent" (Dack Fayden, Helping Hand, round 424): the permanents still to give, in order, and the opponent each one given so far goes to. */

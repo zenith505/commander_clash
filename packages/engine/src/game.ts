@@ -25,6 +25,7 @@ import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
+import { lingerOnLeaving } from "./effects/run-laneb293";
 import { costExileLinksAcrossFaces, olagCandidates, olagCopyChosen } from "./effects/run-round435";
 import { sharedFateInstead } from "./effects/run-laneb282";
 import { cycloneDone, cycloneFor, cycloneInstead } from "./effects/run-laneb286";
@@ -1398,6 +1399,8 @@ export function moveObject(
     const enchanted = o.enchantsCard && host && host.id === o.enchantsCard.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === o.enchantsCard.zc ? { enchantsCard: { ...o.enchantsCard } } : {};
     (s.lastKnown ??= {})[id] = { ...enchanted, zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.name !== undefined ? { chosenName: o.chosen.name } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
+  // Titania's Song (round B293): an effect that goes on to the end of the turn once its source leaves the battlefield.
+  if (fromZone === "battlefield" && hadAbilities) lingerOnLeaving(s, o, last);
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
   if (merged) {
@@ -1575,7 +1578,9 @@ export function moveObject(
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
     for (const e of s.effects) e.affected = e.affected.filter((x) => x !== id);
     // "For as long as ~ remains tapped": it isn't tapped anymore (rulings on Vedalken Shackles).
-    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id && e.whileControlled?.id !== id);
+    // A stored effect for a group (ContinuousEffect.group) has no fixed objects and stays (round B293: it used to end here
+    // whenever any permanent left the battlefield).
+    s.effects = s.effects.filter((e) => (e.group || e.affected.length) && e.whileTapped?.id !== id && e.whileControlled?.id !== id);
     for (const other of s.battlefield)
       if (s.objects[other]!.attachedTo === id) {
         s.objects[other]!.attachedTo = undefined;

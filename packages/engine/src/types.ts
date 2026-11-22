@@ -3155,6 +3155,8 @@ export interface Resolving {
   powerBefore?: number;
   /** Cyclonus, Cybertronian Fighter: "convert it. If you do, ...": a transform effect turned a permanent over this resolution. */
   transformedThisWay?: true;
+  /** Soundwave, Sonic Spy (round B293): "You may cast the copy without paying its mana cost. If you do, ...": a castFromAmong of this resolution cast a spell. */
+  castAmongCast?: true;
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
   /** The permanents a flicker returned to the battlefield (Splash Portal's "if that creature is ..."). */

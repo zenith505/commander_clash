@@ -11896,6 +11896,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B293 (least played first, two cards off the skip lists, neither in Lane A's rounds 442-443): Titania's Song's "Each
+  noncreature artifact loses all abilities and becomes an artifact creature with power and toughness each equal to its mana
+  value. If this enchantment leaves the battlefield, this effect continues until end of turn." (out after round B172): one
+  static ability on every player's noncreature artifacts, as March of the Machines's (an artifact creature that keeps its
+  other types, CR 205.1b; layers 4, 6 and 7b, the set fixed in layer 4 for the later layers, CR 613.6), not locked in (CR
+  611.3a). As it leaves the battlefield with the ability, the same effect goes on until the cleanup step (CR 514.2) with the
+  Song's timestamp (CR 613.7a), still not locked in: CR 611.2c, which locks in the objects an effect changes, is only about
+  effects of resolving spells and abilities, and no ruling says otherwise, so an artifact that enters afterwards that turn
+  is affected too (StaticAbility.lingers, run-laneb293.ts lingerOnLeaving, a ContinuousEffect.group). Found on the way: a
+  stored effect for a group (Autumn's Veil, The Akroan War and the other "this turn" or "until your next turn" rules effects for a group) ended whenever
+  any permanent left the battlefield (game.ts moveObject dropped every effect with no fixed objects); it now lasts as long as
+  it says. Soundwave, Sonic Spy's "Whenever one or more creature tokens you control deal combat damage to a player, exile
+  target instant or sorcery card with mana value equal to the damage dealt from their graveyard. Copy it. You may cast the
+  copy without paying its mana cost. If you do, convert Soundwave." (out after round B193): one trigger for each player
+  dealt damage, the amount the damage the tokens dealt that player (rulings: exactly that mana value), the target in that
+  player's graveyard, chosen as it's put on the stack and checked as it resolves (CR 603.3d, 608.2b); the copy cast as it
+  resolves or never (CR 608.2g, 704.5e), and Soundwave converts only if it was cast (IfCond castAmongThisWay; CR 701.28).
+  Browser test: two creature tokens deal 3 to Ana, only her Divination (not her Night's Whisper or Ben's Divination) is
+  offered, the copy is cast and Soundwave converts. +2, 31,865 of 31,936 on B292's branch (main through round 441 and
+  B291). The compiled text of every other card is unchanged.
+- Out after round B293 (looked at, not done): the lists after round B292 stay out. Spy Kit (every check of a name in the
+  engine would have to know every nonlegendary creature card's name), Pulmonic Sliver (a "you may" in the middle of a zone
+  move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (the division of damage is
+  announced before the cost picks the Equipment whose mana value is the amount, CR 601.2d, 601.2h), Ghostly Flame (its
+  rulings make damage colorless only for some checks: protection and prevention, not "a red spell deals damage"
+  triggers), Shaman's Trance (every "your graveyard" permission would have to reach other players' graveyards) and
+  Yixlid Jailer were looked at again and stay out. Judgment calls and known gaps: Titania's Song that has lost its
+  abilities as it leaves (Mycosynth Lattice makes it a noncreature artifact, so its own effect takes them away) leaves no
+  effect behind, the "continues" being part of the ability it no longer has; bots don't weigh Titania's Song against their
+  own artifacts.
 - Round B292 (least played first, two cards off the skip lists, neither in Lane A's rounds 441-442): Balduvian Shaman's "{T}:
   Change the text of target white enchantment you control that doesn't have cumulative upkeep by replacing all instances of
   one color word with another. That enchantment gains "Cumulative upkeep {1}."" (out after round 281): Sleight of Mind's text

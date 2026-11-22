@@ -2481,6 +2481,12 @@ export interface StaticAbility {
    * nonland cards they own outside the battlefield too (layers.ts offFieldColored).
    */
   offFieldColorsYours?: true;
+  /**
+   * Titania's Song (round B293): "If ~ leaves the battlefield, this effect continues until end of turn": as its source
+   * leaves the battlefield with the ability, the same effect goes on to the end of the turn, not locked in (CR 611.3a), with
+   * its source's timestamp (CR 613.7a) (laneb293.ts lingerOnLeaving).
+   */
+  lingers?: "endOfTurn";
 }
 
 /**
@@ -6845,6 +6851,8 @@ export type SpellCondition =
   | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
   /** Cyclonus, Cybertronian Fighter: "convert it. If you do, ...": the transform just before turned it over (CR 701.27, 701.28). */
   | { kind: "transformedThisWay" }
+  /** Soundwave, Sonic Spy (round B293): "You may cast the copy ... If you do, ...": the castFromAmong just before cast a spell (ResolvingState.castAmongCast). */
+  | { kind: "castAmongThisWay" }
   /** Inferno of the Star Mounts: "When its power becomes 20 this way": the continuous effect before (with `notePower`) changed ~'s power from something else to exactly `n` (rulings: not 21 or more, not another way). */
   | { kind: "powerBecame"; n: number }
   /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */

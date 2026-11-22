@@ -1854,6 +1854,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${you.name} loses ${e.castLoseLife} life (${src}).`);
           loseLife(s, you.id, e.castLoseLife);
         }
+        // Soundwave, Sonic Spy (round B293): "If you do, convert ~": one was cast this way (IfCond castAmongThisWay).
+        if (st.cast && s.resolving) s.resolving.castAmongCast = true;
         // Yennett: none cast, so you draw (the card revealed, still on top: rulings).
         if (e.noneCastDraw && !st.cast) draw(s, you.id, e.noneCastDraw);
         if (!e.rest) return;

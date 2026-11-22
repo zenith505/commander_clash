@@ -145,6 +145,7 @@ import {
   autoEvidence,
   evidenceCandidates,
   evidenceValue,
+  evidenceMeasure,
   targetedPermanentsMv,
   bothModes,
   teamworkCandidates,
@@ -499,7 +500,7 @@ type CastDraft = {
  */
 /** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
 type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[]; single?: boolean } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
-type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean; /** The Capitoline Triad: its own words, not collecting evidence. */ title?: string } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
+type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean; /** The Capitoline Triad: its own words, not collecting evidence. */ title?: string; /** Baron Helmut Zemo (round B299): counted in mana symbols of this color among the cards' mana costs. */ symbols?: Color } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
 type CostOrPick = { draft: CastDraft; label: string; options: string[] };
@@ -966,7 +967,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "collectEvidence") {
         // "Collect evidence 3": click cards in your graveyard until their mana values add up (CR 701.59a).
         if (d.collect !== undefined) continue;
-        return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN, undefined, [], c.filter), optional: false, ...(c.notEvidence && c.filter ? { title: `exile ${c.filter.text}s from your graveyard with total mana value ${c.n} or more` } : {}) });
+        return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN, undefined, [], c.filter), optional: false, ...(c.notEvidence && c.filter ? { title: `exile ${c.filter.text}s from your graveyard with ${evidenceMeasure(c.n, c.symbols)}` } : {}), ...(c.symbols ? { symbols: c.symbols } : {}) });
       }
       if (c.kind === "craft") {
         // Craft's materials (CR 702.167a): click permanents you control and/or cards in your graveyard that fit.
@@ -2424,6 +2425,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               s={s}
               title={evidencePick.title ? `${evidencePick.label}: ${evidencePick.title}` : `${evidencePick.label}: ${evidencePick.optional ? "you may collect" : "collect"} evidence ${evidencePick.n}, exiling cards with total mana value ${evidencePick.n} or more from your graveyard`}
               n={evidencePick.n}
+              {...(evidencePick.symbols ? { symbols: evidencePick.symbols } : {})}
               cards={evidencePick.candidates}
               onHover={setHover}
               onDone={(ids) => {
@@ -2637,7 +2639,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal" && c.orControl) return `${c.warped ? "choose" : "behold"} ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
-  if (c.kind === "collectEvidence") return c.notEvidence && c.filter ? `exile ${c.filter.text}s with total mana value ${c.n} or more from your graveyard` : `collect evidence ${c.n}`;
+  if (c.kind === "collectEvidence") return c.notEvidence && c.filter ? `exile ${c.filter.text}s with ${evidenceMeasure(c.n, c.symbols)} from your graveyard` : `collect evidence ${c.n}`;
   if (c.kind === "putCounter") return counterOnWhat(c);
   if (c.kind === "mill") return c.exile ? `exile the top ${c.n === 1 ? "card" : `${c.n} cards`} of your library` : `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
@@ -3407,6 +3409,7 @@ function EvidenceChoice({
   s,
   title,
   n,
+  symbols,
   cards,
   onHover,
   onDone,
@@ -3416,6 +3419,8 @@ function EvidenceChoice({
   s: GameState;
   title: string;
   n: number;
+  /** Baron Helmut Zemo (round B299): the total counts mana symbols of this color, not mana values. */
+  symbols?: Color;
   cards: string[];
   onHover: (d: CardDef | null) => void;
   onDone: (ids: string[]) => void;
@@ -3424,13 +3429,13 @@ function EvidenceChoice({
   onCancel?: () => void;
 }) {
   const [chosen, setChosen] = useState<string[]>([]);
-  const total = evidenceValue(s, chosen);
+  const total = evidenceValue(s, chosen, symbols);
   return (
     <div className="modal-backdrop">
       <div className="modal evidence-pick">
         <header>
           <strong>{title}</strong>
-          <span className="muted"> total mana value {total} of {n}</span>
+          <span className="muted" data-evidence-total={total}> {symbols ? `${{ W: "white", U: "blue", B: "black", R: "red", G: "green" }[symbols]} mana symbols` : "total mana value"} {total} of {n}</span>
           <button disabled={total < n} onClick={() => onDone(chosen)}>
             Done
           </button>
@@ -5517,6 +5522,8 @@ function AbilityMenu({
               <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
               {x.mills ? "add one mana for each colored mana symbol in the milled card's mana cost" : x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
+              {/* Snowfall (round B298): the part a triggered mana ability adds with a spending restriction. */}
+              {x.limited ? <span data-limited={x.limited.map((l) => l.mana).join("")}> ({x.limited.map((l) => `{${l.mana}}`).join("")}: {x.limited[0]!.spend.text.replace(/^Spend this mana only /, "only ").replace(/\.$/, "")})</span> : null}
               {/* Rhystic Cave (round B254): each other player may pay to stop it. */}
               {ab.unlessAnyPays ? (
                 <>

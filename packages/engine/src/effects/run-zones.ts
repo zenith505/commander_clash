@@ -1554,6 +1554,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!enough && ids.length) log(s, `${you.name} exiled fewer than ${e.minDug} cards this way, so they can't cast any of them.`);
         sc.castAmong = { ids, declined: [], ...(enough ? {} : { max: 0 }) };
       }
+      // Baron Helmut Zemo (round B299): the cards its cost exiled, those still in exile as those objects (CR 400.7).
+      if (!sc.castAmong && e.fromCost) sc.castAmong = { ids: (s.resolving!.item.costExiled ?? []).filter((x) => s.objects[x.id]?.zone === "exile" && (s.objects[x.id]!.zoneChanges ?? 0) === x.zc), declined: [] };
       if (!sc.castAmong && e.fromExiledThisWay) sc.castAmong = { ids: [...new Set(s.resolving!.exiledCards ?? [])].filter((id) => s.objects[id]?.zone === "exile").map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       if (!sc.castAmong && e.pushLuck !== undefined) {
         // Dance with Calamity: one card at a time, looked at before deciding to go on (rulings), a card's mana value with

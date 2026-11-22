@@ -3379,6 +3379,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f779754a-3de9-4621-b190-cf32949da0e8",
+  "name": "Ashenmoor Liege",
+  "manaCost": "{1}{B/R}{B/R}{B/R}",
+  "cmc": 4,
+  "typeLine": "Creature — Elemental Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Knight"
+  ],
+  "oracleText": "Other black creatures you control get +1/+1.\nOther red creatures you control get +1/+1.\nWhenever this creature becomes the target of a spell or ability an opponent controls, that player loses 4 life.",
+  "power": "4",
+  "toughness": "1",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "67d66678-a8e6-4f80-bade-1f1daf4b0610",
   "name": "Ashiok, Wicked Manipulator",
   "manaCost": "{3}{B}{B}",
@@ -4619,6 +4652,43 @@
   "commanderLegal": "legal",
   "set": "mmq",
   "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0fe6c042-1182-4392-8938-fee36149d74f",
+  "name": "Baron Helmut Zemo",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Noble Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Noble",
+   "Villain"
+  ],
+  "oracleText": "Whenever you cast a black spell from your hand, Baron Helmut Zemo connives.\nBoast — Exile any number of black cards from your graveyard with fifteen or more black mana symbols among their mana costs: Copy those exiled cards. You may cast up to three of the copies without paying their mana costs. (Activate only if this creature attacked this turn and only once each turn.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Boast",
+   "Connive"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14288,6 +14358,32 @@
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fd74f8eb-0253-42dd-8277-186d4934da38",
+  "name": "Dismember",
+  "manaCost": "{1}{B/P}{B/P}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "({B/P} can be paid with either {B} or 2 life.)\nTarget creature gets -5/-5 until end of turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soa",
+  "releasedAt": "2026-04-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -36030,6 +36126,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "94a844d2-0574-45a7-b347-e0e329767c42",
+  "name": "Necropotence",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Skip your draw step.\nWhenever you discard a card, exile that card from your graveyard.\nPay 1 life: Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "wot",
+  "releasedAt": "2023-09-08",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
+ },
+ {
   "oracleId": "9d637892-26d7-46f1-bd7d-89bda523f649",
   "name": "Necrotic Plague",
   "manaCost": "{2}{B}{B}",
@@ -39311,6 +39433,39 @@
   "set": "tmp",
   "releasedAt": "1997-10-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "41820f91-27cf-41c0-bb5e-9adf6845a6a4",
+  "name": "Phyrexian Obliterator",
+  "manaCost": "{B}{B}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Phyrexian Horror",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Horror"
+  ],
+  "oracleText": "Trample\nWhenever a source deals damage to this creature, that source's controller sacrifices that many permanents of their choice.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -47089,6 +47244,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dd05294b-2c5b-48c2-a9f6-8a528baa3dff",
+  "name": "Sludge Crawler",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Eldrazi Drone",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Drone"
+  ],
+  "oracleText": "Devoid (This card has no color.)\nIngest (Whenever this creature deals combat damage to a player, that player exiles the top card of their library.)\n{2}: This creature gets +1/+1 until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Devoid",
+   "Ingest"
+  ],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "71d2a0fe-5426-4fa3-85a4-564c37184996",
   "name": "Smelting Vat",
   "manaCost": "{4}",
@@ -47289,6 +47476,37 @@
   "commanderLegal": "legal",
   "set": "khm",
   "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5ffed544-1656-4753-ac8f-ad8fb4442c7f",
+  "name": "Snowfall",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {U} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhenever an Island is tapped for mana, its controller may add an additional {U}. If that Island is snow, its controller may add an additional {U}{U} instead. Spend this mana only to pay cumulative upkeep costs.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

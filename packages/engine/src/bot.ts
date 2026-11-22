@@ -4220,6 +4220,14 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
       out.push(worst(s, pid, pool));
       continue;
     }
+    // The Myriad Pools (round 441): not a copy of a legendary spell, whose legend rule would cost us one as it resolves
+    // (the spell just cast is the top one on the stack as its trigger's target is chosen).
+    const ofSpell = copies.some((e) => e.of.ref === "castSpell" && e.what.ref === "target" && e.what.index === i);
+    const topSpell = ofSpell ? [...s.stack].reverse().find((x) => x.kind === "spell" && x.controller === pid && x.objectId) : undefined;
+    if (ofSpell && spec.optional && (!topSpell || characteristics(s, obj(s, topSpell.objectId!)).supertypes.includes("Legendary"))) {
+      out.push({ kind: "none" });
+      continue;
+    }
     out.push(copying ? worst(s, pid, pool) : best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));
   }
   // Only "up to" targets, none of them worth choosing: not worth doing.

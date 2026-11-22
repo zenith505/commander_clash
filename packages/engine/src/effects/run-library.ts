@@ -617,7 +617,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const me = e.selfDamage && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (me?.zone === "battlefield" && n > 0) {
         const dealt = dealDamage(s, objectSource(s, me), { object: me }, n);
-        if (dealt) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false });
+        if (dealt) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false, hits: [me.id] });
       }
       if (!e.life || n <= 0) return;
       const inst = e.life.instead && staticConditionNow(s, e.life.instead.cond, ctx.sourceId ?? "", ctx.controller, ctx.event?.player, undefined, ctx.sourceZc);

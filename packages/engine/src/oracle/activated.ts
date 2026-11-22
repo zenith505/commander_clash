@@ -655,9 +655,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // target is when the cost is worked out (CR 601.2f).
     const lessTarget = / This ability costs \{(\d+)\} less to activate if it targets (?:an? )?([^.]+)\.$/.exec(effectText);
     if (lessTarget && !costLess && !costLessIf && !costLessIfTarget) {
-      const filter = parseTargetPhrase(lessTarget[2]!);
+      // Wayta, Trainer Prodigy (round 441): "if it targets two creatures you control": two of its targets are, as they are
+      // when the cost is worked out (CR 601.2f).
+      const two = /^two (creatures you control)$/.exec(lessTarget[2]!);
+      const filter = parseTargetPhrase(two ? "creature you control" : lessTarget[2]!);
       if (filter?.kind !== "object") return "fail";
-      costLessIfTarget = { n: Number(lessTarget[1]), filter: { ...filter, text: lessTarget[2]! } };
+      costLessIfTarget = { n: Number(lessTarget[1]), filter: { ...filter, text: two ? two[1]! : lessTarget[2]! }, ...(two ? { count: 2 } : {}) };
       effectText = effectText.slice(0, lessTarget.index);
       found = true;
     }

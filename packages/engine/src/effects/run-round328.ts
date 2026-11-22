@@ -1,7 +1,7 @@
 // Round 328's effects.
 import type { Effect } from "../abilities";
 import { objIsType, power } from "../cards";
-import { dealDamageBatch, objectSource, type DamageEvent } from "../damage";
+import { dealDamageBatch, hitsBy, objectSource, type DamageEvent } from "../damage";
 import { controllerOf } from "../layers";
 import { log, nameOf } from "../game";
 import type { GameState, ObjectId } from "../types";
@@ -36,8 +36,9 @@ export function runRound328Effect(s: GameState, e: R328Effect, ctx: ResolveCtx, 
       const source = objectSource(s, from);
       const events: DamageEvent[] = among.flatMap((o) => ((parts![o.id] ?? 0) > 0 ? [{ src: source, to: { object: o.id as ObjectId }, n: parts![o.id]! }] : []));
       if (!events.length) return;
-      const dealt = dealDamageBatch(s, events).reduce((a, d) => a + d.dealt, 0);
-      if (dealt) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
+      const results = dealDamageBatch(s, events);
+      const dealt = results.reduce((a, d) => a + d.dealt, 0);
+      if (dealt) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false, hits: hitsBy(results, from.id) });
       return;
     }
   }

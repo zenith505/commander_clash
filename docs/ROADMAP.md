@@ -1,7 +1,7 @@
 # Roadmap
 
-31,846 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,985 of 4,988 (99%), top 10,000: 9,950 of
+31,865 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,961 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4702,6 +4702,28 @@ line blocks.
    Out after round 441 (looked at, not done): the lists after round 440 (still out, for their reasons). Known gaps: bots
    pick their least useful permanent for the Pools' copy, none for a legendary spell (the legend rule), and never hold
    its {U} for a permanent spell.
+   Round 442 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   of Promise, Psychic Paper and the others still out, to two cards whose pieces are there now. Auspicious Starrix's
+   "Whenever this creature mutates, exile cards from the top of your library until you exile X permanent cards, where X is
+   the number of times this creature has mutated. Put those permanent cards onto the battlefield." (CR 702.140d; X of the
+   merged permanent as it resolves; the whole library if it holds fewer, the cards not put onto the battlefield staying
+   exiled; all entering at once, an Aura enchanting something already there or staying exiled with nothing to enchant, CR
+   303.4f-g; not land plays; rulings; revealUntil `exile`, rest "exile"). Arna Kennerüd, Skycaptain's "Whenever a modified
+   creature you control attacks, double the number of each kind of counter on it. Then for each nontoken permanent attached
+   to it, create a token that's a copy of that permanent attached to that creature." (CR 700.9, 701.10e; whoever controls
+   what's attached; an Aura token that can't enchant it isn't created, CR 303.4i, an Equipment token that can't equip it
+   enters unattached, CR 301.5e, rulings; Effect tokenCopiesOfAttached). Browser tests click through Starrix's mutate onto
+   Grizzly Bears (Lightning Bolt stays exiled, Sol Ring enters) and an attack with an equipped Grizzly Bears (its counter
+   doubles, a Bonesplitter token enters on it). +2, 31,856 of 31,936 on this stacked branch (round 441 #734), 31,861
+   with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in, 31,863 with main aca5d42 (B291), 31,865 with main 24bb9f8 (B292); the compiled text of every other card is unchanged.
+   Out after round 442 (looked at, not done): Battlefield Thaumaturge (still out: its ruling, "{1} per target creature,
+   even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (still out: "Ward—Discard
+   an enchantment, instant, or sorcery card" needs a discard of a kind as the ward payment, and its "When one or more cards
+   are milled this way" reflexive trigger targets a card by the triggering spell's mana value), and the lists after round
+   441 (still out, for their reasons). Judgment calls: a bestowed Aura attached to Arna's attacker is copied as the
+   enchantment creature card (being an Aura is the bestow ability's effect, CR 702.103b, not a copiable value, CR 707.2),
+   so its token enters unattached (CR 303.4h); Arna's rulings don't cover it. Known gaps: bots don't weigh Arna's copies
+   when choosing attackers, nor Starrix's mutation count when choosing what to mutate onto.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -11941,8 +11963,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player's graveyard, chosen as it's put on the stack and checked as it resolves (CR 603.3d, 608.2b); the copy cast as it
   resolves or never (CR 608.2g, 704.5e), and Soundwave converts only if it was cast (IfCond castAmongThisWay; CR 701.28).
   Browser test: two creature tokens deal 3 to Ana, only her Divination (not her Night's Whisper or Ben's Divination) is
-  offered, the copy is cast and Soundwave converts. +2, 31,865 of 31,936 with main 24bb9f8 (through round 441 and
-  B292). The compiled text of every other card is unchanged.
+  offered, the copy is cast and Soundwave converts. +2, 31,865 of 31,936 with main 24bb9f8 (through round 441 and B292),
+  31,867 with main 887f11a (round 442) merged in. The compiled text of every other card is unchanged.
 - Out after round B293 (looked at, not done): the lists after round B292 stay out. Spy Kit (every check of a name in the
   engine would have to know every nonlegendary creature card's name), Pulmonic Sliver (a "you may" in the middle of a zone
   move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (the division of damage is

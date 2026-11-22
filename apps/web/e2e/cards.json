@@ -3108,6 +3108,48 @@
   "gameChanger": false
  },
  {
+  "oracleId": "436e7548-f8d5-43af-947d-b382da0d19b3",
+  "name": "Arna Kennerüd, Skycaptain",
+  "manaCost": "{2}{W}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Flying, lifelink\nWard—Discard a card.\nWhenever a modified creature you control attacks, double the number of each kind of counter on it. Then for each nontoken permanent attached to it, create a token that's a copy of that permanent attached to that creature.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink",
+   "Ward",
+   "Double"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d799e58a-0032-4df8-a77f-0d824ec15214",
   "name": "Arni Metalbrow",
   "manaCost": "{2}{R}",
@@ -3794,6 +3836,39 @@
   "releasedAt": "2026-01-23",
   "rarity": "mythic",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8432df19-dbf4-457b-8c0b-1f4b3a0a37d2",
+  "name": "Auspicious Starrix",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Elk Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elk",
+   "Beast"
+  ],
+  "oracleText": "Mutate {5}{G} (If you cast this spell for its mutate cost, put it over or under target non-Human creature you own. They mutate into the creature on top plus all abilities from under it.)\nWhenever this creature mutates, exile cards from the top of your library until you exile X permanent cards, where X is the number of times this creature has mutated. Put those permanent cards onto the battlefield.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Mutate"
+  ],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "uncommon",
+  "layout": "mutate",
   "gameChanger": false
  },
  {

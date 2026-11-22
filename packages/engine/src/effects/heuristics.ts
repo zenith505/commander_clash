@@ -52,6 +52,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Quarum Trench Gnomes: a Plains that makes colorless mana instead of white is worse for its controller.
     // "Target unblocked attacking creature becomes blocked" (Curtain of Light): against an opponent's attacker.
     // Disorienting Choice ("controllersMayExile"): their permanent exiled, or lands for us.
+    // Altaïr Ibn-La'Ahad (round 444): a card from your own graveyard exiled with a counter on it, for your later use.
+    if (e.type === "exile" && e.counters && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card" && body.targets[e.what.index]!.owner === "you") continue;
     if (["destroy", "destroyRandomTarget", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut", "replaceLandMana", "turnFaceDown", "becomeBlocked", "controllersMayExile"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
     // Identity Thief: "exile another target nontoken creature. If you do, ~ becomes a copy of that creature until end of
     // turn" (the card back at the next end step): an opponent's creature out of the way for the turn, and copied.

@@ -7795,6 +7795,31 @@ function etrataWorth(s: GameState, pid: PlayerId, o: GameObject): boolean {
   return isType(card, "Instant") || isType(card, "Sorcery") || (isType(card, "Creature") && card.cmc >= 3);
 }
 
+/**
+ * The Animus (round 444): "Until your next turn, target legendary creature you control becomes a copy of target creature card
+ * in exile with a memory counter on it." In our main phase with the stack empty: the pair where the card (as printed, CR
+ * 707.2) is worth the most more than the creature is now, never a legendary card whose name we already have on the
+ * battlefield (the legend rule, CR 704.5j); none worth it, no activation.
+ */
+function animusPlan(s: GameState, pid: PlayerId, id: ObjectId, i: number, ab: ActivatedAbility): Action[] | null {
+  if (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) return null;
+  const e = ab.body.effects[0];
+  const spec = e?.type === "becomeCopy" && e.of.ref === "target" ? ab.body.targets[e.of.index] : undefined;
+  const counter = spec?.exiledWithCounter;
+  if (!counter) return null;
+  const creatures = s.battlefield.map((b) => obj(s, b)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature") && characteristics(s, o).supertypes.includes("Legendary"));
+  const cards = s.turnOrder.flatMap((p) => player(s, p).exile).map((x) => obj(s, x)).filter((o) => o.zone === "exile" && !o.faceDown && !o.hiddenExile && (o.counters[counter] ?? 0) > 0 && isType(restingDef(s.cards[o.cardId]!), "Creature"));
+  let best: { gain: number; c: GameObject; card: GameObject } | undefined;
+  for (const c of creatures)
+    for (const card of cards) {
+      const d = restingDef(s.cards[card.cardId]!);
+      if (d.supertypes.includes("Legendary") && s.battlefield.some((b) => b !== c.id && controllerOf(s, obj(s, b)) === pid && characteristics(s, obj(s, b)).name === d.name)) continue;
+      const gain = defWorth(d) - defWorth(defOf(s, c));
+      if (gain > 0 && (!best || gain > best.gain)) best = { gain, c, card };
+    }
+  return best ? planActivate(s, pid, id, i, [{ kind: "object", id: best.c.id }, { kind: "object", id: best.card.id }]) : null;
+}
+
 function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility, o: GameObject) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -7814,6 +7839,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const up0 = ab.body.effects[0];
       if (up0?.type === "turnFaceUp" && up0.setDid) {
         const plan = etrataWorth(s, pid, o) ? planActivate(s, pid, id, i) : null;
+        if (plan) return plan;
+        continue;
+      }
+      // The Animus (round 444): one of our legendary creatures becomes a copy of a creature card in exile with a memory
+      // counter, only when that card is worth more (animusPlan).
+      const copy0 = ab.body.effects[0];
+      if (copy0?.type === "becomeCopy" && copy0.of.ref === "target" && ab.body.targets[copy0.of.index]?.exiledWithCounter) {
+        const plan = animusPlan(s, pid, id, i, ab);
         if (plan) return plan;
         continue;
       }

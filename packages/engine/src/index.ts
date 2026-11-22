@@ -23,3 +23,4 @@ export { partySize, PARTY_TYPES } from "./amounts";
 export { blightOptions } from "./counters";
 export { keywordLabel, CREATURE_TYPES } from "./keywords";
 export { mayPayUse } from "./spend";
+export { channelProblem, channelling } from "./channel";

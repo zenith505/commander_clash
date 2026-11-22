@@ -72,7 +72,9 @@ export function round344Sentence(s: string, sentences: string[], si: number, ctx
  * that Aura (`compile`), or the line is unsupported.
  */
 export function round344Line(line: string, raw: string, out: CompiledCard, isSpell: boolean, d: CardDef, compile: (d: CardDef) => CompiledCard): boolean {
-  const m = /^When ~ dies, (?:if it was a creature, )?return it to the battlefield\. It's an Aura enchantment with enchant ((?:creature|Forest|land) you control) and "(.+?),?"(,? and it loses all other abilities)?\.?$/.exec(line);
+  // Harold and Bob, First Numens (round B295): "... and "Enchanted Forest has '...'" ~ loses all other abilities." The same
+  // as Bronzehide Lion's "and it loses all other abilities", a sentence of its own (rulings: only the granted abilities).
+  const m = /^When ~ dies, (?:if it was a creature, )?return it to the battlefield\. It's an Aura enchantment with enchant ((?:creature|Forest|land) you control) and "(.+?),?"(,? and it loses all other abilities| ~ loses all other abilities)?\.?$/.exec(line);
   if (!m || isSpell || !d.types.includes("Creature")) return false;
   const spec = parseTargetPhrase(m[1]!);
   // The granted text with its inner quotes as quotes ("Enchanted Forest has '{T}: Add {G}{G}'" ...), each ability ending in a period.

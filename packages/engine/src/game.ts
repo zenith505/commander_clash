@@ -25,6 +25,7 @@ import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
 import { flipsRigged, noteFlipped, rollDice } from "./effects/run-dice";
 import { watchExileLookers } from "./effects/run-laneb189";
+import { lingerOnLeaving } from "./effects/run-laneb293";
 import { costExileLinksAcrossFaces, olagCandidates, olagCopyChosen } from "./effects/run-round435";
 import { sharedFateInstead } from "./effects/run-laneb282";
 import { cycloneDone, cycloneFor, cycloneInstead } from "./effects/run-laneb286";
@@ -38,7 +39,8 @@ import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTarget
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type CostSymbol, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
-import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { abilityUse, addMana, boundSpend, canPayFromPool, falseDawnMana, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { channelMana } from "./channel";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
@@ -581,11 +583,15 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "drawLook":
       chooseDrawLook(s, p, action.objectId, action.instead);
       break;
+    case "channelMana":
+      // Channel (round B294): any time a mana ability could be activated (channel.ts checks when).
+      channelMana(s, p.id);
+      break;
   }
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
   if (artifactAbility.kind !== "none" || s.turnLog?.artifactAbility?.[p.id] === "mana") noteArtifactAbility(s, p.id, artifactAbility.artifact, artifactAbility.kind);
-  afterAction(s, action.type === "activateMana" || manaAbility);
+  afterAction(s, action.type === "activateMana" || action.type === "channelMana" || manaAbility);
   watchForMandatoryLoop(s, action, allPassed, mandatoryChoice);
 }
 
@@ -1404,6 +1410,8 @@ export function moveObject(
     const enchanted = o.enchantsCard && host && host.id === o.enchantsCard.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === o.enchantsCard.zc ? { enchantsCard: { ...o.enchantsCard } } : {};
     (s.lastKnown ??= {})[id] = { ...enchanted, zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.name !== undefined ? { chosenName: o.chosen.name } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
+  // Titania's Song (round B293): an effect that goes on to the end of the turn once its source leaves the battlefield.
+  if (fromZone === "battlefield" && hadAbilities) lingerOnLeaving(s, o, last);
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
   if (merged) {
@@ -1581,7 +1589,9 @@ export function moveObject(
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
     for (const e of s.effects) e.affected = e.affected.filter((x) => x !== id);
     // "For as long as ~ remains tapped": it isn't tapped anymore (rulings on Vedalken Shackles).
-    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id && e.whileControlled?.id !== id);
+    // A stored effect for a group (ContinuousEffect.group) has no fixed objects and stays (round B293: it used to end here
+    // whenever any permanent left the battlefield).
+    s.effects = s.effects.filter((e) => (e.group || e.affected.length) && e.whileTapped?.id !== id && e.whileControlled?.id !== id);
     for (const other of s.battlefield)
       if (s.objects[other]!.attachedTo === id) {
         s.objects[other]!.attachedTo = undefined;
@@ -5924,6 +5934,8 @@ function finishCleanup(s: GameState) {
   s.drawSteals = undefined; // Plagiarize's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
   for (const q of s.players) q.noLegendRuleTurn = undefined; // Hall of Echoes' "this turn" (CR 514.2)
+  // Channel, False Dawn (round B294): "until end of turn" ends here (CR 514.2), not as the turn does.
+  if (s.turnRules?.some((r) => r.rule === "channel" || r.rule === "whiteMana" || r.rule === "whiteAnyColor")) s.turnRules = s.turnRules.filter((r) => r.rule !== "channel" && r.rule !== "whiteMana" && r.rule !== "whiteAnyColor");
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
@@ -7250,6 +7262,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (instead !== undefined && !(ab.tap && insteadChoices(s, p.id, o).includes(instead))) throw new RulesError(`${name}'s mana can't be made {${instead}} instead`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   let adds = manaProduced(s, o, ab, mana, combo, instead);
+  // False Dawn (round B294): an ability its activator controls (CR 602.2) adds white mana instead of colored, before the
+  // triggered mana abilities see what the permanent produced (Mana Flare's "that type", CR 106.12b).
+  adds = falseDawnMana(s, p.id, adds);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -7332,7 +7347,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.toEachPlayer) {
     const others = turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost);
     if (others.length) log(s, `${name}: each player adds ${adds.map((m) => `{${m}}`).join("")}.`);
-    for (const q of others) addMana(s, q, adds, { from });
+    for (const q of others) addMana(s, q, adds, { from, by: p.id });
   }
   // Spectral Searchlight: another player chooses the color of the mana they add (CR 605.3b, 608.2d): asked below, once the
   // rest of the ability is done; the activator's pick only says how much (Mana Reflection's doubling, CR 106.12b).
@@ -7340,14 +7355,14 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (milledCombos) {
     // One result: added now, with what replaces tapping it for mana (Mana Reflection's doubling, CR 106.12b).
     if (milledCombos.length === 1) {
-      adds = tappedForMana(s, p.id, o, milledCombos[0]!);
-      if (adds.length) addMana(s, getter, adds, { from });
+      adds = falseDawnMana(s, p.id, tappedForMana(s, p.id, o, milledCombos[0]!));
+      if (adds.length) addMana(s, getter, adds, { from, by: p.id });
       log(s, adds.length ? `${p.name} adds ${adds.map((m) => `{${m}}`).join("")} (${name}).` : `${name} adds no mana.`);
     } else adds = milledCombos[0]!;
     if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id, made: [...adds] });
   }
   else if (unless) s.manaUnless = { player: p.id, id: o.id, zc: o.zoneChanges ?? 0, adds, from, picked, queue: turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost), cost: unless, source: name };
-  else if (!theyChoose) addMana(s, getter, adds, { only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  else if (!theyChoose) addMana(s, getter, adds, { by: p.id, only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
   if (o.zone === "battlefield" && !unless) fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -7365,6 +7380,12 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
   // sacrifice it" (checked after the cost removed one).
   if (ab.putCounter && o.zone === "battlefield") putCounters(s, o, ab.putCounter, 1);
+  // Harold and Bob, First Numens (round B295): "You get two rad counters." The activator, as the ability resolves (CR
+  // 605.3b, 122.1): whether or not the permanent is still there.
+  if (ab.radCounters && !unless) {
+    const got = putPlayerCounters(s, p.id, "rad", ab.radCounters);
+    if (got) log(s, `${p.name} gets ${got === 1 ? "a rad counter" : `${got} rad counters`} (${name}).`);
+  }
   // Foraging Wickermaw: "~ becomes that color until end of turn": the color of the mana it added (CR 605.3b), in layer 5.
   if (ab.becomesManaColor && o.zone === "battlefield" && adds[0] && adds[0] !== "C") {
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: name, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "setColors", colors: [adds[0]] }] });
@@ -7380,7 +7401,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}), ...(ab.tap ? { tapSymbol: true as const } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}) });
   if (unless) askManaUnless(s);
   if (theyChoose && adds.length && !player(s, getter).lost) {
-    s.manaColorFor = { player: getter, n: adds.length, from, source: name };
+    s.manaColorFor = { player: getter, n: adds.length, from, source: name, by: p.id };
     s.pending = { kind: "chooseOption", player: getter, source: name, what: "manaColorFor", options: COLORS.map((c) => COLOR_NAMES[c]), prompt: `${p.name} tapped ${name}: choose the color of the ${adds.length === 1 ? "mana" : `${adds.length} mana`} you add` };
   }
   // Charmed Pendant: the colors of its hybrid symbols, chosen once the card is milled (rulings), as the ability resolves (CR 605.3b).
@@ -7461,8 +7482,8 @@ export const isSnowSource = (s: GameState, o: GameObject) => o.zone === "battlef
  * Add the mana that triggered mana abilities add (CR 605.4a). Its source is each ability's source (CR 106.3): mana from
  * Utopia Sprawl on a snow Forest isn't snow mana, mana from a snow Mana Flare is.
  */
-export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][]; damage?: ObjectId[] }): void {
-  picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [] }));
+export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][]; by?: PlayerId[]; damage?: ObjectId[] }): void {
+  picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [], ...(picked.by?.[i] !== undefined ? { by: picked.by[i] } : {}) }));
   // Overabundance, Barbflare Gremlin: then 1 damage to that player from each source, as the triggered mana ability resolves
   // (CR 605.4a; no chance to respond, rulings). It can't stop for a question, so its shields are chosen as a bot would.
   for (const id of picked.damage ?? []) {
@@ -13421,7 +13442,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const combo = m?.combos.find((c) => c.join("") === choice);
     if (!m || m.player !== p.id || !combo) throw new RulesError("no mana is waiting for its colors");
     s.pendantMana = undefined;
-    const adds = tappedForMana(s, p.id, s.objects[m.id], combo);
+    const adds = falseDawnMana(s, p.id, tappedForMana(s, p.id, s.objects[m.id], combo));
     addMana(s, p.id, adds, { from: m.from });
     log(s, `${p.name} adds ${adds.map((x) => `{${x}}`).join("")} (${m.source}).`);
     return;
@@ -13432,8 +13453,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (!m || m.player !== p.id) throw new RulesError("no mana is waiting for its color");
     s.manaColorFor = undefined;
     const c = COLORS.find((k) => COLOR_NAMES[k] === choice)!;
-    addMana(s, p.id, Array<ManaType>(m.n).fill(c), { from: m.from });
-    log(s, `${p.name} adds ${`{${c}}`.repeat(m.n)} (${m.source}).`);
+    const made = falseDawnMana(s, m.by ?? p.id, Array<ManaType>(m.n).fill(c));
+    addMana(s, p.id, made, { from: m.from, by: m.by ?? p.id });
+    log(s, `${p.name} adds ${made.map((x) => `{${x}}`).join("")} (${m.source}).`);
     return;
   }
   if (pend.what === "legend") {

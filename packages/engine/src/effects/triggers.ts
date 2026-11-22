@@ -428,6 +428,15 @@ function diesMatches(
     const link = zc !== undefined ? s.animated?.[`${srcId}@${zc}`] : undefined;
     return !!link && link.id === dying.o.id && s.lastKnown?.[link.id]?.zc === link.zc && dying.c.types.includes("Creature");
   }
+  // Havengul Mystery (round B296): "the creature put onto the battlefield with ~" (CR 607.2c), one its ability put there
+  // while the watcher was this object (any face, CR 607.1b), still that object as it left; the watcher leaving at the same
+  // time too, as it last existed (CR 603.10a).
+  if (d.putWithSelf) {
+    const src = s.objects[srcId];
+    const zc = src?.zone === "battlefield" ? (src.zoneChanges ?? 0) : s.lastKnown?.[srcId]?.zc;
+    const links = zc !== undefined ? s.putWith?.[`${srcId}@${zc}`] : undefined;
+    return !!links?.some((l) => l.id === dying.o.id && s.lastKnown?.[l.id]?.zc === l.zc) && dying.c.types.includes("Creature");
+  }
   if (srcId === dying.o.id) {
     // "~ or another creature is returned to your hand" (Stormfront Riders): ~ too only if it's yours (CR 404.2).
     // "Whenever ~ or another creature you control dies, if it was enchanted or equipped" (Cass, Hand of Vengeance, round

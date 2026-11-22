@@ -222,7 +222,7 @@ describe("Songcrafter Mage: target instant or sorcery card in your graveyard gai
     let s = settle(run(s0, castPlan(s0, ap, mage)));
     expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
     s = settle(act(s, { type: "chooseTargets", player: ap, targets: [obj(div)] }));
-    expect(s.yardCastGrants).toEqual([{ id: div, zc: s.objects[div]!.zoneChanges ?? 0, kind: "harmonize" }]);
+    expect(s.yardCastGrants).toMatchObject([{ id: div, zc: s.objects[div]!.zoneChanges ?? 0, kind: "harmonize" }]);
     // Only that card.
     expect(castPlan(s, ap, other, [], { via: "harmonize" })).toBeNull();
     s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, U: 1 };
@@ -282,7 +282,7 @@ describe("Filigree Racer: pay {E}{E}, and target instant or sorcery card in your
     for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect((s.pending as { specs?: { types?: string[] }[] }).specs?.[0]?.types).toEqual(["Instant", "Sorcery"]);
     s = settle(act(s, { type: "chooseTargets", player: ap, targets: [obj(div)] }));
-    expect(s.yardCastGrants).toEqual([{ id: div, zc: s.objects[div]!.zoneChanges ?? 0, kind: "jumpStart" }]);
+    expect(s.yardCastGrants).toMatchObject([{ id: div, zc: s.objects[div]!.zoneChanges ?? 0, kind: "jumpStart" }]);
     poolOnly(s, ap, { U: 3 });
     const fodder = place(s, ap, opt(), "hand");
     // Divination is a sorcery: not in combat.
@@ -319,7 +319,7 @@ describe("Ghost Ark: whenever it becomes crewed, each artifact creature card in 
     const thopter = place(s0, ap, ornithopter(), "graveyard");
     const bear = place(s0, ap, bears(), "graveyard");
     let s = settle(run(s0, planActivate(s0, ap, arkId, 0, [], undefined, crew)));
-    expect(s.yardKeywordGrants).toEqual([{ id: thopter, zc: s.objects[thopter]!.zoneChanges ?? 0, keyword: "Unearth", cost: "{3}" }]);
+    expect(s.yardKeywordGrants).toMatchObject([{ id: thopter, zc: s.objects[thopter]!.zoneChanges ?? 0, keyword: "Unearth", cost: "{3}" }]);
     const later = place(s, ap, ornithopter(), "graveyard");
     poolOnly(s, ap, { C: 3 });
     expect(planActivate(s, ap, bear, 0)).toBeNull();

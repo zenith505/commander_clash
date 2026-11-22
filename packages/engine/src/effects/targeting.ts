@@ -132,6 +132,11 @@ export function hasNoAbilities(s: GameState, o: GameObject, c: Characteristics):
   }
   if (!c.hasPrintedAbilities || o.faceDown) return true;
   const d = defOf(s, o);
+  // Yixlid Jailer (round B297): a card in a graveyard that lost all its abilities (cards.ts yardLostDef).
+  if (d.yardLostOf) {
+    const a = abilitiesOf(s, o);
+    return !a.activated.length && !a.triggers.length && !a.statics.length && !a.mana.length;
+  }
   return !d.faces?.length && d.oracleText.replace(/\([^)]*\)/g, "").trim() === "";
 }
 
@@ -615,8 +620,10 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined || spec.powerAtMostOfObject) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
   // Fang-Druid Summoner: "a creature card with no abilities": nothing in its rules text but reminder text (CR 113.1, 207.2a).
   // Dryad Arbor: a Forest has its intrinsic mana ability (CR 305.6).
-  if (spec.noAbilities && (d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
-  if (spec.hasAbilities && !(d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "" || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
+  // Yixlid Jailer (round B297): a card in a graveyard that lost all its abilities has no rules text that counts.
+  const texted = !d.yardLostOf && (!!d.faces?.length || d.oracleText.replace(/\([^)]*\)/g, "").trim() !== "");
+  if (spec.noAbilities && (texted || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
+  if (spec.hasAbilities && !(texted || d.subtypes.some((t) => BASIC_LAND_TYPES.includes(t)))) return false;
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
   if (spec.hasAdventure && d.layout !== "adventure") return false;
   if (spec.enchantCreature && !/^Enchant creature$/m.test(d.oracleText)) return false;

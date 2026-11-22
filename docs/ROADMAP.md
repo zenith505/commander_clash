@@ -1,7 +1,7 @@
 # Roadmap
 
-31,879 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,965 of
+31,880 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,968 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -11991,6 +11991,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B297 (least played first, one card off the skip lists, not in Lane A's rounds 445-446): Yixlid Jailer's "Cards in
+  graveyards lose all abilities." (out after rounds B154 and B233, every graveyard-zone ability check): a layer 6 effect
+  (CR 613.1f) of the permanent's static ability on every card in every graveyard, recorded as it applies in the layers
+  (OffFieldGrant.yardLoseAll), so a Jailer that lost its abilities (Turn to Frog, Humility) applies to nothing (CR 613.8a).
+  A card in a graveyard then has the definition cards.ts yardLostDef gives it: no keywords, and compileCard drops its
+  triggered, activated, mana and static abilities and everything that works from there (flashback, aftermath and the other
+  ways to cast it, dredge, mayhem, unearth, Bloodghast's and Narcomoeba's triggers, "from anywhere" triggers even from the
+  battlefield, rulings), and flash (CR 702.8a works from the zone it's cast from). Kept (rulings): its changeling (every
+  creature type, CR 613.6 for layer 4), its colors and types, a "*" power or toughness as 0 (Tarmogoyf is a 0/1 card); and
+  what the spell does and what works as it's cast, since a spell cast from a graveyard by another permission (Yawgmoth's
+  Will) is on the stack before its costs and targets (CR 601.2a: Burst Lightning can be kicked). A graveyard card's static
+  ability (Anger) depends on the Jailer's effect and comes after it whatever the timestamps (CR 613.8a), as does Cairn
+  Wanderer's, which reads graveyard cards' keywords. An ability an effect gives a graveyard card (Snapcaster Mage's and
+  Past in Flames's flashback, Underworld Breach's escape, Lier's flashback, Sedris's unearth, Cursecloth Wrappings, Filigree
+  Racer, The Necrobloom's dredge, keyword counters) stays only if its timestamp is the later (CR 613.7; the grants now record
+  one); a permission to cast it (Yawgmoth's Will, Muldrotha, Karador) isn't an ability of the card's. Browser test: Think
+  Twice isn't offered from your graveyard under Ana's Jailer; after Murder kills it, it's cast with its flashback. +1.
+  The compiled text of every other card is unchanged.
+- Out after round B297 (looked at, not done): the lists after round B296 stay out; Panglacial Wurm (still out: casting it
+  pauses every search of its owner's library, about 80 places a search starts, and pays for a spell in the middle of a
+  resolution) and Pulmonic Sliver were looked at again. About 51 unsupported cards remain, all of them hard. Known gaps under
+  Yixlid Jailer: a card cast from a graveyard by a permission keeps its own "cast this spell only ..." restrictions; bots
+  don't weigh what the Jailer takes from their own graveyard before casting it.
 - Round B296 (least played first, two cards off the skip lists, neither in Lane A's rounds 444-445; Flamewar was left to
   round 445 and Starrix was already done in round 442): Havengul Laboratory // Havengul Mystery's "When the creature put onto
   the battlefield with ~ leaves the battlefield, transform ~." (out after rounds 206 and 407): linked to the back face's

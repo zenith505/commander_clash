@@ -2147,6 +2147,12 @@ export type Modification =
    */
   | { kind: "addKeywords"; keywords: string[]; /** "auras": "This effect doesn't remove Auras" (Spectra Ward): no Aura, the source or another. "attached": "This effect doesn't remove Auras and Equipment you control that are already attached to it" (Benevolent Blessing, CR 702.16p): those attached as the effect began (GameObject.sparesAttached). */ spares?: true | "auras" | "attached"; sharedAmongYours?: true | "graveyard" }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
+  /**
+   * Yixlid Jailer (round B297): "Cards in graveyards lose all abilities." Layer 6 (CR 613.1f) for every card in every
+   * graveyard, not for permanents: its source's static ability records it (layers.ts OffFieldGrant.yardLoseAll), and a
+   * graveyard card's definition then has no abilities (cards.ts defOf, yardLostDef).
+   */
+  | { kind: "yardLoseAll" } // layer 6
   | { kind: "loseAllAbilities"; /** Blood Sun: "lose all abilities except mana abilities" (CR 605.1a): its mana abilities, printed or granted before, stay. */ exceptMana?: true } // layer 6
   /**
    * Layer 6: 'has "{T}: Add one mana of any color."', 'gains "When ~ dies, ..." until end of turn'. The text

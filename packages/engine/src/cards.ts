@@ -513,10 +513,19 @@ export function abilitiesOf(s: GameState, o: GameObject, unbound = false): Compi
     const granted = yardGranted(s, o);
     if (granted.length) own = { ...own, activated: [...own.activated, ...granted] };
   }
+  // Cosima, God of the Voyage (round 445): the abilities this card gained in exile, while it's still that object there (CR
+  // 400.7, 611.2c).
+  const gained = gainedInExileNow(o);
+  if (gained.length) own = withGranted(own, gained);
   const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
   if (lent.length) own = withLent(own, lent);
   const all = own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
   return o.zone === "battlefield" && !lendingLoyalty && c.types.includes("Planeswalker") ? withKasmina(s, o, c.controller, all) : all;
+}
+
+/** Cosima, God of the Voyage (round 445): the abilities `o` gained in exile (Effect gainInExile), if it's still that object there. */
+export function gainedInExileNow(o: GameObject): string[] {
+  return o.zone === "exile" && o.gainedInExile && o.gainedInExile.zc === (o.zoneChanges ?? 0) ? o.gainedInExile.texts : [];
 }
 
 /** While working out a Kasmina's loyalty abilities to lend: its own, without what other Kasminas lend it (no loops). */

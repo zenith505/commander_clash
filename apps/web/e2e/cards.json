@@ -8507,6 +8507,47 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7d038055-035d-4698-b6b6-e2859bf2f1d1",
+  "name": "Captain America, First Avenger",
+  "manaCost": "{R}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Soldier Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier",
+   "Hero"
+  ],
+  "oracleText": "Throw ... — {3}, Unattach an Equipment from Captain America: He deals damage equal to that Equipment's mana value divided as you choose among one, two, or three targets.\n... Catch — At the beginning of combat on your turn, attach up to one target Equipment you control to Captain America.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Throw ...",
+   "... Catch"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-11-04",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6d86d783-7116-4426-8c0f-718c2d904887",
   "name": "Captain Marvel, Apex Avenger",
   "manaCost": "{5}{R}{W}",
@@ -38562,6 +38603,68 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9b0c6b77-69df-4330-86a7-8dc4666abd38",
+  "name": "Paleontologist's Pick-Axe // Dinosaur Headdress",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Equipment // Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Whenever equipped creature attacks, draw a card, then discard a card.\nEquip {1}\nCraft with one or more creatures {5} ({5}, Exile this artifact, Exile one or more creatures you control and/or creature cards from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Craft",
+   "Transform",
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "lcc",
+  "releasedAt": "2023-11-17",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Paleontologist's Pick-Axe",
+    "manaCost": "{2}",
+    "typeLine": "Artifact — Equipment",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Equipment"
+    ],
+    "oracleText": "Whenever equipped creature attacks, draw a card, then discard a card.\nEquip {1}\nCraft with one or more creatures {5} ({5}, Exile this artifact, Exile one or more creatures you control and/or creature cards from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/front/e/0/e08c0cf4-3669-4a9a-aa12-7e8fe0f063ad.jpg?1783913936",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/e/0/e08c0cf4-3669-4a9a-aa12-7e8fe0f063ad.jpg?1783913936"
+   },
+   {
+    "name": "Dinosaur Headdress",
+    "manaCost": "",
+    "typeLine": "Artifact — Equipment",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Equipment"
+    ],
+    "oracleText": "When this Equipment enters, attach it to target creature you control.\nAs this Equipment becomes attached to a creature, choose an exiled creature card used to craft this Equipment.\nEquipped creature is a copy of the last chosen card.\nEquip {2}",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/e/0/e08c0cf4-3669-4a9a-aa12-7e8fe0f063ad.jpg?1783913936",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/e/0/e08c0cf4-3669-4a9a-aa12-7e8fe0f063ad.jpg?1783913936"
+   }
+  ]
+ },
+ {
   "oracleId": "f38fe1e9-8997-4b63-9109-7513034bac88",
   "name": "Palisade Giant",
   "manaCost": "{4}{W}{W}",
@@ -44268,6 +44371,46 @@
   "set": "tsp",
   "releasedAt": "2006-10-06",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c2d04138-cc17-4dd0-9a4c-9c87df72ed01",
+  "name": "Saruman of Many Colors",
+  "manaCost": "{3}{W}{U}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Avatar Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar",
+   "Wizard"
+  ],
+  "oracleText": "Ward—Discard an enchantment, instant, or sorcery card.\nWhenever you cast your second spell each turn, each opponent mills two cards. When one or more cards are milled this way, exile target enchantment, instant, or sorcery card with equal or lesser mana value than that spell from an opponent's graveyard. Copy the exiled card. You may cast the copy without paying its mana cost.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Ward",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "hoc",
+  "releasedAt": "2026-08-14",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -50518,6 +50661,32 @@
   "set": "ncc",
   "releasedAt": "2022-04-29",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2ccdc60a-49a9-44b9-a7af-0ebf18b26785",
+  "name": "Sword of Fire and Ice",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +2/+2 and has protection from red and from blue.\nWhenever equipped creature deals combat damage to a player, this Equipment deals 2 damage to any target and you draw a card.\nEquip {2}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "mps",
+  "releasedAt": "2016-09-30",
+  "rarity": "special",
   "layout": "normal",
   "gameChanger": false
  },

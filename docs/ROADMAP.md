@@ -1,6 +1,6 @@
 # Roadmap
 
-31,884 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,885 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,971 of
 9,979 (99%).
 
@@ -1355,7 +1355,7 @@ line blocks.
    any color": a payment rule for colored symbols); War's Toll ("If a creature an opponent controls attacks, all
    creatures that opponent controls attack if able": a requirement that depends on the declaration); Kaito, Dancing
    Shadow ("activate loyalty abilities of ~ twice this turn", a one-turn grant); Saheeli's Lattice, Altar of the
-   Wretched, Paleontologist's Pick-Axe and Sunbird Standard (all but the Pick-Axe done in round 334) ("Craft with one or more ...", and what their back faces
+   Wretched, Paleontologist's Pick-Axe and Sunbird Standard (all but the Pick-Axe done in round 334; the Pick-Axe in round 448) ("Craft with one or more ...", and what their back faces
    read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
    direction); Ramses, Assassin Lord (done in round 265).
    Round 232 (unexamined cards from ranks 6,400 to 13,000, now done): a search's exile linked to a dies ability (Hoarding
@@ -2381,7 +2381,7 @@ line blocks.
    "sacrifice an artifact other than [the Equipment that gave it]" (Dire Blunderbuss). +7, 30,942 of 31,936 with B172.
    Bots: a bot crafts "one or more" with every spare graveyard card and cheap token that fits (more power, colors or
    cards to cast for the back face), and for the Throne finds one material for each type among those.
-   Out after round 334 (looked at, not done): Paleontologist's Pick-Axe (its craft works now; Dinosaur Headdress makes the
+   Out after round 334 (looked at, not done): Paleontologist's Pick-Axe (done in round 448) (its craft works now; Dinosaur Headdress makes the
    equipped creature a copy of a card chosen as it becomes attached); The Enigma Jewel ("four or more nonlands with
    activated abilities", and Locus of Enlightenment has the exiled cards' activated abilities).
    Round 335 took the four cards no list named (Sasaya, Tazri, The Master, Tezzeret), so every ranked unsupported card is
@@ -4847,6 +4847,30 @@ line blocks.
    Battlefield Thaumaturge's reading above (a creature targeted twice counts twice). Known gaps: bots throw an Equipment only
    in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
    even when the thrown Equipment's mana value leaves room for fewer (the division then refuses them).
+   Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
+   round B299) to Paleontologist's Pick-Axe, out since round 334, whose pieces are there now. Its back face, Dinosaur
+   Headdress: "As this Equipment becomes attached to a creature, choose an exiled creature card used to craft this
+   Equipment." (asked each time it becomes attached, by its enters trigger, an equip ability or an effect, as Sanctuary
+   Blade's color, CR 614.12; among the creature cards its craft cost exiled that are still in exile, CR 702.167c, a token
+   used to craft it counting for nothing, the same card as last time or another, rulings; with one left it's chosen
+   without asking, with none nothing is chosen and the last chosen card stays; CompiledCard.attachChooseCrafted, entersChoices
+   "attachCopy", game.ts headdressChosen) and "Equipped creature is a copy of the last chosen card." (a static copy effect,
+   CR 707.2, 611.3a, of exactly what's printed on the card, X as 0, not what it was before it was exiled, rulings, with the
+   Equipment's timestamp, a new one each time it becomes attached, CR 613.7e; becoming a copy isn't entering, so the copied
+   card's enters abilities don't trigger, and counters stay; CompiledCard.equippedCopiesChosen, kept by game.ts
+   syncAuraCopies as Metamorphic Alteration's). A browser test clicks through the craft, the card picker after its enters
+   trigger attaches it to Grizzly Bears (Serra Angel), and the picker again when it's equipped to a Hill Giant (Llanowar
+   Elves). +1, 31,885 of 31,936 on this stacked branch (round 447 #748, with round 446's head ae5ba1d, main 499a31a, B297,
+   merged in); the compiled text of every other card and face is unchanged.
+   Out after round 448 (looked at, not done): Baron Helmut Zemo (Lane B's round B299), Codie, Ravenous Codex (still out:
+   "a prepared spell" isn't a term of CR 722, which speaks of "a spell cast as a prepare spell", 722.3d), Spy Kit (still out:
+   every nonlegendary creature card's name at once), and the lists after round 447 (still out, for their reasons). Judgment
+   call: the last chosen card's copiable values are locked in as it's chosen, so the equipped creature stays a copy of it if
+   that card later leaves exile (no ruling; as Metamorphic Alteration's rulings say of its chosen creature leaving the
+   battlefield). Known gaps: as for Metamorphic Alteration, the copy begins at the next state-based action check after the
+   card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
+   card with the most power, toughness and abilities.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -8838,7 +8862,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (done in round B202) (a mana value limit from its power on
   a delayed cast trigger), The Fugitive Doctor (done in round B184) and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
-  of the Grim Captain (all but the Pick-Axe done in round 334) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
+  of the Grim Captain (all but the Pick-Axe done in round 334; the Pick-Axe in round 448) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape (done in round B191), Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot (done in round B187),
   Rhuk (done in round B70), Alpha Brawl, Brain in a Jar (done in round B158), Sita Varma (done in round B114), Munda (done in round B196) and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until

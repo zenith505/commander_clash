@@ -3203,7 +3203,7 @@ export function syncAuraCopies(s: GameState): boolean {
   const holds = (e: CopyEffect, host: GameObject) => {
     if (!e.aura || typeof e.until !== "object" || !("whileAttached" in e.until)) return true;
     const a = s.objects[e.until.whileAttached.id];
-    return !!a && a.zone === "battlefield" && a.chosen?.copyKey === e.key && !!compileCard(defOf(s, a)).enchantedCopiesChosen && copyWhileHolds(s, e.until) && e.until.whileAttached.host === host.id;
+    return !!a && a.zone === "battlefield" && a.chosen?.copyKey === e.key && copiesChosen(s, a) && copyWhileHolds(s, e.until) && e.until.whileAttached.host === host.id;
   };
   for (const id of s.battlefield) {
     const host = s.objects[id]!;
@@ -3220,7 +3220,9 @@ export function syncAuraCopies(s: GameState): boolean {
   for (const id of s.battlefield) {
     const a = s.objects[id]!;
     const key = a.chosen?.copyKey;
-    if (!key || !a.attachedTo || !compileCard(defOf(s, a)).enchantedCopiesChosen) continue;
+    if (!key || !a.attachedTo || !copiesChosen(s, a)) continue;
+    // Dinosaur Headdress (round 448): its card is still to be chosen as it becomes attached (askEntersChoice).
+    if (s.entersChoices?.some((c) => c.id === a.id && c.what === "attachCopy")) continue;
     const host = s.objects[a.attachedTo];
     if (!host || host.zone !== "battlefield") continue;
     const until: CopyWhile = { whileAttached: { id: a.id, zc: a.zoneChanges ?? 0, host: host.id, hostZc: host.zoneChanges ?? 0 } };
@@ -3236,6 +3238,28 @@ export function syncAuraCopies(s: GameState): boolean {
     changed = true;
   }
   return changed;
+}
+
+/**
+ * Whether `a` has a static copy effect on what it's attached to: Metamorphic Alteration's "Enchanted creature is a copy of
+ * the chosen creature." or Dinosaur Headdress's (round 448) "Equipped creature is a copy of the last chosen card."
+ */
+function copiesChosen(s: GameState, a: GameObject): boolean {
+  const cc = compileCard(defOf(s, a));
+  return !!cc.enchantedCopiesChosen || !!cc.equippedCopiesChosen;
+}
+
+/**
+ * Dinosaur Headdress (round 448): `cardId`, an exiled creature card used to craft `o`, is the last chosen card: its printed
+ * copiable values (CR 707.2; rulings), locked in now, a key into GameState.cards (Chosen.copyKey), as the object it is in
+ * exile (Chosen.card, CR 400.7). syncAuraCopies makes the equipped creature a copy of it.
+ */
+export function headdressChosen(s: GameState, o: GameObject, cardId: ObjectId) {
+  const c = obj(s, cardId);
+  const base = restingDef(s.cards[c.cardId]!);
+  o.chosen = { ...o.chosen, card: { id: c.id, zc: c.zoneChanges ?? 0 }, copyKey: copyKey(s, base) };
+  log(s, `${player(s, controllerOf(s, o)).name} chooses ${base.name} for ${defOf(s, o).name}.`);
+  invalidateCharacteristics(s);
 }
 
 /** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
@@ -13528,6 +13552,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       olagCopyChosen(s, o, choice);
       return;
     }
+    if (pend.what === "attachCopy") {
+      // Dinosaur Headdress (round 448): the exiled creature card used to craft it that the equipped creature is a copy of.
+      if (!pend.options.includes(choice)) throw new RulesError("choose an exiled creature card used to craft it");
+      headdressChosen(s, o, choice);
+      return;
+    }
     if (pend.what === "copyLast") {
       if (!pend.options.includes(choice)) throw new RulesError("choose a copy offered");
       enterCopying(s, o, choice);
@@ -14425,6 +14455,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "attachPlayer") throw new RulesError("nothing to attach");
   // Olag's copy (round 435) is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
   if (pend.what === "transformCopy") throw new RulesError("nothing to choose");
+  // Dinosaur Headdress's card (round 448) is chosen as it becomes attached, with an objectId (askEntersChoice).
+  if (pend.what === "attachCopy") throw new RulesError("nothing to choose");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
@@ -14663,12 +14695,19 @@ function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId | ObjectId[
 export function askAttachColor(s: GameState, o: GameObject): void {
   if (o.zone !== "battlefield" || !o.attachedTo) return;
   const cc = compileCard(defOf(s, o));
-  if (!cc.attachChooseColor && !cc.attachChooseNameAndType) return;
+  if (!cc.attachChooseColor && !cc.attachChooseNameAndType && !cc.attachChooseCrafted) return;
   const host = s.objects[o.attachedTo];
   if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature")) return;
   if (cc.attachChooseColor) {
     if (s.entersChoices?.some((c) => c.id === o.id && c.what === "color")) return;
     (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "color" });
+    return;
+  }
+  // Dinosaur Headdress (round 448): "choose an exiled creature card used to craft ~", asked with the other "as ~ enters"
+  // choices (askEntersChoice "attachCopy").
+  if (cc.attachChooseCrafted) {
+    if (s.entersChoices?.some((c) => c.id === o.id && c.what === "attachCopy")) return;
+    (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "attachCopy" });
     return;
   }
   // Psychic Paper (round 446): "choose a creature card name and a creature type", the name first, as its text has them;
@@ -14745,6 +14784,19 @@ function askEntersChoice(s: GameState): boolean {
       }
       const per = compileCard(defOf(s, o)).entersRemoveCounters?.per ?? 1;
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "choose", what: "artifact, creature, or enchantment", options, count: options.length, min: 0, objectId: o.id, prompt: `remove all counters from any number of artifacts, creatures, and enchantments as it enters (${per === 1 ? "a +1/+1 counter" : `${per} +1/+1 counters`} for each counter removed): click them, then choose.` };
+      return true;
+    }
+    if (c.what === "attachCopy") {
+      // Dinosaur Headdress (round 448): one of the creature cards used to craft it still in exile (CR 702.167c), chosen
+      // as it becomes attached (CR 614.12); with one, that one; with none, nothing is chosen (the last chosen card stays).
+      const cards = olagCandidates(s, o);
+      if (cards.length < 2) {
+        q.shift();
+        if (cards[0]) headdressChosen(s, o, cards[0].id);
+        else log(s, `There's no creature card used to craft ${defOf(s, o).name} in exile, so nothing is chosen.`);
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "attachCopy", options: cards.map((x) => x.id), labels: cards.map((x) => restingDef(s.cards[x.cardId]!).name), objectId: o.id, prompt: `choose an exiled creature card used to craft ${defOf(s, o).name}: the equipped creature is a copy of it` };
       return true;
     }
     if (c.what === "transformCopy") {

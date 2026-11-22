@@ -226,6 +226,7 @@ import { round444Line } from "./round444";
 import { round445Line } from "./round445";
 import { round446Line } from "./round446";
 import { round447Line } from "./round447";
+import { round448Line } from "./round448";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1138,6 +1139,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 448: oracle/round448.ts.
+    if (round448Line(line, raw, out, isSpell)) continue;
     // Round 447: oracle/round447.ts.
     if (round447Line(line, raw, out, isSpell)) continue;
     // Round 446: oracle/round446.ts.

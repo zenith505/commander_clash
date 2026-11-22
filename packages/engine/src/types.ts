@@ -1012,7 +1012,7 @@ export interface CopyEffect {
    */
   until?: "endOfTurn" | /** Vesuvan Shapeshifter (round 446): "until this creature is turned face down" (run-permanents.ts turnFaceDown). */ "faceDown" | { turnOf: PlayerId } | { nextEndStep: { turn: number; endSteps: number } } | CopyWhile;
   /**
-   * Metamorphic Alteration (round 429): the copy effect of an Aura's static ability on the permanent it enchants (CR 611.3a,
+   * Metamorphic Alteration (round 429), Dinosaur Headdress (round 448, an Equipment's): the copy effect of an Aura's static ability on the permanent it enchants (CR 611.3a,
    * 707.2), with the Aura's timestamp (613.7e), kept while that Aura (`until` whileAttached) is attached to it and has the
    * ability (game.ts syncAuraCopies), not one that began after the permanent entered.
    */

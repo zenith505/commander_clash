@@ -2443,7 +2443,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
     // Olag, Ludevic's Hubris (round 435): likewise as it transforms.
-    if (pend.kind === "chooseOption" && (pend.what === "aegisCopy" || pend.what === "transformCopy")) {
+    // Dinosaur Headdress (round 448): likewise for the creature it's attached to (bots attach it to their own creatures).
+    if (pend.kind === "chooseOption" && (pend.what === "aegisCopy" || pend.what === "transformCopy" || pend.what === "attachCopy")) {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
     }

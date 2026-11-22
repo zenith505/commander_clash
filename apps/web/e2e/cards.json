@@ -4850,6 +4850,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "70d2f5f7-f727-48e1-9532-8d365b1c1ae5",
+  "name": "Battlefield Thaumaturge",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Each instant and sorcery spell you cast costs {1} less to cast for each creature it targets.\nHeroic — Whenever you cast a spell that targets this creature, this creature gains hexproof until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Heroic"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "650bf82e-7f83-470c-bf4a-34281bfe9341",
   "name": "Battlegrowth",
   "manaCost": "{G}",
@@ -16864,6 +16897,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0fa2cb01-476e-4e82-94e6-9639e53a7743",
+  "name": "Equinox",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant land\nEnchanted land has \"{T}: Counter target spell if it would destroy a land you control.\"",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "aab905ef-b945-4523-b26f-fb5e6932bb56",
   "name": "Equipoise",
   "manaCost": "{2}{W}",
@@ -20309,6 +20372,32 @@
   "set": "j25",
   "releasedAt": "2024-11-15",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "382097b3-f753-493c-bde4-101c0538feb4",
+  "name": "Frost Breath",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tap up to two target creatures. Those creatures don't untap during their controller's next untap step.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m12",
+  "releasedAt": "2011-07-15",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

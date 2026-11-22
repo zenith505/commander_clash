@@ -176,6 +176,7 @@ import {
   payableDelayed,
   plotCost,
   attacksIfAbleNow,
+  spellWouldDestroyLand,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, restingDef, sameName } from "./faces";
@@ -2696,6 +2697,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       // Ertai's Trickery: only a kicked spell is countered.
       if (c?.type === "counterSpell" && c.ifKicked && !top.kicked?.length) return false;
+      // Equinox (round B302): only a spell that would destroy one of our lands.
+      if (c?.type === "counterSpell" && c.ifDestroysLand && !spellWouldDestroyLand(s, top.id, pid)) return false;
       return !!c && (c.type !== "counterSpell" || !c.unless || !canPayUnless(s, top.controller, c.unless, pid, sourceId, x));
     };
     for (const id of player(s, pid).hand) {

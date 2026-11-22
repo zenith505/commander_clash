@@ -5218,7 +5218,7 @@ line blocks.
    for its own other creatures, as many as it can; it aims each Zevlor copy at that opponent's most valuable permanent
    it can target, else the player.
    Out after round 333 (looked at, not done): Nathan Drake, Treasure Hunter (spending mana as though it were any color
-   on "spells you don't own" needs the spell's owner wherever mana is checked and paid, as Thieving Varmint); Equinox
+   on "spells you don't own" needs the spell's owner wherever mana is checked and paid, as Thieving Varmint); Equinox (done in round B302)
    ("counter target spell if it would destroy a land you control": whether a spell would destroy a land is decided as
    the ability resolves, rulings, which needs a look ahead into what the spell would do).
    Not looked at yet (no list names them; next in popularity): Ore-Rich Stalactite // Cosmium Catalyst; Sasaya, Orochi
@@ -12087,6 +12087,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B302 (least played first, one card off the skip lists, not in Lane A's rounds 447-450): Equinox (out after rounds
+  B247-B301: whether a spell would destroy a land needs a look ahead into what it would do). "Enchanted land has "{T}:
+  Counter target spell if it would destroy a land you control."": any spell can be targeted, and as the ability resolves
+  it's decided whether the spell "would destroy a land if it resolved right then" (rulings): game.ts spellWouldDestroyLand
+  resolves the spell in a copy of the game, as though it were on top of the stack, and sees whether its own instructions
+  destroy a land the ability's controller controls (counterSpell `ifDestroysLand`). As the rulings say, a land destroyed
+  by a game rule after damage doesn't count (state-based actions, CR 704.5g, don't run in the copy), nor a sacrifice, nor
+  a destruction that waits for a choice (the copy stops at the first one: Bend or Break) or comes by chance (a random pick
+  before it, rng.ts randomWatch, not a shuffle: Wild Swing), nor a permanent spell's enters trigger (indirect). Judgment
+  calls: an indestructible land can't be destroyed (CR 702.12b), so a spell aimed at one wouldn't; a land with a
+  regeneration shield or a shield counter would be destroyed, the shield only replacing that (CR 614.1a, 701.19a), so
+  that spell would. Bots tap the land against an opponent's spell that would destroy one of theirs (the usual mana value
+  3 or more for countering). Browser test: cast Stone Rain at your own Swamp, then the enchanted Forest's ability at it.
+  Also, in the hand: a spell that costs less for what it targets (Battlefield Thaumaturge, done in round 447; Hinata;
+  Killian) can now be cast when only the reduced cost is affordable (App.tsx cheaperWithTargets tries a different legal
+  target for each one, creatures first; the engine checks the real targets as it's cast). Browser test: Frost Breath at
+  two creatures with a Thaumaturge and only an Island and a Mountain. +1, 31,891 of 31,936 on B301's head 10c007a1 (main
+  5035246). The compiled text of every other card is unchanged.
+- Out after round B302 (looked at, not done): the lists after round B301 stay out; Battlefield Thaumaturge was found done
+  in round 447 (its reading, a creature in two target slots counting twice, kept). About 45 unsupported cards remain, all
+  of them hard. Known gaps: the hand's "playable" glow for a target-dependent reduction tries one set of targets only (a
+  spell that's cheaper only if it targets a tapped creature isn't offered when only that cost is affordable); bots don't
+  pick targets to make a spell cheaper, and don't use Equinox against a land destruction spell of mana value 2 or less.
 - Round B301 (least played first, one card off the skip lists, not in Lane A's rounds 447-449): Codie, Ravenous Codex (out
   after rounds 204, 448 and B294: "a prepared spell" isn't a term of CR 722). "Whenever you cast a prepared spell, copy it.
   You may choose new targets for the copy.": read as "a spell cast as a prepare spell" (CR 722.3d), the copy of a prepared
@@ -12101,7 +12124,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   copy from exile at the Eater; Codie's copy targets Grizzly Bears instead. +1, 31,886 of 31,936 on B300's head 65c7e36
   (main 2c9aae1), 31,890 with main 5035246 (rounds 447-449). The compiled text of every other card is unchanged.
 - Out after round B301 (looked at, not done): the lists after round B300 stay out; Snowblind ("toughness minus 1" read
-  inside its own layer 7c effect), North Star, Equinox, Spy Kit and Pulmonic Sliver were looked at again. About 47
+  inside its own layer 7c effect), North Star, Equinox (done in round B302), Spy Kit and Pulmonic Sliver were looked at again. About 47
   unsupported cards remain, all of them hard. Known gap: bots don't weigh Codie's copy when picking which prepared copy to
   cast.
 - Round B300 (least played first, one card off the skip lists, not in Lane A's rounds 447-448): Share the Spoils (out after
@@ -12253,7 +12276,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8), 31,871 with main cf06b92 (through round 443) and B293's head a9dbd248 merged in. The compiled text of every other card is unchanged.
 - Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind ("toughness minus 1" read inside
   its own layer 7c effect, no ruling), Codie, Ravenous Codex ("a prepared spell" still isn't defined, CR 722), Cosima, God of
-  the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo (done in round B299) and Snowfall (done in round B298) were looked
+  the Voyage, Share the Spoils, Finale of Promise, Equinox (done in round B302), Saruman of Many Colors, Baron Helmut Zemo (done in round B299) and Snowfall (done in round B298) were looked
   at again and stay out for the reasons in the earlier lists; about 69 unsupported cards remain, all of them hard. Judgment
   calls and known gaps: with another replacement of the same mana (Contamination's {B}, a color chosen for Pulse of
   Llanowar), False Dawn is applied last, the order its controller would choose (CR 616.1), so the mana is white; moving mana
@@ -12733,7 +12756,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   tests click through casting Secret Invasion on your Grizzly Bears and exiling Ana's Serra Angel (the Copy chip's
   title), and activating Runesword on your attacking Bears blocked by Ana's Drudge Skeletons, which is exiled. +2, 31,794
   of 31,936 on B275's branch (with main through B274), 31,797 with main through round 427. The compiled text of every other card is unchanged.
-- Out after round B276 (looked at, not done): the lists after round B275 stay out. Equinox stays out ("counter target
+- Out after round B276 (looked at, not done): the lists after round B275 stay out. Equinox (done in round B302) stays out ("counter target
   spell if it would destroy a land you control": whether the spell would destroy a land if it resolved right then, not
   by a choice, a random chance, damage or a sacrifice, rulings, needs a look ahead into everything the spell would do,
   including what its earlier instructions change). Judgment calls and known gaps: Runesword's two marks both count
@@ -12775,7 +12798,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   whose chooser has left the game returns as a non-Aura enchantment whose upkeep trigger never triggers; the Coffin's
   "you may choose not to untap" uses the existing untap-step prompt. Next in line (not looked at closely yet): the
   remaining bottom cards are all in earlier skip lists (North Star, Golgothian Sylex, Ghostly Flame, the Wishes and other
-  "outside the game" cards stay out); Secret Invasion, Runesword and Equinox are the next to look at again.
+  "outside the game" cards stay out); Secret Invasion, Runesword and Equinox (done in round B302) are the next to look at again.
 - Round B274 (least played first, from the Lane B skip lists, neither in Lane A's round 427): Dimensional Breach's "Exile
   all permanents. For as long as any of those cards remain exiled, at the beginning of each player's upkeep, that player
   returns one of the exiled cards they own to the battlefield." (every permanent, tokens ceasing to exist, CR 111.7,
@@ -13086,7 +13109,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Opposition Agent doesn't control it): the pile is searched, not the library; a Reversal of Fortune copy is made in exile
   and only its spell records the hand it was cast from; Raging River's piles hold only the creatures without flying as it
   resolves, so one that loses flying later is in no pile; bots attacking into Raging River don't weigh it before
-  attacking. Next of Kin, Lightning Storm, Spy Kit, Equinox and Camouflage were looked at again and stay out for the
+  attacking. Next of Kin, Lightning Storm, Spy Kit, Equinox (done in round B302) and Camouflage were looked at again and stay out for the
   reasons in the earlier lists.
 - Round B264 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-419): Soul Echo ("At the
   beginning of your upkeep, sacrifice ~ if there are no echo counters on it. Otherwise, target opponent may choose that for
@@ -13138,7 +13161,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   before the creature's other shields apply, and once declined for some damage it isn't asked again if another effect
   then sends that damage to another creature; bots never answer another player's Blood of the Martyr in their favor, and
   cast Guardian Angel through the general spell logic only; Battlefield Thaumaturge (done in round 447), Sacred Ground, Emblazoned Golem,
-  Equinox and Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
+  Equinox (done in round B302) and Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
 - Round B262 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-417): Immortal Coil
   ("If damage would be dealt to you, prevent that damage. Exile a card from your graveyard for each 1 damage prevented
   this way." and "When there are no cards in your graveyard, you lose the game."): a prevention effect (CR 615.1a), so

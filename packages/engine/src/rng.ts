@@ -3,7 +3,14 @@
 import type { GameState, Player, PlayerId } from "./types";
 import { fireEvent } from "./effects/triggers";
 
+/**
+ * Equinox's look-ahead (game.ts spellWouldDestroyLand): while `on`, the random picks made (coin flips, dice, "at random"),
+ * not the shuffles, so a spell that would destroy a land only by chance isn't one that would (rulings).
+ */
+export const randomWatch = { on: false, picks: 0, shuffling: false };
+
 export function nextRandom(state: { rngState: number }): number {
+  if (randomWatch.on && !randomWatch.shuffling) randomWatch.picks++;
   let t = (state.rngState = (state.rngState + 0x6d2b79f5) | 0);
   t = Math.imul(t ^ (t >>> 15), t | 1);
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -11,10 +18,13 @@ export function nextRandom(state: { rngState: number }): number {
 }
 
 export function shuffle<T>(state: { rngState: number }, arr: T[]): void {
+  const was = randomWatch.shuffling;
+  randomWatch.shuffling = true;
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(nextRandom(state) * (i + 1));
     [arr[i], arr[j]] = [arr[j]!, arr[i]!];
   }
+  randomWatch.shuffling = was;
 }
 
 /**

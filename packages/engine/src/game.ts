@@ -38,7 +38,7 @@ import { characteristics, controllerOf, enchantableBy, attachableBy, everyCreatu
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type CostSymbol, type ParsedCost } from "./mana";
-import { evalAmount, halve } from "./amounts";
+import { evalAmount, halve, manaSymbolsOf } from "./amounts";
 import { abilityUse, addMana, boundSpend, canPayFromPool, falseDawnMana, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { channelMana } from "./channel";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
@@ -10565,7 +10565,15 @@ function offeringProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDe
 const cardMv = (s: GameState, id: ObjectId) => defMv(defOf(s, obj(s, id)));
 
 /** The total mana value of these cards, for collecting evidence (CR 701.59a). */
-export const evidenceValue = (s: GameState, ids: ObjectId[]) => ids.reduce((n, id) => n + cardMv(s, id), 0);
+/** With `symbols` (Baron Helmut Zemo, round B299): the mana symbols of that color among their mana costs instead (CR 107.4e). */
+export const evidenceValue = (s: GameState, ids: ObjectId[], symbols?: Color) => ids.reduce((n, id) => n + (symbols ? cardSymbols(s, id, symbols) : cardMv(s, id)), 0);
+
+/** The mana symbols of this color in a card's mana cost (a split card's both halves, CR 709.4b), a hybrid one counting once. */
+const cardSymbols = (s: GameState, id: ObjectId, color: Color) => manaSymbolsOf(defOf(s, obj(s, id)).manaCost, [color]);
+
+const COLOR_WORD: Record<Color, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
+/** What a total of evidence-like cards is counted in: "total mana value 4", or "15 or more black mana symbols". */
+export const evidenceMeasure = (n: number, symbols?: Color) => (symbols ? `${n} or more ${COLOR_WORD[symbols]} mana symbols among their mana costs` : `total mana value ${n} or more`);
 
 /** The cards `pid` could exile to collect evidence: their graveyard, but not `not` (a spell on its way to the stack) or `taken`. */
 /** `filter`: only cards like this (The Capitoline Triad's historic cards). */
@@ -10575,24 +10583,26 @@ export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, 
  * Why `ids` can't collect evidence N, or null: cards in `pid`'s graveyard with total mana value N or more (CR 701.59a).
  * Without `ids`, whether they could: without enough, they can't choose to (701.59b).
  */
-export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): string | null {
+export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec, symbols?: Color): string | null {
   const pool = evidenceCandidates(s, pid, not, taken, filter);
-  if (!ids) return evidenceValue(s, pool) >= n ? null : `you need cards with total mana value ${n} or more in your graveyard`;
+  if (!ids) return evidenceValue(s, pool, symbols) >= n ? null : `you need ${filter && symbols ? `${filter.text}s` : "cards"} with ${evidenceMeasure(n, symbols)} in your graveyard`;
   if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return filter ? `exile ${filter.text}s from your graveyard` : "collect evidence with cards from your graveyard";
-  if (evidenceValue(s, ids) < n) return `collect evidence ${n}: those cards have total mana value ${evidenceValue(s, ids)}`;
+  if (symbols && evidenceValue(s, ids, symbols) < n) return `exile cards with ${evidenceMeasure(n, symbols)}: those cards have ${evidenceValue(s, ids, symbols)}`;
+  if (evidenceValue(s, ids, symbols) < n) return `collect evidence ${n}: those cards have total mana value ${evidenceValue(s, ids)}`;
   return null;
 }
 
 /** Cards to collect evidence N with when nobody picked them: the fewest, biggest mana values first (null if it can't be done). */
-export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): ObjectId[] {
-  const pool = evidenceCandidates(s, pid, not, taken, filter).sort((a, b) => cardMv(s, b) - cardMv(s, a));
+export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec, symbols?: Color): ObjectId[] {
+  const worth = (id: ObjectId) => (symbols ? cardSymbols(s, id, symbols) : cardMv(s, id));
+  const pool = evidenceCandidates(s, pid, not, taken, filter).sort((a, b) => worth(b) - worth(a));
   const out: ObjectId[] = [];
   for (const id of pool) {
-    if (evidenceValue(s, out) >= n) break;
+    if (evidenceValue(s, out, symbols) >= n) break;
     out.push(id);
   }
   // Then drop the biggest ones the rest already make up for, so as little as possible is exiled.
-  for (let i = 0; i < out.length; i++) if (evidenceValue(s, out.filter((_, j) => j !== i)) >= n) out.splice(i--, 1);
+  for (let i = 0; i < out.length; i++) if (evidenceValue(s, out.filter((_, j) => j !== i), symbols) >= n) out.splice(i--, 1);
   return out;
 }
 
@@ -10879,7 +10889,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "collectEvidence") {
       // Each card pays one cost only: not also exiled for another cost, delve or the spell's own evidence.
       const taken = [...(choices?.exileCards ?? []), ...(choices?.delve ?? []), ...(choices?.evidence ?? [])];
-      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken, c.filter);
+      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken, c.filter, c.symbols);
       if (problem) return `${problem} to ${doing}`;
       continue;
     }
@@ -11697,10 +11707,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
       }
     } else if (c.kind === "collectEvidence") {
-      const ids = choices.collect ?? autoEvidence(s, p.id, c.n, undefined, [], c.filter);
+      const ids = choices.collect ?? autoEvidence(s, p.id, c.n, undefined, [], c.filter, c.symbols);
       collectEvidence(s, p, ids, c.n, c.notEvidence);
       // Kylox's Voltstrider (round 401): "cards exiled with it" (CR 607.2a), kept as the ability is activated.
-      if (c.linkSource) for (const id of ids) if (obj(s, id).zone === "exile") exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+      // Baron Helmut Zemo (round B299): "those exiled cards", the ones this cost exiled (StackItem.costExiled).
+      if (c.linkSource || c.costCards) for (const id of ids) if (obj(s, id).zone === "exile") exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
     }
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);

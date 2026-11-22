@@ -1,7 +1,7 @@
 # Roadmap
 
-31,879 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,965 of
+31,880 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,968 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -6114,7 +6114,7 @@ line blocks.
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
    Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (done in round 445) (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
-   (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
+   (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (done in round B299) (black mana
    symbols among exiled cards' costs); March from Velis Vel (done in round 435) (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
    Stalactite (done in round 334) (craft with cards that share a type, or four or more); Kaya, Spirits' Justice; Ashiok, Wicked Manipulator (a
@@ -11991,6 +11991,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B299 (least played first, one card off the skip lists, not in Lane A's rounds 446-447 nor Lane B's B297-B298):
+  Baron Helmut Zemo's "Boast — Exile any number of black cards from your graveyard with fifteen or more black mana symbols
+  among their mana costs: Copy those exiled cards. You may cast up to three of the copies without paying their mana costs."
+  (out after round 291 and in the Lane B lists, "black mana symbols among exiled cards' costs"): boast's "only if this creature attacked this turn
+  and only once each turn" (CR 702.142a); the cost is chosen and paid as it's activated (CR 602.2b, 601.2h) the way The
+  Capitoline Triad's is, counted in black mana symbols instead of mana value (AdditionalCost collectEvidence `symbols`, game.ts
+  evidenceValue): a hybrid symbol with black in it, a {2/B} and a Phyrexian {B/P} are each one (CR 107.4e-f, counted as
+  devotion and chroma count them), a split card's cost is both halves' (CR 709.4b) and an adventurer card's only its own (CR
+  715.4); a devoid card isn't black (CR 702.114a). The cards it exiled are "those exiled cards" (StackItem.costExiled,
+  castFromAmong `fromCost`), still in exile as those objects (CR 400.7): copied in exile and cast one at a time in the
+  order its controller picks, up to three (CR 707.12, 707.12a, 608.2g), a copy not cast ceasing to exist (CR 704.5e), and a
+  copy of a permanent card resolving as a token. Bots boast after attacking with the fewest cards that make fifteen, none they'd
+  use from the graveyard. The picker counts "black mana symbols N of 15". Browser test: Zemo exiles six black cards (Sludge
+  Crawler, devoid, isn't offered) and casts a copy of Night's Whisper. +1, 31,880 of 31,936 on main a10d465 (through round
+  445 and B296). The compiled text of every other card is unchanged.
+- Out after round B299 (looked at, not done): the lists after round B298 stay out; Saruman of Many Colors (its ward needs a
+  discard of a kind, and "that spell" of its reflexive trigger), North Star and Finale of Promise were looked at again.
+  About 49 unsupported cards remain, all of them hard. Known gaps: bots pick which copies to cast by their usual worth, not
+  weighing which ones are worth the most cast for free; the black mana symbols are read from the card's mana cost as printed
+  (a graveyard card's mana cost isn't changed by any effect here).
 - Round B296 (least played first, two cards off the skip lists, neither in Lane A's rounds 444-445; Flamewar was left to
   round 445 and Starrix was already done in round 442): Havengul Laboratory // Havengul Mystery's "When the creature put onto
   the battlefield with ~ leaves the battlefield, transform ~." (out after rounds 206 and 407): linked to the back face's
@@ -12053,7 +12073,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8), 31,871 with main cf06b92 (through round 443) and B293's head a9dbd248 merged in. The compiled text of every other card is unchanged.
 - Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind ("toughness minus 1" read inside
   its own layer 7c effect, no ruling), Codie, Ravenous Codex ("a prepared spell" still isn't defined, CR 722), Cosima, God of
-  the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo and Snowfall were looked
+  the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo (done in round B299) and Snowfall were looked
   at again and stay out for the reasons in the earlier lists; about 69 unsupported cards remain, all of them hard. Judgment
   calls and known gaps: with another replacement of the same mana (Contamination's {B}, a color chosen for Pulse of
   Llanowar), False Dawn is applied last, the order its controller would choose (CR 616.1), so the mana is white; moving mana

@@ -5695,10 +5695,11 @@ function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { 
 const usefulInGraveyard = (s: GameState, id: ObjectId) => !!compileCard(defOf(s, obj(s, id))).fromGraveyard?.length || abilitiesOf(s, obj(s, id)).activated.some((ab) => ab.zone === "graveyard");
 
 /** Cards to collect evidence N with (CR 701.59a): the fewest that do it, none we'd use from the graveyard; null if there aren't. */
-function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec): ObjectId[] | null {
+/** `symbols` (Baron Helmut Zemo, round B299): counted in mana symbols of that color, not mana value. */
+function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = [], filter?: TargetSpec, symbols?: Color): ObjectId[] | null {
   const keepers = player(s, pid).graveyard.filter((c) => usefulInGraveyard(s, c));
-  if (evidenceProblem(s, pid, n, undefined, not, [...taken, ...keepers], filter)) return null;
-  return autoEvidence(s, pid, n, not, [...taken, ...keepers], filter);
+  if (evidenceProblem(s, pid, n, undefined, not, [...taken, ...keepers], filter, symbols)) return null;
+  return autoEvidence(s, pid, n, not, [...taken, ...keepers], filter, symbols);
 }
 
 /** Does the spell do more if evidence was collected for it (CR 701.59c): a part of it, its enters trigger, or a lower cost? */
@@ -5948,7 +5949,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       out.discard = chooseDiscards(s, pid, c.n, id);
     } else if (c.kind === "collectEvidence") {
       // Conspiracy Unraveler's alternative cost: the fewest cards that make it up.
-      const ids = spareEvidence(s, pid, c.n, id, out.exileCards, c.filter);
+      const ids = spareEvidence(s, pid, c.n, id, out.exileCards, c.filter, c.symbols);
       if (!ids) return null;
       out.collect = ids;
     } else if (c.kind === "exileFromGraveyard" && c.top) {
@@ -9136,7 +9137,7 @@ function ownAbilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: Activat
       if (!picked) return null;
       out.reveal = picked;
     } else if (c.kind === "collectEvidence") {
-      const ids = spareEvidence(s, pid, c.n, undefined, [], c.filter);
+      const ids = spareEvidence(s, pid, c.n, undefined, [], c.filter, c.symbols);
       if (!ids) return null;
       out.collect = ids;
     } else if (c.kind === "discard" && c.lastDrawn) {

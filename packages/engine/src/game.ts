@@ -17,7 +17,7 @@ import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { cardSource, dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
+import { cardSource, dealDamage, dealPlanned, hitsBy, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { isSuspended } from "./effects/run-zones";
@@ -4557,7 +4557,7 @@ function wordsDamage(s: GameState, pid: PlayerId, w: NonNullable<Player["nextDra
   }
   log(s, `${w.source} deals ${w.damage.n} damage to ${"player" in to ? player(s, to.player).name : characteristics(s, target!).name} instead of ${p.name} drawing a card.`);
   const dealt = dealDamage(s, src, "player" in to ? { player: to.player } : { object: target! }, w.damage.n);
-  if (dealt && src.ref && me?.zone === "battlefield" && (me.zoneChanges ?? 0) === src.ref.zc) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false });
+  if (dealt && src.ref && me?.zone === "battlefield" && (me.zoneChanges ?? 0) === src.ref.zc) fireEvent(s, { type: "dealtDamage", id: me.id, amount: dealt, combat: false, ...(target ? { hits: [target.id] } : {}) });
 }
 
 /** Answers PendingDecision "drawInstead": the shield that replaces this draw; the draws after it go on. */
@@ -12123,8 +12123,11 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   let less = (ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0) + yardLess;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
   // Raft Security Officer: "if it targets a creature with power 3 or less", as that target is now.
-  const lessAim = ab.costLessIfTarget && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
+  const lessAim = ab.costLessIfTarget && !ab.costLessIfTarget.count && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
   if (lessAim && objectMatches(s, ab.costLessIfTarget!.filter, lessAim, pid, false)) less += ab.costLessIfTarget!.n;
+  // Wayta, Trainer Prodigy: "if it targets two creatures you control": that many different objects among its targets match.
+  const lessCount = ab.costLessIfTarget?.count;
+  if (lessCount && new Set((targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id] && objectMatches(s, ab.costLessIfTarget!.filter, s.objects[t.id]!, pid, false) ? [t.id] : []))).size >= lessCount) less += ab.costLessIfTarget!.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
   const aim = per && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
@@ -17219,7 +17222,7 @@ function finishCombatDamage(s: GameState): boolean {
     lifelink.delete(key(e));
   }
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
-  for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true, ...(toBlocker.has(id) ? { toBlocker: true as const } : {}) });
+  for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true, ...(toBlocker.has(id) ? { toBlocker: true as const } : {}), hits: hitsBy(done, id) });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
   // "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar): each player dealt it by creatures.
   // Who controlled each creature as it dealt it: "creatures an opponent controls" (Norn's Decree).

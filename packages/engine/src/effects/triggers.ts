@@ -24,6 +24,7 @@ import { hasSuspend, isSuspended } from "./run-zones";
 import { sourcePowerNow } from "./run-laneb202";
 import { liveEmblems } from "../emblems";
 import { landCouldProduce } from "../manaabilities";
+import { copiableDef, copyKey } from "../copies";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
 const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]>> = {
@@ -49,7 +50,7 @@ export function declareAttackersDue(s: GameState, d: DelayedTrigger): boolean {
 }
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage" | /** A face-down permanent turned face up (Panoptic Projektor). */ "turnedFaceUp"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
+type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage" | /** A face-down permanent turned face up (Panoptic Projektor). */ "turnedFaceUp" | /** Wayta, Trainer Prodigy (round 441): damage dealt, `objs` the permanents dealt it in that event, as they were then. */ "dealtDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined } | /** A player drawing a card (Krang, the All-Powerful). */ { event: "draws"; player: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -321,9 +322,9 @@ export type TriggerSourceEvent =
    * `amount` all it dealt then; `creature` it was a creature permanent, `stackSpell` a spell on the stack; `ref` the
    * object it was.
    */
-  | { type: "sourceDealtDamageEvent"; by: PlayerId; colors: Color[]; amount: number; types: string[]; creature?: true; stackSpell?: true; ref?: { id: ObjectId; zc: number } }
+  | { type: "sourceDealtDamageEvent"; by: PlayerId; colors: Color[]; amount: number; types: string[]; creature?: true; stackSpell?: true; ref?: { id: ObjectId; zc: number }; /** The permanents it dealt damage to then (Wayta, Trainer Prodigy). */ hits?: ObjectId[] }
   /** A permanent dealt damage to one or more creatures at the same time (Briarbridge Patrol). */
-  | { type: "dealtDamageToCreatures"; source: ObjectId }
+  | { type: "dealtDamageToCreatures"; source: ObjectId; /** Those creatures (Wayta, Trainer Prodigy). */ hits?: ObjectId[] }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
@@ -340,7 +341,7 @@ export type TriggerSourceEvent =
   /** Erestor of the Council: players finished a vote (CR 701.38), with the votes cast. */
   | { type: "votesDone"; votes: { voter: PlayerId; choice: string }[] }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
-  | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean; /** Some of this combat damage went to a blocking creature (Arashin War Beast). */ toBlocker?: true }
+  | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean; /** Some of this combat damage went to a blocking creature (Arashin War Beast). */ toBlocker?: true; /** The permanents it dealt this damage to (Wayta, Trainer Prodigy, CR 603.2d). */ hits?: ObjectId[] }
   | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | /** After attackers are declared, or none were (CR 508.1, 508.2). */ "declareAttackers" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** With `copy`: the stack id of the spell copied (Parnesse, the Subtle Brush's "that spell", round B289). */ copyOf?: string; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana; /** The permanents whose kept-apart mana was spent on it ("id#zoneChanges", ManaLot.source). */ manaSources?: string[] }
@@ -546,6 +547,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // While set, what the event is for "triggers an additional time" (Panharmonicon, Teysa Karlov, Isshin; CR 603.2d) and
   // the objects doing it, as they were then.
   let causedBy: Cause | null = null;
+  // Wayta, Trainer Prodigy: damage dealt to these permanents, as they are now (just as it's dealt, before state-based
+  // actions, CR 704.3) is what causes a damage trigger.
+  const hitCause = (ids: readonly ObjectId[]): Cause | null => {
+    const objs = [...new Set(ids)].flatMap((id) => {
+      const o = s.objects[id];
+      return o?.zone === "battlefield" ? [{ o, controller: controllerOf(s, o) }] : [];
+    });
+    return objs.length ? { event: "dealtDamage", objs } : null;
+  };
   // While set, `add` is looking at a delayed triggered ability with a duration (CR 603.7b), made by a spell or ability.
   let floating: NonNullable<GameState["floatingTriggers"]>[number] | null = null;
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
@@ -2269,6 +2279,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksPlayerAlone" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
     causedBy = null;
   } else if (ev.type === "dealtDamage") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause(ev.hits ?? []);
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
@@ -2293,6 +2305,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
         }
     }
+    causedBy = null;
   } else if (ev.type === "damagedPlayer") {
     // "Whenever ~ deals damage to a player / an opponent": once for each player dealt damage (CR 603.2c).
     const o = s.objects[ev.source];
@@ -2343,6 +2356,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // damaged player's (CR 603.7b).
     fromFloating((src, ctrl, triggers) => ctrl === ev.player && add(src, ctrl, (e, t) => e === "dealsDamageToYou" && fits(t), triggers, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount }));
   } else if (ev.type === "sourceDealtDamage") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause(ev.id ? [ev.id] : []);
     // "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): its
     // controller's permanents, once for each source and recipient (rulings); the permanent is the subject.
     const hit = ev.id ? s.objects[ev.id] : undefined;
@@ -2384,7 +2399,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, w) !== ev.by) continue;
       add(w, ev.by, (e, t) => e === "sourceYouControlDealsDamage" && !!t.sourceDamage && (t.sourceDamage.toughness ? !ev.combat && ev.toughness !== undefined && ev.amount === ev.toughness : ev.amount === t.sourceDamage.exactly) && !(t.sourceDamage.other && ev.source === w.id), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     }
+    causedBy = null;
   } else if (ev.type === "sourceDealtDamageEvent") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause(ev.hits ?? []);
     // The Red Terror: "Whenever a red source you control deals damage to one or more permanents and/or players": its
     // controller's permanents, once for each source and damage event; the source's colors as it dealt the damage.
     for (const id of s.battlefield) {
@@ -2400,11 +2418,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // controller": anyone's; that controller as it resolves while the source is still that object (CR 608.2h).
       add(w, wc, (e, t) => e === "sourceDealsDamage" && fits(t), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, player: ev.by, ...(ev.ref ? { sourceOf: ev.ref } : {}) });
     }
+    causedBy = null;
   } else if (ev.type === "dealtDamageToCreatures") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause(ev.hits ?? []);
     // Briarbridge Patrol: "Whenever ~ deals damage to one or more creatures": once for all it dealt at the same time (rulings).
     const o = s.objects[ev.source];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreatures");
+    causedBy = null;
   } else if (ev.type === "damagedCreature") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause([ev.id]);
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
     if (o?.zone === "battlefield" && hit) {
@@ -2434,7 +2458,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           add(w, wc, (e, t) => e === "creatureDealsCombatDamageToCreature" && !!t.dealer && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, hit, undefined, undefined, undefined, info);
         }
     }
+    causedBy = null;
   } else if (ev.type === "spellDealtDamage") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause(ev.creature ? [ev.creature] : []);
     // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in
     // a graveyard too): once for each player or battle dealt damage (CR 603.2c).
     // Imodane, the Pyrohammer: a creature dealt damage by a spell whose every target is that creature (CR 115.1), as the
@@ -2449,6 +2476,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.by) watch(obj(s, id));
     fromGraveyards((o, owner) => owner === ev.by && watch(o));
+    causedBy = null;
   } else if (ev.type === "playersDealtDamage") {
     // "Whenever one or more Pirates you control deal damage to your opponents" (Malcolm): the permanents its controller
     // controlled as they dealt it; one that has left as it last existed (its types and subtypes then).
@@ -2482,10 +2510,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const wc = controllerOf(s, w);
-      for (const h of ev.hits) add(w, wc, (e, t) => e === "permanentDealtExcess" && !t.excess?.oneOrMore && fits(t, obj(s, h.id), wc), undefined, undefined, obj(s, h.id), undefined, undefined, undefined, { amount: h.amount, player: h.controller });
+      // Wayta, Trainer Prodigy (CR 603.2d): each about the permanent dealt that excess damage, "one or more" about them all.
+      for (const h of ev.hits) {
+        causedBy = hitCause([h.id]);
+        add(w, wc, (e, t) => e === "permanentDealtExcess" && !t.excess?.oneOrMore && fits(t, obj(s, h.id), wc), undefined, undefined, obj(s, h.id), undefined, undefined, undefined, { amount: h.amount, player: h.controller });
+      }
+      causedBy = hitCause(ev.hits.map((h) => h.id));
       add(w, wc, (e, t) => e === "permanentDealtExcess" && !!t.excess?.oneOrMore && ev.hits.some((h) => fits(t, obj(s, h.id), wc)));
     }
+    causedBy = null;
   } else if (ev.type === "wasDealtDamage") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause([ev.id]);
     // "Whenever ~ is dealt damage", "When enchanted creature is dealt damage": it's still on the battlefield as the
     // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
     const o = s.objects[ev.id];
@@ -2509,7 +2545,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // trigger with a duration (CR 603.7b), that permanent the subject.
       fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentIsDealtDamage" && !!t.dealtFilter && objectMatches(s, t.dealtFilter, o, ctrl, false), triggers, undefined, o, undefined, undefined, undefined, { amount: ev.amount }));
     }
+    causedBy = null;
   } else if (ev.type === "dealtDamageBySource") {
+    // Wayta, Trainer Prodigy (CR 603.2d): what this damage was dealt to.
+    causedBy = hitCause([ev.id]);
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealtDamageBySource", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
     // Archfiend of Spite: only a source an opponent controlled as it dealt the damage; the source noted, for its controller
@@ -2532,6 +2571,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e) => e === "creatureDealsCombatDamageToSelf", undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
       fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "creatureDealsCombatDamageToSelf", triggers, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, player: ev.by }), o);
     }
+    causedBy = null;
   } else if (ev.type === "combatDamageToPlayer" && ev.planeswalker) {
     // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
     const o = obj(s, ev.id);
@@ -2707,6 +2747,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const it = s.objects[first.id];
       return it?.zone === "battlefield" ? it : undefined;
     })();
+    // The Myriad Pools (round 441): "becomes a copy of that spell", which may have left the stack by then (spellCopyKey).
+    const copiesSpell = (ts: TriggeredAbility[]) => ts.some((t) => t.event === "castSpell" && t.body.effects.some((e) => e.type === "becomeCopy" && e.of.ref === "castSpell"));
     const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy) || (!ev.copy && t.cast.onlyCopy)) return false;
@@ -2807,7 +2849,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
         return orSpell || (item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card));
-      }, triggers, ev.stackId, onlyTarget && (triggers ?? abilitiesOf(s, o).triggers).some((t) => t.cast?.subjectTarget) ? onlyTarget : undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.copy && ev.copyOf ? { copied: ev.copyOf } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
+      }, triggers, ev.stackId, onlyTarget && (triggers ?? abilitiesOf(s, o).triggers).some((t) => t.cast?.subjectTarget) ? onlyTarget : undefined, spell ? { copyKey: cardIdOf(spell), ...((spell.faceDown || spell.prototyped) && copiesSpell(triggers ?? abilitiesOf(s, o).triggers) ? { spellCopyKey: copyKey(s, copiableDef(s, spell)) } : {}) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.copy && ev.copyOf ? { copied: ev.copyOf } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     // Veyran (CR 603.2d): casting or copying an instant or sorcery spell, as the spell is.
     const instantOrSorcery = spell ? characteristics(s, spell).types.some((t) => t === "Instant" || t === "Sorcery") : ev.card.types.some((t) => t === "Instant" || t === "Sorcery");
     causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;

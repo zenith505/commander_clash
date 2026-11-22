@@ -213,6 +213,7 @@ import { round437Line } from "./round437";
 import { round438Line } from "./round438";
 import { round439Line } from "./round439";
 import { round440Line } from "./round440";
+import { round441Line } from "./round441";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1098,6 +1099,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 441: oracle/round441.ts.
+    if (round441Line(line, raw, out, isSpell)) continue;
     // Round 440: oracle/round440.ts.
     if (round440Line(line, raw, out, isSpell)) continue;
     // Round 439: oracle/round439.ts.
@@ -9145,6 +9148,13 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   // makes each ability of a permanent you control that it triggers trigger once more (CR 603.2d): its own "when ~ is turned
   // face up" ones too; two Projektors make three in all (rulings).
   if (line === "If turning a face-down permanent face up causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "turnedFaceUp" } };
+  // Wayta, Trainer Prodigy (round 441): only abilities whose trigger conditions refer to damage being dealt, with a creature
+  // its controller controls among what's dealt that damage (rulings: not a life gain from lifelink that damage led to);
+  // two Waytas make three in all (CR 603.2d). See effects/triggers.ts `dealtDamage` causes.
+  if (line === "If a creature you control being dealt damage causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") {
+    const yours = kinds("creature you control", false);
+    return yours ? { by: { event: "dealtDamage", filter: yours.map((x) => ({ ...x.filter, text: "creature you control" })) } } : null;
+  }
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
   // "Another creature you control of the chosen type" (Roaming Throne): the creature type chosen as it entered.
   const ofChosen = m && /^(another )?(creature you control) of the chosen type$/.exec(m[1]!);

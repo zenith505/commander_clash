@@ -124,17 +124,19 @@ export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal
  * source in each damage event (CR 120.3, 603.2c), damage dealt at the same time being one (see dealPlanned); its colors
  * and controller as it dealt it.
  */
-let sourceBatch: Map<string, { src: DamageSource; amount: number; stackSpell: boolean }> | null = null;
-function sourceDealtOnce(s: GameState, src: DamageSource, n: number) {
+let sourceBatch: Map<string, { src: DamageSource; amount: number; stackSpell: boolean; hits: ObjectId[] }> | null = null;
+function sourceDealtOnce(s: GameState, src: DamageSource, n: number, hit?: ObjectId) {
   const key = src.ref ? `${src.ref.object}@${src.ref.zc}` : src.id ? `id:${src.id}` : `name:${src.name}:${src.controller}`;
   // Flame Channeler, Blaze Commando: "a spell you control deals damage" is a spell on the stack (CR 112.1, rulings), not a
   // reflexive or delayed ability of one that has left it.
   const stackSpell = !!src.spell && !!src.ref && s.objects[src.ref.object]?.zone === "stack" && (s.objects[src.ref.object]!.zoneChanges ?? 0) === src.ref.zc;
   if (sourceBatch) {
     const had = sourceBatch.get(key);
-    if (had) had.amount += n;
-    else sourceBatch.set(key, { src, amount: n, stackSpell });
-  } else fireSourceDealt(s, src, n, stackSpell);
+    if (had) {
+      had.amount += n;
+      if (hit !== undefined && !had.hits.includes(hit)) had.hits.push(hit);
+    } else sourceBatch.set(key, { src, amount: n, stackSpell, hits: hit !== undefined ? [hit] : [] });
+  } else fireSourceDealt(s, src, n, stackSpell, hit !== undefined ? [hit] : []);
 }
 
 /**
@@ -143,9 +145,9 @@ function sourceDealtOnce(s: GameState, src: DamageSource, n: number) {
  * creature permanent (CR 109.2: "a red creature" is one on the battlefield, or as it last existed there) or a spell on
  * the stack, and the object it was, for "that creature's or spell's controller" as the trigger resolves.
  */
-function fireSourceDealt(s: GameState, src: DamageSource, amount: number, stackSpell: boolean) {
+function fireSourceDealt(s: GameState, src: DamageSource, amount: number, stackSpell: boolean, hits: ObjectId[]) {
   const creature = !src.spell && !!src.id && src.types.includes("Creature");
-  fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors], amount, types: [...src.types], ...(creature ? { creature: true as const } : {}), ...(stackSpell ? { stackSpell: true as const } : {}), ...(src.ref ? { ref: { id: src.ref.object, zc: src.ref.zc } } : {}) });
+  fireEvent(s, { type: "sourceDealtDamageEvent", by: src.controller, colors: [...src.colors], amount, types: [...src.types], ...(creature ? { creature: true as const } : {}), ...(stackSpell ? { stackSpell: true as const } : {}), ...(src.ref ? { ref: { id: src.ref.object, zc: src.ref.zc } } : {}), ...(hits.length ? { hits } : {}) });
 }
 
 /**
@@ -161,7 +163,7 @@ function fireSourceDealt(s: GameState, src: DamageSource, amount: number, stackS
  */
 /** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
 function noteDealt(s: GameState, src: DamageSource, combat: boolean | undefined, to: { player: PlayerId } | { object: GameObject }, n: number) {
-  sourceDealtOnce(s, src, n);
+  sourceDealtOnce(s, src, n, "object" in to ? to.object.id : undefined);
   // Impact Resonance (round 395): what each source dealt to each permanent or player this turn, added up (rulings: over the
   // whole turn), the source as sourceDealtOnce keys it and the permanent as the object it is (CR 400.7).
   const pairKey = `${src.ref ? `${src.ref.object}@${src.ref.zc}` : src.id ? `id:${src.id}` : `name:${src.name}:${src.controller}`}>${"player" in to ? `p${to.player}` : `${to.object.id}@${to.object.zoneChanges ?? 0}`}`;
@@ -406,7 +408,7 @@ export function dealDamage(
       if (creatureBatch) creatureBatch.push(ev);
       else {
         fireEvent(s, ev);
-        fireEvent(s, { type: "dealtDamageToCreatures", source: src.id });
+        fireEvent(s, { type: "dealtDamageToCreatures", source: src.id, hits: [o.id] });
       }
     }
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, colors: [...src.colors], types: [...src.types], ...(opts.combat ? { combat: true } : {}), ...(c.types.includes("Creature") ? { toughness: c.toughness } : {}) });
@@ -1878,6 +1880,12 @@ function damageAsInfect(s: GameState, pid: PlayerId): boolean {
 /** The "deals damage to a creature" events of the damage dealPlanned is dealing now, fired once it's all dealt. */
 let creatureBatch: Extract<Parameters<typeof fireEvent>[1], { type: "damagedCreature" }>[] | null = null;
 
+/**
+ * The permanents the source `id` dealt damage to among these dealt damage events (Wayta, Trainer Prodigy: a "dealtDamage"
+ * event's `hits`, what that damage was dealt to, CR 603.2d).
+ */
+export const hitsBy = (dealt: readonly (DamageEvent & { dealt: number })[], id: ObjectId): ObjectId[] => [...new Set(dealt.flatMap((d) => (d.dealt > 0 && d.src.id === id && "object" in d.to ? [d.to.object] : [])))];
+
 /** The excess damage `id`, as the object it is now, has been dealt this turn (CR 120.10). */
 export const excessThisTurn = (s: GameState, id: ObjectId, zc: number) => (s.turnLog?.excessDealt ?? []).reduce((a, e) => a + (e.id === id && e.zc === zc ? e.amount : 0), 0);
 
@@ -2020,7 +2028,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   sourceBatch = outerSources;
   for (const ev of toCreatures) fireEvent(s, { ...ev, excess: excessThisTurn(s, ev.id, s.objects[ev.id]?.zoneChanges ?? 0) });
   // Briarbridge Patrol: "Whenever ~ deals damage to one or more creatures": once for each source in this event (rulings).
-  for (const source of new Set(toCreatures.map((ev) => ev.source))) fireEvent(s, { type: "dealtDamageToCreatures", source });
+  for (const source of new Set(toCreatures.map((ev) => ev.source))) fireEvent(s, { type: "dealtDamageToCreatures", source, hits: [...new Set(toCreatures.filter((ev) => ev.source === source).map((ev) => ev.id))] });
   for (const [id, amount] of dealtTo) {
     // Each permanent's damage events this turn: damage dealt at the same time is one event (CR 120.3).
     const key = `${id}@${s.objects[id]?.zoneChanges ?? 0}`;
@@ -2042,7 +2050,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   infectAtZero = outerInfect;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });
   firePlayersDealt(s, out);
-  for (const d of dealers.values()) fireSourceDealt(s, d.src, d.amount, d.stackSpell);
+  for (const d of dealers.values()) fireSourceDealt(s, d.src, d.amount, d.stackSpell, d.hits);
   // Swans of Bryn Argoll (round B252): damage dealt outside a resolution and outside combat (whose own step makes them,
   // game.ts dealCombatDamage; a resolution makes them after the instruction, resolve.ts): the draws right after it.
   if (s.damageDraws?.length && !opts.combatStep && !s.resolving) damageDrawsMade(s);

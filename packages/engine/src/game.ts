@@ -34,7 +34,7 @@ import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead }
 import { pileDrawLabel } from "./effects/run-round386";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType, setChosenTypeAside } from "./copies";
-import { characteristics, controllerOf, enchantableBy, attachableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, enchantableBy, attachableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, yardGrantLost, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type CostSymbol, type ParsedCost } from "./mana";
@@ -4155,7 +4155,8 @@ export function dredgeAmount(s: GameState, pid: PlayerId, id: ObjectId): number 
     const p = obj(s, pid2);
     if (controllerOf(s, p) !== pid) continue;
     const g = abilitiesOf(s, p).dredgeGrants?.find((x) => printedMatches(x.filter, d));
-    if (g) return g.n;
+    // Yixlid Jailer (round B297): dredge a permanent gives the card, gone if that permanent is the earlier (CR 613.7a).
+    if (g && !yardGrantLost(s, p.timestamp)) return g.n;
   }
   return undefined;
 }
@@ -9372,7 +9373,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
   // Alaundo the Seer (round B279): a creature spell cast with its granted trigger gains haste until end of turn (CR 400.7a).
   const hasteEot = s.pending?.kind === "castFree" && !!s.pending.hasteEot && s.pending.objectId === id;
-  const d = defOf(s, o);
+  // Yixlid Jailer (round B297): cast from a graveyard, it has its abilities as the spell it becomes (CR 601.2a, rulings).
+  const d = defOf(s, o).yardLostOf ?? defOf(s, o);
   const spell = compileCard(d).spell;
   // Modes first (CR 601.2b), then the targets they need (601.2c).
   if (spell?.modal && modes === undefined) throw new RulesError(castProblem(s, p.id, id) ?? `choose ${describeCount(spell.modal.min, spell.modal.max)} for ${d.name}`);
@@ -9958,7 +9960,9 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 }
 
 /** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
-export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast);
+// Yixlid Jailer (round B297): an ability an effect gave a card in a graveyard before "cards in graveyards lose all abilities"
+// began to apply is gone, one it gave the card later stays (CR 613.7; layers.ts yardGrantLost), in each of these.
+export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast && !yardGrantLost(s, g.ts));
 /**
  * Flashback an effect gave this card until end of turn: its mana cost (Snapcaster Mage), or a cost of its own (Archmage's
  * Newt's {0}, which a card with no mana cost can pay too, rulings). With both, one way is offered: the {0} one (simplified:
@@ -9966,17 +9970,17 @@ export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "
  */
 const grantedFlashbackWays = (s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] => {
   if (!hasGrantedFlashback(s, o)) return [];
-  const own = s.flashbackGrants!.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast && g.mana)?.mana;
+  const own = s.flashbackGrants!.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && !g.escape && !g.cast && g.mana && !yardGrantLost(s, g.ts))?.mana;
   return [{ kind: "grantedFlashback" as const, mana: own ?? d.manaCost, costs: [], exile: true }];
 };
 /** "You may cast this card from your graveyard" an effect gave this card until end of turn (Case of the Uneaten Feast). */
-const hasGrantedCast = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.cast);
+const hasGrantedCast = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.cast && !yardGrantLost(s, g.ts));
 /**
  * Escape an effect gave this card until end of turn with a cost of its own (The Grim Captain's Locker): a grantedEscape
  * way, unless a permanent already gives it escape (one escape way is offered for each kind, see grantedWays).
  */
 const grantedEscapeUntilEot = (s: GameState, o: GameObject): CastFromGraveyard[] => {
-  const g = o.zone === "graveyard" ? s.flashbackGrants?.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.escape) : undefined;
+  const g = o.zone === "graveyard" ? s.flashbackGrants?.find((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0) && g.escape && !yardGrantLost(s, g.ts)) : undefined;
   return g?.escape ? [{ kind: "grantedEscape", mana: g.escape.mana, costs: [{ kind: "exileFromGraveyard", n: g.escape.exile }], exile: false }] : [];
 };
 
@@ -9990,7 +9994,7 @@ function grantedCastUntilEot(s: GameState, o: GameObject, d: CardDef, has: CastF
   if (o.zone !== "graveyard" || !d.manaCost) return [];
   const out: CastFromGraveyard[] = [];
   for (const g of s.yardCastGrants ?? []) {
-    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || [...has, ...out].some((w) => w.kind === g.kind)) continue;
+    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || [...has, ...out].some((w) => w.kind === g.kind) || yardGrantLost(s, g.ts)) continue;
     out.push(g.kind === "jumpStart" ? { kind: "jumpStart", mana: d.manaCost, costs: [{ kind: "discard", n: 1 }], exile: true } : { kind: "harmonize", mana: d.manaCost, costs: [], exile: true });
   }
   return out;
@@ -10075,6 +10079,10 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       if (g.anyGraveyard ? holder !== caster : holder !== o.owner) continue;
       if (g.yourTurn && s.activePlayer !== holder) continue;
       if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
+      // Yixlid Jailer (round B297): escape, flashback, retrace or jump-start a permanent gives the card is an ability the card
+      // has (CR 113.6, 613.1f), gone if the permanent's timestamp is the earlier one (CR 613.7a); a permission to cast it
+      // isn't an ability of the card's (rulings).
+      if (g.way.kind !== "permission" && g.way.kind !== "turnPermission" && yardGrantLost(s, p.timestamp)) continue;
       // Eye of Duskmantle (round 405): life rather than the mana cost, which a card without one can pay too (CR 118.6a).
       // Ninja Teen (round 428): for a sneak cost, which has its own mana (CR 118.9, 702.190a).
       if (!d.manaCost && !g.way.mana && g.way.alt !== "citadel" && g.way.alt !== "sneak") continue;

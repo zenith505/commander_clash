@@ -56,6 +56,7 @@ export function layerOf(m: Modification): Layer {
     case "removeKeywords":
     case "cantHaveKeywords":
     case "loseAllAbilities":
+    case "yardLoseAll":
     case "addAbility":
     case "unblockedDamage":
     case "loseActivated":
@@ -708,7 +709,9 @@ const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** Does a static ability's source still have it? It must be on the battlefield and not have lost its abilities. */
 function exists(s: GameState, e: Inst, chars: CharMap): boolean {
-  if (e.fromGraveyard) return !e.condition || conditionMet(s, e.condition, e.sourceId!, e.controller!, chars);
+  // Yixlid Jailer (round B297): a graveyard card's static ability is gone once that effect has applied in layer 6, unless it
+  // began to apply in an earlier layer (CR 613.6). Its effect depends on the Jailer's, which applies first (dependsOn).
+  if (e.fromGraveyard) return (!!e.locked || yardLostAt(s) === undefined) && (!e.condition || conditionMet(s, e.condition, e.sourceId!, e.controller!, chars));
   if (!e.affects || e.emblem || e.live) return true;
   const src = chars.get(e.sourceId!);
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
@@ -2011,6 +2014,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantHaveKeywords":
       c.cantHave = [...new Set([...(c.cantHave ?? []), ...m.keywords])];
       return;
+    case "yardLoseAll":
+      // Yixlid Jailer: nothing on the battlefield; computeLayers records it for cards in graveyards (OffFieldGrant.yardLoseAll).
+      return;
     case "loseAllAbilities":
       // Blood Sun: all but its mana abilities (CR 605.1a), printed or granted before; its basic land types' mana
       // abilities stay too (CR 305.6). Its keywords aren't mana abilities.
@@ -2459,6 +2465,10 @@ function signature(s: GameState, e: Inst, chars: CharMap): string {
  */
 function dependsOn(s: GameState, a: Inst, b: Inst, layer: Layer, chars: CharMap): boolean {
   if (a.locked || a.fixed) return false;
+  // Yixlid Jailer (round B297): applying it takes away every graveyard card's static abilities, so a graveyard card's effect
+  // in layer 6 depends on it (CR 613.8a) and comes after it, whatever their timestamps.
+  // So does Cairn Wanderer's, which reads the keywords of creature cards in graveyards.
+  if ((a.fromGraveyard || modsIn(a, layer).some((m) => m.kind === "addKeywords" && m.keywords.some((k) => k.startsWith(YARD_CREATURE_CARD_KEYWORD)))) && modsIn(b, layer).some((m) => m.kind === "yardLoseAll") && (b.locked || exists(s, b, chars))) return true;
   if (!modsIn(b, layer).some((m) => CAN_CREATE_DEPENDENCY.has(m.kind) || ((m.kind === "addKeywords" || m.kind === "removeKeywords") && readsKeywords(a)) || (GIVES_ABILITIES.has(m.kind) && readsAbilities(a)))) return false;
   if (!b.locked && !exists(s, b, chars)) return false;
   const trial: CharMap = new Map(chars);
@@ -2564,6 +2574,9 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
       if (pick.offFieldAll && layer === "5" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true, ...(s.objects[pick.sourceId]?.chosen?.color ? { chosenColor: s.objects[pick.sourceId]!.chosen!.color } : {}) });
+      // Yixlid Jailer (round B297): as it applied in layer 6, to every card in every graveyard (cards.ts yardLostDef).
+      if (layer === "6" && pick.sourceId && modsIn(pick, "6").some((m) => m.kind === "yardLoseAll"))
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: [], yardLoseAll: true });
       // Celestial Dawn (round B281): as it applied in layer 5, to its controller's spells and nonland cards too.
       if (pick.offFieldColorsYours && layer === "5" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), yours: true });
@@ -2695,7 +2708,7 @@ export function invalidateCharacteristics(s: GameState) {
 }
 
 export function characteristics(s: GameState, o: GameObject): Characteristics {
-  if (o.zone !== "battlefield") return withCounters(o, printed(s, o));
+  if (o.zone !== "battlefield") return withCounters(s, o, printed(s, o));
   let hit = cacheEnabled ? cache.get(s) : undefined;
   if (hit?.sig !== undefined && !sameCounts(s, hit.sig)) hit = undefined;
   if (!hit || !hit.map.has(o.id)) {
@@ -2719,9 +2732,11 @@ export function characteristics(s: GameState, o: GameObject): Characteristics {
  * A card outside the battlefield with counters on it (an effect put them there, CR 122.2): a keyword counter gives it that
  * keyword (CR 122.1b), and +1/+1 and -1/-1 counters change a creature card's power and toughness (CR 122.1a).
  */
-function withCounters(o: GameObject, c: Characteristics): Characteristics {
+function withCounters(s: GameState, o: GameObject, c: Characteristics): Characteristics {
   for (const [kind, n] of Object.entries(o.counters)) {
     const kw = (n ?? 0) > 0 ? keywordOfCounter(kind) : undefined;
+    // Yixlid Jailer (round B297): in a graveyard, a keyword from a counter put on before that effect began is gone (CR 613.7c).
+    if (kw && o.zone === "graveyard" && yardGrantLost(s, o.counterTimestamps?.[kind] ?? o.timestamp)) continue;
     if (kw && !c.keywords.some((k) => sameCI(k, kw))) c.keywords.push(kw);
   }
   const [dp, dt] = ptFromCounters(o);
@@ -2762,12 +2777,33 @@ interface OffFieldGrant {
   cards?: "nonlandPermanent" | "libraryLand" | "yardCreature";
   /** A color change for its controller's spells and the nonland cards they own outside the battlefield (Celestial Dawn). */
   yours?: true;
+  /** "Cards in graveyards lose all abilities" (Yixlid Jailer, round B297): every card in every graveyard, from `timestamp`. */
+  yardLoseAll?: true;
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
 
 /** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
-const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands || st.offFieldCards || st.offFieldColorsYours));
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells || st.offFieldLands || st.offFieldCards || st.offFieldColorsYours || st.mods.some((m) => m.kind === "yardLoseAll")));
+
+/**
+ * Yixlid Jailer (round B297): the latest timestamp among the "cards in graveyards lose all abilities" effects that apply now
+ * (CR 613.7a: its source's), or undefined with none. Every card in a graveyard has lost its own abilities then, and the
+ * abilities effects gave it before that timestamp; one an effect gave it later stays (layer 6 in timestamp order, CR 613.7;
+ * neither effect changes what the other applies to, so neither depends on the other, 613.8a). While the layers are being
+ * worked out it's what applied so far (none before layer 6).
+ */
+export function yardLostAt(s: GameState): number | undefined {
+  let at: number | undefined;
+  for (const g of offFieldGrants(s)) if (g.yardLoseAll && (at === undefined || g.timestamp > at)) at = g.timestamp;
+  return at;
+}
+
+/** Whether an ability an effect gave a card in a graveyard, with this timestamp, is gone under Yixlid Jailer (yardLostAt). */
+export const yardGrantLost = (s: GameState, timestamp: number | undefined): boolean => {
+  const at = yardLostAt(s);
+  return at !== undefined && (timestamp ?? 0) < at;
+};
 
 function offFieldGrants(s: GameState): OffFieldGrant[] {
   if (building) return building.grants;

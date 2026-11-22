@@ -2228,7 +2228,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // until end of turn; a card with no mana cost gets an ability it can't pay for (CR 118.6, see cards.ts).
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "graveyard") continue;
-        (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword });
+        (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword, ts: s.nextTimestamp++ });
         log(s, `${defOf(s, o).name} gains ${e.keyword.toLowerCase()} until end of turn (${src}).`);
       }
       return;
@@ -2237,7 +2237,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Ghost Ark: each matching card in its controller's graveyard as this resolves (CR 611.2c, rulings), unearth with
       // this cost until end of turn, while it's that card (CR 400.7).
       const cards = player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(e.filter, defOf(s, o)));
-      for (const o of cards) (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword, cost: e.cost });
+      const ts = s.nextTimestamp++;
+      for (const o of cards) (s.yardKeywordGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, keyword: e.keyword, cost: e.cost, ts });
       if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.keyword.toLowerCase()} ${e.cost} until end of turn (${src}).`);
       return;
     }
@@ -2246,7 +2247,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // there this turn with jump-start or harmonize (game.ts grantedCastUntilEot).
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "graveyard") continue;
-        (s.yardCastGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.kind });
+        (s.yardCastGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.kind, ts: s.nextTimestamp++ });
         log(s, `${defOf(s, o).name} gains ${e.kind === "jumpStart" ? "jump-start" : "harmonize"} until end of turn (${src}).`);
       }
       return;
@@ -2262,10 +2263,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Confession Dial: an escape cost made of the card's own mana cost; a card with none has no such cost and can't be cast
       // this way (as with flashback, rulings on Snapcaster Mage).
       const escapeOf = (o: GameObject) => (e.escape ? { mana: e.escape.mana ?? defOf(s, o).manaCost ?? "", exile: e.escape.exile } : undefined);
+      // Yixlid Jailer (round B297): an ability gained with this timestamp (CR 613.7a), against "cards in graveyards lose all abilities".
+      const ts = s.nextTimestamp++;
       for (const o of cards) {
         const escape = escapeOf(o);
         if (escape && !escape.mana) continue;
-        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}), ...(e.mana && !escape && !e.cast ? { mana: e.mana } : {}) });
+        (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, ts, ...(escape ? { escape } : {}), ...(e.cast ? { cast: true as const } : {}), ...(e.mana && !escape && !e.cast ? { mana: e.mana } : {}) });
       }
       if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} ${e.escape ? `escape (${cards.length === 1 ? escapeOf(cards[0]!)!.mana : (e.escape.mana ?? "its mana cost")}, exile ${e.escape.exile} other cards from your graveyard)` : e.cast ? `"You may cast this card from your graveyard"` : e.mana ? `flashback ${e.mana}` : "flashback"} until end of turn.`);
       return;

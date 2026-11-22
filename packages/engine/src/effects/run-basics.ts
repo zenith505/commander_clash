@@ -5,7 +5,7 @@ import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, 
 import { addPhases, endWhileTapped, manaBurn, canPreventDamage, inCombatPhase, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
-import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, damageUnalterableTo, type DamageEvent, type DamageSource } from "../damage";
+import { cardSource, dealDamage, dealDamageBatch, dealPlanned, hitsBy, excessOver, lethalAmounts, objectSource, planDamage, unpreventable, damageUnalterableTo, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { emptyPool } from "../mana";
@@ -305,9 +305,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         events = events.map((ev) => (damageUnalterableTo(s, ev.to) ? ev : { ...ev, n: Math.max(0, ev.n - off) })).filter((ev) => ev.n > 0);
         log(s, `${src}: ${off} of that damage is prevented.`);
       }
-      const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));
+      const results: (DamageEvent & { dealt: number })[] = [];
+      const dealt = dealtWithExcess(s, from, events, (evs) => {
+        const out = dealDamageBatch(s, evs, { lifelink });
+        results.push(...out);
+        return out;
+      });
       gainLife(s, from.controller, lifelink.n, "lifelink");
-      if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
+      if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false, hits: hitsBy(results, from.id) });
       return;
     }
     case "eachDealsDamage": {
@@ -328,7 +333,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const [pid, g] of gains) gainLife(s, pid, g.n, "lifelink");
       const by = new Map<ObjectId, number>();
       for (const d of dealt) if (d.dealt > 0 && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
-      for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
+      for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false, hits: hitsBy(dealt, id) });
       return;
     }
     case "preventNext": {
@@ -1206,12 +1211,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const to = (x: DamageEvent) => ("object" in x.to ? x.to.object : "");
       const lethal = new Map(events.map((x) => [`${x.src.id}>${to(x)}`, lethalAmounts(s, x.src, obj(s, to(x)))]));
       const by = new Map<string, number>();
-      for (const d of dealDamageBatch(s, events)) {
+      const results = dealDamageBatch(s, events);
+      for (const d of results) {
         if (!d.dealt || !d.src.id) continue;
         by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
         noteExcess(s, to(d), excessOver(lethal.get(`${d.src.id}>${to(d)}`)!, d.dealt), true);
       }
-      for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
+      for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false, hits: hitsBy(results, id) });
       for (const f of pairs.flat()) if (f.zone === "battlefield") f.foughtTurn = s.turn;
       return;
     }
@@ -1242,12 +1248,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }),
         );
         const by = new Map<string, number>();
+        const results: (DamageEvent & { dealt: number })[] = [];
         dealtWithExcess(s, events[0]!.src, events, (evs) => {
           const out = dealDamageBatch(s, evs);
+          results.push(...out);
           for (const d of out) if (d.dealt && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
           return out;
         });
-        for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
+        for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false, hits: hitsBy(results, id) });
         return;
       }
       // Fighting: each creature deals damage at the same time, so each is one event per source.
@@ -1265,8 +1273,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         noteExcess(s, b.id, excessOver(lethalB, byA), true);
         noteExcess(s, a.id, excessOver(lethalA, byB), true);
       }
-      if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
-      if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
+      if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false, hits: [b.id] });
+      if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false, hits: [a.id] });
       if (e.byToughness) return;
       // Boxing Ring: "a creature that fought this turn", even one that's dealt no damage (CR 701.14b).
       for (const f of [a, b]) if (f.zone === "battlefield") f.foughtTurn = s.turn;

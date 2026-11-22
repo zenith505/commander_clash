@@ -1,7 +1,7 @@
 # Roadmap
 
-31,871 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,965 of
+31,873 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,967 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4797,6 +4797,31 @@ line blocks.
    their commander Cosima; bots exile any other Cosima at their upkeep, add voyage counters until three (fewer with few cards
    left in the library), use Flamewar's "Discard your hand" in their second main phase once it brings back two more cards
    than their hand, and sacrifice only a noncreature artifact token (Treasure, Clue, Food) to convert it.
+   Round 446 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss and Finale of
+   Promise to Psychic Paper, back off the lists (its name's layer is settled by CR 123.6c: a name change is a text-changing
+   effect, as Witness Protection's), and Vesuvan Shapeshifter, whose pieces are there now. Psychic Paper's "As this
+   Equipment becomes attached to a creature, choose a creature card name and a creature type." (asked each time it becomes
+   attached, as Sanctuary Blade's color, CR 614.12; any creature card's name in the game, CR 201.4, and an existing creature
+   type, rulings; CompiledCard.attachChooseNameAndType) and "Equipped creature has ward {1}, it can't be blocked, and its
+   name and creature type are the last chosen name and creature type." (the name in layer 3, CR 123.6c, 613.1c, Modification
+   setName `chosen`; the creature type replacing its others, its other card types kept, CR 205.1b, 613.1d; so the legend
+   rule sees the new name, CR 704.5j). Vesuvan Shapeshifter's "As this creature enters or is turned face up, you may choose
+   another creature on the battlefield. If you do, until this creature is turned face down, it becomes a copy of that
+   creature, except it has "At the beginning of your upkeep, you may turn this creature face down."" (as it enters, a copy
+   replacement, so the copied creature's enters abilities apply and trigger, CR 614.1c; as it's turned face up, chosen with
+   the special action or as an effect turns it face up, CR 614.1e, 702.37e, so the copy's "turned face up" abilities apply
+   and trigger, rulings; Action turnFaceUp `copy`, PendingDecision "faceUpCopy"; the exception a copiable value, CR 707.9b,
+   so a copy of it has the trigger; CopyEffect.until "faceDown", ended as it's turned face down, CR 611.2a, so face up again
+   it's its own card with its morph; entering face down, nothing is chosen, CR 708.2). Browser tests click through Psychic
+   Paper's name and type pickers, Vesuvan's Turn face up with a Hill Giant to copy and without a copy (a 0/0 that dies),
+   Ixidor's ability turning it face up (Copy Hill Giant), and its upkeep "Yes" to turn it face down. +2, 31,873 of 31,936 on
+   this stacked branch (round 445 #744); the compiled text of every other card is unchanged.
+   Out after round 446 (looked at, not done): the lists after round 445 (still out, for their reasons), and Taskmaster,
+   Mercenary Mimic and Havengul Laboratory (Lane B's round B296). Known gaps: the names offered for Psychic Paper (as for
+   every name choice) are those of the creature cards in the game, not every creature card there is; bots keep the equipped
+   creature's own name and pick their most common creature type; bots never turn Vesuvan face down at their upkeep, and turn
+   it face up (or answer an effect turning it face up) as a copy of the creature with the most power, toughness and
+   abilities, not a legend whose name they have, never as a 0/0.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

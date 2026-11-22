@@ -26883,6 +26883,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "90b98aa7-c8d0-4853-887c-164f8160c3f3",
+  "name": "Ixidor, Reality Sculptor",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Face-down creatures get +1/+1.\n{2}{U}: Turn target face-down creature face up.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ons",
+  "releasedAt": "2002-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8074afbf-190b-4a24-b939-cc559bdffe38",
   "name": "Izoni, Center of the Web",
   "manaCost": "{4}{B}{G}",
@@ -40328,6 +40361,32 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/f/0/f0a3dc50-a5c4-4073-8fec-2f68544bc2a1.jpg?1783919909"
    }
   ]
+ },
+ {
+  "oracleId": "110b601c-bf38-4985-8de6-fcb477f543a8",
+  "name": "Psychic Paper",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "As this Equipment becomes attached to a creature, choose a creature card name and a creature type.\nEquipped creature has ward {1}, it can't be blocked, and its name and creature type are the last chosen name and creature type.\nEquip {2}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "e5128230-3535-4f77-8b97-20d0791e7b1d",
@@ -56323,6 +56382,38 @@
   "commanderLegal": "legal",
   "set": "mat",
   "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ec577886-fb25-455b-9c3d-5fd610959436",
+  "name": "Vesuvan Shapeshifter",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "As this creature enters or is turned face up, you may choose another creature on the battlefield. If you do, until this creature is turned face down, it becomes a copy of that creature, except it has \"At the beginning of your upkeep, you may turn this creature face down.\"\nMorph {1}{U}",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Morph"
+  ],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

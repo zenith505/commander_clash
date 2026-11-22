@@ -37,6 +37,7 @@ import { runLinkedCreatureOrHandEffect, runLinkedFaceUpLoseLifeEffect, runLoyalt
 import { runLandTypeCopiesEffect } from "./run-round435";
 import { runTokenCopiesOfAttachedEffect } from "./run-round442";
 import { runExileSelfCastFreeEffect } from "./run-round443";
+import { runTokenCopiesOfExiledWithCounterEffect } from "./run-round444";
 import { runRound421Effect } from "./run-round421";
 import { runRound424Effect } from "./run-round424";
 import { runChooseSourceNowEffect } from "./run-round364";
@@ -2061,6 +2062,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runTokenCopiesOfAttachedEffect(s, e, ctx, src);
     case "exileSelfCastFree":
       return runExileSelfCastFreeEffect(s, ctx, src);
+    case "tokenCopiesOfExiledWithCounter":
+      return runTokenCopiesOfExiledWithCounterEffect(s, e, ctx, src);
     case "linkedFaceUpLoseLife":
       return runLinkedFaceUpLoseLifeEffect(s, ctx, src);
     case "linkedCreatureOrHand":

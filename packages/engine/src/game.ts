@@ -3516,7 +3516,7 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: DrawAfter, made
       continue;
     }
     const before = player(s, pid).lastDrawn;
-    const one = drawOne(s, pid, { left: n, made, ...(after ? { after } : {}) });
+    const one = drawOne(s, pid, { left: n, made, ...(after ? { after } : {}), ...(reveal ? { breath: true as const } : {}) });
     if (one === "paused") return false;
     if (!one) break;
     // Breathstealer's Crypt (round B289): the card its draw drew (none when an empty library's replacement applied).
@@ -3660,6 +3660,21 @@ export function cantDraw(s: GameState, pid: PlayerId): ObjectId | undefined {
 }
 
 function drawWithoutAsking(s: GameState, pid: PlayerId) {
+  quietDraws++;
+  try {
+    drawQuietly(s, pid);
+  } finally {
+    quietDraws--;
+  }
+}
+
+/**
+ * Draws made inside another draw's replacement (drawWithoutAsking) whose pause the replacement can't wait for: God-Eternal
+ * Kefnet's reveal isn't asked during them (kefnetAsk), an instant or sorcery card being revealed (as miracle's is).
+ */
+let quietDraws = 0;
+
+function drawQuietly(s: GameState, pid: PlayerId) {
   if (cantDraw(s, pid)) return;
   // Possessed Portal: the draw a Notion Thief or an Alms Collector makes is skipped too (CR 614.5: it's a new draw).
   const portal = drawSkipper(s);
@@ -3886,7 +3901,7 @@ function archiveDraws(s: GameState, pid: PlayerId): number {
  * One draw, which nothing but an empty library's replacements can change any more. False when nothing was drawn and the
  * draws stop; "paused" when Out of the Tombs waits for its player to choose (`rest`: the draws after this one).
  */
-function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number[]; after?: DrawAfter } = { left: 0, made: [] }): boolean | "paused" {
+function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number[]; after?: DrawAfter; /** Breathstealer's Crypt's own draw (BREATH_REVEAL). */ breath?: true } = { left: 0, made: [] }): boolean | "paused" {
   const p = player(s, pid);
   // River Song (round 382): "You draw cards from the bottom of your library rather than the top." Otherwise it's the same
   // draw (rulings), so `top` is the card drawn wherever it comes from.
@@ -3977,7 +3992,65 @@ function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number
         body: { targets: [], effects: [{ type: "miracle", ...(m.granted ? { cost: m.mana } : {}) }], text: `Miracle ${m.mana}: you may cast ~ for its miracle cost.` },
       });
   }
+  // God-Eternal Kefnet (round B291): the first card drawn this turn may be revealed as it's drawn.
+  if (p.draws.n === 1 && card.zone === "hand" && kefnetAsk(s, pid, top, rest) === "paused") return "paused";
   return true;
+}
+
+/**
+ * God-Eternal Kefnet (round B291, CompiledCard.kefnetReveal): "You may reveal the first card you draw each turn as you draw
+ * it." Its controller looks at the card as it's drawn and decides before it joins the others in hand (rulings), so the
+ * draw pauses for the question and the draws after it (`rest`) go on once it's answered (answerKefnet). Each Kefnet they
+ * control asks in turn (rulings: a card may be revealed for any number of them). Only an instant or sorcery card is asked
+ * about: revealing another card does nothing ("whenever you reveal an instant or sorcery card this way"). During a draw made
+ * inside another replacement that can't pause (quietDraws), such a card is revealed for each, as miracle's is.
+ */
+function kefnetAsk(s: GameState, pid: PlayerId, card: ObjectId, rest: { left: number; made: number[]; after?: DrawAfter; breath?: true }): "paused" | void {
+  const o = s.objects[card];
+  if (!o || o.zone !== "hand" || !(objIsType(s, o, "Instant") || objIsType(s, o, "Sorcery"))) return;
+  const kefnets = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).kefnetReveal);
+  if (!kefnets.length) return;
+  if (quietDraws) {
+    log(s, `${player(s, pid).name} reveals ${defOf(s, o).name} as they draw it (${nameOf(s, kefnets[0]!)}).`);
+    for (const k of kefnets) kefnetTrigger(s, pid, k, card);
+    return;
+  }
+  // Breathstealer's Crypt's draw reveals the card too (a noncreature card: only revealed), before this pause.
+  if (rest.breath) breathReveal(s, pid, card, rest.left, rest.after, rest.made);
+  s.pending = kefnetQuestion(s, pid, card, { kefnets, left: rest.left, made: [...rest.made], ...(rest.after ? { after: rest.after } : {}) });
+  return "paused";
+}
+
+function kefnetQuestion(s: GameState, pid: PlayerId, card: ObjectId, k: NonNullable<Extract<PendingDecision, { kind: "chooseMay" }>["kefnet"]>): PendingDecision {
+  const name = defOf(s, obj(s, card)).name;
+  const less = abilitiesOf(s, obj(s, k.kefnets[0]!)).kefnetReveal?.less ?? 2;
+  return { kind: "chooseMay", player: pid, source: nameOf(s, k.kefnets[0]!), prompt: `reveal ${name} as you draw it${k.revealed ? " for this one too" : ""}: you copy it and may cast the copy for {${less}} less`, card, kefnet: k };
+}
+
+/** Kefnet's "Whenever you reveal an instant or sorcery card this way" (CR 603.2): its trigger, about that card. */
+function kefnetTrigger(s: GameState, pid: PlayerId, kefnet: ObjectId, card: ObjectId) {
+  const k = obj(s, kefnet);
+  const r = abilitiesOf(s, k).kefnetReveal;
+  if (!r) return;
+  s.triggerQueue.push({ sourceId: kefnet, sourceCardId: cardIdOf(k), controller: pid, index: -1, sourceZc: k.zoneChanges ?? 0, subject: { id: card, zc: obj(s, card).zoneChanges ?? 0 }, body: { targets: [], effects: [{ type: "kefnetCopy", less: r.less }], text: `Whenever you reveal an instant or sorcery card this way, ${r.text}` } });
+}
+
+/** Answers God-Eternal Kefnet's question (kefnetAsk): reveal the card for this Kefnet or not; then the next one asks, then the draws go on. */
+function answerKefnet(s: GameState, p: Player, yes: boolean) {
+  const pend = s.pending;
+  if (pend?.kind !== "chooseMay" || !pend.kefnet || pend.card === undefined) throw new RulesError("nothing to decide");
+  const k = pend.kefnet;
+  s.pending = null;
+  const [first, ...others] = k.kefnets;
+  if (yes) {
+    if (!k.revealed) log(s, `${p.name} reveals ${nameOf(s, pend.card)} as they draw it (${pend.source}).`);
+    kefnetTrigger(s, p.id, first!, pend.card);
+  } else log(s, `${p.name} doesn't reveal the card for ${pend.source}.`);
+  if (others.length && s.objects[pend.card]?.zone === "hand") {
+    s.pending = kefnetQuestion(s, p.id, pend.card, { ...k, kefnets: others, ...(yes || k.revealed ? { revealed: true as const } : {}) });
+    return;
+  }
+  continueDraws(s, p.id, k.left, k.after, [...k.made]);
 }
 
 /** Whether `pid` draws from the bottom of their library (River Song, CompiledCard.drawsFromBottom): a permanent of theirs says so. */
@@ -4824,7 +4897,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     made.unshift(madeEntry(pend.archive - 1, pend.scriv ?? 0), madeEntry(pend.archive - 1, pend.scriv ?? 0));
   } else {
     const before = p.lastDrawn;
-    const one = drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) });
+    const one = drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}), ...(pend.breath ? { breath: true as const } : {}) });
     if (one === "paused") return;
     // Breathstealer's Crypt (round B289): not dredging, the Crypt's own draw drew this card.
     if (one && pend.breath && p.lastDrawn && p.lastDrawn !== before && breathReveal(s, p.id, p.lastDrawn.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made) === "paused") return;
@@ -15024,6 +15097,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   }
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.weirding) return answerWeirding(s, p, yes);
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.breathstealer) return answerBreath(s, p, yes);
+  if (pend?.kind === "chooseMay" && pend.player === p.id && pend.kefnet) return answerKefnet(s, p, yes);
   if (pend?.kind === "chooseMay" && pend.player === p.id && pend.skipDraw) {
     const { from, declined } = pend.skipDraw;
     s.pending = null;

@@ -136,6 +136,7 @@ import { runLaneB284Effect } from "./run-laneb284";
 import { runLaneB285Effect } from "./run-laneb285";
 import { runLaneB287Effect } from "./run-laneb287";
 import { runLaneB288Effect } from "./run-laneb288";
+import { runLaneB291Effect } from "./run-laneb291";
 import { runLaneB279Effect } from "./run-laneb279";
 import { runLaneB241Effect } from "./run-laneb241";
 import { runLaneB250Effect } from "./run-laneb250";
@@ -236,7 +237,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
   // Together), "with the same controller" (Simic Guildmage), "in that player's graveyard" (Goblin Welder).
   body.targets.forEach((spec, i) => {
-    if (legal[i] && (spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.sharesCardTypeWith?.length || spec.powerAtMostOf?.length || spec.mvAtMostOf?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined || spec.attachedToTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.sharesCardTypeWith?.length || spec.powerAtMostOf?.length || spec.mvAtMostOf?.length || spec.sharesNoCreatureTypeWith?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.controlledByTarget !== undefined || spec.blockedByTarget !== undefined || spec.attachedToTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
   });
   // Fiery Annihilation: with the creature it's attached to an illegal target, the Equipment isn't exiled either (rulings).
   body.targets.forEach((spec, i) => {
@@ -2262,6 +2263,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB287Effect(s, e, ctx, src);
     case "nihiloorTap":
       return runLaneB288Effect(s, e, ctx, src);
+    case "kefnetCopy":
+      return runLaneB291Effect(s, e, ctx, src);
     case "timeCounterFromOwnExiled":
     case "alaundoCast":
       return runLaneB279Effect(s, e, ctx, src);

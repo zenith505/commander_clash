@@ -249,6 +249,7 @@ import {
   mayPayUse,
   canActAtSorcerySpeed,
   seatOrder,
+  unlessDiscardable,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -6569,7 +6570,9 @@ function Controls({
     const canBlight = !pending.blight || blightOptions(s, HUMAN, pending.blight).length > 0;
     // "Ward—Collect evidence 4": only with enough mana value in your graveyard (rulings); you pick the cards after.
     const canEvidence = !pending.collectEvidence || evidenceValue(s, evidenceCandidates(s, HUMAN)) >= pending.collectEvidence;
-    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice && canBlight && canEvidence ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    // "Ward—Discard an enchantment, instant, or sorcery card" (Saruman of Many Colors): only with one of those in hand.
+    const discardable = pending.discardFilter ? unlessDiscardable(s, HUMAN, pending.discardFilter).length : s.players[HUMAN]!.hand.length;
+    const taps = s.players[HUMAN]!.life >= life && discardable >= discard && canSacrifice && canBlight && canEvidence ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     // Ward—Waterbend: mana first, then your artifacts and creatures pay {1} each of the rest (CR 701.67a).
     const water = !taps && pending.waterbend ? autoWaterbend(s, HUMAN, parseManaCost(pending.cost), 0, pending.waterbend, []) : null;
     return (
@@ -6583,7 +6586,11 @@ function Controls({
           ) : pending.exileGraveyard ? (
             "exile all cards from your graveyard"
           ) : discard ? (
+            pending.discardFilter ? (
+            `discard ${discard === 1 ? `${/^[aeiou]/i.test(pending.discardFilter.text) ? "an" : "a"} ${pending.discardFilter.text}` : `${discard} ${pending.discardFilter.text}s`}`
+          ) : (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}${pending.discardRandom ? " at random" : ""}`
+          )
           ) : pending.collectEvidence ? (
             `collect evidence ${pending.collectEvidence} (exile cards with total mana value ${pending.collectEvidence} or more from your graveyard)`
           ) : pending.blight ? (

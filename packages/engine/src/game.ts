@@ -15,7 +15,7 @@ import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDama
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
+import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, unlessDiscardable, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, hitsBy, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -15487,13 +15487,15 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
     }
     if (pend.discard) {
       // Then which cards to discard; the cards are discarded as the counter effect carries on (see counterOnStack).
-      if (p.hand.length < pend.discard) throw new RulesError(`you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
+      // "Ward—Discard an enchantment, instant, or sorcery card" (Saruman of Many Colors, round 449): only cards like that.
+      const able = unlessDiscardable(s, p.id, pend.discardFilter);
+      if (able.length < pend.discard) throw new RulesError(pend.discardFilter ? `you don't have ${pend.discard === 1 ? `${/^[aeiou]/i.test(pend.discardFilter.text) ? "an" : "a"} ${pend.discardFilter.text}` : `${pend.discard} ${pend.discardFilter.text}s`} to discard` : `you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
       r.scratch = { ...r.scratch, queue: [p.id], chosen: {} };
-      if (p.hand.length > pend.discard) {
-        s.pending = { kind: "discard", player: p.id, count: pend.discard, source: pend.source };
+      if (able.length > pend.discard) {
+        s.pending = { kind: "discard", player: p.id, count: pend.discard, source: pend.source, ...(pend.discardFilter ? { filter: pend.discardFilter } : {}) };
         return;
       }
-      r.scratch.chosen![p.id] = [...p.hand];
+      r.scratch.chosen![p.id] = able;
       s.pending = null;
       continueResolution(s);
       return;

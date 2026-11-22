@@ -1755,6 +1755,16 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
 }
 
 /**
+ * The cards in a player's hand they could discard to pay "unless ... discards" (UnlessPays.discard): any card, or with
+ * `discardFilter` only cards like it ("Ward—Discard an enchantment, instant, or sorcery card", Saruman of Many Colors, round
+ * 449), as printed in the hand (CR 701.9a).
+ */
+export function unlessDiscardable(s: GameState, pid: PlayerId, filter: TargetSpec | undefined): ObjectId[] {
+  const hand = player(s, pid).hand;
+  return filter ? hand.filter((id) => printedMatches(filter, defOf(s, s.objects[id]!))) : [...hand];
+}
+
+/**
  * "Unless [payer] pays ...", as this resolves (CR 118.12): true if they paid, false if they didn't, "paused" while they
  * choose. They may activate mana abilities to pay (CR 605.3a).
  */
@@ -1768,7 +1778,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     if (sc.unlessWay === undefined) {
       const p = player(s, payer);
       // Tamiyo, Collector of Tales (round B251): not a discard another player's spell or ability offers them (rulings).
-      const can = (u: UnlessPays) => !p.lost && !(u.discard && p.hand.length < u.discard) && !((u.discard || u.discardHand || u.discardRandom) && opponentForbidsDiscard(s, payer, ctx.controller));
+      const can = (u: UnlessPays) => !p.lost && !(u.discard && unlessDiscardable(s, payer, u.discardFilter).length < u.discard) && !((u.discard || u.discardHand || u.discardRandom) && opponentForbidsDiscard(s, payer, ctx.controller));
       const options = ways.flatMap((u, i) => (can(u) ? [String(i)] : []));
       if (!options.length) {
         sc.paid = false;
@@ -1837,13 +1847,13 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);
     // A player can't discard more cards than they have (CR 701.9b), nor sacrifice permanents they don't control
     // (CR 118.3), so they can't pay that.
-    if (p.lost || ((unless.discard || unless.discardHand || unless.discardRandom) && opponentForbidsDiscard(s, payer, ctx.controller)) || (unless.discard && p.hand.length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n) || (unless.blight && !blightOptions(s, payer, unless.blight).length) || (unless.collectEvidence && evidenceProblem(s, payer, unless.collectEvidence, undefined))) sc.paid = false;
+    if (p.lost || ((unless.discard || unless.discardHand || unless.discardRandom) && opponentForbidsDiscard(s, payer, ctx.controller)) || (unless.discard && unlessDiscardable(s, payer, unless.discardFilter).length < unless.discard) || (unless.discardRandom && p.hand.length < unless.discardRandom) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n) || (unless.blight && !blightOptions(s, payer, unless.blight).length) || (unless.collectEvidence && evidenceProblem(s, payer, unless.collectEvidence, undefined))) sc.paid = false;
     else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice && !unless.discardHand && !unless.exileGraveyard && !unless.discardRandom && !unless.poison && !unless.blight && !unless.collectEvidence) {
       // Paying {0} is just saying so (CR 118.5); nobody would refuse.
       log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);
       sc.paid = true;
     } else {
-      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.exileGraveyard ? { exileGraveyard: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}), ...(unless.blight ? { blight: unless.blight } : {}), ...(unless.collectEvidence ? { collectEvidence: unless.collectEvidence } : {}) };
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard, ...(unless.discardFilter ? { discardFilter: unless.discardFilter } : {}) } : {}), ...(unless.discardHand ? { discardHand: true as const } : {}), ...(unless.exileGraveyard ? { exileGraveyard: true as const } : {}), ...(unless.discardRandom ? { discardRandom: unless.discardRandom } : {}), ...(unless.poison ? { poison: unless.poison } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}), ...(unless.blight ? { blight: unless.blight } : {}), ...(unless.collectEvidence ? { collectEvidence: unless.collectEvidence } : {}) };
       return "paused";
     }
   }

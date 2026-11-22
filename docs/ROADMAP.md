@@ -1,6 +1,6 @@
 # Roadmap
 
-31,885 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,886 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,971 of
 9,979 (99%).
 
@@ -4334,7 +4334,7 @@ line blocks.
    Out after round 426 (looked at, not done): Filigree Vector (done in round B280) ("each of any number of target creatures and ... each of any
    number of target artifacts": two any-number target groups in one ability, one permanent possibly in both, rulings),
    Arvinox, the Mind Flail ("isn't a creature unless you control three or more permanents you don't own", and cards
-   exiled face down from the bottom of each opponent's library that you may look at and cast), Saruman of Many Colors
+   exiled face down from the bottom of each opponent's library that you may look at and cast), Saruman of Many Colors (done in round 449)
    (ward with a discard of a card of given types, and a reflexive trigger comparing mana value with the spell that
    triggered it), the cards round 425 left out (still out, for its reasons), and the rest of `npm run popular` above
    rank 17,500 (still out, for the reasons in their earlier lists). Known gaps: spells given cascade only while Treasure
@@ -4717,7 +4717,7 @@ line blocks.
    doubles, a Bonesplitter token enters on it). +2, 31,856 of 31,936 on this stacked branch (round 441 #734), 31,861
    with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in, 31,863 with main aca5d42 (B291), 31,865 with main 24bb9f8 (B292); the compiled text of every other card is unchanged.
    Out after round 442 (looked at, not done): Battlefield Thaumaturge (done in round 447) (still out: its ruling, "{1} per target creature,
-   even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (still out: "Ward—Discard
+   even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (done in round 449) (still out: "Ward—Discard
    an enchantment, instant, or sorcery card" needs a discard of a kind as the ward payment, and its "When one or more cards
    are milled this way" reflexive trigger targets a card by the triggering spell's mana value), and the lists after round
    441 (still out, for their reasons). Judgment calls: a bestowed Aura attached to Arna's attacker is copied as the
@@ -4740,7 +4740,7 @@ line blocks.
    A browser test clicks through Etrata's ability on a cloaked Lightning Bolt: exiled, then cast for free at an
    opponent. +2, 31,863 of 31,936 on this stacked branch (round 442 #736), 31,867 with round 442's head 06e3d13 (main
    24bb9f8, B291-B292) merged in; the compiled text of every other card is unchanged.
-   Out after round 443 (looked at, not done): Battlefield Thaumaturge (done in round 447) and Saruman of Many Colors (still out, as after
+   Out after round 443 (looked at, not done): Battlefield Thaumaturge (done in round 447) and Saruman of Many Colors (done in round 449) (still out, as after
    round 442), Titania's Song (still out: whether its effect, continuing until end of turn after it leaves, keeps to the
    artifacts it applied to then), Pulmonic Sliver (still out: a granted optional replacement on every Sliver's move to a
    graveyard, several ordered by their owner at once, rulings), and the lists after round 442 (still out, for their
@@ -4871,6 +4871,28 @@ line blocks.
    battlefield). Known gaps: as for Metamorphic Alteration, the copy begins at the next state-based action check after the
    card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
    card with the most power, toughness and abilities.
+   Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
+   Kiss, Finale of Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
+   Bracelet and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
+   are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
+   unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
+   118.3, rulings; with one such card it's discarded without asking; UnlessPays.discardFilter, the payUnless and discard
+   prompts carrying the filter; a whole line in oracle/round449.ts, since the keyword list splits its commas) and
+   "Whenever you cast your second spell each turn, each opponent mills two cards. When one or more cards are milled this
+   way, exile target enchantment, instant, or sorcery card with equal or lesser mana value than that spell from an
+   opponent's graveyard. Copy the exiled card. You may cast the copy without paying its mana cost." (a reflexive trigger,
+   CR 603.12, once if any card at all was milled, its target chosen as it triggers, rulings, in any opponent's graveyard,
+   the milled cards or others; "that spell" the second spell, its mana value as it was cast, CR 202.3, 608.2h, as
+   Hammerhead Tyrant's; the copy cast as it resolves or never, X as 0, CR 608.2g, 707.12, rulings). Browser tests click
+   through the ward's Pay and the discard picker (Opt chosen over Holy Strength, Grizzly Bears refused) and the trigger
+   after Divination and Night's Whisper: Ana mills Lightning Bolt and Mind Rot, Mind Rot (mana value 3) isn't offered, the
+   Bolt's copy is cast at Ana. +1, 31,886 of 31,936 on this stacked branch (round 448 #750); the compiled text of every other
+   card and face is unchanged.
+   Out after round 449 (looked at, not done): Mastermind's Acquisition and Spawnsire of Ulamog (still out: cards from outside
+   the game), The Dominion Bracelet (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
+   lists after round 448 (still out, for their reasons). Known gaps: bots pay the ward whenever they hold such a card, and
+   discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
+   can.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5828,7 +5850,7 @@ line blocks.
    own creature type, then any number of cards of it); Eumidian Wastewaker ("you and defending player each discard a card
    or sacrifice a permanent", mandatory, then the land cards put into graveyards this way); Detective's Phoenix (bestow
    with collect evidence, cast from the graveyard with bestow); Hand of Vecna (done in round 321) ("equipped creature or a creature you
-   control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (its ward needs a
+   control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (done in round 449) (its ward needs a
    discard of a kind, but its second-spell trigger is the harder part); Infernal Offering (done in round B204) (both modes choose an
    opponent first).
    Round 307 took cards back off the "Out after round N" lists, most played first: "−6: Choose left or right. Each player
@@ -6925,7 +6947,7 @@ line blocks.
    a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
    - Life swaps still out: Heart of Bogardan (done in round B225), Spirit of Resistance (done in round B106).
    - "You can't cast" variants other than creature or noncreature spells are still out. Ward costs still out: discard
-     a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors), "discard a card or pay {2}"
+     a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors, done in round 449), "discard a card or pay {2}"
      (Titania), blight, collect evidence, poison counters; most of these cards have other lines that are out too.
    - Bots cast Living Death, Terminus and Memory Jar by their usual rough value, without weighing whose creatures or
      hands they help.

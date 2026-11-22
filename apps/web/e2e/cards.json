@@ -44182,6 +44182,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c2d04138-cc17-4dd0-9a4c-9c87df72ed01",
+  "name": "Saruman of Many Colors",
+  "manaCost": "{3}{W}{U}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Avatar Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar",
+   "Wizard"
+  ],
+  "oracleText": "Ward—Discard an enchantment, instant, or sorcery card.\nWhenever you cast your second spell each turn, each opponent mills two cards. When one or more cards are milled this way, exile target enchantment, instant, or sorcery card with equal or lesser mana value than that spell from an opponent's graveyard. Copy the exiled card. You may cast the copy without paying its mana cost.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Ward",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "hoc",
+  "releasedAt": "2026-08-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f07f3bf0-e1c8-4a24-87c7-1d6d0b5bd242",
   "name": "Sasaya, Orochi Ascendant // Sasaya's Essence",
   "manaCost": "{1}{G}{G}",

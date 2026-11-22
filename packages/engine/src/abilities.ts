@@ -87,6 +87,8 @@ export interface UnlessPays {
   exileGraveyard?: true;
   /** "Ward—Discard a card at random" (Alpharael): this many cards chosen at random as the payment (CR 701.9c). */
   discardRandom?: number;
+  /** With `discard`, "Ward—Discard an enchantment, instant, or sorcery card" (Saruman of Many Colors, round 449): only cards in their hand like this can be discarded to pay, and without enough of them it can't be paid (CR 118.3, rulings). */
+  discardFilter?: TargetSpec;
   /** "Ward—Get five poison counters" (The Serpent Society): the player gets this many as the payment (CR 122.1, 118.3). */
   poison?: number;
   /** "Ward—Blight 2" (Auntie Ool, Cursewretch): this many -1/-1 counters on one creature they control as the payment (CR 701.68a); not with none (701.68b). */

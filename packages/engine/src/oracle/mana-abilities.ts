@@ -178,6 +178,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       out.nextCast = e;
     }
     else if (extra === "If you spend this mana to cast your commander, it enters with a number of additional +1/+1 counters on it equal to the number of times it's been cast from the command zone this game.") out.spentCommanderCounters = true;
+    // Harold and Bob, First Numens (round B295): "{T}: Add three mana of any one color. You get two rad counters." Its
+    // activator gets them as the ability resolves (CR 605.3b, 122.1, 728), after the mana.
+    else if ((m2 = new RegExp(`^You get ${NUM} rad counters?\\.$`).exec(extra)) && !out.radCounters) out.radCounters = num(m2[1]!);
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);
     else if ((m2 = new RegExp(`^If there are no ${COUNTER} counters on ~, sacrifice it\\.$`).exec(extra)) && !out.sacrificeIfNo && removeCounters?.counter === counterKind(m2[1]!)) out.sacrificeIfNo = counterKind(m2[1]!);

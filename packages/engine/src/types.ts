@@ -2927,13 +2927,13 @@ export interface GameState {
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
   /** Spectral Searchlight: the mana another player adds in the color they choose (chooseOption "manaColorFor"): how much, and what made it (CR 106.3). */
-  manaColorFor?: { player: PlayerId; n: number; from: ManaOrigin[]; source: string };
+  manaColorFor?: { player: PlayerId; n: number; from: ManaOrigin[]; source: string; /** False Dawn (round B294): who activated the ability, controlling it. */ by?: PlayerId };
   /**
    * Rhystic Cave (round B254): "Add one mana of that color unless any player pays {1}": the mana ability's activation, its
    * cost paid, waiting for the players in `queue` (turn order from the active player) to decline paying (payUnless
    * `manaUnless`); `adds` the mana it makes then, `picked` its triggered mana abilities' (CR 605.1b, 605.4a).
    */
-  manaUnless?: { player: PlayerId; id: ObjectId; zc: number; adds: ManaType[]; from: ManaOrigin[]; picked: { adds: ManaType[]; from?: ManaOrigin[][]; damage?: ObjectId[]; skipUntap?: true }; queue: PlayerId[]; cost: string; source: string };
+  manaUnless?: { player: PlayerId; id: ObjectId; zc: number; adds: ManaType[]; from: ManaOrigin[]; picked: { adds: ManaType[]; from?: ManaOrigin[][]; by?: PlayerId[]; damage?: ObjectId[]; skipUntap?: true }; queue: PlayerId[]; cost: string; source: string };
   /** Peace Talks (round B254): the turns ("this turn and next turn") in which creatures can't attack and players and permanents can't be the targets of spells or activated abilities. */
   peaceTalksTurns?: number[];
   /** Charmed Pendant (round B239): the mana its milled card's hybrid symbols could add, waiting for its controller's choice (chooseOption "pendantMana"). */
@@ -3061,7 +3061,7 @@ export interface TurnRule {
   /** "castFromHandFree": Chandra, Flame's Catalyst's "Until end of turn, you may cast spells from your hand without paying their mana costs" (Omniscience's alternative cost for this turn, CR 118.9). */
   /** "loyaltyTwice": Kaito, Dancing Shadow's "you may activate loyalty abilities of ~ twice this turn rather than only once": of `object` only (CR 606.3), not more than twice however often (rulings); with no `object` (Urza Assembles the Titans), of every planeswalker `player` controls this turn. */
   /** "noAbilities": Sen Triplets' "that player can't ... activate abilities" this turn: mana abilities too (rulings), in any zone (round 412). */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "noAbilities" | "castFromHandFree" | "loyaltyTwice" | /** Piracy (round B238): this player may tap lands they don't control for mana (CR 106.12), that mana spendable only to cast spells. */ "tapOthersLands";
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty" | "noActivations" | "noAbilities" | "castFromHandFree" | "loyaltyTwice" | /** Piracy (round B238): this player may tap lands they don't control for mana (CR 106.12), that mana spendable only to cast spells. */ "tapOthersLands" | /** Channel (Yavimaya Bloomsage's prepare spell, round B294): "Until end of turn, any time you could activate a mana ability, you may pay 1 life. If you do, add {C}." (channel.ts). */ "channel" | /** False Dawn (round B294): "Until end of turn, spells and abilities you control that would add colored mana instead add that much white mana" (spend.ts falseDawnMana). */ "whiteMana" | /** False Dawn: "Until end of turn, you may spend white mana as though it were mana of any color" (CR 609.4b, spend.ts payableCost). */ "whiteAnyColor";
   /** The permanent the rule is about ("loyaltyTwice"), as the object it was then (CR 400.7). */
   object?: { id: ObjectId; zc: number };
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
@@ -3168,6 +3168,8 @@ export interface Resolving {
   powerBefore?: number;
   /** Cyclonus, Cybertronian Fighter: "convert it. If you do, ...": a transform effect turned a permanent over this resolution. */
   transformedThisWay?: true;
+  /** Soundwave, Sonic Spy (round B293): "You may cast the copy without paying its mana cost. If you do, ...": a castFromAmong of this resolution cast a spell. */
+  castAmongCast?: true;
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
   /** The permanents a flicker returned to the battlefield (Splash Portal's "if that creature is ..."). */
@@ -4108,6 +4110,8 @@ export type Action =
   | { type: "payDelayed"; player: PlayerId; id: number }
   /** Guardian Angel (GameState.payShields): pay for one more shield, a special action (CR 116.2c). */
   | { type: "payShield"; player: PlayerId; id: number }
+  /** Channel (round B294): pay 1 life and add {C}, any time this player could activate a mana ability (TurnRule "channel"). */
+  | { type: "channelMana"; player: PlayerId }
   | { type: "concede"; player: PlayerId };
 
 export class RulesError extends Error {}

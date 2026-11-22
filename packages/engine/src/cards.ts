@@ -1,5 +1,5 @@
 import type { AbilityBody, CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
-import { characteristics, controllerOf, offFieldColored, offFieldDefinedPT, offFieldTyped, printedKeywords, type PTPart } from "./layers";
+import { characteristics, controllerOf, everyCreatureType as everyCreatureTypeOf, offFieldColored, offFieldDefinedPT, offFieldTyped, printedKeywords, yardGrantLost, yardLostAt, type PTPart } from "./layers";
 import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
 import { parseCostKeyword, parseGraveyardKeyword } from "./oracle/keyword-abilities";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -148,8 +148,47 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.zone === "stack") return offFieldDefinedPT(s, o, offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(withWords(s, o, out)))));
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types; a "*" power
   // or toughness is what its characteristic-defining ability says (CR 604.3), last: the caches above key on the card.
-  return offFieldDefinedPT(s, o, offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out))));
+  // Yixlid Jailer's "cards in graveyards lose all abilities" applies in layer 6, after those of layers 4 and 5 (CR 613.1f).
+  const typed = offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
+  return offFieldDefinedPT(s, o, o.zone === "graveyard" && yardLostAt(s) !== undefined ? yardLostDef(typed) : typed);
 };
+
+const yardLostDefs = new Map<string, CardDef>();
+
+/** A "*" in a printed power or toughness counted as 0 ("1+*" is 1); anything else as it is. */
+const starAsZero = (v: string | undefined): string | undefined => {
+  if (v === undefined || !v.includes("*")) return v;
+  const terms = v.replace(/\s+/g, "").replace(/\*/g, "0").match(/[+-]?\d+/g);
+  return terms ? String(terms.reduce((n, x) => n + Number(x), 0)) : "0";
+};
+
+/**
+ * Yixlid Jailer (round B297): "Cards in graveyards lose all abilities." `d`, a card's definition in a graveyard, with none of
+ * its abilities (CR 613.1f): no keywords and nothing compiled from its text that works there, its flashback, dredge and
+ * the like among them (rulings). What applied in earlier layers stays (CR 613.6): its changeling or "is every creature
+ * type" still makes it every creature type, colors and types are its own (rulings). A "*" in its power or toughness is 0,
+ * its characteristic-defining ability being gone (rulings: Tarmogoyf is a 0/1 creature card). Its text stays for what a
+ * spell cast from there does: casting moves it to the stack first, where it has its abilities, so the costs and targets
+ * of a spell some other permission casts are its own (CR 601.2a, rulings); compileCard keeps those (yardLostCompiled).
+ */
+export function yardLostDef(d: CardDef): CardDef {
+  if (d.yardLostOf) return d;
+  const key = `${d.oracleId}|${d.name}|${d.supertypes.join(",")}|${d.types.join(",")}|${d.subtypes.join(",")}|${d.everyCreatureType ?? ""}|${d.colors.join("")}|${d.power ?? ""}|${d.toughness ?? ""}`;
+  const hit = yardLostDefs.get(key);
+  if (hit) return hit;
+  const out: CardDef = {
+    ...d,
+    oracleId: `${d.oracleId}|yardLost`,
+    keywords: [],
+    everyCreatureType: everyCreatureTypeOf(d),
+    ...(d.power !== undefined ? { power: starAsZero(d.power) } : {}),
+    ...(d.toughness !== undefined ? { toughness: starAsZero(d.toughness) } : {}),
+    ...(d.faces ? { faces: d.faces.map((f) => ({ ...f, keywords: [], ...(f.power !== undefined ? { power: starAsZero(f.power) } : {}), ...(f.toughness !== undefined ? { toughness: starAsZero(f.toughness) } : {}) })) } : {}),
+    yardLostOf: d,
+  };
+  yardLostDefs.set(key, out);
+  return out;
+}
 
 /**
  * A spell cast this turn (GameState.castThisTurn), with the card types it had as it was cast, which effects can change
@@ -534,6 +573,8 @@ function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
     const p = s.objects[id]!;
     const grants = compileCard(defOf(s, p)).yardGrants;
     if (!grants || !characteristics(s, p).hasPrintedAbilities || characteristics(s, p).controller !== o.owner) continue;
+    // Yixlid Jailer (round B297): what a permanent with the earlier timestamp gives it is gone (CR 613.7a).
+    if (yardGrantLost(s, p.timestamp)) continue;
     for (const g of grants) {
       if (!printedMatches(g.filter, d)) continue;
       // X in a card's mana cost is 0 here (CR 202.3e).
@@ -547,7 +588,7 @@ function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
   // Cursecloth Wrappings: embalm (or encore) until end of turn for this card, "equal to its mana cost": its printed mana
   // cost, an {X} in it counted as 0 (CR 202.3e, 107.3); with no mana cost, nothing to pay it with (CR 118.6).
   for (const g of s.yardKeywordGrants ?? []) {
-    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || (!d.manaCost && !g.cost)) continue;
+    if (g.id !== o.id || g.zc !== (o.zoneChanges ?? 0) || (!d.manaCost && !g.cost) || yardGrantLost(s, g.ts)) continue;
     const cost = g.cost ?? (d.manaCost!.replace(/\{X\}/g, "") || "{0}");
     // Ghost Ark: "unearth {3}" (CR 702.84a), the card's own ability until end of turn.
     if (g.keyword === "Unearth") {

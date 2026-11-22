@@ -51,6 +51,7 @@ import { roundB292Line } from "./laneb292-lines";
 import { roundB293Line } from "./laneb293-lines";
 import { roundB295Line } from "./laneb295-lines";
 import { roundB296Line } from "./laneb296-lines";
+import { roundB297Line } from "./laneb297-lines";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
@@ -253,9 +254,33 @@ export const cleavedText = (text: string): string =>
 /** The cleaved text of each card with cleave compiled, by oracle id (its text as compiled has the brackets taken out). */
 const cleavedTexts = new Map<string, string>();
 
+/**
+ * Yixlid Jailer (round B297): a card's compiled abilities while it's in a graveyard where cards have lost all abilities (CR
+ * 613.1f): no triggered, activated, mana or static abilities, nothing that works from the graveyard (flashback, aftermath
+ * and the other ways to cast it from there, dredge, mayhem, Retriever Phoenix's, Pardic Firecat's, Haakon's), nothing
+ * that lets it be cast with flash from there (CR 702.8a: that works in the zone it's cast from). Kept: what it does as a
+ * spell and what works as it's cast, on the stack (its costs, cost reductions, targets, modes, X), since a spell cast from a
+ * graveyard is on the stack before any of that (CR 601.2a, rulings: its additional and alternative costs apply), and its
+ * characteristic-defining abilities that apply in layers 4 and 5 (CR 613.6; rulings: a changeling is every creature type).
+ */
+function yardLostCompiled(c: CompiledCard): CompiledCard {
+  const out: CompiledCard = { ...c, triggers: [], activated: [], mana: [], statics: [], textKeywords: [] };
+  for (const k of ["manaTriggers", "manaAbilityLifeTax", "fromGraveyard", "dredge", "mayhemLand", "returnInsteadOfLearn", "countsAsNamed", "castOnlyFromGraveyard", "castFromExile"] as const) delete out[k];
+  for (const k of Object.keys(out) as (keyof CompiledCard)[]) if (/^flash/.test(k) || k === "teamworkFlash") delete out[k];
+  return out;
+}
+
 export function compileCard(card: CardDef): CompiledCard {
   // A card with faces as it is in the card data: its resting characteristics, the ones it has in a game (CR 709.4, 712.8a).
   const d0 = restingDef(card);
+  // Yixlid Jailer (round B297): a card in a graveyard that has lost all its abilities (cards.ts yardLostDef).
+  if (d0.yardLostOf) {
+    const lost = cache.get(d0.oracleId);
+    if (lost) return lost;
+    const out = yardLostCompiled(compileCard(d0.yardLostOf));
+    cache.set(d0.oracleId, out);
+    return out;
+  }
   // Cleave: not cast for its cleave cost, the words in square brackets are the spell's text (CR 702.148a).
   const cleaves = hasCleave(d0) && !d0.oracleId.endsWith("|cleaved");
   if (cleaves) cleavedTexts.set(d0.oracleId, cleavedText(d0.oracleText));
@@ -2570,6 +2595,8 @@ export function compile(d: CardDef): CompiledCard {
     if (roundB295Line(line, out, isSpell)) continue;
     // Havengul Laboratory // Havengul Mystery, Taskmaster, Mercenary Mimic (round B296).
     if (roundB296Line(line, out, isSpell)) continue;
+    // Yixlid Jailer (round B297).
+    if (roundB297Line(line, out, isSpell)) continue;
     // Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards. It enters with a flying counter on it if a
     // card discarded this way has flying. The same is true for first strike, ...": a choice as it enters (CR 614.12), one
     // keyword counter of each kind a discarded card has (CR 122.1b, rulings).

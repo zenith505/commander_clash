@@ -11055,6 +11055,86 @@
   "gameChanger": false
  },
  {
+  "oracleId": "648100cd-d44a-48f8-87e4-a1d5467f348c",
+  "name": "Cosima, God of the Voyage // The Omenkeel",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — God // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "God"
+  ],
+  "oracleText": "At the beginning of your upkeep, you may exile Cosima. If you do, it gains \"Whenever a land you control enters, if Cosima is exiled, you may put a voyage counter on it. If you don't, return Cosima to the battlefield with X +1/+1 counters on it and draw X cards, where X is the number of voyage counters on it.\"",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Cosima, God of the Voyage",
+    "manaCost": "{2}{U}",
+    "typeLine": "Legendary Creature — God",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "God"
+    ],
+    "oracleText": "At the beginning of your upkeep, you may exile Cosima. If you do, it gains \"Whenever a land you control enters, if Cosima is exiled, you may put a voyage counter on it. If you don't, return Cosima to the battlefield with X +1/+1 counters on it and draw X cards, where X is the number of voyage counters on it.\"",
+    "power": "2",
+    "toughness": "4",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/9/b/9b660733-6ed4-49a6-ae4c-e9e4f9c851cf.jpg?1783928158",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/9/b/9b660733-6ed4-49a6-ae4c-e9e4f9c851cf.jpg?1783928158"
+   },
+   {
+    "name": "The Omenkeel",
+    "manaCost": "{1}{U}",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Whenever a Vehicle you control deals combat damage to a player, that player exiles that many cards from the top of their library. You may play lands from among those cards for as long as they remain exiled.\nCrew 1",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/9/b/9b660733-6ed4-49a6-ae4c-e9e4f9c851cf.jpg?1783928158",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/9/b/9b660733-6ed4-49a6-ae4c-e9e4f9c851cf.jpg?1783928158"
+   }
+  ]
+ },
+ {
   "oracleId": "603e518c-8f12-432c-ae03-790db5be77bf",
   "name": "Cosmos Charger",
   "manaCost": "{3}{U}",
@@ -19278,6 +19358,100 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "cf812f1e-f48a-4375-8d2c-f6e3cb82e067",
+  "name": "Flamewar, Brash Veteran // Flamewar, Streetwise Operative",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {B}{R} (You may cast this card converted for {B}{R}.)\nSacrifice another artifact: Put a +1/+1 counter on Flamewar and convert it. Activate only as a sorcery.\n{1}, Discard your hand: Put all exiled cards you own with intel counters on them into your hand.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Living metal",
+   "Convert",
+   "Menace",
+   "More Than Meets the Eye",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Flamewar, Brash Veteran",
+    "manaCost": "{1}{B}{R}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {B}{R} (You may cast this card converted for {B}{R}.)\nSacrifice another artifact: Put a +1/+1 counter on Flamewar and convert it. Activate only as a sorcery.\n{1}, Discard your hand: Put all exiled cards you own with intel counters on them into your hand.",
+    "power": "3",
+    "toughness": "2",
+    "colors": [
+     "B",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/8/7/876d9732-9201-4327-8748-7c87ec55453f.jpg?1783919904",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/8/7/876d9732-9201-4327-8748-7c87ec55453f.jpg?1783919904"
+   },
+   {
+    "name": "Flamewar, Streetwise Operative",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nMenace, deathtouch\nWhenever Flamewar deals combat damage to a player, exile that many cards from the top of your library face down. Put an intel counter on each of them. Convert Flamewar.",
+    "power": "2",
+    "toughness": "1",
+    "colors": [
+     "B",
+     "R"
+    ],
+    "colorIndicator": [
+     "B",
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/8/7/876d9732-9201-4327-8748-7c87ec55453f.jpg?1783919904",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/8/7/876d9732-9201-4327-8748-7c87ec55453f.jpg?1783919904"
+   }
+  ]
  },
  {
   "oracleId": "fab8c985-d7a9-41eb-9884-01128b97af5c",

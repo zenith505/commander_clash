@@ -7969,6 +7969,9 @@ export function castProblem(
     const cast = choices?.face !== undefined && d.faces?.length ? faceDef(d, choices.face) : d;
     if (!isType(cast, "Creature")) return `${cast.name} can be cast from exile only as a creature spell`;
   }
+  // The Omenkeel (round 445): "You may play lands from among those cards": never cast this way, unless something else lets it be.
+  if (!free && !via && o.zone === "exile" && o.mayPlay?.landOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && !linkedFreeAny(s, o, pid))
+    return `${d.name} can only be played as a land this way`;
   // Arvinox, the Mind Flail (round 439): "you may cast permanent spells from among them", the spell as it would be cast
   // (its face or Adventure, CR 601.3e), a permanent spell (CR 110.4b), unless something else lets it be cast from exile.
   if (!free && !via && o.zone === "exile" && o.mayPlay?.permanentOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && !linkedFreeAny(s, o, pid)) {

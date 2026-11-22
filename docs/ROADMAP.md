@@ -2346,7 +2346,7 @@ line blocks.
    as the exiled card" and the return when it leaves (Ashiok's Erasure); "each player exiles X permanents they control
    and/or cards from their hand", you first (Descent into Madness, with a browser test of the pick). +10, 30,170 of 31,936 with B123.
    Out after round 293 (looked at, not done): Spellweaver Helix (done in round B270) (copying the other imprinted card when a card with one's
-   name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (paying life whenever a mana ability could be
+   name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (done in round B294) (paying life whenever a mana ability could be
    activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (done in round B283) (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (done in round B263) (a redirection chosen for each
    damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
@@ -4383,7 +4383,7 @@ line blocks.
    first, CR 707.10; nextCast `minManaSpent`, the activated event's `manaSpent`). A browser test clicks through Ninja
    Teen's graveyard sneak entry. +2, 31,793 of 31,936 on this stacked branch (round 427 #702, with main 8391ce7, Lane B B272-B273, in it); the
    compiled text of every other card is unchanged.
-   Out after round 428 (looked at, not done): Yavimaya Bloomsage // Channel (Channel's "any time you could activate a mana
+   Out after round 428 (looked at, not done): Yavimaya Bloomsage // Channel (done in round B294) (Channel's "any time you could activate a mana
    ability, you may pay 1 life. If you do, add {C}.": a mana source that isn't an object, usable whenever a mana ability
    is, CR 605.3a, while paying costs and in every payment prompt, which the automatic payment would need to know about),
    Captain America, First Avenger ("deals damage equal to that Equipment's mana value divided as you choose among one,
@@ -5994,7 +5994,7 @@ line blocks.
    Pygmy Hippo (done in round B286); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion (done in round B291) and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
-   battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
+   battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn (done in round B294); Tidal Flats (done in round B214) (a payment for each attacking
    creature); Backdraft (damage dealt by each sorcery spell); Merseine (done in round B211) ("pay enchanted creature's mana cost", activated only
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (done in round B290) (names first printed in a set); Reflecting Mirror;
@@ -11896,6 +11896,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B294 (least played first, two cards off the skip lists, neither in Lane A's rounds 442-443): Yavimaya Bloomsage //
+  Channel, whose prepare spell is Channel's "Until end of turn, any time you could activate a mana ability, you may pay 1 life.
+  If you do, add {C}." (out after round 293): a permission for the rest of the turn (TurnRule "channel", ended in the cleanup
+  step, CR 514.2) used whenever its controller could activate a mana ability, while they have priority or while a payment is
+  asked of them (CR 605.3a; channel.ts, Action "channelMana", the "Pay 1 life: add {C} (Channel)" button), without the stack;
+  life is paid only up to the life total (CR 119.4, rulings: none at 0) and not while it can't change (CR 119.8), and what the
+  payment triggers waits as a mana ability's triggers do (CR 117.5). It's neither a spell nor an activated ability, so "can't
+  pay life to cast spells or activate abilities" doesn't stop it. The front face's end step trigger was already supported.
+  The original Channel (banned in Commander) compiles too. False Dawn's "Until end of turn, spells and abilities you control
+  that would add colored mana instead add that much white mana. Until end of turn, you may spend white mana as though it were
+  mana of any color." (out after round 294): a replacement on all mana production by spells and abilities its controller
+  controls (CR 614.1a, 106.6a: same amount, restrictions and riders kept), whoever's pool the mana goes to: a player tapping
+  their own land isn't affected, while a Mana Flare of False Dawn's controller gives them white mana (spend.ts falseDawnMana,
+  addMana `by`, ManaTriggerResult.by); colorless mana stays colorless; no permanent's color or land type changes (rulings).
+  White mana then pays any colored symbol for its controller (CR 609.4b, payableCost colorAsAny, shared with Quicksilver
+  Elemental's blue), and autopay counts on its sources' mana being white. Browser tests: Bloomsage prepared by its trigger,
+  Channel's copy cast from exile, three life payments casting Commander's Sphere; Divination cast with Mountains under False
+  Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8). The compiled text of every other card is unchanged.
+- Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind ("toughness minus 1" read inside
+  its own layer 7c effect, no ruling), Codie, Ravenous Codex ("a prepared spell" still isn't defined, CR 722), Cosima, God of
+  the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo and Snowfall were looked
+  at again and stay out for the reasons in the earlier lists; about 69 unsupported cards remain, all of them hard. Judgment
+  calls and known gaps: with another replacement of the same mana (Contamination's {B}, a color chosen for Pulse of
+  Llanowar), False Dawn is applied last, the order its controller would choose (CR 616.1), so the mana is white; moving mana
+  from one pool to another (Drain Power) isn't adding it and isn't changed; autopay doesn't foresee that another player's
+  triggered mana ability adds colored mana to a False Dawn player's pool (it counts it as white). Bots pay life with Channel
+  only when nothing else can be cast, keeping at least 10 life; they cast False Dawn only as a cantrip.
 - Round B293 (least played first, two cards off the skip lists, neither in Lane A's rounds 442-443): Titania's Song's "Each
   noncreature artifact loses all abilities and becomes an artifact creature with power and toughness each equal to its mana
   value. If this enchantment leaves the battlefield, this effect continues until end of turn." (out after round B172): one
@@ -12144,7 +12171,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Vivien, Arkbow Ranger stays out with the Wishes (cards from outside the game, CR 400.11). Breathstealer's Crypt stays
   out: its "they draw a card and reveal it" is a draw other replacements can still replace (CR 614.5, 616.1), and no
   ruling says what "it" is when that draw becomes two (an Archive) or none (dredge). North Star ("for one spell this turn":
-  which spell, and when it's used up, has no ruling), False Dawn (every colored mana your spells and abilities add becomes
+  which spell, and when it's used up, has no ruling), False Dawn (done in round B294) (every colored mana your spells and abilities add becomes
   white: a replacement on all mana production, not only lands tapped for mana), Snowblind ("toughness minus 1" read inside
   its own layer 7c effect, no ruling) and Ghostly Flame (damage from a "colorless source" that's still red, wherever color
   of damage is looked at) were looked at again and stay out. Judgment calls and known gaps: Chorus's counters need it still
@@ -13004,7 +13031,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   of a graveyard), Pure Intentions (done in round B240) (a turn's delayed trigger on "one or more cards" an opponent's spell or ability makes you
   discard, once per event) and the lists after round B224 stay out.
 - Out after round B224 (looked at, not done): Peace Talks (activated abilities, not triggered ones, can't target: target
-  legality doesn't yet know whether an ability was activated or triggered), False Dawn (mana from spells and abilities, not
+  legality doesn't yet know whether an ability was activated or triggered), False Dawn (done in round B294) (mana from spells and abilities, not
   only lands, turned white, and white mana spent as any color), Benthic Explorers (done in round B259) (untapping an opponent's land as a mana
   ability's cost) and the lists after round B223 stay out.
 - Out after round B223 (looked at, not done): Eye for an Eye (done in round B257) (a replacement, not a prevention, that keeps the damage and

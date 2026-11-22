@@ -9,7 +9,7 @@ import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifact
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
-import { canPayFromPool, manaOriginsOf } from "./spend";
+import { canPayFromPool, falseDawnMana, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { nameActivationBan } from "./names";
 import { sameName } from "./faces";
@@ -554,6 +554,8 @@ export interface ManaTriggerResult {
   extra: ManaType[];
   adds: ManaType[];
   from: ManaOrigin[][];
+  /** False Dawn (round B294): who controls the triggered ability that adds each of `adds` (CR 603.3a, its source's controller). */
+  by?: PlayerId[];
   /** Winter's Night (ManaTrigger.landSkipsUntap): the permanent tapped for mana doesn't untap during its controller's next untap step. */
   skipUntap?: true;
   /** Overabundance, Barbflare Gremlin (ManaTrigger.damage): 1 damage from each of these sources to the player who tapped it, after the mana. */
@@ -612,7 +614,8 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     const from = src ? manaOriginsOf(s, src) : [];
     // Overabundance deals its damage, Barbflare Gremlin has the land deal it.
     const hurts = t.damage === "self" ? src?.id : t.damage === "land" ? o.id : undefined;
-    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)], ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}), ...(hurts || r.damage ? { damage: [...(r.damage ?? []), ...(hurts ? [hurts] : [])] } : {}) })));
+    // False Dawn (round B294): colored mana a triggered ability of a player under it adds is white (falseDawnMana).
+    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...falseDawnMana(s, ctl, p.adds)], from: [...r.from, ...p.adds.map(() => from)], by: [...(r.by ?? []), ...p.adds.map(() => ctl)], ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}), ...(hurts || r.damage ? { damage: [...(r.damage ?? []), ...(hurts ? [hurts] : [])] } : {}) })));
   }
   return results;
 }

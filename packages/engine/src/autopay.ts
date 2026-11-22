@@ -9,7 +9,7 @@ import { abilityProblem, exileWaterbendCap, beholdTypeFor, costIsPaid, spellHow,
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
-import { abilityUse, boundSpend, dawnMana, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
+import { abilityUse, boundSpend, dawnMana, falseDawnMana, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
 import type { AdditionalCost, ManaAbility, ManaSpend, SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -79,7 +79,9 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
       const treasure = isTreasure(s, o);
       // Tapping it for mana triggers something of its own (Forbidden Orchard gives an opponent a Spirit): last.
       const tapRider = abilitiesOf(s, o).triggers.some((t) => t.event === "tappedForMana" && !t.manaTap?.filter) ? 2 : 0;
+      // False Dawn (round B294): what its abilities would add as white mana instead.
       const options = manaOptions(s, o)
+        .map((x) => dawned(s, pid, x))
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
         // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs; a Mana
         // Battery gives its one mana without removing any.
@@ -111,12 +113,18 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
     .sort((a, b) => Number(a.creature) - Number(b.creature) || a.colors - b.colors);
 }
 
+/** False Dawn (round B294): an option's mana as the player activating it would get it, colored mana white (spend.ts falseDawnMana). */
+function dawned<T extends { adds: ManaType[]; snow?: ManaType[] }>(s: GameState, pid: PlayerId, x: T): T {
+  const adds = falseDawnMana(s, pid, x.adds);
+  return adds === x.adds ? x : { ...x, adds, ...(x.snow ? { snow: falseDawnMana(s, pid, x.snow) } : {}) };
+}
+
 /** The activated mana abilities (CR 605.1a) a payment can use, as options. */
 function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): (Option & { spendOnly?: ManaSpend })[] {
   return payableActivatedMana(s, pid, o).flatMap(({ ab, options, penalty }) => {
     const cost = manaAbilityCostOf(s, pid, o, ab);
     const spendOnly = activatedAsMana(ab)?.spendOnly;
-    return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...x, cost, penalty, activated: true as const, ...(spendOnly ? { spendOnly, restricted: true } : {}) }));
+    return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...dawned(s, pid, x), cost, penalty, activated: true as const, ...(spendOnly ? { spendOnly, restricted: true } : {}) }));
   });
 }
 

@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   asFace,
+  channelling,
+  channelProblem,
   crewLoyaltyChoices,
   dredgeAmount,
   castableFaces,
@@ -2423,6 +2425,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             />
           )}
           {!targeting && !modePick && !tapPick && !picking && pending?.kind !== "chooseModes" && <Controls s={s} pending={pending} attacks={attacks} aim={aim} blocks={blocks} blocker={blocker} discards={discards} dispatch={dispatch} onCastFree={(id, face, alt) => startCast(id, undefined, undefined, alt, undefined, face)} onHover={setHover} />}
+          {/* Channel (round B294): pay 1 life for {C}, any time you could activate a mana ability. */}
+          {!s.over && channelling(s, HUMAN) && (
+            <div className="controls">
+              <button data-channel disabled={channelProblem(s, HUMAN) !== null} title={channelProblem(s, HUMAN) ?? "Channel: pay 1 life and add {C} to your mana pool. Like a mana ability, it doesn't use the stack."} onClick={() => dispatch([{ type: "channelMana", player: HUMAN }])}>
+                Pay 1 life: add {"{C}"} (Channel)
+              </button>
+            </div>
+          )}
           <PriorityToggle mode={priorityMode} onChange={setPriorityMode} />
           {!s.over && <LoopBar s={s} loop={loop} note={shortcutNote} onStart={startLoop} onCancel={cancelLoop} onRepeat={repeatLoop} />}
           {error && <div className="error">{error}</div>}

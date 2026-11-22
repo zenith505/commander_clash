@@ -9234,6 +9234,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d1b815d1-2848-40d4-a555-66822d1becbc",
+  "name": "Channel",
+  "manaCost": "{G}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, any time you could activate a mana ability, you may pay 1 life. If you do, add {C}.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "banned",
+  "set": "sta",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4b3d1cfb-9f1d-4e4e-a15a-2e248ff5bdfc",
   "name": "Channel Harm",
   "manaCost": "{5}{W}",
@@ -18004,6 +18033,32 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "efd9cc25-f445-4de0-9a69-adab9f8878f4",
+  "name": "False Dawn",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, spells and abilities you control that would add colored mana instead add that much white mana. Until end of turn, you may spend white mana as though it were mana of any color.\nDraw a card.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -58968,6 +59023,77 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "d9068051-b51c-4700-b492-30b148e3a72c",
+  "name": "Yavimaya Bloomsage // Channel",
+  "manaCost": "{2}{G} // {G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Dryad Druid // Sorcery",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dryad",
+   "Druid"
+  ],
+  "oracleText": "At the beginning of your end step, put a +1/+1 counter on target creature you control. Then if that creature has power 7 or greater, this creature becomes prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Prepared"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "soc",
+  "releasedAt": "2026-04-24",
+  "rarity": "rare",
+  "layout": "prepare",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Yavimaya Bloomsage",
+    "manaCost": "{2}{G}",
+    "typeLine": "Creature — Dryad Druid",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Dryad",
+     "Druid"
+    ],
+    "oracleText": "At the beginning of your end step, put a +1/+1 counter on target creature you control. Then if that creature has power 7 or greater, this creature becomes prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
+    "power": "2",
+    "toughness": "2",
+    "colors": [
+     "G"
+    ]
+   },
+   {
+    "name": "Channel",
+    "manaCost": "{G}{G}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Until end of turn, any time you could activate a mana ability, you may pay 1 life. If you do, add {C}.",
+    "colors": [
+     "G"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "322f0459-f394-44f0-977b-55fd0cbe0712",

@@ -20,7 +20,7 @@ test("Havengul Laboratory: three Clues sacrificed, it transforms at your end ste
   expect(back.objects[lab]!.face).toBe(1);
   // On to your next turn's first main phase, with Havengul Mystery still face up: played on in the engine and the page
   // opened again there, since passing round the table in the page could race past that main phase under load.
-  const main = playUntil(back, (st) => st.step === "main1" && st.activePlayer === 0 && st.turn === back.turn + 4 && st.stack.length === 0 && !st.pending);
+  const main = playUntil(back, (st) => st.step === "main1" && st.activePlayer === 0 && st.turn > back.turn && st.stack.length === 0 && !st.pending);
   expect(main.objects[lab]!.face).toBe(1);
   await open(page, main);
   await card(page, "Murder", main).click();

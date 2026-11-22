@@ -4789,8 +4789,8 @@ line blocks.
    remain exiled." (MayPlay.landOnly: the lands only, never cast, as your normal land plays, whoever controls The Omenkeel
    later, rulings; Effect exileTopLandsPlayable). Browser tests click through Flamewar's sacrifice of Sol Ring and its
    "Discard your hand" for two face-down intel cards, Cosima's exile at your upkeep and its voyage counter (Yes) and return
-   with two (No), and The Omenkeel's attack, then Ana's Forest played from her exile. +2, 31,871 of 31,936 on this stacked
-   branch (round 444 #741); the compiled text of every other card is unchanged.
+   with two (No), and The Omenkeel's attack, then Ana's Forest played from her exile. +2, 31,871 of 31,936 with main
+   f277baf (round 444 #741 merged); the compiled text of every other card is unchanged.
    Out after round 445 (looked at, not done): the lists after round 444 (still out, for their reasons), and Harold and Bob,
    First Numens and Nick Fury, Agent of S.H.I.E.L.D. (Lane B's round B295). Known gaps: a commander Cosima exiled by its own
    ability goes to the command zone at once (owners always choose to, CR 903.9a), losing the voyage, so bots never exile

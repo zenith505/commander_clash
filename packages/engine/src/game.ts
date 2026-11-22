@@ -8337,8 +8337,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
       const by = controllerOf(s, src);
       for (const c of per) {
         if (c.opponents ? !opponents(s, by).includes(pid) : by !== pid) continue;
-        if (c.n < 0) mods.less += -c.n * targetCount;
-        else mods.more += c.n * targetCount;
+        if (c.spellTypes && !c.spellTypes.some((ty) => (d.types as readonly string[]).includes(ty))) continue;
+        // Battlefield Thaumaturge (round 447): each target that's a creature (one on the battlefield, CR 109.2), a creature
+        // targeted twice counting twice ("even if the spell targets a creature more than once", rulings).
+        const n = c.creatures ? (how.targets ?? []).filter((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objIsType(s, obj(s, t.id), "Creature")).length : targetCount;
+        if (c.n < 0) mods.less += -c.n * n;
+        else mods.more += c.n * n;
       }
     }
   // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
@@ -11774,7 +11778,19 @@ export function definedCastX(s: GameState, pid: PlayerId, o: GameObject, choices
  * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
  * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
  */
+/** Captain America, First Avenger (round 447): the Equipment attached to `o` that "Unattach an Equipment from ~" can unattach. */
+export function unattachableEquipment(s: GameState, o: GameObject): ObjectId[] {
+  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attachedTo === o.id && characteristics(s, obj(s, id)).subtypes.includes("Equipment"));
+}
+
 export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility, costs?: CostChoices, targets?: TargetChoice[]): number | null | undefined {
+  // Captain America, First Avenger (round 447): the mana value of the Equipment "Unattach an Equipment from ~" unattaches, as
+  // it's chosen (CR 202.3); none chosen yet, X isn't known (a choice to make), and null for one that can't be.
+  if (ab.unattachEquipment) {
+    const e = costs?.unattachEquipment;
+    if (e === undefined) return undefined;
+    return unattachableEquipment(s, o).includes(e) ? defMv(defOf(s, obj(s, e))) : null;
+  }
   // Reflecting Mirror (round B235): twice the target spell's mana value, its X included (CR 202.3e); its targets are chosen
   // before its cost is worked out (CR 601.2c, 601.2f), so undefined until they are, and null when that target isn't a spell.
   if (ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs) {
@@ -11798,6 +11814,20 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
+  // Captain America, First Avenger (round 447): with no Equipment chosen yet, it can be activated if one of those attached
+  // to it would do (its mana value the damage to divide, CR 601.2d).
+  if (ab.unattachEquipment && costs?.unattachEquipment === undefined) {
+    const options = unattachableEquipment(s, o);
+    if (!options.length) return `no Equipment is attached to ${d.name}`;
+    let first: string | null = null;
+    for (const e of options) {
+      const p2 = abilityProblem(s, pid, id, index, targets, modes, tapCreatures, x0, { ...costs, unattachEquipment: e });
+      if (!p2) return null;
+      first ??= p2;
+    }
+    return first;
+  }
+  if (costs?.unattachEquipment !== undefined && !ab.unattachEquipment) return `${d.name}'s ability doesn't unattach an Equipment`;
   const fixedX = definedX(s, o, ab, costs, targets);
   if (fixedX === null) return ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs ? `X is twice the mana value of the target spell for ${d.name}'s ability` : `no card is exiled with ${d.name}, so X isn't defined`;
   // Bargaining Table: an opponent is chosen (not targeted) as it's announced, before X (rulings, CR 602.2b, 601.2b).
@@ -12011,7 +12041,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const cost = activationCost(s, pid, o, ab, targets, x, costs);
   // A cost's X (Corpseweft's "one or more creature cards") is chosen as it's activated: asked before that (no X and no
   // costs chosen, the menu's check), only whether the ability could be activated at all.
-  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
+  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : ab.unattachEquipment ? null /* Captain America (round 447): its X is the unattached Equipment's mana value, not mana. */ : xProblem(cost, x);
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
   const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);
@@ -12573,6 +12603,15 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
       fireEvent(s, { type: "exerted", id: o.id });
     }
     if (ab.tapAttached && o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield") tapPermanent(s, obj(s, o.attachedTo));
+    // Captain America, First Avenger (round 447): "Unattach an Equipment from ~" (CR 701.3d): the one chosen, still on the
+    // battlefield, unattached.
+    const thrown = ab.unattachEquipment && costs?.unattachEquipment !== undefined ? s.objects[costs.unattachEquipment] : undefined;
+    if (thrown && thrown.attachedTo === o.id) {
+      log(s, `${p.name} unattaches ${nameOf(s, thrown.id)} from ${d.name}.`);
+      fireEvent(s, { type: "unattached", id: thrown.id, host: o.id });
+      thrown.attachedTo = undefined;
+      invalidateCharacteristics(s);
+    }
     if (ab.unattachCost && o.attachedTo) {
       log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
       fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });

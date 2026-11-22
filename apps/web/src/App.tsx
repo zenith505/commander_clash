@@ -12,6 +12,7 @@ import {
   registerFace,
   abilityProblem,
   definedX,
+  unattachableEquipment,
   definedCastX,
   altCost,
   isEmerge,
@@ -356,7 +357,7 @@ type ZoneView = { pid: PlayerId; zone: "graveyard" | "exile" | "hand" };
 /** The human is picking targets for a spell, an activated ability, or a triggered ability (after its modes, if modal). */
 type Targeting = (
   | { mode: "cast"; draft: CastDraft; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
-  | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number; xOpponent?: PlayerId }
+  | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number; xOpponent?: PlayerId; /** Captain America (round 447): the Equipment its cost unattaches. */ unattachEquipment?: string }
   | { mode: "trigger"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
   | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
@@ -516,6 +517,9 @@ type GiftPick = { draft: CastDraft; label: string; what: string; options: Player
 /** Bargaining Table, Spoils of War: the opponent chosen as it's announced, whose cards set X (rulings). */
 type XOpponentPick = { label: string; what: string; options: PlayerId[]; /** Button labels, by option. */ labels?: string[]; onPick: (pid: PlayerId) => void };
 
+/** Captain America, First Avenger (round 447): which Equipment attached to it "Unattach an Equipment from ~" unattaches, before its targets. */
+type UnattachPick = { label: string; options: string[]; labels: string[]; onPick: (id: string) => void };
+
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
 
@@ -573,7 +577,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
 /** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
 type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[]; /** Gift of Doom (round B255): the creature it's attached to as it's turned face up, or "none". */ attach?: string ; /** Vesuvan Shapeshifter (round 446): the creature it becomes a copy of as it's turned face up, or "none". */ copy?: string };
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; addedSacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; /** Lodestone Bauble (round 417): the player chosen as it's activated with no target. */ yardPlayer?: PlayerId; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; addedSacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; /** Captain America, First Avenger (round 447): the Equipment "Unattach an Equipment from ~" unattaches, chosen first. */ unattachEquipment?: string; /** Lodestone Bauble (round 417): the player chosen as it's activated with no target. */ yardPlayer?: PlayerId; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[]; instead?: ManaType };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -676,6 +680,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [xOppPick, setXOppPick] = useState<XOpponentPick | null>(null);
+  const [unattachPick, setUnattachPick] = useState<UnattachPick | null>(null);
   const [castTypePick, setCastTypePick] = useState<{ draft: CastDraft; label: string } | null>(null);
   const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
   const [numberPick, setNumberPick] = useState<NumberPick | null>(null);
@@ -727,7 +732,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || replicatePick || offspringPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || castTypePick || buybackPick);
+  const picking = !!(xPick || kickPick || replicatePick || offspringPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || unattachPick || castTypePick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -747,6 +752,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setNumberPick(null);
         setForagePick(null);
         setGiftPick(null);
+        setUnattachPick(null);
         setAim(null);
         setBlocker(null);
         setTargeting((t) => (answering(t) ? t : null));
@@ -845,10 +851,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (tg.mode === "change") return dispatch([{ type: "changeTarget", player: HUMAN, target: chosen[0]! }]);
     if (tg.mode === "retarget") return dispatch([{ type: "newTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "cast") return continueCast({ ...tg.draft, targets: chosen });
-    continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, ...(tg.xOpponent !== undefined ? { xOpponent: tg.xOpponent } : {}), targets: chosen });
+    continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, ...(tg.xOpponent !== undefined ? { xOpponent: tg.xOpponent } : {}), ...(tg.unattachEquipment !== undefined ? { unattachEquipment: tg.unattachEquipment } : {}), targets: chosen });
   }
 
-  function useAbility(objectId: string, index: number, modes?: number[], x?: number, pick?: ManaPick, xOpponent?: PlayerId) {
+  function useAbility(objectId: string, index: number, modes?: number[], x?: number, pick?: ManaPick, xOpponent?: PlayerId, unattachEquipment?: string) {
     if (!s) return;
     setMenu(null);
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
@@ -865,8 +871,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Bargaining Table: "X is the number of cards in an opponent's hand": the opponent is chosen first (rulings).
     if (ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs && xOpponent === undefined)
       return setXOppPick({ label, what: "choose an opponent: X is the number of cards in their hand", options: opps, onPick: (pid) => useAbility(objectId, index, modes, undefined, pick, pid) });
+    // Captain America, First Avenger (round 447): the Equipment to unattach first, its mana value the damage to divide
+    // among the targets (CR 602.2b, 601.2d).
+    if (ab.unattachEquipment && unattachEquipment === undefined) {
+      const options = unattachableEquipment(s, s.objects[objectId]!).filter((e) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, undefined, { unattachEquipment: e }) || /not enough mana|target/.test(abilityProblem(s, HUMAN, objectId, index, undefined, modes, undefined, undefined, { unattachEquipment: e }) ?? ""));
+      return setUnattachPick({ label, options, labels: options.map((e) => `${cardOf(s, e).name} (${definedX(s, s.objects[objectId]!, ab, { unattachEquipment: e }) ?? 0} damage)`), onPick: (e) => useAbility(objectId, index, modes, undefined, pick, xOpponent, e) });
+    }
     // Prototype Portal: an X the ability's text sets isn't chosen (CR 107.3c).
-    const fixedX = definedX(s, s.objects[objectId]!, ab, xOpponent !== undefined ? { xOpponent } : undefined);
+    const fixedX = definedX(s, s.objects[objectId]!, ab, xOpponent !== undefined ? { xOpponent } : unattachEquipment !== undefined ? { unattachEquipment } : undefined);
     if (x === undefined && fixedX != null) x = fixedX;
     // Reflecting Mirror: "X is twice the mana value of that spell", set by the target once it's chosen (CR 107.3c, 601.2f).
     const targetX = !!ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs;
@@ -921,7 +933,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // "Any number of target ...": an "up to" target for each there could be (CR 601.2c).
     // "Target ... of an opponent's choice" (Magus of the Arena): that opponent chooses it, after you choose yours.
     const offered = forController(offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId));
-    const xOpp = xOpponent !== undefined ? { xOpponent } : {};
+    const xOpp = { ...(xOpponent !== undefined ? { xOpponent } : {}), ...(unattachEquipment !== undefined ? { unattachEquipment } : {}) };
     if (offered.length && offered.every((t) => t.skip) && body.targets.some((t) => t.chosenBy === "opponent")) return continueActivate({ objectId, index, modes, x, ...xOpp, targets: offered.map(() => ({ kind: "none" as const })), ...(pick ? { pick } : {}) });
     // Goblin Test Pilot: "any target chosen at random", which the game picks as it's activated.
     if (offered.length && !body.targets.some((t) => t.random)) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x, ...xOpp });
@@ -1054,7 +1066,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const all = s.turnOrder.filter((pid) => !s.players[pid]!.lost);
       return setXOppPick({ label: cardOf(s, d.objectId).name, what: "no card is targeted: choose a player, who draws a card at the beginning of the next turn's upkeep", options: all, onPick: (pid) => continueActivate({ ...d, yardPlayer: pid }) });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.addedSacrifice?.length ? { addedSacrifice: d.addedSacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}), ...(d.exileSpell?.length ? { exileSpell: d.exileSpell } : {}), ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}), ...(d.yardPlayer !== undefined ? { yardPlayer: d.yardPlayer } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.addedSacrifice?.length ? { addedSacrifice: d.addedSacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}), ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}), ...(d.exileSpell?.length ? { exileSpell: d.exileSpell } : {}), ...(d.xOpponent !== undefined ? { xOpponent: d.xOpponent } : {}), ...(d.unattachEquipment !== undefined ? { unattachEquipment: d.unattachEquipment } : {}), ...(d.yardPlayer !== undefined ? { yardPlayer: d.yardPlayer } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -2144,6 +2156,27 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 </button>
               ))}
               <button className="ghost" onClick={() => setXOppPick(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {unattachPick && (
+            <div className="targeting unattach-pick">
+              <span>
+                <strong>{unattachPick.label}</strong>: {unattachPick.options.length ? "choose an Equipment to unattach" : "no Equipment attached to it can be unattached for this"}
+              </span>
+              {unattachPick.options.map((id, i) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setUnattachPick(null);
+                    unattachPick.onPick(id);
+                  }}
+                >
+                  {unattachPick.labels[i]}
+                </button>
+              ))}
+              <button className="ghost" onClick={() => setUnattachPick(null)}>
                 Cancel
               </button>
             </div>

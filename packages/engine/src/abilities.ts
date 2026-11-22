@@ -8382,6 +8382,12 @@ export interface ActivatedAbility {
   /** "Unattach ~" as a cost (Sunforger): it must be attached to a creature (rulings). */
   unattachCost?: true;
   /**
+   * Captain America, First Avenger (round 447): "Unattach an Equipment from ~" as a cost, the Equipment chosen as it's
+   * activated (CostChoices.unattachEquipment, CR 602.2b, 601.2h), and the ability's X that Equipment's mana value then
+   * (definedX), for "damage equal to that Equipment's mana value divided as you choose" (CR 601.2d).
+   */
+  unattachEquipment?: true;
+  /**
    * "Tap enchanted creature", "Tap enchanted land" as the cost (Krovikan Plague, Earthlore): tapping the untapped permanent
    * this Aura is attached to (CR 602.2b), which isn't this ability's own {T}, so a creature that came under its
    * controller's control this turn can be tapped (CR 302.6 is about its own {T} abilities).
@@ -11036,7 +11042,7 @@ export interface CompiledCard {
   /** "Spells your opponents cast that target one or more commanders you control cost {3} more to cast" (Esior): once per spell. */
   commanderTargetTax?: number;
   /** Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target", "Spells your opponents cast cost {1} more ...": `n` generic mana (negative: less) for each different player or object the spell targets (rulings). */
-  perTargetCost?: { opponents: boolean; n: number }[];
+  perTargetCost?: { opponents: boolean; n: number; /** Battlefield Thaumaturge (round 447): "for each creature it targets": each target that's a creature on the battlefield, once for each time it's targeted (rulings). */ creatures?: true; /** "Each instant and sorcery spell you cast": only spells of these card types. */ spellTypes?: string[] }[];
   /** Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast" (CR 601.2f, with the targets chosen in 601.2c): this much more for each spell like it a spell targets. */
   stackTargetTax?: number;
   /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */

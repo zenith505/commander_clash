@@ -1762,6 +1762,8 @@ export interface CostChoices {
    * an opponent's graveyard as you cast ~" (Spoils of War): the opponent chosen as it's announced, before X (rulings).
    */
   xOpponent?: PlayerId;
+  /** Captain America, First Avenger (round 447): the Equipment attached to it that "Unattach an Equipment from ~" unattaches (ActivatedAbility.unattachEquipment). */
+  unattachEquipment?: ObjectId;
   /** Selective Snare: the creature type chosen as it's cast, before its targets (CompiledCard.castChooseType, rulings). */
   creatureType?: string;
   /** The spell on the stack (its object) exiled for "Exile an instant or sorcery spell you control" (Nivmagus Elemental). */

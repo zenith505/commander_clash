@@ -2945,7 +2945,7 @@ export interface GameState {
    * cost paid, waiting for the players in `queue` (turn order from the active player) to decline paying (payUnless
    * `manaUnless`); `adds` the mana it makes then, `picked` its triggered mana abilities' (CR 605.1b, 605.4a).
    */
-  manaUnless?: { player: PlayerId; id: ObjectId; zc: number; adds: ManaType[]; from: ManaOrigin[]; picked: { adds: ManaType[]; from?: ManaOrigin[][]; by?: PlayerId[]; damage?: ObjectId[]; skipUntap?: true }; queue: PlayerId[]; cost: string; source: string };
+  manaUnless?: { player: PlayerId; id: ObjectId; zc: number; adds: ManaType[]; from: ManaOrigin[]; picked: { adds: ManaType[]; from?: ManaOrigin[][]; by?: PlayerId[]; damage?: ObjectId[]; skipUntap?: true; spend?: (ManaSpend | undefined)[] }; queue: PlayerId[]; cost: string; source: string };
   /** Peace Talks (round B254): the turns ("this turn and next turn") in which creatures can't attack and players and permanents can't be the targets of spells or activated abilities. */
   peaceTalksTurns?: number[];
   /** Charmed Pendant (round B239): the mana its milled card's hybrid symbols could add, waiting for its controller's choice (chooseOption "pendantMana"). */

@@ -40,6 +40,8 @@ interface Option {
   snow?: ManaType[];
   /** Its mana "can't be spent to pay generic mana costs" (Jegantha): only colored symbols. */
   colorOnly?: true;
+  /** ManaOption.limited (Snowfall, round B298). */
+  limited?: { mana: ManaType; spend: ManaSpend }[];
 }
 
 interface Source {
@@ -88,13 +90,15 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
         // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
         .filter((x) => !handOnly(o, abs[x.ability]!))
+        // Snowfall (round B298): an option whose triggered mana can't be spent on this (CR 106.6) isn't taken; declining it is.
+        .filter((x) => !x.limited?.some((l) => !spendAllows(s, pid, l.spend, use, cost)))
         .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && !abs[x.ability]!.unlessAnyPays && !abs[x.ability]!.returnSelf && !abs[x.ability]!.untapSelf && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use, cost)) && (!pirated(o, abs[x.ability]!) || spendAllows(s, pid, PIRACY_SPEND, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: manaAbilityCostOf(s, pid, o, ab), penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly || pirated(o, ab) ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
+          return { id: o.id, ...x, cost: manaAbilityCostOf(s, pid, o, ab), penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly || pirated(o, ab) || x.limited ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
-      if ((!onlyTreasures || treasure) && controllerOf(s, o) === pid) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use, cost)) && (!only || x.adds.every((m) => only.includes(m)))));
+      if ((!onlyTreasures || treasure) && controllerOf(s, o) === pid) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use, cost)) && !x.limited?.some((l) => !spendAllows(s, pid, l.spend, use, cost)) && (!only || x.adds.every((m) => only.includes(m)))));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
       return { id: o.id, options, colors: makes.length, makes, creature: isCreature(o.id) };
     })

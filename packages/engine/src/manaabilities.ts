@@ -486,6 +486,8 @@ export interface ManaOption {
   snow?: ManaType[];
   /** Charmed Pendant (round B239): what it adds depends on the card its cost mills (`adds` is empty until then). */
   mills?: true;
+  /** Snowfall (round B298): the part of `adds` a triggered mana ability adds with a spending restriction (CR 106.6). */
+  limited?: { mana: ManaType; spend: ManaSpend }[];
 }
 
 /**
@@ -527,6 +529,12 @@ function snowPart(s: GameState, o: GameObject, adds: ManaType[], r: ManaTriggerR
   return snow.length ? { snow } : {};
 }
 
+/** Snowfall (round B298): the restricted part of what the triggered mana abilities add (ManaOption.limited). */
+function limitedPart(r: ManaTriggerResult): { limited?: { mana: ManaType; spend: ManaSpend }[] } {
+  const limited = r.adds.flatMap((mana, i) => (r.spend?.[i] ? [{ mana, spend: r.spend[i]! }] : []));
+  return limited.length ? { limited } : {};
+}
+
 /** The triggered mana abilities on the battlefield (CR 605.1b) and their sources. */
 function manaTriggerSources(s: GameState): { src?: GameObject; controller: PlayerId; t: ManaTrigger }[] {
   const out: { src?: GameObject; controller: PlayerId; t: ManaTrigger }[] = s.battlefield.flatMap((id) => {
@@ -560,6 +568,8 @@ export interface ManaTriggerResult {
   from: ManaOrigin[][];
   /** False Dawn (round B294): who controls the triggered ability that adds each of `adds` (CR 603.3a, its source's controller). */
   by?: PlayerId[];
+  /** Snowfall (round B298, ManaTrigger.spend): what each of `adds` can be spent on, unset for unrestricted mana. */
+  spend?: (ManaSpend | undefined)[];
   /** Winter's Night (ManaTrigger.landSkipsUntap): the permanent tapped for mana doesn't untap during its controller's next untap step. */
   skipUntap?: true;
   /** Overabundance, Barbflare Gremlin (ManaTrigger.damage): 1 damage from each of these sources to the player who tapped it, after the mana. */
@@ -593,7 +603,11 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     const a = t.adds;
     if (a.kind === "fixed") {
       const n = a.times === undefined ? 1 : evalAmount(s, a.times, { controller: ctl, ...(src ? { sourceId: src.id } : {}) });
-      picks = [{ extra: [], adds: Array.from({ length: n }, () => a.mana).flat() }];
+      // Snowfall (round B298): more if the permanent tapped for mana is snow as it resolves (CR 205.4g), and "may": adding
+      // none is one of the picks, told apart by the mana it adds (CR 605.4a).
+      const mana = t.snowAdds && characteristics(s, o).supertypes.includes("Snow") ? t.snowAdds : a.mana;
+      const fixed = Array.from({ length: n }, () => mana).flat();
+      picks = t.may ? [{ extra: [], adds: [] }, { extra: fixed, adds: fixed }] : [{ extra: [], adds: fixed }];
     }
     else if (a.kind === "chosenColor") picks = [{ extra: [], adds: [chosen!] }];
     else if (a.kind === "produced") {
@@ -619,7 +633,9 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     // Overabundance deals its damage, Barbflare Gremlin has the land deal it.
     const hurts = t.damage === "self" ? src?.id : t.damage === "land" ? o.id : undefined;
     // False Dawn (round B294): colored mana a triggered ability of a player under it adds is white (falseDawnMana).
-    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...falseDawnMana(s, ctl, p.adds)], from: [...r.from, ...p.adds.map(() => from)], by: [...(r.by ?? []), ...p.adds.map(() => ctl)], ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}), ...(hurts || r.damage ? { damage: [...(r.damage ?? []), ...(hurts ? [hurts] : [])] } : {}) })));
+    // Snowfall (round B298): its mana's spending restriction (CR 106.6), one entry for each of `adds`.
+    const spend = (r: ManaTriggerResult, p: { adds: ManaType[] }) => (t.spend && p.adds.length) || r.spend ? { spend: [...(r.spend ?? r.adds.map(() => undefined)), ...p.adds.map(() => t.spend)] } : {};
+    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...falseDawnMana(s, ctl, p.adds)], from: [...r.from, ...p.adds.map(() => from)], by: [...(r.by ?? []), ...p.adds.map(() => ctl)], ...spend(r, p), ...(r.skipUntap || t.landSkipsUntap ? { skipUntap: true as const } : {}), ...(hurts || r.damage ? { damage: [...(r.damage ?? []), ...(hurts ? [hurts] : [])] } : {}) })));
   }
   return results;
 }
@@ -654,7 +670,7 @@ function allManaOptions(s: GameState, o: GameObject, abs: ManaAbility[]): ManaOp
       const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length - (ab.produces.base ?? 0) } : {};
       const pays = ab.produces.kind === "doublePool" ? { pays: combos![combo!]! } : {};
       return insteadWays(s, o, ab.tap, (instead) => manaProduced(s, o, ab, mana, combo, instead)).flatMap(({ instead, adds }) =>
-        manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r), ...(ab.produces.kind === "milledSymbols" ? { mills: true as const } : {}) })),
+        manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r), ...limitedPart(r), ...(ab.produces.kind === "milledSymbols" ? { mills: true as const } : {}) })),
       );
     });
   });
@@ -827,7 +843,7 @@ export function activatedManaOptions(s: GameState, o: GameObject, index: number)
   const pid = controllerOf(s, o);
   return manaChoices(s, o, m).flatMap((mana) =>
     insteadWays(s, o, m.tap, (instead) => manaProduced(s, o, m, mana, undefined, instead)).flatMap(({ instead, adds }) =>
-      manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) })),
+      manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, ...(instead ? { instead } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r), ...limitedPart(r) })),
     ),
   );
 }

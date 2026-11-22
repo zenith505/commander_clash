@@ -11991,6 +11991,27 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B300 (least played first, one card off the skip lists, not in Lane A's rounds 447-448): Share the Spoils (out after
+  rounds 356 and B294: each player plays from the cards exiled with it). "When ~ enters and whenever an opponent loses the
+  game, exile the top card of each player's library.": one ability with two trigger events (CR 603.2), every library's top
+  card exiled face up in turn order (CR 406.3) and linked to the permanent (CR 607.2a); an opponent is any other player
+  (no teams, CR 102.3), and a Share the Spoils its losing owner had leaves with them and doesn't trigger (CR 800.4a,
+  rulings). "During each player's turn, that player may play a land or cast a spell from among cards exiled with ~, and
+  they may spend mana as though it were mana of any color to cast that spell.": a static ability (CompiledCard
+  playLinkedEachTurn, game.ts eachTurnSource) for every player, its controller or not, on their own turn, whoever owns the
+  card, a land as their land play or a spell with the usual timing (rulings), mana as though of any color for the spell
+  (CR 609.4b); one land or one spell each turn for that object (rulings; TurnLog.eachTurnLinked), only while it's on the
+  battlefield as that object (CR 400.7, rulings). Its permission gives way to every other one the player has for the card
+  (useEachTurnLinked runs before the others are used up, as Hauken's Insight's gives way). "When they do, exile the top
+  card of their library.": a triggered ability of the permanent's (a castSpell trigger with orPlaysLand and
+  cast.viaEachTurnLinked) for the card played with that permission only, not one played another way; the card it exiles is
+  exiled with it too (CR 607.2a). Bots play from among those cards like any other playable exiled card. Browser tests: cast
+  Share the Spoils, then Ana's exiled Lightning Bolt at her with a Forest, which exiles your top card, and Ben's exiled
+  Forest isn't playable after; play Ana's exiled Forest as your land. +1, 31,881 of 31,936 with main 499a31a (B297). The
+  compiled text of every other card is unchanged.
+- Out after round B300 (looked at, not done): the lists after round B297 (and B298, B299) stay out; about 48 unsupported
+  cards remain, all of them hard. Known gaps under Share the Spoils: bots don't weigh which of those cards is best to play
+  with the one card a turn, or that "When they do" exiles their own top card.
 - Round B297 (least played first, one card off the skip lists, not in Lane A's rounds 445-446): Yixlid Jailer's "Cards in
   graveyards lose all abilities." (out after rounds B154 and B233, every graveyard-zone ability check): a layer 6 effect
   (CR 613.1f) of the permanent's static ability on every card in every graveyard, recorded as it applies in the layers

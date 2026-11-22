@@ -2147,6 +2147,8 @@ export interface TurnLog {
   tappedLandForMana?: PlayerId[];
   /** Hedonist's Trove (CompiledCard.playLinkedSpellOnce): the sources ("id@zoneChanges") whose cards a spell was cast from this turn with that permission. */
   linkedSpellOnce?: string[];
+  /** Share the Spoils (round B300, CompiledCard.playLinkedEachTurn): each source ("id@zoneChanges") whose permission was used this turn, with the card played (its id and zone-change count in exile). */
+  eachTurnLinked?: { src: string; id: ObjectId; zc: number }[];
   /** Lara Croft, Tomb Raider (round 432, Effect playCounteredThisTurn): each permission to play one card from exile with this kind of counter on it this turn, `used` once a card was played with it. */
   playCounteredGrants?: { player: PlayerId; counter: string; used?: true }[];
   /** Jace's Machinations (round 433, Effect loyaltyAtInstantThisTurn): players who may activate loyalty abilities of their planeswalkers of this subtype any time they could cast an instant, on any player's turn, this turn. */

@@ -45403,6 +45403,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d39af66c-4997-48b8-a704-f21d93247d7d",
+  "name": "Share the Spoils",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters and whenever an opponent loses the game, exile the top card of each player's library.\nDuring each player's turn, that player may play a land or cast a spell from among cards exiled with this enchantment, and they may spend mana as though it were mana of any color to cast that spell. When they do, exile the top card of their library.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e23bf5fe-e494-473e-8502-606106ee1820",
   "name": "Shared Fate",
   "manaCost": "{4}{U}",

@@ -6281,6 +6281,14 @@ export type Effect =
    */
   | { type: "landTypeCopies"; of: ObjRef }
   /**
+   * Arna Kennerüd, Skycaptain (round 442): "for each nontoken permanent attached to it, create a token that's a copy of
+   * that permanent attached to that creature": `what` as it is now (CR 608.2h), each nontoken permanent attached to it
+   * then, its copiable values (CR 707.2) for a token you create entering attached to it: an Aura token that can't enchant
+   * it isn't created (CR 303.4i), an Equipment or Fortification token that can't be attached to it enters unattached (CR
+   * 301.5e, 301.6), anything else enters unattached (CR 303.4h; rulings).
+   */
+  | { type: "tokenCopiesOfAttached"; what: ObjRef }
+  /**
    * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
    * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
    * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).

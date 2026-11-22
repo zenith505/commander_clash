@@ -2787,8 +2787,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
  * it has reconfigure (CR 301.5c); an Aura to what its enchant ability allows (CR 303.4d, 702.5d); neither to something
  * with protection from it (CR 702.16c-d).
  */
-export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId, asCreature?: boolean): boolean {
-  if (me.zone !== "battlefield") return false;
+export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId, asCreature?: boolean, /** Arna Kennerüd (round 442): `me` is a token about to enter attached to `host` (CR 301.5e). */ entering?: boolean): boolean {
+  if (me.zone !== "battlefield" && !entering) return false;
   const meChars = characteristics(s, me);
   const aura = meChars.subtypes.includes("Aura");
   // A Fortification is to lands what an Equipment is to creatures (CR 301.6): only to a land, and not while it's a

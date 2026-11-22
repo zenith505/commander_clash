@@ -1,7 +1,7 @@
 # Roadmap
 
-31,884 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,970 of
+31,886 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,971 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -12017,6 +12017,23 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B301 (least played first, one card off the skip lists, not in Lane A's rounds 447-449): Codie, Ravenous Codex (out
+  after rounds 204, 448 and B294: "a prepared spell" isn't a term of CR 722). "Whenever you cast a prepared spell, copy it.
+  You may choose new targets for the copy.": read as "a spell cast as a prepare spell" (CR 722.3d), the copy of a prepared
+  permanent's prepare spell its controller casts from exile (722.3c), the only way a prepare spell is ever cast (722.3); a
+  preparation card cast from a hand has only its normal characteristics (722.4) and isn't one (castSpell trigger
+  `cast.prepared`, the spell's GameObject.preparedFrom). Judgment call, no ruling names the term: the card's reminder text
+  and every other prepare card speak only of casting that copy, so no other reading is open. The copy it makes isn't cast
+  (CR 707.10), so it doesn't trigger Codie again; a copy of a prepare spell is one too (722.3d), which matters only to
+  "cast" triggers here. "{W}{U}{B}{R}{G}, {T}: Each creature you control becomes prepared." was already parsed;
+  each creature with a prepare spell that isn't prepared gets one copy (722.3a). Bots cast those copies as before and let
+  Codie copy them with the usual new-target choice. Browser test: cast Adventurous Eater (no trigger), then Have a Bite's
+  copy from exile at the Eater; Codie's copy targets Grizzly Bears instead. +1, 31,886 of 31,936 on B300's head 65c7e36
+  (main 2c9aae1). The compiled text of every other card is unchanged.
+- Out after round B301 (looked at, not done): the lists after round B300 stay out; Snowblind ("toughness minus 1" read
+  inside its own layer 7c effect), North Star, Equinox, Spy Kit and Pulmonic Sliver were looked at again. About 47
+  unsupported cards remain, all of them hard. Known gap: bots don't weigh Codie's copy when picking which prepared copy to
+  cast.
 - Round B300 (least played first, one card off the skip lists, not in Lane A's rounds 447-448): Share the Spoils (out after
   rounds 356 and B294: each player plays from the cards exiled with it). "When ~ enters and whenever an opponent loses the
   game, exile the top card of each player's library.": one ability with two trigger events (CR 603.2), every library's top

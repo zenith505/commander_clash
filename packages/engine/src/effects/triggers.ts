@@ -2857,6 +2857,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.kicked && !(item?.kicked?.length && (!spell || isRealKicker(compileCard(defOf(s, spell)).kicker)))) return false;
         // "A spell using teamwork" (Virtual Assistant): its teamwork cost was paid as it was cast (CR 702.194b).
         if (t.cast.teamwork && !spell?.teamwork) return false;
+        // Codie, Ravenous Codex (round B301): "a prepared spell": cast as a prepare spell, from the copy a prepared permanent's
+        // controller has in exile (CR 722.3c-d; prepare.ts); a card cast another way has only its normal characteristics (722.4).
+        if (t.cast.prepared && !(spell && !ev.copy && spell.preparedFrom)) return false;
         // "A creature spell that has an Adventure" (Garenbrig Squire): the card is an adventurer card (CR 715.2).
         if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:

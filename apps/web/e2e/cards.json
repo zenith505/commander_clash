@@ -10251,6 +10251,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a17e414c-8de0-47fd-bcbc-540c7fec7642",
+  "name": "Codie, Ravenous Codex",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact Creature — Book Construct",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Book",
+   "Construct"
+  ],
+  "oracleText": "Whenever you cast a prepared spell, copy it. You may choose new targets for the copy.\n{W}{U}{B}{R}{G}, {T}: Each creature you control becomes prepared. (Only creatures with prepare spells can become prepared.)",
+  "power": "1",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Prepared"
+  ],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "67a9357c-4713-4e01-a60d-532bf0dd80b6",
   "name": "Codie, Vociferous Codex",
   "manaCost": "{3}",

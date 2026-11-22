@@ -4279,7 +4279,7 @@ line blocks.
    B267, merged in); the compiled text of every other card is unchanged.
    Out after round 424 (looked at, not done): Secret Invasion (done in round B276) (the enchanted creature a copy of the creature the Aura
    exiled: no ruling says whether that's the card in exile or the creature as it last was), Ludevic, Necrogenius (done in round 435) (its
-   back face a copy of a creature card exiled with it), Guardian Beast ("can't be enchanted" and "can't gain control" for
+   back face a copy of a creature card exiled with it), Guardian Beast (done in round B292) ("can't be enchanted" and "can't gain control" for
    other permanents while it's untapped), Redemptor Dreadnought (its Plasma Incinerator line compiles wrongly, review
    follow-up 18: fix it with the card), Selective Adaptation, Supper for Spiders and Brilliant Ultimatum (Lane B's round
    B268), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists). Known
@@ -6095,7 +6095,7 @@ line blocks.
    Out after round 282 (looked at, not done): Arena (done in round B141) (an activated ability's second target chosen by an opponent);
    Jinxed Choker (done in round 320) (its end step trigger gives it to target opponent, who puts the counter on it; its other line is now
    read).
-   Out after round 281 (looked at, not done): Balduvian Shaman (a target "that doesn't have cumulative upkeep" and a
+   Out after round 281 (looked at, not done): Balduvian Shaman (done in round B292) (a target "that doesn't have cumulative upkeep" and a
    granted cumulative upkeep that must count for it); Swirl the Mists (every color word in every spell and permanent,
    a static text change); The Animus, King Narfi's Betrayal, Wizard's Spellbook and the rest of the most played
    remaining names, as listed in earlier rounds' notes (copies of cards in exile, casting from among exiled cards).
@@ -11896,6 +11896,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B292 (least played first, two cards off the skip lists, neither in Lane A's rounds 441-442): Balduvian Shaman's "{T}:
+  Change the text of target white enchantment you control that doesn't have cumulative upkeep by replacing all instances of
+  one color word with another. That enchantment gains "Cumulative upkeep {1}."" (out after round 281): Sleight of Mind's text
+  change (CR 612.1-612.2, the words chosen as it resolves, never the same word, rulings), then the enchantment gains the
+  keyword with no duration (CR 611.2a, layer 6), an upkeep trigger like a printed one; "that doesn't have cumulative upkeep"
+  counts a keyword gained as text too (targeting.ts objectMatches), checked as the target is chosen and as it resolves (CR
+  601.2c, 608.2b). Guardian Beast's "As long as this creature is untapped, noncreature artifacts you control can't be
+  enchanted, they have indestructible, and other players can't gain control of them. This effect doesn't remove Auras
+  already attached to those artifacts." (out after round B122): one static ability while it's untapped (CR 611.3a); no Aura
+  can become attached to those artifacts (Characteristics.noNewAuras, layers.ts attachableBy: an Aura spell or an Aura put
+  onto the battlefield attached to one doesn't enter, CR 303.4i, and one on the battlefield doesn't move, 303.4j), while one
+  attached already stays (no CR 704.5m); and a control-changing effect that would give one to another player doesn't do
+  that (CR 101.2; guardian.ts controlGainable, checked as the effect begins, CR 611.2c, at every place the engine starts a
+  control effect: gain control, owners regaining control, rotations, random handouts, Dack Fayden's gifts, Herald of
+  Leshrac's upkeep picks), the rest of the spell still happening (Hijack still untaps it) and an exchange with one not
+  happening at all (CR 701.12b). An effect that began while the Beast was tapped goes on after it untaps. Sacrifices aren't
+  stopped (rulings). Browser tests activate the Shaman on Absolute Law (Cold Snap not a target) and pick red then black, and
+  cast Hijack and Animate Artifact at a guarded Sol Ring. +2, 31,861 of 31,936 on B291's branch (main through round 440 and
+  B290), 31,863 with B291's head 043c218d (main through round 441) merged in. The compiled text of every other card is unchanged.
+- Out after round B292 (looked at, not done): the lists after round B291 stay out. Battlefield Thaumaturge (Lane A's lists)
+  was looked at again: its ruling ("{1} per target creature, even if the spell targets a creature more than once") reads
+  as counting each target slot, but Lane A has kept it out several times, so it's left to them. Judgment calls and known
+  gaps: an Aura with "can't be enchanted by other Auras" or a Tetravite's "can't be enchanted" now also keeps an Aura from
+  entering attached (CR 303.4i) instead of entering and then going to the graveyard; bots never activate Balduvian Shaman
+  and don't avoid aiming control-stealing spells at guarded artifacts.
 - Round B291 (least played first, two cards off the skip lists, neither in Lane A's rounds 440-441): God-Eternal Kefnet's "You
   may reveal the first card you draw each turn as you draw it. Whenever you reveal an instant or sorcery card this way, copy
   that card and you may cast the copy. That copy costs {2} less to cast." (out after round 409 because draws couldn't pause;
@@ -12236,7 +12261,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   lands) and Alaundo's exile and the free cast with haste it leads to (its prompt now says the last time counter is
   gone). +2, 31,803 of 31,936 on B278's branch. The compiled text of every other card is unchanged.
 - Out after round B279 (looked at, not done): the lists after round B278 stay out. Chorus of the Conclave (done in round B284) (still out, as
-  after round B240), Guardian Beast (as after round B257). The Face of Boe, Skyway Robber and Hama, the Bloodbender are
+  after round B240), Guardian Beast (done in round B292) (as after round B257). The Face of Boe, Skyway Robber and Hama, the Bloodbender are
   Lane A's round 431. Known gaps: a bot exiles a land or a card with mana value 0 with Alaundo (it never comes back)
   only when its hand holds nothing else; a bot's Golem X counts cost reductions only against its {2}. Next in line (not looked
   at closely yet): Filigree Vector (done in round B280) (two "any number of target" groups), Battlefield Thaumaturge, Psychic Paper.
@@ -12266,7 +12291,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   is done; Land Equilibrium and Sacred Ground together make a loop no one can stop (a draw, CR 104.4b): the choice of
   land doesn't restart the loop's count, but the counts of cards put into graveyards this turn change each time round, so
   the draw comes only after shortcuts.ts MAX_UNBROKEN resolutions (no shortcut offered). Next in line
-  (not looked at closely yet): Chorus of the Conclave (done in round B284), Emblazoned Golem, Guardian Beast, from the earlier skip lists.
+  (not looked at closely yet): Chorus of the Conclave (done in round B284), Emblazoned Golem, Guardian Beast (done in round B292), from the earlier skip lists.
 - Round B277 (least played first, two of the three cards round B276 named next in line, neither in Lane A's rounds
   428-429): Lightning Storm's "Discard a land card: Put two charge counters on Lightning Storm. You may choose a new target
   for it. Any player may activate this ability but only if Lightning Storm is on the stack." (an ability of the spell that
@@ -12380,7 +12405,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bears over Sol Ring at your next upkeep. +2, 31,787 of 31,936 on B273's branch, 31,790 with main through round 426 merged in. The
   compiled text of every other card is unchanged.
 - Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star, Ghostly Flame, Snowblind,
-  Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion (done in round B291) and Guardian Beast
+  Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion (done in round B291) and Guardian Beast (done in round B292)
   were looked at again and stay out for the reasons in the earlier lists; the Wishes and other "outside the game" cards
   stay out (nothing outside the game here). Judgment calls and known gaps: Dimensional Breach's upkeep trigger goes on
   the stack at every player's upkeep while any of its cards is exiled, also for a player who owns none of them (it then
@@ -12773,7 +12798,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (CR 608.3e would have it go to the graveyard, but the copy is chosen once it's on the battlefield here); bots use Sorrow's
   Path and General Jarkeld only when the fights after the swap come out better for them (Sorrow's Path's 2 damage counted),
   and answer Worms of the Earth's question as any punisher.
-- Out after round B257 (looked at, not done): the lists after round B256 stay out, and Guardian Beast (still out: "can't be
+- Out after round B257 (looked at, not done): the lists after round B256 stay out, and Guardian Beast (done in round B292) (still out: "can't be
   enchanted" that "doesn't remove Auras already attached" while it toggles with the Beast's tapped state, and "other players
   can't gain control of them", which its rulings don't settle beyond sacrifices). Known gaps: bots never activate Arcum's
   Whistle or Shell of the Last Kappa's sacrifice ability (they do use its exile against an opponent's spell that targets
@@ -12911,7 +12936,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   bonus should add only {B} or {R} for it; bots' combat predictions don't know Ogre Enforcer survives damage from several
   sources.
 - Out after round B231 (looked at, not done): Torrent of Lava (done in round B263) (an activated ability creatures have while it's on the stack,
-  and a shield against damage from that spell only), Guardian Beast ("other players can't gain control of them" while it's
+  and a shield against damage from that spell only), Guardian Beast (done in round B292) ("other players can't gain control of them" while it's
   untapped, and "can't be enchanted" that doesn't remove Auras already attached), Spy Kit (all names of nonlegendary creature
   cards), Immortal Coil (done in round B262) (a card of your choice exiled for each 1 damage, in the middle of damage) and the lists after round
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
@@ -13256,7 +13281,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   block tax paid in life), Rohgahh of Kher Keep (payment to keep the Kobolds, then control of all of them to an opponent),
   Evangelize (done in round B141) and Echo Chamber (done in round B141) (a target an opponent chooses for your spell or ability).
 - Out after round B122 (looked at, not done): Tamanoa and Briarbridge Patrol (once for each damage event, which a spell
-  dealing damage to several things doesn't report as one yet), Guardian Beast ("can't be enchanted" for other permanents
+  dealing damage to several things doesn't report as one yet), Guardian Beast (done in round B292) ("can't be enchanted" for other permanents
   while it's untapped, with "doesn't remove Auras already attached" and a control rule), Tetravus (done in round B171) (its tokens' plain "can't be
   enchanted", and its other upkeep line). Known gap: a bot may cast an Aura at a permanent another Aura
   says can't be enchanted by it (Consecrate Land), wasting the Aura.

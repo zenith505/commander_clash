@@ -748,7 +748,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // age counters.
       if (e.gainControlCost) {
         if (!sc.n) return runEffect(s, paid, ctx);
-        const filter = e.gainControlCost;
+        // Guardian Beast (round B292): a land whose control can't change to this player can't be one of them.
+        const filter: TargetSpec = { ...e.gainControlCost, gainableControl: true };
         const can = s.battlefield.filter((id) => objectMatches(s, filter, obj(s, id), ctx.controller, false));
         if (can.length < sc.n) {
           log(s, `${player(s, ctx.controller).name} can't gain control of ${sc.n} ${filter.text}s (${can.length} on the battlefield).`);

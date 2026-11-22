@@ -11914,7 +11914,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   happening at all (CR 701.12b). An effect that began while the Beast was tapped goes on after it untaps. Sacrifices aren't
   stopped (rulings). Browser tests activate the Shaman on Absolute Law (Cold Snap not a target) and pick red then black, and
   cast Hijack and Animate Artifact at a guarded Sol Ring. +2, 31,861 of 31,936 on B291's branch (main through round 440 and
-  B290). The compiled text of every other card is unchanged.
+  B290), 31,863 with B291's head 043c218d (main through round 441) merged in. The compiled text of every other card is unchanged.
 - Out after round B292 (looked at, not done): the lists after round B291 stay out. Battlefield Thaumaturge (Lane A's lists)
   was looked at again: its ruling ("{1} per target creature, even if the spell targets a creature more than once") reads
   as counting each target slot, but Lane A has kept it out several times, so it's left to them. Judgment calls and known

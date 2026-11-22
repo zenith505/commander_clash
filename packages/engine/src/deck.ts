@@ -1,4 +1,4 @@
-import type { CardDef, Color } from "./types";
+import { COLORS, type CardDef, type Color } from "./types";
 import { stripReminder } from "./keywords";
 
 export interface DeckProblem {
@@ -77,10 +77,38 @@ export function validateCommanderDeck(commander: CardDef, deck: CardDef[], banne
   });
   const ci = new Set<Color>([...commanders.flatMap((c) => c.colorIdentity), ...commanders.flatMap((c, i) => (colors[i] ? [colors[i]!] : []))]);
   for (const c of deck) {
+    const circled = circledProblem(c);
+    if (circled) out.push({ card: c.name, problem: circled });
     if (c.colorIdentity.some((col) => !ci.has(col))) out.push({ card: c.name, problem: "outside the commander's color identity" });
     if (banned.has(c.name)) out.push({ card: c.name, problem: "banned in Commander" });
   }
   for (const c of commanders) if (banned.has(c.name)) out.push({ card: c.name, problem: "banned in Commander" });
+  return out;
+}
+
+/** Cryptic Spires (round 443): "As you create your deck, circle two of the colors below." (CR 207.5). */
+export const circlesTwoColors = (c: CardDef): boolean => /^As you create your deck, circle two of the colors below\.$/m.test(c.oracleText ?? "");
+
+/** Two different colors circled on a card that has you circle two (CR 207.5), or why not. */
+export function circledProblem(c: CardDef): string | null {
+  const got = c.circledColors;
+  if (!circlesTwoColors(c)) return got ? "has no colors to circle" : null;
+  if (!got || got.length !== 2 || got[0] === got[1] || !got.every((x) => COLORS.includes(x))) return "needs two colors circled as its deck is built (CR 207.5)";
+  return null;
+}
+
+/**
+ * Cryptic Spires (round 443): the definition of the card with these two colors circled as its deck is built (CR 207.5).
+ * Their mana symbols are part of its printed rules text (CR 613.1), so of its copiable values (CR 707.2), and its color
+ * identity includes them (CR 903.4); its colors don't change (rulings: it's still colorless). Its own key in
+ * GameState.cards, so two of them circled differently are two definitions.
+ */
+export function circleColors(c: CardDef, colors: [Color, Color]): CardDef {
+  const base = c.oracleId.replace(/\|circled:[WUBRG]+$/, "");
+  const identity = [...new Set([...c.colorIdentity, ...colors])];
+  const out: CardDef = { ...c, oracleId: `${base}|circled:${colors.join("")}`, circledColors: [...colors], colorIdentity: COLORS.filter((x) => identity.includes(x)), ...(c.producedMana ? { producedMana: [...colors] } : {}) };
+  const problem = circledProblem(out);
+  if (problem) throw new Error(`${c.name} ${problem}`);
   return out;
 }
 

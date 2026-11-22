@@ -7784,6 +7784,17 @@ const BOT_LOOP_LIMIT = 8;
 /** Mechtitan Core's ability: this permanent and other permanents exiled to make a 10/10 or bigger token. */
 const makesTitan = (ab: ActivatedAbility) => !!ab.exileSelf && ab.body.effects.some((e) => e.type === "createToken" && (e.token.power ?? 0) >= 10) && !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile && c.other);
 
+/**
+ * Etrata, Deadly Fugitive (round 443): "Turn this creature face up. If you can't, exile it, then you may cast the exiled card
+ * without paying its mana cost." In our main phase with the stack empty, for a face-down creature card worth more than
+ * the 2/2 it is (mana value 3 or more), or an instant or sorcery card to cast for free; not a land or another permanent.
+ */
+function etrataWorth(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  if (!o.faceDown || o.isToken || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) return false;
+  const card = realDefOf(s, o);
+  return isType(card, "Instant") || isType(card, "Sorcery") || (isType(card, "Creature") && card.cmc >= 3);
+}
+
 function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility, o: GameObject) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -7798,6 +7809,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.mana) continue;
       // Koh, the Face Stealer (round 399): only for a better card to borrow from.
       if (ab.body.effects.some((e) => e.type === "chooseLinkedCard") && !kohChoiceWorth(s, pid, o, ab)) continue;
+      // Etrata, Deadly Fugitive (round 443): a face-down creature of ours turned face up for {2}{U}{B}, or the card it is
+      // cast for free, only when that's worth it (etrataWorth).
+      const up0 = ab.body.effects[0];
+      if (up0?.type === "turnFaceUp" && up0.setDid) {
+        const plan = etrataWorth(s, pid, o) ? planActivate(s, pid, id, i) : null;
+        if (plan) return plan;
+        continue;
+      }
       // Fractured Powerstone's planar die outside Planechase: nothing to gain.
       if (ab.body.effects.every((e) => e.type === "noEffect")) continue;
       // Harvest Mage (round B224): a card for lands that make a color of our choice this turn, which no payment plans

@@ -186,6 +186,12 @@ export interface CardDef {
    */
   borrowedTriggers?: CardDef[];
   /**
+   * Cryptic Spires (round 443): the two colors circled on this card as its deck was built (CR 207.5), part of its printed
+   * rules text, so of its copiable values (CR 707.2) and its color identity (CR 903.4). cards.ts circleColors makes the
+   * definition of such a card with its colors circled.
+   */
+  circledColors?: Color[];
+  /**
    * A mutating creature spell (CR 702.140a): it targets a non-Human creature with this owner, the spell's (see
    * mutatingDef). Set only on the definition a mutating spell uses on the stack.
    */
@@ -3423,6 +3429,8 @@ export interface Resolving {
     cloakDone?: true;
     /** Effect "castRevealedFree" (Lady Loki, Agent of Chaos, round 421): the caster was asked. */
     castRevealedAsked?: true;
+    /** Etrata, Deadly Fugitive (round 443): its exiled card's cast was asked about (effects/run-round443.ts). */
+    exileSelfCastAsked?: true;
     /** Effect "revealTopCounterSharing" (Swindler's Scheme, round 424): the card revealed and whether its caster was asked. */
     scheme?: { id: ObjectId; zc: number; asked?: true };
     /** Effect "giveEachToDifferentOpponent" (Dack Fayden, Helping Hand, round 424): the permanents still to give, in order, and the opponent each one given so far goes to. */

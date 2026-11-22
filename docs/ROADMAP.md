@@ -11960,7 +11960,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   White mana then pays any colored symbol for its controller (CR 609.4b, payableCost colorAsAny, shared with Quicksilver
   Elemental's blue), and autopay counts on its sources' mana being white. Browser tests: Bloomsage prepared by its trigger,
   Channel's copy cast from exile, three life payments casting Commander's Sphere; Divination cast with Mountains under False
-  Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8). The compiled text of every other card is unchanged.
+  Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8), 31,871 with main cf06b92 (through round 443) and B293's head a9dbd248 merged in. The compiled text of every other card is unchanged.
 - Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind ("toughness minus 1" read inside
   its own layer 7c effect, no ruling), Codie, Ravenous Codex ("a prepared spell" still isn't defined, CR 722), Cosima, God of
   the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo and Snowfall were looked

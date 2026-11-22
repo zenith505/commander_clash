@@ -1,7 +1,7 @@
 # Roadmap
 
-31,865 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,961 of
+31,869 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,964 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4749,6 +4749,26 @@ line blocks.
    Cryptic Spires' colors (they're one color each, so it can't be in them: two different colors in the commander's
    identity, CR 207.5, 903.4); bots use Etrata's ability only in their second main phase, for an instant or sorcery card
    or a creature card of mana value 3 or more, and don't weigh it in combat.
+   Round 444 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   of Promise, Psychic Paper, Karn Liberated, Vesuvan Shapeshifter and the others still out, to two cards with memory
+   counters on cards in exile. Altaïr Ibn-La'Ahad's "Whenever Altaïr attacks, exile up to one target Assassin creature card
+   from your graveyard with a memory counter on it. Then for each creature card you own in exile with a memory counter on
+   it, create a tapped and attacking token that's a copy of it. Exile those tokens at end of combat." (the counter on the
+   card in exile, CR 122.1; every face-up creature card you own in exile with one, whatever exiled it, a face-down card
+   having no characteristics, CR 406.3; copies of the cards as printed, CR 707.2, created at once, each attacking whom you
+   choose, CR 508.4, never declared, so no attack triggers, rulings; Effect tokenCopiesOfExiledWithCounter). The Animus's
+   "At the beginning of your end step, exile up to one target legendary creature card from a graveyard with a memory
+   counter on it." and "{T}: Until your next turn, target legendary creature you control becomes a copy of target creature
+   card in exile with a memory counter on it. Activate only as a sorcery." (the card as printed, CR 707.2, rulings; with
+   either target illegal, nothing happens, rulings; TargetSpec.exiledWithCounter on a target card in exile). Browser tests
+   click through Altaïr's exile of Royal Assassin and whom its two token copies attack, and The Animus making Isamaru a copy
+   of Craw Wurm in Ana's exile. +2, 31,869 of 31,936 on this stacked branch (round 443 #738); the compiled text of every
+   other card is unchanged.
+   Out after round 444 (looked at, not done): Titania's Song and Soundwave, Sonic Spy (Lane B's round B293), Yavimaya
+   Bloomsage and False Dawn (Lane B's round B294), and the lists after round 443 (still out, for their reasons). Known
+   gaps: bots exile an Assassin card with Altaïr whenever they can, and use The Animus in their main phase only when the
+   exiled card is worth more than their legendary creature (by power and toughness), never on a legendary card whose name
+   they already have on the battlefield.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

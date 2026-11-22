@@ -59852,6 +59852,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1f55303e-1369-4e42-9ed4-36609887c7c1",
+  "name": "Yixlid Jailer",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Wizard"
+  ],
+  "oracleText": "Cards in graveyards lose all abilities.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e15504a7-2b67-4185-b916-172145f10b19",
   "name": "Yorion, Sky Nomad",
   "manaCost": "{3}{W/U}{W/U}",

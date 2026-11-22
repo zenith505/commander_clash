@@ -2,7 +2,7 @@
 import type { Effect, Modification } from "../abilities";
 import { defOf } from "../cards";
 import { auraHostKey, auraHostLabels, log, moveObject, obj, player } from "../game";
-import { characteristics, enchantableBy } from "../layers";
+import { characteristics, attachableBy } from "../layers";
 import type { GameState } from "../types";
 import { objects, type ResolveCtx } from "./resolve";
 import { objectMatches } from "./targeting";
@@ -38,7 +38,7 @@ export function runRound344Effect(s: GameState, e: R344Effect, ctx: ResolveCtx, 
       // What it could enchant as the Aura it enters as (CR 303.4f): protection from it as an Aura enchantment, with its
       // name, colors and supertypes (CR 702.16c), not targeting.
       const asAura = { ...d, types: ["Enchantment"], subtypes: ["Aura"] };
-      const options = s.battlefield.filter((id) => id !== card.id && objectMatches(s, e.enchant, obj(s, id), you, false, asAura) && enchantableBy(characteristics(s, obj(s, id)), card.id));
+      const options = s.battlefield.filter((id) => id !== card.id && objectMatches(s, e.enchant, obj(s, id), you, false, asAura) && attachableBy(characteristics(s, obj(s, id)), card.id));
       const sc = (s.resolving!.scratch ??= {});
       const hosts = (sc.auraHosts ??= {});
       if (!options.length) {

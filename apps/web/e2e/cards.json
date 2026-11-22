@@ -176,6 +176,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f4aa8391-34d5-4ad2-a981-9aa08f8229db",
+  "name": "Absolute Law",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "All creatures have protection from red.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ec8e310f-e871-498f-8d80-c3617c5e1433",
   "name": "Absorbing Man",
   "manaCost": "{1}{G}{U}",
@@ -1788,6 +1814,36 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2dd7a4dc-902a-4e85-8a3b-c96a898fba86",
+  "name": "Animate Artifact",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant artifact\nAs long as enchanted artifact isn't a creature, it's an artifact creature with power and toughness each equal to its mana value.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4250,6 +4306,38 @@
   "set": "slx",
   "releasedAt": "2023-02-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3354c3d3-5713-4139-beb2-4fa17f6b47d9",
+  "name": "Balduvian Shaman",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Cleric Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric",
+   "Shaman"
+  ],
+  "oracleText": "{T}: Change the text of target white enchantment you control that doesn't have cumulative upkeep by replacing all instances of one color word with another. (For example, you may change \"black creatures can't attack\" to \"blue creatures can't attack.\") That enchantment gains \"Cumulative upkeep {1}.\" (At the beginning of its controller's upkeep, that player puts an age counter on it, then sacrifices it unless they pay its upkeep cost for each age counter on it.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10123,6 +10211,34 @@
   "set": "fic",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3dcbcf5e-bdbe-46b3-881e-5ac4030c6e38",
+  "name": "Cold Snap",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Cumulative upkeep {2} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nAt the beginning of each player's upkeep, this enchantment deals damage to that player equal to the number of snow lands they control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Cumulative upkeep"
+  ],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -22911,6 +23027,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "34c3aebe-a224-426a-ae06-f3145193313e",
+  "name": "Guardian Beast",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "As long as this creature is untapped, noncreature artifacts you control can't be enchanted, they have indestructible, and other players can't gain control of them. This effect doesn't remove Auras already attached to those artifacts.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8e04a5e0-e22c-430b-a39a-c9f38e16ea86",
   "name": "Guardian of Faith",
   "manaCost": "{1}{W}{W}",
@@ -24507,6 +24653,32 @@
   "commanderLegal": "legal",
   "set": "otj",
   "releasedAt": "2024-04-19",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fd5651f7-52f8-4845-8a1b-32e5d2e9b00e",
+  "name": "Hijack",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Gain control of target artifact or creature until end of turn. Untap it. It gains haste until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

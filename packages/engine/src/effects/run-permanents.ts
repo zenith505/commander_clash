@@ -2,7 +2,8 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, opponentForbidsDiscard, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, faceUpAttaches, faceUpAttachOptions, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
-import { characteristics, controllerOf, enchantableBy, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, attachableBy, invalidateCharacteristics } from "../layers";
+import { controlGainable } from "../guardian";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -1931,7 +1932,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Akroma, Vision of Ixidor: each creature's own bonus, by the keywords it has now (rulings); Mercadia's Downfall: by its
       // own defending player's permanents now (CR 802.2a).
       const perAffected = JSON.stringify(e.mods).includes('"affectedKeywordCount"') || JSON.stringify(e.mods).includes('"affectedDefenderPermanents"');
-      const groups = perAffected ? affected.map((id) => [id]) : perController ? [...new Set(affected.map((id) => controllerOf(s, obj(s, id))))].map((pid) => affected.filter((id) => controllerOf(s, obj(s, id)) === pid)) : [affected];
+      // Guardian Beast (round B292): a permanent whose control can't change to this player keeps its controller; only the
+      // control part of the effect doesn't apply to it (CR 101.2), the rest does (below).
+      const gainable = mods.some((m) => m.kind === "control") ? controlGainable(s, affected, giveTo ?? ctx.controller, src) : affected;
+      const lockedOut = affected.filter((id) => !gainable.includes(id));
+      const restMods = mods.filter((m) => m.kind !== "control");
+      if (lockedOut.length && restMods.length)
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: giveTo ?? ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: e.duration, ...(whileTapped ? { whileTapped } : {}), ...(whileControlled ? { whileControlled } : {}), affected: lockedOut, mods: restMods });
+      if (!gainable.length) {
+        invalidateCharacteristics(s);
+        return;
+      }
+      const groups = perAffected ? gainable.map((id) => [id]) : perController ? [...new Set(gainable.map((id) => controllerOf(s, obj(s, id))))].map((pid) => gainable.filter((id) => controllerOf(s, obj(s, id)) === pid)) : [gainable];
       const timestamp = s.nextTimestamp++; // CR 613.7b
       for (const group of groups) {
         const groupMods = perController || perAffected ? fixMods(s, e.mods, ctx, group[0]) : mods;
@@ -1978,6 +1990,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${src}: ${defOf(s, a).name} and ${defOf(s, b).name} have the same controller, so nothing is exchanged.`);
         return;
       }
+      // Guardian Beast (round B292): with either one's control locked, none of the exchange happens (CR 701.12b).
+      if (controlGainable(s, [a.id], cb, src).length === 0 || controlGainable(s, [b.id], ca, src).length === 0) return;
       for (const [o, to] of [[a, cb], [b, ca]] as const) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
       invalidateCharacteristics(s);
       log(s, `${player(s, ca).name} and ${player(s, cb).name} exchange control of ${defOf(s, a).name} and ${defOf(s, b).name}.`);
@@ -2020,6 +2034,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         }
         const [ca, cb] = [controllerOf(s, oa), controllerOf(s, ob)];
         if (ca === cb) continue;
+        // Guardian Beast (round B292): this exchange doesn't happen (CR 701.12b).
+        if (controlGainable(s, [oa.id], cb, src).length === 0 || controlGainable(s, [ob.id], ca, src).length === 0) continue;
         for (const [o, to] of [[oa, cb], [ob, ca]] as const) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
         invalidateCharacteristics(s);
         log(s, `${player(s, ca).name} and ${player(s, cb).name} exchange control of ${defOf(s, oa).name} and ${defOf(s, ob).name}.`);
@@ -2056,7 +2072,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (s.phasedOut?.includes(id) || controllerOf(s, o) === o.owner || player(s, o.owner).lost || !objectMatches(s, e.filter, o, ctx.controller, false)) continue;
         byOwner.set(o.owner, [...(byOwner.get(o.owner) ?? []), id]);
       }
-      for (const [owner, affected] of byOwner) {
+      for (const [owner, all] of byOwner) {
+        const affected = controlGainable(s, all, owner, src); // Guardian Beast (round B292)
+        if (!affected.length) continue;
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: owner, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
         log(s, `${player(s, owner).name} gains control of ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       }
@@ -2201,7 +2219,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       sc.queue = undefined;
       sc.chosen = undefined;
       for (const [to, id] of got) {
-        if (s.objects[id]?.zone !== "battlefield") continue;
+        if (s.objects[id]?.zone !== "battlefield" || !controlGainable(s, [id], to, src).length) continue; // Guardian Beast (round B292)
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [id], mods: [{ kind: "control" }] });
         log(s, `${player(s, to).name} gains control of ${defOf(s, obj(s, id)).name}.`);
       }
@@ -2231,7 +2249,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       let moved = 0;
       for (const to of seats) {
         const from = next(to);
-        const affected = from === to ? [] : (byController.get(from) ?? []);
+        const affected = from === to ? [] : controlGainable(s, byController.get(from) ?? [], to, src); // Guardian Beast (round B292)
         if (!affected.length) continue;
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
         log(s, `${player(s, to).name} gains control of ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${player(s, from).name}.`);
@@ -2251,9 +2269,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const to = who[Math.floor(nextRandom(s) * who.length)]!;
         byPlayer.set(to, [...(byPlayer.get(to) ?? []), id]);
       }
-      for (const [to, affected] of byPlayer) {
-        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
-        log(s, `${player(s, to).name} is chosen at random for ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      for (const [to, chosen] of byPlayer) {
+        log(s, `${player(s, to).name} is chosen at random for ${chosen.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+        const affected = controlGainable(s, chosen, to, src); // Guardian Beast (round B292)
+        if (affected.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
       }
       invalidateCharacteristics(s);
       for (const id of picked) if (obj(s, id).zone === "battlefield" && obj(s, id).tapped) untapPermanent(s, obj(s, id));
@@ -2794,7 +2813,7 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   // Goblin Brawler: "can't be equipped" (CR 701.3b).
   if (!aura && characteristics(s, host).cantBeEquipped) return false;
   // Anti-Magic Aura: "can't be enchanted by other Auras" (CR 303.4j: the Aura doesn't move).
-  if (aura && !enchantableBy(characteristics(s, host), me.id)) return false;
+  if (aura && !attachableBy(characteristics(s, host), me.id)) return false;
   const only = aura ? undefined : abilitiesOf(s, me).attachOnly; // O-Naginata
   return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : creature && objectMatches(s, only ?? { kind: "object", text: "" }, host, who, false, meChars);
 }

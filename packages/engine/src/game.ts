@@ -33,7 +33,7 @@ import { chooseLampKeep, chooseWindPick, lampInstead, pileInstead, windInstead }
 import { pileDrawLabel } from "./effects/run-round386";
 import { bindChoosers, bindModeChooser, chooserChoices, chooserSlots, withChooserPicks, withStandIns } from "./effects/opponent-choice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor, restoreChosenType, setChosenTypeAside } from "./copies";
-import { characteristics, controllerOf, enchantableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, enchantableBy, attachableBy, everyCreatureType, ignoredBy, invalidateCharacteristics, sparedFrom, staticConditionNow, type Characteristics } from "./layers";
 import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type CostSymbol, type ParsedCost } from "./mana";
@@ -1148,6 +1148,28 @@ export function moveObject(
       }
       log(s, `${name} can't enter the battlefield (${worms}), so it's put into ${player(s, o.owner).name}'s graveyard.`);
       to = "graveyard";
+    }
+  }
+  // Guardian Beast (round B292): an Aura put onto the battlefield attached to a permanent that can't be enchanted (one that
+  // keeps the Auras already attached, Characteristics.noNewAuras) can't enter attached to it: it stays where it is, or from
+  // the stack (an Aura spell resolving) it's put into its owner's graveyard; a token isn't created (CR 303.4i).
+  if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged" && opts.attachTo && defOf(s, o).subtypes.includes("Aura") && !o.bestowed) {
+    const host = s.objects[opts.attachTo];
+    if (host?.zone === "battlefield" && !attachableBy(characteristics(s, host), o.id)) {
+      const name = defOf(s, o).name;
+      const why = `${defOf(s, host).name} can't be enchanted`;
+      if (o.isToken && fromZone !== "stack") {
+        log(s, `The ${name} token isn't created: ${why}.`);
+        delete s.objects[id];
+        return;
+      }
+      if (fromZone !== "stack") {
+        log(s, `${name} doesn't enter the battlefield: ${why}.`);
+        return;
+      }
+      log(s, `${name} can't enter attached (${why}), so it's put into ${player(s, o.owner).name}'s graveyard.`);
+      to = "graveyard";
+      opts = { ...opts, attachTo: undefined };
     }
   }
   // Land Equilibrium (round B278): "If an opponent who controls at least as many lands as you do would put a land onto the
@@ -2347,7 +2369,7 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
   if (enchant.kind === "player") return (enchant.opponent ? opponents(s, pid) : livingPlayers(s)).map((p) => ({ attachToPlayer: p }));
   // "Enchant creature card in a graveyard" (Animate Dead): such a card in any graveyard.
   if (enchant.kind === "card") return graveyardCards(s, enchant).map((id) => ({ attachTo: id }));
-  return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && enchantableBy(characteristics(s, obj(s, id)), aura.id)).map((id) => ({ attachTo: id }));
+  return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && attachableBy(characteristics(s, obj(s, id)), aura.id)).map((id) => ({ attachTo: id }));
 }
 
 /** An AuraHost as a chooseOption option ("enchant"), and back. */
@@ -2360,7 +2382,7 @@ const graveyardCards = (s: GameState, f: TargetSpec): ObjectId[] => livingPlayer
 function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec, among?: string[]): ObjectId | undefined {
   // Animate Dead entering without being cast: the biggest creature card in a graveyard.
   if (enchant.kind === "card") return graveyardCards(s, enchant).filter((id) => !among || among.includes(id)).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
-  const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && enchantableBy(characteristics(s, obj(s, id)), aura.id));
+  const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)) && attachableBy(characteristics(s, obj(s, id)), aura.id));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   return (auraHelps(defOf(s, aura)) ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];
 }

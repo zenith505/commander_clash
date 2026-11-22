@@ -9,7 +9,7 @@ test("Baron Helmut Zemo: exile black cards with fifteen black mana symbols, then
   const yard = ["Phyrexian Obliterator", "Necropotence", "Ashenmoor Liege", "Sign in Blood", "Dismember", "Night's Whisper", "Sludge Crawler"];
   const s = scene({ board: ["Baron Helmut Zemo"], yard }, [], { step: "main2" });
   const zemo = one(s, "Baron Helmut Zemo");
-  const [obl, nec, liege, sign, dis, whisper, sludge] = yard.map((n) => one(s, n));
+  const [obl, nec, liege, sign, dis, whisper, sludge] = yard.map((n) => one(s, n)) as [string, string, string, string, string, string, string];
   // It attacked this turn (CR 702.142a).
   s.objects[zemo]!.attacked = { turn: s.turn, n: 1 };
   const hand0 = s.players[0]!.hand.length;

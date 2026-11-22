@@ -3,8 +3,8 @@
 // card from Ana's graveyard through "From a graveyard", or a creature on the battlefield.
 import { expect, test } from "@playwright/test";
 import { characteristics, type GameState } from "@cc/engine";
-import { LANDS, one, open, pageErrors, scene } from "./scene";
-import { card, modal, passTo, resolveUntil } from "./ui";
+import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
+import { card, modal, resolveUntil } from "./ui";
 
 test("Havengul Laboratory: three Clues sacrificed, it transforms at your end step; pick Grizzly Bears; Murder it and it transforms back", async ({ page }) => {
   const s = scene({ hand: ["Murder"], board: ["Swamp", "Swamp", "Swamp", "Havengul Laboratory // Havengul Mystery"], yard: ["Grizzly Bears", "Shock"] });
@@ -18,9 +18,11 @@ test("Havengul Laboratory: three Clues sacrificed, it transforms at your end ste
   await pick.locator(`[data-pick="${bears}"]`).click();
   const back = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[bears]!.zone === "battlefield");
   expect(back.objects[lab]!.face).toBe(1);
-  // On to your next turn's first main phase, with Havengul Mystery still face up.
-  const main = await passTo(page, "main1", back.turn + 4);
+  // On to your next turn's first main phase, with Havengul Mystery still face up: played on in the engine and the page
+  // opened again there, since passing round the table in the page could race past that main phase under load.
+  const main = playUntil(back, (st) => st.step === "main1" && st.activePlayer === 0 && st.turn === back.turn + 4 && st.stack.length === 0 && !st.pending);
   expect(main.objects[lab]!.face).toBe(1);
+  await open(page, main);
   await card(page, "Murder", main).click();
   await page.locator(`[data-obj="${bears}"]`).first().click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[bears]!.zone === "graveyard" && st.objects[lab]!.face !== 1);

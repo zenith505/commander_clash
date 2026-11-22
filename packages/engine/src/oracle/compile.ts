@@ -224,6 +224,7 @@ import { round442Line } from "./round442";
 import { round443Line } from "./round443";
 import { round444Line } from "./round444";
 import { round445Line } from "./round445";
+import { round446Line } from "./round446";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1133,6 +1134,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 446: oracle/round446.ts.
+    if (round446Line(line, raw, out, isSpell)) continue;
     // Round 445: oracle/round445.ts.
     if (round445Line(line, raw, out, isSpell)) continue;
     // Round 444: oracle/round444.ts.
@@ -8720,6 +8723,8 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
     if (typeof o.chosen === "string" && o.kind !== "setColors" && o.chosen !== "attackingPlayer" && o.chosen !== "byPlayer") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : o.chosen === "landOrNonland" ? needs.add("landOrNonland") : o.chosen === "landType" || o.chosen === "landTypeAt" ? needs.add("landType") : o.chosen === "typeOrder" ? needs.add("typeOrder") : o.chosen === "planeswalkerType" ? needs.add("planeswalkerType") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
+    // Psychic Paper (round 446): "its name is the last chosen name".
+    if (o.kind === "setName" && o.chosen === true) needs.add("cardName");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     // Illusionary Terrain: "the first/second chosen type" of the two chosen as it entered.
     if ((o.kind === "setLandTypes" && o.chosenIndex !== undefined) || o.chosen === "landTypeAt") {
@@ -8749,6 +8754,8 @@ function checkCastingLinks(out: CompiledCard, d: CardDef) {
   if (out.entersNamesWithOpponent) choices.add("cardName");
   // Sanctuary Blade (round 390): "the last chosen color" is the one chosen as it last became attached (askAttachColor).
   if (out.attachChooseColor) choices.add("color");
+  // Psychic Paper (round 446): "the last chosen name and creature type", chosen as it last became attached.
+  if (out.attachChooseNameAndType) (choices.add("cardName"), choices.add("creatureType"));
   // Oko, Shadowmoor Scion's emblem (round 387): its "chosen type" is the one chosen as the ability that made it resolved.
   if (d.typeLine === "Emblem" && d.oracleId.endsWith(CHOSEN_TYPE_EMBLEM)) choices.add("creatureType");
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.

@@ -159,6 +159,9 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
     ...(except.colors ? { colors: except.colors } : except.addColors ? { colors: [...base.colors, ...except.addColors.filter((c) => !base.colors.includes(c))] } : {}),
     ...(except.noManaCost ? { manaCost: "", cmc: 0 } : {}),
     ...(except.loyalty !== undefined && types.includes("Planeswalker") ? { loyalty: String(except.loyalty) } : {}),
+    // Creature types set by the exception ("he's a legendary Human Mercenary Villain creature", Taskmaster, round B296):
+    // a changeling's characteristic-defining ability for them isn't copied (CR 707.9d).
+    ...(except.setSubtypes?.some((t) => subtypeSet(t) === "Creature") ? { everyCreatureType: false } : {}),
   } as Partial<T> & { cmc?: number };
 }
 

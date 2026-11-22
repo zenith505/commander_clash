@@ -1,7 +1,7 @@
 # Roadmap
 
-31,884 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,970 of
+31,888 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,971 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -184,7 +184,7 @@ line blocks.
    of exiled cards), Ultimate Magic: Meteor ("if ~ was cast from exile" with a choice for each opponent), Spectral
    Searchlight (another player adds the mana), Rat King, Verminister ("all other cards with the same name"),
    Valentin, Dean of the Vein (a reflexive trigger from a replacement), Spider-Verse (done in round 388) ("from anywhere other than your
-   hand"), Captain America, First Avenger (unattaching an Equipment as a cost), Desert Warfare, Soulfire Eruption,
+   hand"), Captain America, First Avenger (done in round 447) (unattaching an Equipment as a cost), Desert Warfare, Soulfire Eruption,
    Círdan the Shipwright (secret council for players), Dragonlord
    Kolaghan, Back for Seconds (done in round 295) (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
    cost), Kamiz, Obscura Oculus (done in round 295), Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery (done in round 302), Thunderwave,
@@ -997,7 +997,7 @@ line blocks.
    the Equipment: granted abilities can't name their source yet); Curse of Chaos (done in round B182) ("that attacking player may discard a
    card"); Bebop & Rocksteady (done in round B105) ("sacrifice a permanent unless you discard a card" as a trigger); Sarevok ("if no permanents
    left the battlefield this turn"); Fight for the Throne (a delayed "when the creature an opponent controls dies this
-   turn" with a monarch condition); Battlefield Thaumaturge (cost cut per creature targeted); Bucolic Ranch (done in round B187); Rosheen,
+   turn" with a monarch condition); Battlefield Thaumaturge (done in round 447) (cost cut per creature targeted); Bucolic Ranch (done in round B187); Rosheen,
    Roaring Prophet; Aurification; Creeping Dread; Gavi, Nest Warden (done in round 326); Tezzeret, Agent of Bolas (−1 base 5/5); Jared
    Carthalion; Frodo, Determined Hero (done in round 326); Syr Carah; Shadow Urchin (done in round B182); Head Games; Seeker of Slaanesh (done in round 326); Drizzt Do'Urden (done in round 368);
    Soul-Shackled Zombie (done in round B156) ("from a single graveyard ... if at least one creature card was exiled this way"); Ambitious
@@ -1355,7 +1355,7 @@ line blocks.
    any color": a payment rule for colored symbols); War's Toll ("If a creature an opponent controls attacks, all
    creatures that opponent controls attack if able": a requirement that depends on the declaration); Kaito, Dancing
    Shadow ("activate loyalty abilities of ~ twice this turn", a one-turn grant); Saheeli's Lattice, Altar of the
-   Wretched, Paleontologist's Pick-Axe and Sunbird Standard (all but the Pick-Axe done in round 334) ("Craft with one or more ...", and what their back faces
+   Wretched, Paleontologist's Pick-Axe and Sunbird Standard (all but the Pick-Axe done in round 334; the Pick-Axe in round 448) ("Craft with one or more ...", and what their back faces
    read from the exiled cards used to craft them); Teyo, Geometric Tactician (attack only the nearest opponent in a
    direction); Ramses, Assassin Lord (done in round 265).
    Round 232 (unexamined cards from ranks 6,400 to 13,000, now done): a search's exile linked to a dies ability (Hoarding
@@ -2381,7 +2381,7 @@ line blocks.
    "sacrifice an artifact other than [the Equipment that gave it]" (Dire Blunderbuss). +7, 30,942 of 31,936 with B172.
    Bots: a bot crafts "one or more" with every spare graveyard card and cheap token that fits (more power, colors or
    cards to cast for the back face), and for the Throne finds one material for each type among those.
-   Out after round 334 (looked at, not done): Paleontologist's Pick-Axe (its craft works now; Dinosaur Headdress makes the
+   Out after round 334 (looked at, not done): Paleontologist's Pick-Axe (done in round 448) (its craft works now; Dinosaur Headdress makes the
    equipped creature a copy of a card chosen as it becomes attached); The Enigma Jewel ("four or more nonlands with
    activated abilities", and Locus of Enlightenment has the exiled cards' activated abilities).
    Round 335 took the four cards no list named (Sasaya, Tazri, The Master, Tezzeret), so every ranked unsupported card is
@@ -2440,7 +2440,7 @@ line blocks.
    reselects the player it attacks, rulings: no ability activated by a player who doesn't control it, and no way to change
    an attacker's defender after attacks are declared); Flickerform (exiled Auras returned attached to the card that comes
    back, those that can't enchant it staying exiled, rulings); Breath of Fury (the Aura attached to another creature after
-   its own is sacrificed, then an extra combat after this phase); Captain America, First Avenger ("Unattach an Equipment
+   its own is sacrificed, then an extra combat after this phase); Captain America, First Avenger (done in round 447) ("Unattach an Equipment
    from ~" as a cost, its mana value the damage divided among one to three targets); Filigree Vector (done in round B280) (still out, as after
    round 345).
    Round 352 went on down `npm run popular` and the "Out after round N" lists, most played first, to cards with four or
@@ -2871,7 +2871,7 @@ line blocks.
    Dog's payment and Codie's mana and free card. Bots cast Gorex with the cards it needs and answer Three Dog with the
    existing may and pick logic. +4, 31,362 of 31,936 with Lane B's B207-B208. The compiled text of every other card is unchanged.
    Out after round 368 (looked at, not done): Aragorn, Company Leader (done in round 416) ("one or more counters" put on a creature at once
-   comes as one event per kind of counter); Captain America, First Avenger (the damage division announced before the
+   comes as one event per kind of counter); Captain America, First Avenger (done in round 447) (the damage division announced before the
    cost picks the Equipment, no ruling); Spectral Searchlight (still out: another player choosing a color inside a mana
    ability); Sanctuary Blade (done in round 390) and Psychic Paper (a choice made as the Equipment becomes attached); Rift Elemental (still
    out); Altaïr Ibn-La'Ahad (its short name now reads; memory counters on token copies still missing).
@@ -3032,7 +3032,7 @@ line blocks.
    but don't control attacks, you draw a card." Browser tests click through Garland's two targets, Lorcan's payment,
    Endless Whispers' target opponent and Jon's targets with and without a creature. No new prompt kinds. +4, 31,426 of
    31,936 with round 374 and Lane B's B213-B215. The compiled text of every other card is unchanged. Bots give no creature to Jon's opponent.
-   Out after round 375 (looked at, not done): Battlefield Thaumaturge (still out: "{1} per target creature, even if the
+   Out after round 375 (looked at, not done): Battlefield Thaumaturge (done in round 447) (still out: "{1} per target creature, even if the
    spell targets a creature more than once" reads either way for one creature targeted by two "target" words); Ranar the
    Ever-Watchful and Hero of Bretagard (still out: "a spell or ability you control exiles one or more permanents" needs who
    controls the exiling effect for costs and replacement effects too, not recorded on zone moves); Stardew Valley
@@ -3345,7 +3345,7 @@ line blocks.
    (its empty pile only to skip a draw from an empty library), activate the Foundry in their second main phase for their
    most expensive artifact card (mana value 2 or more) with one to three cheaper artifacts, and activate Memory Vessel in
    their first main phase only with at most one card in hand.
-   Out after round 386 (looked at, not done): Battlefield Thaumaturge (still out: "{1} less for each creature it
+   Out after round 386 (looked at, not done): Battlefield Thaumaturge (done in round 447) (still out: "{1} less for each creature it
    targets" over every target of a spell with several target words, CR 115.3, and its ruling's "even if the spell targets
    a creature more than once" isn't settled for one creature in two target slots); Lara Croft, Tomb Raider and
    Regenerations Restored (done in round 390) (still out, as in their earlier lists); Guff Rewrites History, Sunken Palace, Ulalek, Filigree
@@ -3488,7 +3488,7 @@ line blocks.
    mana value reads as 0.
    Out after round 392 (looked at, not done): Jasmine Boreal of the Seven (done in round 426) (every effect that gives spells abilities);
    Filigree Vector (done in round B280) (two "any number of target" slots in one ability); Kraven the Hunter (the greatest power among
-   creatures that died at once); Battlefield Thaumaturge (a creature targeted twice by one spell, rulings unclear for the
+   creatures that died at once); Battlefield Thaumaturge (done in round 447) (a creature targeted twice by one spell, rulings unclear for the
    discount); Celestial Reunion (done in round 426) (a creature type chosen as it's cast and behold two as an optional cost); Capricopian,
    Wayta, Archelos, Metamorphic Alteration, Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
    their earlier lists).
@@ -3612,7 +3612,7 @@ line blocks.
    CardDef.borrowedTriggers, so they're copiable values and an enters ability among them triggers as it's created, the
    rulings). Browser tests click through Hurkyl's pick, the Book's cost and Grime Gorger's pick. +3, 31,591 of 31,936 on
    this stacked branch. The compiled text of every other card is unchanged.
-   Out after round 398 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
+   Out after round 398 (looked at, not done): Battlefield Thaumaturge (done in round 447) (still out: whether one creature in two target slots
    counts twice); Kraven the Hunter (the greatest power among a player's creatures as several die at once); Coward //
    Killer, Celestial Dawn (done in round B281), Titania's Song, Bitter Feud (done in round B262), Breathstealer's Crypt, Swans of Bryn Argoll (done in round B252), Blood of the Martyr (done in round B263),
    Shared Fate (done in round B282), Elemental Resonance (done in round B252), Rhystic Cave, Sharkey (done in round B251), Eye for an Eye (done in round B257), Spy Kit and the rest from rank 15,000 to 25,000
@@ -3885,7 +3885,7 @@ line blocks.
    of 31,936 on this stacked branch with main (B250, B251) merged in. The compiled text of every other card is unchanged.
    Out after round 409 (looked at, not done): God-Eternal Kefnet (done in round B291) ("You may reveal the first card you draw each turn as you
    draw it": a choice in the middle of any draw, before the card joins the hand, rulings; draws don't pause yet); Karn
-   Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
+   Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger (done in round 447), Confusion in the Ranks, Sen
    Triplets (done in round 412), Xanathar (done in round 412), Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector (done in round B280), Wayta and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists).
    Round 410 took two cards back off the "Out after round N" lists, most played first: keyword costs a permanent gives the
@@ -4008,7 +4008,7 @@ line blocks.
    and both picks, Boltbender turned face up against Ana's Murder and Murder's new target, and the target you choose for
    Ana's Confusion when your Grizzly Bears enters. +3, 31,693 of 31,936 on this stacked branch (31,706 with main 99e27a4,
    Lane B through B258, merged in). The compiled text of every other card is unchanged.
-   Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
+   Out after round 414 (looked at, not done): Captain America, First Avenger (done in round 447) (the damage division is announced before
    the cost picks the Equipment whose mana value it divides, no ruling); Kefnet (done in round B291), Taskmaster, Niko, Mirror of the
    Forebears, Wayta, Draugr Necromancer (done in round B270), Apple of Eden (done in round B269), Missy and the rest of `npm run popular` above rank 15,000 (still
    out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
@@ -4099,7 +4099,7 @@ line blocks.
    more). Browser tests click through the Bauble with no target (choose Ana, who draws at her upkeep) and with two of
    Ana's lands, Arcee's X counters and target, Giant Growth on the Coupe, and Helm of Kaldra's Kaldra. +3, 31,724 of
    31,936 with round 416 and main (B259, B260). The compiled text of every other card is unchanged.
-   Out after round 417 (looked at, not done): Battlefield Thaumaturge (still out: whether one creature in two target slots
+   Out after round 417 (looked at, not done): Battlefield Thaumaturge (done in round 447) (still out: whether one creature in two target slots
    counts once or twice), Lara Croft, Tomb Raider, Filigree Vector (done in round B280), Sunken Palace, Ulalek, Possibility Storm and the rest
    of `npm run popular` above rank 15,000 (still out, for the reasons in their earlier lists). Known gaps: a converted or transformed
    permanent shows a "Copy" chip in the UI (App.tsx compares its face's key with its card's; on main too); bots don't
@@ -4123,7 +4123,7 @@ line blocks.
    choose). Browser tests click through Surge's free copy, Gale's graveyard pick and paid cast, Zethi kicked twice and
    its attack. +3, 31,727 of 31,936 on this stacked branch with main 9b0c8ca (B259, B260) merged in; the compiled text of every other card is unchanged.
    Out after round 418 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
-   ability; fitMany can't tell where the first group ends in the chosen targets), Captain America, First Avenger (its
+   ability; fitMany can't tell where the first group ends in the chosen targets), Captain America, First Avenger (done in round 447) (its
    damage "divided as you choose" is announced before the cost that picks the Equipment, CR 601.2d, 601.2h, and no ruling
    settles it), Jasmine Boreal of the Seven (done in round 426) (a spell's abilities granted by effects, which its mana can't be spent on per
    its rulings, aren't gathered in one place), Wayta, Trainer Prodigy (a cost reduction by its targets, and triggers
@@ -4153,7 +4153,7 @@ line blocks.
    and its upkeep trigger, and Balthier and Fran crewing Sky Skiff, attacking and paying for the extra combat. +3, 31,730
    of 31,936 on this stacked branch; the compiled text of every other card is unchanged.
    Out after round 419 (looked at, not done): Supper for Spiders (still out: whether the cards are Food artifacts as they
-   enter), C.A.M.P. (the colors of the mana its land produced), Filigree Vector (done in round B280), Captain America, First Avenger, Jasmine
+   enter), C.A.M.P. (the colors of the mana its land produced), Filigree Vector (done in round B280), Captain America, First Avenger (done in round 447), Jasmine
    Boreal of the Seven, Wayta, Trainer Prodigy, Sunken Palace, Ulalek, Possibility Storm and the rest of `npm run popular`
    above rank 15,100 (still out, for the reasons in their earlier lists). Known gaps: bots don't save Shifting Shadow for
    a weak creature or a creature-heavy library, nor crew with Balthier and Fran on purpose for its trigger.
@@ -4310,7 +4310,7 @@ line blocks.
    a spell was cast with, and the ability it gives the spell kept on the permanent, CR 400.7a), Taskmaster, Mercenary
    Mimic ("target creature on the battlefield or creature card in a graveyard": one target from either zone), Codie,
    Ravenous Codex ("a prepared spell" isn't a term the Comprehensive Rules define; CR 722.3d speaks of a spell cast as a
-   prepare spell), Battlefield Thaumaturge (still out, as in its earlier lists), Sanar, Innovative First-Year ("for each
+   prepare spell), Battlefield Thaumaturge (done in round 447) (still out, as in its earlier lists), Sanar, Innovative First-Year ("for each
    of those colors, you may exile a card of that color": whether one multicolored card can count for two colors isn't
    settled), Lara Croft, Tomb Raider (still out), and the rest of `npm run popular` above rank 17,500 (still out, for the
    reasons in their earlier lists). Known gaps: Kaya's bot copies the card worth the most, if worth more than the token.
@@ -4334,7 +4334,7 @@ line blocks.
    Out after round 426 (looked at, not done): Filigree Vector (done in round B280) ("each of any number of target creatures and ... each of any
    number of target artifacts": two any-number target groups in one ability, one permanent possibly in both, rulings),
    Arvinox, the Mind Flail ("isn't a creature unless you control three or more permanents you don't own", and cards
-   exiled face down from the bottom of each opponent's library that you may look at and cast), Saruman of Many Colors
+   exiled face down from the bottom of each opponent's library that you may look at and cast), Saruman of Many Colors (done in round 449)
    (ward with a discard of a card of given types, and a reflexive trigger comparing mana value with the spell that
    triggered it), the cards round 425 left out (still out, for its reasons), and the rest of `npm run popular` above
    rank 17,500 (still out, for the reasons in their earlier lists). Known gaps: spells given cascade only while Treasure
@@ -4386,7 +4386,7 @@ line blocks.
    Out after round 428 (looked at, not done): Yavimaya Bloomsage // Channel (done in round B294) (Channel's "any time you could activate a mana
    ability, you may pay 1 life. If you do, add {C}.": a mana source that isn't an object, usable whenever a mana ability
    is, CR 605.3a, while paying costs and in every payment prompt, which the automatic payment would need to know about),
-   Captain America, First Avenger ("deals damage equal to that Equipment's mana value divided as you choose among one,
+   Captain America, First Avenger (done in round 447) ("deals damage equal to that Equipment's mana value divided as you choose among one,
    two, or three targets": the division is announced, CR 601.2d via 602.2b, before the cost that sets the amount is paid,
    601.2h, and no ruling says how), Ashiok, Wicked Manipulator, Lich's Mirror (done in round B280), Breathstealer's Crypt and Titania's Song
    (still out, for the reasons in their earlier lists), the cards rounds 425-427 left out (still out, for their reasons),
@@ -4439,7 +4439,7 @@ line blocks.
    trigger. +2, 31,804 of 31,936 on this stacked branch (round 429 #707, with main f60fd58, B275-B276, in it); the compiled text of every other card is
    unchanged.
    Out after round 430 (looked at, not done): Filigree Vector (done in round B280) (still out: two "any number of target" groups in one
-   ability, only one per ability is modeled), Battlefield Thaumaturge (still out, as after round 386), the cards rounds
+   ability, only one per ability is modeled), Battlefield Thaumaturge (done in round 447) (still out, as after round 386), the cards rounds
    425-429 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for
    the reasons in their earlier lists). Known gaps: bots put back on top with the Academy what they would with Library
    of Leng (spells, and lands while short of them); C.A.M.P.'s bot picks the creature for the counter without looking
@@ -4464,7 +4464,7 @@ line blocks.
    "whenever you waterbend" sees it). Browser tests click through each, Hama's twice (mana, then waterbending). +3, 31,803
    of 31,936 on this stacked branch (round 430 #709), 31,809 with round 430's head 7b21a52 (main 6388275, B277) merged in;
    the compiled text of every other card is unchanged.
-   Out after round 431 (looked at, not done): Filigree Vector (done in round B280) and Battlefield Thaumaturge (still out, as after round
+   Out after round 431 (looked at, not done): Filigree Vector (done in round B280) and Battlefield Thaumaturge (done in round 447) (still out, as after round
    430), Nihiloor (a reflexive trigger for each creature tapped, each targeting a creature of one opponent with power up to
    that creature's, checked with its last known power), Drain Power (done in round B281) (mana abilities another player activates for each land,
    then that mana moved), Ertai's Meddling (done in round B282) (delay counters, then the card put onto the stack as a copy of the spell), the
@@ -4498,7 +4498,7 @@ line blocks.
    copy; CompiledCard.entersAsCopy `hasteIfCopied`). Browser tests click through each, Lara's twice (Ana's Mox Amber cast
    from her exile, your Gaea's Cradle played as your land). +3, 31,812 of 31,936 on this stacked branch (round 431 #712);
    the compiled text of every other card is unchanged.
-   Out after round 432 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (still out, as after round
+   Out after round 432 (looked at, not done): Filigree Vector and Battlefield Thaumaturge (done in round 447) (still out, as after round
    430), Nihiloor (still out, as after round 431), Drain Power (done in round B281), Ertai's Meddling (done in round B282), Nick Fury, Agent of S.H.I.E.L.D. (still
    out: "If it's a double-faced card, you may transform it" for a card put onto the battlefield has no rulings, and whether
    it enters transformed or transforms after entering, with the front face's enters triggers, isn't settled), the cards
@@ -4526,10 +4526,10 @@ line blocks.
    loyaltyAtInstantSpeed). Browser tests click through Avacyn's search and its chapter III Yes and No, and The Eleventh
    Hour's target. +3, 31,815 of 31,936 on this stacked branch (round 432 #714), 31,821 with main 7f7b8f6 (B278-B280) merged in;
    the compiled text of every other card is unchanged.
-   Out after round 433 (looked at, not done): Captain America, First Avenger (its "Throw" damage is divided as targets are
+   Out after round 433 (looked at, not done): Captain America, First Avenger (done in round 447) (its "Throw" damage is divided as targets are
    chosen, CR 601.2d, before the cost that unattaches the Equipment fixes the amount, CR 601.2h, and it has no rulings),
    Pulmonic Sliver (still out: an optional "put it on top of its owner's library instead" asked in the middle of any move
-   to a graveyard, which zone moves can't pause for), Filigree Vector (done in round B280), Battlefield Thaumaturge, Nihiloor,
+   to a graveyard, which zone moves can't pause for), Filigree Vector (done in round B280), Battlefield Thaumaturge (done in round 447), Nihiloor,
    Drain Power (done in round B281), Ertai's Meddling (done in round B282) and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds
    425-430 left out (still out, for their reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the
    reasons in their earlier lists). Judgment calls: The Eleventh Hour's token keeps snow and other supertypes (no ruling
@@ -4555,8 +4555,8 @@ line blocks.
    picker (Done only once the two share a type) and Apex Observatory's card type, its free Colossal Dreadmaw, and The Enigma
    Jewel's picker and Locus's copied ping. +2, 31,817 of 31,936 on this stacked branch (round 433 #716), 31,823 with round 433's head 412ee5a (main
    7f7b8f6, B278-B280) merged in; the compiled text of every other card is unchanged.
-   Out after round 434 (looked at, not done): Captain America, First Avenger and Pulmonic Sliver (still out, as after round
-   433), Filigree Vector (done in round B280), Drain Power (done in round B281), Ertai's Meddling (done in round B282), Battlefield Thaumaturge, Nihiloor
+   Out after round 434 (looked at, not done): Captain America, First Avenger (done in round 447) and Pulmonic Sliver (still out, as after round
+   433), Filigree Vector (done in round B280), Drain Power (done in round B281), Ertai's Meddling (done in round B282), Battlefield Thaumaturge (done in round 447), Nihiloor
    and Nick Fury, Agent of S.H.I.E.L.D. (still out, as after round 432), the cards rounds 425-430 left out (still out, for their
    reasons), and the rest of `npm run popular` above rank 17,500 (still out, for the reasons in their earlier lists).
    Judgment calls: a permanent with cycling, unearth or another ability that works only from another zone has an
@@ -4716,8 +4716,8 @@ line blocks.
    Grizzly Bears (Lightning Bolt stays exiled, Sol Ring enters) and an attack with an equipped Grizzly Bears (its counter
    doubles, a Bonesplitter token enters on it). +2, 31,856 of 31,936 on this stacked branch (round 441 #734), 31,861
    with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in, 31,863 with main aca5d42 (B291), 31,865 with main 24bb9f8 (B292); the compiled text of every other card is unchanged.
-   Out after round 442 (looked at, not done): Battlefield Thaumaturge (still out: its ruling, "{1} per target creature,
-   even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (still out: "Ward—Discard
+   Out after round 442 (looked at, not done): Battlefield Thaumaturge (done in round 447) (still out: its ruling, "{1} per target creature,
+   even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (done in round 449) (still out: "Ward—Discard
    an enchantment, instant, or sorcery card" needs a discard of a kind as the ward payment, and its "When one or more cards
    are milled this way" reflexive trigger targets a card by the triggering spell's mana value), and the lists after round
    441 (still out, for their reasons). Judgment calls: a bestowed Aura attached to Arna's attacker is copied as the
@@ -4740,7 +4740,7 @@ line blocks.
    A browser test clicks through Etrata's ability on a cloaked Lightning Bolt: exiled, then cast for free at an
    opponent. +2, 31,863 of 31,936 on this stacked branch (round 442 #736), 31,867 with round 442's head 06e3d13 (main
    24bb9f8, B291-B292) merged in; the compiled text of every other card is unchanged.
-   Out after round 443 (looked at, not done): Battlefield Thaumaturge and Saruman of Many Colors (still out, as after
+   Out after round 443 (looked at, not done): Battlefield Thaumaturge (done in round 447) and Saruman of Many Colors (done in round 449) (still out, as after
    round 442), Titania's Song (still out: whether its effect, continuing until end of turn after it leaves, keeps to the
    artifacts it applied to then), Pulmonic Sliver (still out: a granted optional replacement on every Sliver's move to a
    graveyard, several ordered by their owner at once, rulings), and the lists after round 442 (still out, for their
@@ -4823,6 +4823,76 @@ line blocks.
    creature's own name and pick their most common creature type; bots never turn Vesuvan face down at their upkeep, and turn
    it face up (or answer an effect turning it face up) as a copy of the creature with the most power, toughness and
    abilities, not a legend whose name they have, never as a 0/0.
+   Round 447 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Promise, Karn Liberated and Secret of Bloodbending (still out, for their reasons) to two cards back off the lists, each
+   settled by reading closer. Captain America, First Avenger's "Throw ... — {3}, Unattach an Equipment from Captain America:
+   He deals damage equal to that Equipment's mana value divided as you choose among one, two, or three targets." ("Throw
+   ..." and "... Catch" one flavor word, CR 207.2d; "He" is the card, CR 201.5): the division is announced before the cost
+   is paid (CR 601.2d, 601.2h), but an announced division that the Equipment then unattached doesn't add up to would make the
+   activation illegal, so the legal activations are exactly an attached Equipment and a division of its mana value (CR
+   202.3), and the Equipment is chosen first (ActivatedAbility.unattachEquipment, CostChoices.unattachEquipment, its mana
+   value the ability's X in definedX); at least 1 to each target, so mana value 0 can't be thrown, and 1 has one target; it
+   stays on the battlefield, unattached (CR 701.3d). Its "... Catch — At the beginning of combat on your turn, attach up to
+   one target Equipment you control to Captain America." needed only the flavor word taken off. Battlefield Thaumaturge's
+   "Each instant and sorcery spell you cast costs {1} less to cast for each creature it targets.": its ruling "The cost
+   reduction is {1} per target creature, even if the spell targets a creature more than once" is read against the same
+   card's heroic ruling, "will trigger only once per spell, even if that spell targets the creature ... multiple times":
+   where Wizards means once, its rulings say "only once" (Hinata's say each object counts once), and this one doesn't, so
+   each target that's a creature counts, one creature in two target slots twice (CompiledCard.perTargetCost `creatures`,
+   `spellTypes`; worked out after targets, CR 601.2c, 601.2f; creatures on the battlefield, CR 109.2; generic mana only).
+   Browser tests click through Captain America's Equipment buttons ("Sword of Fire and Ice (3 damage)", then two targets and
+   the division, and "Bonesplitter (1 damage)" at Ana). +2, 31,883 of 31,936 on this stacked branch (round 446 #745), 31,884
+   with round 446's head ae5ba1d (main 499a31a, B297) merged in; the compiled text of every other card is unchanged.
+   Out after round 447 (looked at, not done): the lists after round 446 (still out, for their reasons). Judgment call:
+   Battlefield Thaumaturge's reading above (a creature targeted twice counts twice). Known gaps: bots throw an Equipment only
+   in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
+   even when the thrown Equipment's mana value leaves room for fewer (the division then refuses them).
+   Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
+   round B299) to Paleontologist's Pick-Axe, out since round 334, whose pieces are there now. Its back face, Dinosaur
+   Headdress: "As this Equipment becomes attached to a creature, choose an exiled creature card used to craft this
+   Equipment." (asked each time it becomes attached, by its enters trigger, an equip ability or an effect, as Sanctuary
+   Blade's color, CR 614.12; among the creature cards its craft cost exiled that are still in exile, CR 702.167c, a token
+   used to craft it counting for nothing, the same card as last time or another, rulings; with one left it's chosen
+   without asking, with none nothing is chosen and the last chosen card stays; CompiledCard.attachChooseCrafted, entersChoices
+   "attachCopy", game.ts headdressChosen) and "Equipped creature is a copy of the last chosen card." (a static copy effect,
+   CR 707.2, 611.3a, of exactly what's printed on the card, X as 0, not what it was before it was exiled, rulings, with the
+   Equipment's timestamp, a new one each time it becomes attached, CR 613.7e; becoming a copy isn't entering, so the copied
+   card's enters abilities don't trigger, and counters stay; CompiledCard.equippedCopiesChosen, kept by game.ts
+   syncAuraCopies as Metamorphic Alteration's). A browser test clicks through the craft, the card picker after its enters
+   trigger attaches it to Grizzly Bears (Serra Angel), and the picker again when it's equipped to a Hill Giant (Llanowar
+   Elves). +1, 31,885 of 31,936 on this stacked branch (round 447 #748, with its head 025b31d, main c8a3332, round
+   446 #745 and B297, merged in), 31,887 with main 2c9aae1 (B298, B299); the compiled text of every other card and face is unchanged.
+   Out after round 448 (looked at, not done): Baron Helmut Zemo (Lane B's round B299), Codie, Ravenous Codex (still out:
+   "a prepared spell" isn't a term of CR 722, which speaks of "a spell cast as a prepare spell", 722.3d), Spy Kit (still out:
+   every nonlegendary creature card's name at once), and the lists after round 447 (still out, for their reasons). Judgment
+   call: the last chosen card's copiable values are locked in as it's chosen, so the equipped creature stays a copy of it if
+   that card later leaves exile (no ruling; as Metamorphic Alteration's rulings say of its chosen creature leaving the
+   battlefield). Known gaps: as for Metamorphic Alteration, the copy begins at the next state-based action check after the
+   card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
+   card with the most power, toughness and abilities.
+   Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
+   Kiss, Finale of Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
+   Bracelet and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
+   are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
+   unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
+   118.3, rulings; with one such card it's discarded without asking; UnlessPays.discardFilter, the payUnless and discard
+   prompts carrying the filter; a whole line in oracle/round449.ts, since the keyword list splits its commas) and
+   "Whenever you cast your second spell each turn, each opponent mills two cards. When one or more cards are milled this
+   way, exile target enchantment, instant, or sorcery card with equal or lesser mana value than that spell from an
+   opponent's graveyard. Copy the exiled card. You may cast the copy without paying its mana cost." (a reflexive trigger,
+   CR 603.12, once if any card at all was milled, its target chosen as it triggers, rulings, in any opponent's graveyard,
+   the milled cards or others; "that spell" the second spell, its mana value as it was cast, CR 202.3, 608.2h, as
+   Hammerhead Tyrant's; the copy cast as it resolves or never, X as 0, CR 608.2g, 707.12, rulings). Browser tests click
+   through the ward's Pay and the discard picker (Opt chosen over Holy Strength, Grizzly Bears refused) and the trigger
+   after Divination and Night's Whisper: Ana mills Lightning Bolt and Mind Rot, Mind Rot (mana value 3) isn't offered, the
+   Bolt's copy is cast at Ana. +1, 31,886 of 31,936 on this stacked branch (round 448 #750), 31,888 with round 448's head 39bb057 (main
+   2c9aae1, B298-B299) merged in; the compiled text of every other card and face is unchanged.
+   Out after round 449 (looked at, not done): Mastermind's Acquisition and Spawnsire of Ulamog (still out: cards from outside
+   the game), The Dominion Bracelet (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
+   lists after round 448 (still out, for their reasons). Known gaps: bots pay the ward whenever they hold such a card, and
+   discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
+   can.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -5364,7 +5434,7 @@ line blocks.
    (still out, for the reasons in their earlier lists); Eiganjo Uprising ("X minus one" tokens for each opponent next to
    "They gain menace and haste" for the X just made); Energy Field (done in round B191) (damage from sources you don't control prevented, and
    a card put into your graveyard from anywhere); Blossombind ("can't have counters put on it": every way counters are
-   put would have to check it); Battlefield Thaumaturge (a cost reduction for each creature the spell targets, set after
+   put would have to check it); Battlefield Thaumaturge (done in round 447) (a cost reduction for each creature the spell targets, set after
    targets are chosen, CR 601.2f); Rootweaver Druid (each opponent's searched lands split between two controllers);
    Pulmonic Sliver (a granted optional "put it on top of its owner's library instead" for every Sliver); Storm Cauldron (done in round B191)
    (a land tapped for mana returning to its owner's hand).
@@ -5780,7 +5850,7 @@ line blocks.
    own creature type, then any number of cards of it); Eumidian Wastewaker ("you and defending player each discard a card
    or sacrifice a permanent", mandatory, then the land cards put into graveyards this way); Detective's Phoenix (bestow
    with collect evidence, cast from the graveyard with bestow); Hand of Vecna (done in round 321) ("equipped creature or a creature you
-   control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (its ward needs a
+   control named Vecna", chosen as it resolves, and a life-per-card equip cost); Saruman of Many Colors (done in round 449) (its ward needs a
    discard of a kind, but its second-spell trigger is the harder part); Infernal Offering (done in round B204) (both modes choose an
    opponent first).
    Round 307 took cards back off the "Out after round N" lists, most played first: "−6: Choose left or right. Each player
@@ -6877,7 +6947,7 @@ line blocks.
    a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
    - Life swaps still out: Heart of Bogardan (done in round B225), Spirit of Resistance (done in round B106).
    - "You can't cast" variants other than creature or noncreature spells are still out. Ward costs still out: discard
-     a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors), "discard a card or pay {2}"
+     a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors, done in round 449), "discard a card or pay {2}"
      (Titania), blight, collect evidence, poison counters; most of these cards have other lines that are out too.
    - Bots cast Living Death, Terminus and Memory Jar by their usual rough value, without weighing whose creatures or
      hands they help.
@@ -8814,7 +8884,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the Past (a group sharing a creature type with the dying creature), Loki Laufeyson (done in round B202) (a mana value limit from its power on
   a delayed cast trigger), The Fugitive Doctor (done in round B184) and Filigree Racer (flashback or jump-start granted until end of turn),
   Mazzy (an Aura put into a graveyard, cast until your next turn), Saheeli's Lattice, Paleontologist's Pick-Axe and Throne
-  of the Grim Captain (all but the Pick-Axe done in round 334) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
+  of the Grim Captain (all but the Pick-Axe done in round 334; the Pick-Axe in round 448) ("craft with one or more"), Seifer (blocked by two or more), Distended Mindbender (done in round B158) (a choice of two
   cards by different rules), plus Shaun & Rebecca, Wild Shape (done in round B191), Bridge from Below, Aetherborn Marauder (done in round 315), Sigardian Zealot (done in round B187),
   Rhuk (done in round B70), Alpha Brawl, Brain in a Jar (done in round B158), Sita Varma (done in round B114), Munda (done in round B196) and Hans Eriksson.
 - Round B61 (the unlisted ones from EDHREC rank about 19,700 up, and from the B10/B11 lists below): "gets +2/+2 until
@@ -10979,7 +11049,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   as it dies and as it resolves, CR 603.4; Effect delayed `ifCond`). Outmaneuver ("X target blocked creatures assign their
   combat damage this turn as though they weren't blocked": decided as it resolves, all of it to the player or planeswalker
   attacked even if the blockers are gone, rulings, CR 510.1c). +7, 31,207 of 31,936 with B189 to B196 and rounds 348 to 351.
-- Out after round B197 (looked at, not done): Battlefield Thaumaturge ("costs {1} less to cast for each creature it
+- Out after round B197 (looked at, not done): Battlefield Thaumaturge (done in round 447) ("costs {1} less to cast for each creature it
   targets": its ruling "{1} per target creature, even if the spell targets a creature more than once" doesn't settle whether
   one creature targeted twice counts once or twice), Concerted Effort (landwalk and protection granted kind by kind),
   Delaying Shield (done in round B201) (a pay-or-lose-1-life choice for each delay counter removed) and Rootpath Purifier (land cards in your
@@ -12119,7 +12189,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Murder, returns on the Forest chosen, which taps for {U}{U}{U} and two rad counters; Nick Fury puts Peter Parker onto the
   battlefield and transforms him. +2, 31,875 of 31,936 with main f277baf (through round 444) and B293-B294.
   The compiled text of every other card is unchanged.
-- Out after round B295 (looked at, not done): the lists after round B294 stay out. Battlefield Thaumaturge (its ruling's
+- Out after round B295 (looked at, not done): the lists after round B294 stay out. Battlefield Thaumaturge (done in round 447) (its ruling's
   "even if the spell targets a creature more than once" still reads either way for one creature in two target slots), North
   Star, Arna Kennerüd, Skycaptain and Psychic Paper were looked at again and stay out for the reasons in the earlier lists;
   about 67 unsupported cards remain, all of them hard. Known gaps: the mana menu labels the Forest's granted ability by its
@@ -12174,7 +12244,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   31,867 with main 887f11a (round 442) merged in. The compiled text of every other card is unchanged.
 - Out after round B293 (looked at, not done): the lists after round B292 stay out. Spy Kit (every check of a name in the
   engine would have to know every nonlegendary creature card's name), Pulmonic Sliver (a "you may" in the middle of a zone
-  move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (the division of damage is
+  move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (done in round 447) (the division of damage is
   announced before the cost picks the Equipment whose mana value is the amount, CR 601.2d, 601.2h), Ghostly Flame (its
   rulings make damage colorless only for some checks: protection and prevention, not "a red spell deals damage"
   triggers), Shaman's Trance (every "your graveyard" permission would have to reach other players' graveyards) and
@@ -12201,7 +12271,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   stopped (rulings). Browser tests activate the Shaman on Absolute Law (Cold Snap not a target) and pick red then black, and
   cast Hijack and Animate Artifact at a guarded Sol Ring. +2, 31,861 of 31,936 on B291's branch (main through round 440 and
   B290), 31,863 with B291's head 043c218d (main through round 441) merged in. The compiled text of every other card is unchanged.
-- Out after round B292 (looked at, not done): the lists after round B291 stay out. Battlefield Thaumaturge (Lane A's lists)
+- Out after round B292 (looked at, not done): the lists after round B291 stay out. Battlefield Thaumaturge (done in round 447) (Lane A's lists)
   was looked at again: its ruling ("{1} per target creature, even if the spell targets a creature more than once") reads
   as counting each target slot, but Lane A has kept it out several times, so it's left to them. Judgment calls and known
   gaps: an Aura with "can't be enchanted by other Auras" or a Tetravite's "can't be enchanted" now also keeps an Aura from
@@ -12350,7 +12420,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and cast from the top with Galea as with other permissions. Browser tests click through Galea's Bonesplitter cast from
   the top and its attach target, and the Cyclone's Hill Giant found by cycling Desert Cerodon and cast free. +3, 31,840
   of 31,936 on B285's branch (main 32fb7a3, round 436, merged in). The compiled text of every other card is unchanged.
-- Out after round B286 (looked at, not done): the lists after round B285 stay out. Battlefield Thaumaturge stays out
+- Out after round B286 (looked at, not done): the lists after round B285 stay out. Battlefield Thaumaturge (done in round 447) stays out
   (its ruling "{1} per target creature, even if the spell targets a creature more than once" still reads either way for
   a creature targeted twice). Sanar, Innovative First-Year (reveal until X nonland cards, then a card of each color among
   them, one card standing for one color) was next in line (done in round B287). Judgment calls and known gaps: a
@@ -12518,7 +12588,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   their own dying permanents in and send another player's to the graveyard. Browser tests click through the Vector's two
   groups and the Mirror's graveyard question. +2, 31,805 of 31,936 on B279's branch, 31,815 with its head f21fd3a (main
   e33b145, round 431) merged in. The compiled text of every other card is unchanged.
-- Out after round B280 (looked at, not done): the lists after round B279 stay out. Battlefield Thaumaturge (still out:
+- Out after round B280 (looked at, not done): the lists after round B279 stay out. Battlefield Thaumaturge (done in round 447) (still out:
   whether one creature in two target slots counts once or twice), Psychic Paper (as after round 390), Breathstealer's
   Crypt (still out, as after round B237: which card "it" is once another replacement applies to the draw it makes).
   Known gaps: Lich's Mirror's draw of seven that pauses for a draw replacement's question finishes after the life total
@@ -12550,7 +12620,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   after round B240), Guardian Beast (done in round B292) (as after round B257). The Face of Boe, Skyway Robber and Hama, the Bloodbender are
   Lane A's round 431. Known gaps: a bot exiles a land or a card with mana value 0 with Alaundo (it never comes back)
   only when its hand holds nothing else; a bot's Golem X counts cost reductions only against its {2}. Next in line (not looked
-  at closely yet): Filigree Vector (done in round B280) (two "any number of target" groups), Battlefield Thaumaturge, Psychic Paper.
+  at closely yet): Filigree Vector (done in round B280) (two "any number of target" groups), Battlefield Thaumaturge (done in round 447), Psychic Paper.
 - Round B278 (least played first, from the Lane B skip lists, neither in Lane A's rounds 428-430): Land Equilibrium's "If
   an opponent who controls at least as many lands as you do would put a land onto the battlefield, that player instead puts
   that land onto the battlefield then sacrifices a land of their choice." (a replacement effect, CR 614.1a: a land as it
@@ -13029,7 +13099,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   game): paying for a shield on nothing would do nothing; Blood of the Martyr's choice is asked for each source's damage
   before the creature's other shields apply, and once declined for some damage it isn't asked again if another effect
   then sends that damage to another creature; bots never answer another player's Blood of the Martyr in their favor, and
-  cast Guardian Angel through the general spell logic only; Battlefield Thaumaturge, Sacred Ground, Emblazoned Golem,
+  cast Guardian Angel through the general spell logic only; Battlefield Thaumaturge (done in round 447), Sacred Ground, Emblazoned Golem,
   Equinox and Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
 - Round B262 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-417): Immortal Coil
   ("If damage would be dealt to you, prevent that damage. Exile a card from your graveyard for each 1 damage prevented
@@ -13118,7 +13188,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sacrifice, so a protected player sacrifices nothing and the damage is still replaced.
 - Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (Y counted from the
   toughness so far in layer 7c: other 7c effects apply first, as it depends on them, CR 613.8, but counters apply in
-  timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (as before: one
+  timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (done in round 447) (as before: one
   creature in two target slots), Mangara's Equity (done in round B261) (as before), Ghostly Flame (its rulings make only the damage colorless,
   not the source for triggers, and leave prevention by color open) and North Star ("for one spell": which spell, and only
   its mana cost, not additional or alternative costs). Known gaps: Elemental Resonance's {2/W} reading follows its reminder
@@ -13151,7 +13221,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   or ability you control exiles one or more permanents" needs who caused each exile, which a zone move doesn't record, and
   whether an exile cost or a replacement counts) and Kraven the Hunter (still out, as before). Known gap: bots don't target
   their own creatures with Lagrella for the counters.
-- Out after round B245 (looked at, not done): the lists after round B244 stay out, and Battlefield Thaumaturge (still
+- Out after round B245 (looked at, not done): the lists after round B244 stay out, and Battlefield Thaumaturge (done in round 447) (still
   out: its ruling "{1} per target creature, even if the spell targets a creature more than once" against Hinata,
   Dawn-Crowned's rulings, which count a twice-targeted object once), Jasmine Boreal of the Seven (done in round 426) (still out: abilities
   given to a spell as it's cast are granted in several places, not all read as the mana is spent) and Lodestone Bauble
@@ -13296,7 +13366,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B217 (looked at, not done): Lich and Nefarious Lich (done in round B253) (life gained becomes cards drawn, and those draws
   can happen in the middle of lifelink damage, where a draw replacement can't pause yet, see Swans of Bryn Argoll (done in round B252); Nefarious
   Lich's and Dralnu, Lich Lord's (done in round B253) choices of what to exile or sacrifice for each damage are in the middle of damage too),
-  Battlefield Thaumaturge (still out: whether a creature targeted twice counts twice), Charmed Pendant (done in round B239) (a mana ability whose
+  Battlefield Thaumaturge (done in round 447) (still out: whether a creature targeted twice counts twice), Charmed Pendant (done in round B239) (a mana ability whose
   colors come from the card its cost mills, a hybrid symbol giving either color: the mana can't be known before paying, so
   autopay can't plan it), Cemetery Desecrator (a reflexive modal trigger after exiling a card from any graveyard, X its mana
   value) stays out for now.
@@ -13383,7 +13453,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   rulings: who removes counters isn't tracked), Rain of Gore (whether lifelink damage from a spell is that spell causing its
   controller to gain life isn't settled by its rulings), Lich's Mirror (done in round B280), Blood Scrivener, Snowblind and Garruk, Curse Breaker (done in round B219)
   stay out for the reasons in the earlier lists.
-- Out after round B176 (looked at, not done): Battlefield Thaumaturge ("{1} less for each creature it targets": whether a
+- Out after round B176 (looked at, not done): Battlefield Thaumaturge (done in round 447) ("{1} less for each creature it targets": whether a
   creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (done in round B213) (soulshift X counted
   from the Spirits as they last existed), Barbed Wire (done in round B182) (a "prevent the next damage dealt by ~" shield), Spiteful Repossession
   (each opponent's own difference, then "the damage dealt this way") stay out for these reasons.

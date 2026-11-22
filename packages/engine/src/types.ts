@@ -1012,7 +1012,7 @@ export interface CopyEffect {
    */
   until?: "endOfTurn" | /** Vesuvan Shapeshifter (round 446): "until this creature is turned face down" (run-permanents.ts turnFaceDown). */ "faceDown" | { turnOf: PlayerId } | { nextEndStep: { turn: number; endSteps: number } } | CopyWhile;
   /**
-   * Metamorphic Alteration (round 429): the copy effect of an Aura's static ability on the permanent it enchants (CR 611.3a,
+   * Metamorphic Alteration (round 429), Dinosaur Headdress (round 448, an Equipment's): the copy effect of an Aura's static ability on the permanent it enchants (CR 611.3a,
    * 707.2), with the Aura's timestamp (613.7e), kept while that Aura (`until` whileAttached) is attached to it and has the
    * ability (game.ts syncAuraCopies), not one that began after the permanent entered.
    */
@@ -1767,6 +1767,8 @@ export interface CostChoices {
    * an opponent's graveyard as you cast ~" (Spoils of War): the opponent chosen as it's announced, before X (rulings).
    */
   xOpponent?: PlayerId;
+  /** Captain America, First Avenger (round 447): the Equipment attached to it that "Unattach an Equipment from ~" unattaches (ActivatedAbility.unattachEquipment). */
+  unattachEquipment?: ObjectId;
   /** Selective Snare: the creature type chosen as it's cast, before its targets (CompiledCard.castChooseType, rulings). */
   creatureType?: string;
   /** The spell on the stack (its object) exiled for "Exile an instant or sorcery spell you control" (Nivmagus Elemental). */
@@ -1965,7 +1967,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** "Unless its controller discards their hand" (Perplex): the whole hand, even an empty one. */ discardHand?: true; /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none. */ exileGraveyard?: true; /** "Ward—Discard a card at random": this many cards, chosen at random once they pay. */ discardRandom?: number; /** "Ward—Get five poison counters": this many poison counters as the payment. */ poison?: number; /** "Ward—Blight 2": this many -1/-1 counters on one creature they control as the payment, the creature chosen after saying yes (CR 701.68a). */ blight?: number; /** "Ward—Collect evidence 4": cards from their graveyard with this much total mana value, exiled as the payment, chosen after saying yes (CR 701.59a). */ collectEvidence?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string; /** Rhystic Cave (round B254): paying stops a mana ability's mana (GameState.manaUnless), outside any resolution. */ manaUnless?: true }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** "Unless its controller discards their hand" (Perplex): the whole hand, even an empty one. */ discardHand?: true; /** "Unless its controller exiles all cards from their graveyard" (Grip of Amnesia): all of them, even none. */ exileGraveyard?: true; /** "Ward—Discard a card at random": this many cards, chosen at random once they pay. */ discardRandom?: number; /** With `discard` (Saruman of Many Colors, round 449): only cards like this can be discarded to pay. */ discardFilter?: TargetSpec; /** "Ward—Get five poison counters": this many poison counters as the payment. */ poison?: number; /** "Ward—Blight 2": this many -1/-1 counters on one creature they control as the payment, the creature chosen after saying yes (CR 701.68a). */ blight?: number; /** "Ward—Collect evidence 4": cards from their graveyard with this much total mana value, exiled as the payment, chosen after saying yes (CR 701.59a). */ collectEvidence?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string; /** Rhystic Cave (round B254): paying stops a mana ability's mana (GameState.manaUnless), outside any resolution. */ manaUnless?: true }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".

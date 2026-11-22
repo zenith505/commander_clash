@@ -87,6 +87,8 @@ export interface UnlessPays {
   exileGraveyard?: true;
   /** "Ward—Discard a card at random" (Alpharael): this many cards chosen at random as the payment (CR 701.9c). */
   discardRandom?: number;
+  /** With `discard`, "Ward—Discard an enchantment, instant, or sorcery card" (Saruman of Many Colors, round 449): only cards in their hand like this can be discarded to pay, and without enough of them it can't be paid (CR 118.3, rulings). */
+  discardFilter?: TargetSpec;
   /** "Ward—Get five poison counters" (The Serpent Society): the player gets this many as the payment (CR 122.1, 118.3). */
   poison?: number;
   /** "Ward—Blight 2" (Auntie Ool, Cursewretch): this many -1/-1 counters on one creature they control as the payment (CR 701.68a); not with none (701.68b). */
@@ -6718,7 +6720,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own" | "ownCreature" | /** Mindblaze: a card in that player's library. */ "inLibrary" | /** Day of the Moon: the name of creatures to goad, an opponent's. */ "goadTheirs" | /** Sphinx Ambassador: a card someone else found in this player's own library and would take if it's a creature card without that name. */ "guardLibrary" | /** Psychic Paper (round 446): the name the creature it becomes attached to will have. */ "disguise";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst" | /** Olag, Ludevic's Hubris (round 435): which creature card exiled with it it becomes a copy of as it transforms (CompiledCard.asTransformsCopyLinked). */ "transformCopy";
+export type EntersOption = /** "As ~ enters, choose another creature you control" (CompiledCard.entersChooseObject). */ "chosenObject" | /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | /** Grifter's Blade: the creature it enters attached to (CompiledCard.entersAttachedToYours). */ "attachHost" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | /** Round B249: which of several different copy replacements applies last as it enters (game.ts entersAsCopyKeys). */ "copyLast" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | /** Indominus Rex, Alpha: "As ~ enters, discard any number of creature cards" (CompiledCard.entersDiscardKeywords). */ "discardKeywords" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** CompiledCard.entersEachPlayerChooses: one player's word. */ "playerWord" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form" | /** The Mimeoplasm: the second card exiled with the one it copies, for counters equal to its power (EntersAsCopy.exileTwo). */ "copyOther" | /** CompiledCard.entersExileFromYard: one more card of the graveyard to exile as it enters. */ "exileFromYard" | /** CompiledCard.entersRemoveCounters: the permanents whose counters it takes as it enters. */ "removeCounters" | /** CompiledCard.entersProcess: the cards in exile put into graveyards as it enters (round B229). */ "processExile" | /** Archelos, Lagoon Mystic (round 403): whether it enters tapped or untapped, when replacement effects of both kinds apply (CR 616.1). */ "tapOrder" | /** Round B250: which control-changing replacement applies first as it enters (Gather Specimens, Xantcha; gather.ts). */ "controlFirst" | /** Olag, Ludevic's Hubris (round 435): which creature card exiled with it it becomes a copy of as it transforms (CompiledCard.asTransformsCopyLinked). */ "transformCopy" | /** Dinosaur Headdress (round 448): the exiled creature card used to craft it, chosen as it becomes attached (CompiledCard.attachChooseCrafted). */ "attachCopy";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -8387,6 +8389,12 @@ export interface ActivatedAbility {
   untapSelf?: true;
   /** "Unattach ~" as a cost (Sunforger): it must be attached to a creature (rulings). */
   unattachCost?: true;
+  /**
+   * Captain America, First Avenger (round 447): "Unattach an Equipment from ~" as a cost, the Equipment chosen as it's
+   * activated (CostChoices.unattachEquipment, CR 602.2b, 601.2h), and the ability's X that Equipment's mana value then
+   * (definedX), for "damage equal to that Equipment's mana value divided as you choose" (CR 601.2d).
+   */
+  unattachEquipment?: true;
   /**
    * "Tap enchanted creature", "Tap enchanted land" as the cost (Krovikan Plague, Earthlore): tapping the untapped permanent
    * this Aura is attached to (CR 602.2b), which isn't this ability's own {T}, so a creature that came under its
@@ -10765,6 +10773,19 @@ export interface CompiledCard {
   /** Sanctuary Blade (round 390): "As ~ becomes attached to a creature, choose a color.": asked each time it becomes attached to a creature (game.ts askAttachColor), into Chosen.color, the "last chosen color". */
   attachChooseColor?: true;
   /** Psychic Paper (round 446): "As ~ becomes attached to a creature, choose a creature card name and a creature type.": asked each time it becomes attached to a creature (game.ts askAttachColor), into Chosen.name and Chosen.type; `names` is the names' filter. */
+  /**
+   * Dinosaur Headdress (round 448): "As ~ becomes attached to a creature, choose an exiled creature card used to craft ~.":
+   * asked each time it becomes attached to a creature (game.ts askAttachColor, entersChoices "attachCopy"), one of the
+   * creature cards its craft cost exiled that are still in exile (CR 702.167c), into Chosen.card and Chosen.copyKey (the
+   * card's printed copiable values, CR 707.2, rulings); none left, nothing is chosen and the last chosen card stays.
+   */
+  attachChooseCrafted?: true;
+  /**
+   * Dinosaur Headdress (round 448): "Equipped creature is a copy of the last chosen card.": a static copy effect (CR 707.2,
+   * 611.3a) of Chosen.copyKey on the creature it's attached to, with its timestamp (CR 613.7e), as Metamorphic Alteration's
+   * (game.ts syncAuraCopies).
+   */
+  equippedCopiesChosen?: true;
   attachChooseNameAndType?: { names: TargetSpec };
   /** Liquid Fire: "As an additional cost to cast this spell, choose a number between 0 and 5" (CR 601.2b): chosen as it's cast (CostChoices.number), "the chosen number" as it resolves. */
   castNumber?: { min: number; max: number };
@@ -11051,7 +11072,7 @@ export interface CompiledCard {
   /** "Spells your opponents cast that target one or more commanders you control cost {3} more to cast" (Esior): once per spell. */
   commanderTargetTax?: number;
   /** Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target", "Spells your opponents cast cost {1} more ...": `n` generic mana (negative: less) for each different player or object the spell targets (rulings). */
-  perTargetCost?: { opponents: boolean; n: number }[];
+  perTargetCost?: { opponents: boolean; n: number; /** Battlefield Thaumaturge (round 447): "for each creature it targets": each target that's a creature on the battlefield, once for each time it's targeted (rulings). */ creatures?: true; /** "Each instant and sorcery spell you cast": only spells of these card types. */ spellTypes?: string[] }[];
   /** Kaervek's Torch: "As long as ~ is on the stack, spells that target it cost {2} more to cast" (CR 601.2f, with the targets chosen in 601.2c): this much more for each spell like it a spell targets. */
   stackTargetTax?: number;
   /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */

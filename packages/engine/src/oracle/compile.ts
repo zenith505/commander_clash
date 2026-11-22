@@ -226,6 +226,9 @@ import { round443Line } from "./round443";
 import { round444Line } from "./round444";
 import { round445Line } from "./round445";
 import { round446Line } from "./round446";
+import { round447Line } from "./round447";
+import { round448Line } from "./round448";
+import { round449Line } from "./round449";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1059,6 +1062,9 @@ export function compile(d: CardDef): CompiledCard {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
     let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
+    // Captain America, First Avenger (round 447): "Throw ... — " and "... Catch — ", one flavor word split across two
+    // abilities, with no rules meaning (CR 207.2d).
+    if (!isSpell) line = line.replace(/^(?:Throw \.\.\.|\.\.\. Catch) — /, "");
     // An instant's or sorcery's ability word ("Spell mastery — If ...", CR 207.2c): no rules meaning either.
     if (isSpell) line = line.replace(SPELL_ABILITY_WORD, "");
     // Zimone, All-Questioning: "if ... you control a prime number of lands, create Primo, ..., then put that many +1/+1
@@ -1135,6 +1141,12 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 449: oracle/round449.ts.
+    if (round449Line(line, raw, out, isSpell)) continue;
+    // Round 448: oracle/round448.ts.
+    if (round448Line(line, raw, out, isSpell)) continue;
+    // Round 447: oracle/round447.ts.
+    if (round447Line(line, raw, out, isSpell)) continue;
     // Round 446: oracle/round446.ts.
     if (round446Line(line, raw, out, isSpell)) continue;
     // Round 445: oracle/round445.ts.

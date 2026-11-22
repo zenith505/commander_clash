@@ -1,7 +1,7 @@
 # Roadmap
 
-31,861 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,960 of
+31,863 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,961 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4715,7 +4715,7 @@ line blocks.
    enters unattached, CR 301.5e, rulings; Effect tokenCopiesOfAttached). Browser tests click through Starrix's mutate onto
    Grizzly Bears (Lightning Bolt stays exiled, Sol Ring enters) and an attack with an equipped Grizzly Bears (its counter
    doubles, a Bonesplitter token enters on it). +2, 31,856 of 31,936 on this stacked branch (round 441 #734), 31,861
-   with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in; the compiled text of every other card is unchanged.
+   with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in, 31,863 with main aca5d42 (B291); the compiled text of every other card is unchanged.
    Out after round 442 (looked at, not done): Battlefield Thaumaturge (still out: its ruling, "{1} per target creature,
    even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (still out: "Ward—Discard
    an enchantment, instant, or sorcery card" needs a discard of a kind as the ward payment, and its "When one or more cards

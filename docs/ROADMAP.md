@@ -11914,8 +11914,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player's graveyard, chosen as it's put on the stack and checked as it resolves (CR 603.3d, 608.2b); the copy cast as it
   resolves or never (CR 608.2g, 704.5e), and Soundwave converts only if it was cast (IfCond castAmongThisWay; CR 701.28).
   Browser test: two creature tokens deal 3 to Ana, only her Divination (not her Night's Whisper or Ben's Divination) is
-  offered, the copy is cast and Soundwave converts. +2, 31,865 of 31,936 on B292's branch (main through round 441 and
-  B291). The compiled text of every other card is unchanged.
+  offered, the copy is cast and Soundwave converts. +2, 31,865 of 31,936 with main 24bb9f8 (through round 441 and
+  B292). The compiled text of every other card is unchanged.
 - Out after round B293 (looked at, not done): the lists after round B292 stay out. Spy Kit (every check of a name in the
   engine would have to know every nonlegendary creature card's name), Pulmonic Sliver (a "you may" in the middle of a zone
   move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (the division of damage is

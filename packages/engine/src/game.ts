@@ -45,6 +45,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
+import { circledProblem } from "./deck";
 import { spendPlan } from "./value";
 import { gatherInstance, gatherSteps } from "./gather";
 import { cardNameOptions, currentName, nameActivationBan, nameCastBan, nameLandBan } from "./names";
@@ -169,7 +170,12 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
       player.command.push(cmd.id);
       player.commanderCasts[cmd.id] = 0;
     }
-    for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
+    for (const card of p.deck) {
+      // Cryptic Spires (round 443): its two colors are circled as the deck is built, before any game (CR 207.5).
+      const circled = circledProblem(card);
+      if (circled) throw new RulesError(`${card.name} ${circled}`);
+      player.library.push(newObject(s, card, pid, "library").id);
+    }
     shuffleLibrary(s, player);
   });
   // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.

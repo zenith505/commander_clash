@@ -4724,6 +4724,31 @@ line blocks.
    enchantment creature card (being an Aura is the bestow ability's effect, CR 702.103b, not a copiable value, CR 707.2),
    so its token enters unattached (CR 303.4h); Arna's rulings don't cover it. Known gaps: bots don't weigh Arna's copies
    when choosing attackers, nor Starrix's mutation count when choosing what to mutate onto.
+   Round 443 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   of Promise, Psychic Paper and the others still out, to two cards whose pieces are there now. Etrata, Deadly Fugitive's
+   'Face-down creatures you control have "{2}{U}{B}: Turn this creature face up. If you can't, exile it, then you may cast
+   the exiled card without paying its mana cost."' (turned face up by the effect, no cost paid, CR 708.8; it can't be when
+   it's a cloaked or manifested instant or sorcery card, revealed and left face down, CR 701.58g, 701.40g, or an effect
+   says so, Unable to Scream, or it's face up or gone already, CR 609.3; then it's exiled and the card may be cast as the
+   ability resolves, timing ignored, X as 0, CR 608.2g, rulings; Effect turnFaceUp `setDid`, exileSelfCastFree) and
+   "Whenever an Assassin you control deals combat damage to an opponent, cloak the top card of that player's library."
+   (that player's card, under your control, CR 701.58a). Cryptic Spires' "As you create your deck, circle two of the
+   colors below." and "{T}: Add one mana of either of the circled colors." (CR 207.5, new since it was left out: the
+   circled colors' mana symbols are part of its printed rules text, so its copiable values, CR 707.2, and its color
+   identity, CR 903.4; it stays colorless; an object that only gained the ability adds no mana, CR 607.2, rulings;
+   CardDef.circledColors, deck.ts circleColors and circledProblem, checked by validateCommanderDeck and createGame).
+   A browser test clicks through Etrata's ability on a cloaked Lightning Bolt: exiled, then cast for free at an
+   opponent. +2, 31,863 of 31,936 on this stacked branch (round 442 #736), 31,867 with round 442's head 06e3d13 (main
+   24bb9f8, B291-B292) merged in; the compiled text of every other card is unchanged.
+   Out after round 443 (looked at, not done): Battlefield Thaumaturge and Saruman of Many Colors (still out, as after
+   round 442), Titania's Song (still out: whether its effect, continuing until end of turn after it leaves, keeps to the
+   artifacts it applied to then), Pulmonic Sliver (still out: a granted optional replacement on every Sliver's move to a
+   graveyard, several ordered by their owner at once, rulings), and the lists after round 442 (still out, for their
+   reasons). Judgment calls: Etrata's ability on a creature turned face up in response can't turn it face up, so it's
+   exiled and its card may be cast (CR 609.3, "If you can't"; no ruling). Known gaps: the sample decks never circle
+   Cryptic Spires' colors (they're one color each, so it can't be in them: two different colors in the commander's
+   identity, CR 207.5, 903.4); bots use Etrata's ability only in their second main phase, for an instant or sorcery card
+   or a creature card of mana value 3 or more, and don't weigh it in combat.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

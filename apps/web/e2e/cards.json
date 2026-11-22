@@ -16947,6 +16947,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "87957d09-7e22-40fe-8770-ff66d1934a38",
+  "name": "Etrata, Deadly Fugitive",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Vampire Assassin",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Assassin"
+  ],
+  "oracleText": "Deathtouch\nFace-down creatures you control have \"{2}{U}{B}: Turn this creature face up. If you can't, exile it, then you may cast the exiled card without paying its mana cost.\"\nWhenever an Assassin you control deals combat damage to an opponent, cloak the top card of that player's library.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Cloak",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "72a570a2-0a22-4680-ac88-a1724faf17de",
   "name": "Eumidian Wastewaker",
   "manaCost": "{2}{B}{B}",

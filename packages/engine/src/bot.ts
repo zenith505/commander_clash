@@ -344,6 +344,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
     // Breathstealer's Crypt (round B289): 3 life to keep a creature card costing 3 or more, while 10 life or more is left.
+    // God-Eternal Kefnet (round B291): revealing only offers a copy to cast, which is decided as the trigger resolves.
+    if (pend.kind === "chooseMay" && pend.kefnet) return [{ type: "chooseMay", player: pid, yes: true }];
     if (pend.kind === "chooseMay" && pend.breathstealer) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && mv(s, pend.card) >= 3 && player(s, pid).life - 3 >= 10 }];
     // Parnesse, the Subtle Brush (round B289): a copy of that spell for us, once (two Parnesses copying for each other would
     // never end): not when a copy of it under our control is already on the stack.
@@ -4103,7 +4105,7 @@ function pickTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced =
     const holds = (t: TargetChoice) => !guard || guard(t);
     const all0 = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
       // "Target creature that player controls" (Cloak and Dagger, Entwined, round 420): controlled by the player target already chosen.
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && (spec.controlledByTarget === undefined || relatedOk(s, spec, out, t)) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && !(countersFrom && t.kind === "player" && !playerCountersWorthRemoving(s, pid, t.id)),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && (spec.controlledByTarget === undefined || relatedOk(s, spec, out, t)) && (spec.blockedByTarget === undefined || relatedOk(s, spec, out, t)) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (countersKind === undefined || k === countersKind) && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && !(countersFrom && t.kind === "player" && !playerCountersWorthRemoving(s, pid, t.id)),
     );
     // A target only the guard rules out still has to be chosen when the ability must have one (a trigger): Triumph of
     // Cruelty's opponent when we don't control the greatest power now (it's checked again as it resolves).

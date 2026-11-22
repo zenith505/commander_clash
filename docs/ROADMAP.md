@@ -1,7 +1,7 @@
 # Roadmap
 
-31,861 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,960 of
+31,863 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,961 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1319,7 +1319,7 @@ line blocks.
    card" in a graveyard trigger); Ixidron and Illithid Harvester (turning permanents face down); Brazen Cannonade (done in round 314) ("until
    end of combat on your next turn"); Auntie Ool, Cursewretch (done in round 266); Arlinn's back face (a temporary "enters with
    an additional counter"); River Song's Diary, Knowledge Pool (done in round 422), Black Cat, Cunning Thief (done in round 273), Ninja Teen (granted sneak from
-   the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet, Hierophant Bio-Titan (done in round 315), Falco
+   the graveyard), Grothama, All-Devouring, Tovolar, Dire Overlord, God-Eternal Kefnet (done in round B291), Hierophant Bio-Titan (done in round 315), Falco
    Spara, Pactweaver, Baral and Kari Zev, Xanathar, Guild Kingpin, Painter's Servant and Warp World (each a new
    mechanism).
    Round 229 (fresh cards from the top): "Cumulative upkeep—Add {R}" (Braid of Fire; the bot keeps it); "Auras
@@ -3883,7 +3883,7 @@ line blocks.
    in triggers it again, rulings). Bots pay for Arni only when a card in their hand fits. Browser tests click through
    Portent's picks and free cast, Jadzi's {1} cast, Journey's lands and discard, and Arni's payment and attack. +3, 31,673
    of 31,936 on this stacked branch with main (B250, B251) merged in. The compiled text of every other card is unchanged.
-   Out after round 409 (looked at, not done): God-Eternal Kefnet ("You may reveal the first card you draw each turn as you
+   Out after round 409 (looked at, not done): God-Eternal Kefnet (done in round B291) ("You may reveal the first card you draw each turn as you
    draw it": a choice in the middle of any draw, before the card joins the hand, rulings; draws don't pause yet); Karn
    Liberated (restarting the game), Vesuvan Shapeshifter, Captain America, First Avenger, Confusion in the Ranks, Sen
    Triplets (done in round 412), Xanathar (done in round 412), Gift of Doom, Psychic Paper, Taskmaster, Niko, Pulmonic Sliver, Filigree Vector (done in round B280), Wayta and the rest
@@ -4009,7 +4009,7 @@ line blocks.
    Ana's Confusion when your Grizzly Bears enters. +3, 31,693 of 31,936 on this stacked branch (31,706 with main 99e27a4,
    Lane B through B258, merged in). The compiled text of every other card is unchanged.
    Out after round 414 (looked at, not done): Captain America, First Avenger (the damage division is announced before
-   the cost picks the Equipment whose mana value it divides, no ruling); Kefnet, Taskmaster, Niko, Mirror of the
+   the cost picks the Equipment whose mana value it divides, no ruling); Kefnet (done in round B291), Taskmaster, Niko, Mirror of the
    Forebears, Wayta, Draugr Necromancer (done in round B270), Apple of Eden (done in round B269), Missy and the rest of `npm run popular` above rank 15,000 (still
    out, for the reasons in their earlier lists). Known gaps: bots don't weigh Boltbender's trigger when deciding whether to turn
    it face up; a bot voting with Elrond counts only creatures, not what the new controller can do with them.
@@ -4715,7 +4715,7 @@ line blocks.
    enters unattached, CR 301.5e, rulings; Effect tokenCopiesOfAttached). Browser tests click through Starrix's mutate onto
    Grizzly Bears (Lightning Bolt stays exiled, Sol Ring enters) and an attack with an equipped Grizzly Bears (its counter
    doubles, a Bonesplitter token enters on it). +2, 31,856 of 31,936 on this stacked branch (round 441 #734), 31,861
-   with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in; the compiled text of every other card is unchanged.
+   with round 441's head de3f4e0 (main c96dc95, B289-B290) merged in, 31,863 with main aca5d42 (B291); the compiled text of every other card is unchanged.
    Out after round 442 (looked at, not done): Battlefield Thaumaturge (still out: its ruling, "{1} per target creature,
    even if the spell targets a creature more than once", reads either way), Saruman of Many Colors (still out: "Ward—Discard
    an enchantment, instant, or sorcery card" needs a discard of a kind as the ward payment, and its "When one or more cards
@@ -6038,7 +6038,7 @@ line blocks.
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
-   Pygmy Hippo (done in round B286); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion and Glyph of Reincarnation
+   Pygmy Hippo (done in round B286); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion (done in round B291) and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn; Tidal Flats (done in round B214) (a payment for each attacking
@@ -11943,6 +11943,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B291 (least played first, two cards off the skip lists, neither in Lane A's rounds 440-441): God-Eternal Kefnet's "You
+  may reveal the first card you draw each turn as you draw it. Whenever you reveal an instant or sorcery card this way, copy
+  that card and you may cast the copy. That copy costs {2} less to cast." (out after round 409 because draws couldn't pause;
+  they can since round B289): its controller's first card drawn in a turn, any turn (rulings), asked as it's drawn, before
+  the next card of the same instruction is drawn (rulings: only the first of several, decided before it joins the hand;
+  game.ts kefnetAsk, a chooseMay `kefnet` that pauses the draw, then the draws go on); each Kefnet they control asks in turn
+  (rulings: any number of them); the trigger copies the card, as it last existed if it left the hand (rulings), the copy
+  made in the hand and cast from there as it resolves, timing ignored, for {2} less generic mana (CR 601.2f, 608.2g; rulings:
+  then or never, a copy not cast ceasing to exist, CR 704.5e; Effect kefnetCopy, GameObject.copyCastFrom "hand"). Glyph of
+  Delusion's "Put X glyph counters on target creature that target Wall blocked this turn, where X is the power of that
+  blocked creature. The creature gains ..." (TargetSpec.blockedByTarget: the creature that Wall blocked this turn, both as
+  the objects they are now, assigned, banded or moved into or out of the block, rulings, TurnLog.blocks; checked as the
+  targets are chosen, the Wall first, and as it resolves, CR 601.2c, 608.2b; X its power then; the two abilities it gains
+  with no duration, CR 611.2a). Bots always reveal for Kefnet (whether to cast the copy is decided as it resolves). Browser
+  tests reveal Concentrate drawn by Divination and cast its copy for {U}{U}, and target a Wall then the Grizzly Bears it
+  blocked (Hill Giant not a target). +2, 31,853 of 31,936 on B290's branch, 31,859 with B290's head 5683e92
+  (main through round 440) merged in, 31,861 with main a899238 (round 441). The compiled text of every other card is
+  unchanged.
+- Out after round B291 (looked at, not done): the lists after round B290 stay out. Judgment calls: Kefnet asks only about an
+  instant or sorcery card (revealing another card does nothing); during a draw made inside another player's draw
+  replacement (Notion Thief, Alms Collector's first draw), which can't pause, such a card is revealed for each Kefnet without
+  asking, as miracle's card is. Known gaps: bots don't weigh Kefnet's reveal (they always reveal) and never cast Glyph of
+  Delusion with a plan for it.
 - Round B290 (least played first, from the skip lists, none of them in Lane A's rounds 439-440): "a name originally printed in
   the ... expansion" for Antiquities, Arabian Nights and Homelands. The card data keeps one printing per card (usually a recent
   reprint), so the names first printed in those three sets are listed in the engine (first-printings.ts, from the sets'
@@ -12404,7 +12427,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Bears over Sol Ring at your next upkeep. +2, 31,787 of 31,936 on B273's branch, 31,790 with main through round 426 merged in. The
   compiled text of every other card is unchanged.
 - Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star, Ghostly Flame, Snowblind,
-  Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion and Guardian Beast
+  Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion (done in round B291) and Guardian Beast
   were looked at again and stay out for the reasons in the earlier lists; the Wishes and other "outside the game" cards
   stay out (nothing outside the game here). Judgment calls and known gaps: Dimensional Breach's upkeep trigger goes on
   the stack at every player's upkeep while any of its cards is exiled, also for a player who owns none of them (it then
@@ -12769,7 +12792,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Nefarious Lich and Immortal Coil each take a different source's damage in one damage event, the Lich's cards are
   chosen first (for one source's damage only the one applied first applies: the damage is gone after it); bots' other ways of exiling their own graveyard (delve,
   escape, Nefarious Lich) don't look at Immortal Coil; Winter's Chill's three-way choice is asked as two questions, {2}
-  first, then {1}; Snowblind, Noxious Vapors, Land Equilibrium, Glyph of Delusion and Lich's Mirror (done in round B280) were looked at again
+  first, then {1}; Snowblind, Noxious Vapors, Land Equilibrium, Glyph of Delusion (done in round B291) and Lich's Mirror (done in round B280) were looked at again
   and stay out for the reasons in the earlier lists.
 - Out after round B261 (looked at, not done): the lists after round B260 stay out. Judgment calls and known gaps: Turf
   War's has no rulings of its own, so with a player who controls no land its enters ability follows Vaevictis Asmadi's
@@ -12940,7 +12963,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards), Immortal Coil (done in round B262) (a card of your choice exiled for each 1 damage, in the middle of damage) and the lists after round
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
-- Out after round B230 (looked at, not done): Glyph of Delusion ("target creature that target Wall blocked this turn": a
+- Out after round B230 (looked at, not done): Glyph of Delusion (done in round B291) ("target creature that target Wall blocked this turn": a
   target whose legality depends on another target), Runesword (done in round B276), Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava (done in round B263)
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
   effects; Aetherplasm done in round B261) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue

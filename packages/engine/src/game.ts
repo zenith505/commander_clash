@@ -15,7 +15,7 @@ import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDama
 import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
-import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
+import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, unlessDiscardable, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { cardSource, dealDamage, dealPlanned, hitsBy, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
@@ -3203,7 +3203,7 @@ export function syncAuraCopies(s: GameState): boolean {
   const holds = (e: CopyEffect, host: GameObject) => {
     if (!e.aura || typeof e.until !== "object" || !("whileAttached" in e.until)) return true;
     const a = s.objects[e.until.whileAttached.id];
-    return !!a && a.zone === "battlefield" && a.chosen?.copyKey === e.key && !!compileCard(defOf(s, a)).enchantedCopiesChosen && copyWhileHolds(s, e.until) && e.until.whileAttached.host === host.id;
+    return !!a && a.zone === "battlefield" && a.chosen?.copyKey === e.key && copiesChosen(s, a) && copyWhileHolds(s, e.until) && e.until.whileAttached.host === host.id;
   };
   for (const id of s.battlefield) {
     const host = s.objects[id]!;
@@ -3220,7 +3220,9 @@ export function syncAuraCopies(s: GameState): boolean {
   for (const id of s.battlefield) {
     const a = s.objects[id]!;
     const key = a.chosen?.copyKey;
-    if (!key || !a.attachedTo || !compileCard(defOf(s, a)).enchantedCopiesChosen) continue;
+    if (!key || !a.attachedTo || !copiesChosen(s, a)) continue;
+    // Dinosaur Headdress (round 448): its card is still to be chosen as it becomes attached (askEntersChoice).
+    if (s.entersChoices?.some((c) => c.id === a.id && c.what === "attachCopy")) continue;
     const host = s.objects[a.attachedTo];
     if (!host || host.zone !== "battlefield") continue;
     const until: CopyWhile = { whileAttached: { id: a.id, zc: a.zoneChanges ?? 0, host: host.id, hostZc: host.zoneChanges ?? 0 } };
@@ -3236,6 +3238,28 @@ export function syncAuraCopies(s: GameState): boolean {
     changed = true;
   }
   return changed;
+}
+
+/**
+ * Whether `a` has a static copy effect on what it's attached to: Metamorphic Alteration's "Enchanted creature is a copy of
+ * the chosen creature." or Dinosaur Headdress's (round 448) "Equipped creature is a copy of the last chosen card."
+ */
+function copiesChosen(s: GameState, a: GameObject): boolean {
+  const cc = compileCard(defOf(s, a));
+  return !!cc.enchantedCopiesChosen || !!cc.equippedCopiesChosen;
+}
+
+/**
+ * Dinosaur Headdress (round 448): `cardId`, an exiled creature card used to craft `o`, is the last chosen card: its printed
+ * copiable values (CR 707.2; rulings), locked in now, a key into GameState.cards (Chosen.copyKey), as the object it is in
+ * exile (Chosen.card, CR 400.7). syncAuraCopies makes the equipped creature a copy of it.
+ */
+export function headdressChosen(s: GameState, o: GameObject, cardId: ObjectId) {
+  const c = obj(s, cardId);
+  const base = restingDef(s.cards[c.cardId]!);
+  o.chosen = { ...o.chosen, card: { id: c.id, zc: c.zoneChanges ?? 0 }, copyKey: copyKey(s, base) };
+  log(s, `${player(s, controllerOf(s, o)).name} chooses ${base.name} for ${defOf(s, o).name}.`);
+  invalidateCharacteristics(s);
 }
 
 /** A permanent on the battlefield with an Aura attached to it ("enchanted", CR 303.4). */
@@ -8374,8 +8398,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
       const by = controllerOf(s, src);
       for (const c of per) {
         if (c.opponents ? !opponents(s, by).includes(pid) : by !== pid) continue;
-        if (c.n < 0) mods.less += -c.n * targetCount;
-        else mods.more += c.n * targetCount;
+        if (c.spellTypes && !c.spellTypes.some((ty) => (d.types as readonly string[]).includes(ty))) continue;
+        // Battlefield Thaumaturge (round 447): each target that's a creature (one on the battlefield, CR 109.2), a creature
+        // targeted twice counting twice ("even if the spell targets a creature more than once", rulings).
+        const n = c.creatures ? (how.targets ?? []).filter((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objIsType(s, obj(s, t.id), "Creature")).length : targetCount;
+        if (c.n < 0) mods.less += -c.n * n;
+        else mods.more += c.n * n;
       }
     }
   // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
@@ -11830,7 +11858,19 @@ export function definedCastX(s: GameState, pid: PlayerId, o: GameObject, choices
  * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
  * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
  */
+/** Captain America, First Avenger (round 447): the Equipment attached to `o` that "Unattach an Equipment from ~" can unattach. */
+export function unattachableEquipment(s: GameState, o: GameObject): ObjectId[] {
+  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attachedTo === o.id && characteristics(s, obj(s, id)).subtypes.includes("Equipment"));
+}
+
 export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility, costs?: CostChoices, targets?: TargetChoice[]): number | null | undefined {
+  // Captain America, First Avenger (round 447): the mana value of the Equipment "Unattach an Equipment from ~" unattaches, as
+  // it's chosen (CR 202.3); none chosen yet, X isn't known (a choice to make), and null for one that can't be.
+  if (ab.unattachEquipment) {
+    const e = costs?.unattachEquipment;
+    if (e === undefined) return undefined;
+    return unattachableEquipment(s, o).includes(e) ? defMv(defOf(s, obj(s, e))) : null;
+  }
   // Reflecting Mirror (round B235): twice the target spell's mana value, its X included (CR 202.3e); its targets are chosen
   // before its cost is worked out (CR 601.2c, 601.2f), so undefined until they are, and null when that target isn't a spell.
   if (ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs) {
@@ -11854,6 +11894,20 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
+  // Captain America, First Avenger (round 447): with no Equipment chosen yet, it can be activated if one of those attached
+  // to it would do (its mana value the damage to divide, CR 601.2d).
+  if (ab.unattachEquipment && costs?.unattachEquipment === undefined) {
+    const options = unattachableEquipment(s, o);
+    if (!options.length) return `no Equipment is attached to ${d.name}`;
+    let first: string | null = null;
+    for (const e of options) {
+      const p2 = abilityProblem(s, pid, id, index, targets, modes, tapCreatures, x0, { ...costs, unattachEquipment: e });
+      if (!p2) return null;
+      first ??= p2;
+    }
+    return first;
+  }
+  if (costs?.unattachEquipment !== undefined && !ab.unattachEquipment) return `${d.name}'s ability doesn't unattach an Equipment`;
   const fixedX = definedX(s, o, ab, costs, targets);
   if (fixedX === null) return ab.xIs && typeof ab.xIs === "object" && "twiceTargetSpellMv" in ab.xIs ? `X is twice the mana value of the target spell for ${d.name}'s ability` : `no card is exiled with ${d.name}, so X isn't defined`;
   // Bargaining Table: an opponent is chosen (not targeted) as it's announced, before X (rulings, CR 602.2b, 601.2b).
@@ -12067,7 +12121,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const cost = activationCost(s, pid, o, ab, targets, x, costs);
   // A cost's X (Corpseweft's "one or more creature cards") is chosen as it's activated: asked before that (no X and no
   // costs chosen, the menu's check), only whether the ability could be activated at all.
-  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
+  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) && !(x === undefined && costs === undefined && !ab.loyaltyX) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : ab.unattachEquipment ? null /* Captain America (round 447): its X is the unattached Equipment's mana value, not mana. */ : xProblem(cost, x);
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
   const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);
@@ -12629,6 +12683,15 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
       fireEvent(s, { type: "exerted", id: o.id });
     }
     if (ab.tapAttached && o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield") tapPermanent(s, obj(s, o.attachedTo));
+    // Captain America, First Avenger (round 447): "Unattach an Equipment from ~" (CR 701.3d): the one chosen, still on the
+    // battlefield, unattached.
+    const thrown = ab.unattachEquipment && costs?.unattachEquipment !== undefined ? s.objects[costs.unattachEquipment] : undefined;
+    if (thrown && thrown.attachedTo === o.id) {
+      log(s, `${p.name} unattaches ${nameOf(s, thrown.id)} from ${d.name}.`);
+      fireEvent(s, { type: "unattached", id: thrown.id, host: o.id });
+      thrown.attachedTo = undefined;
+      invalidateCharacteristics(s);
+    }
     if (ab.unattachCost && o.attachedTo) {
       log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
       fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });
@@ -13537,6 +13600,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       olagCopyChosen(s, o, choice);
       return;
     }
+    if (pend.what === "attachCopy") {
+      // Dinosaur Headdress (round 448): the exiled creature card used to craft it that the equipped creature is a copy of.
+      if (!pend.options.includes(choice)) throw new RulesError("choose an exiled creature card used to craft it");
+      headdressChosen(s, o, choice);
+      return;
+    }
     if (pend.what === "copyLast") {
       if (!pend.options.includes(choice)) throw new RulesError("choose a copy offered");
       enterCopying(s, o, choice);
@@ -14434,6 +14503,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "attachPlayer") throw new RulesError("nothing to attach");
   // Olag's copy (round 435) is chosen as it transforms, with an objectId (askEntersChoice), never as something resolves.
   if (pend.what === "transformCopy") throw new RulesError("nothing to choose");
+  // Dinosaur Headdress's card (round 448) is chosen as it becomes attached, with an objectId (askEntersChoice).
+  if (pend.what === "attachCopy") throw new RulesError("nothing to choose");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
@@ -14672,12 +14743,19 @@ function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId | ObjectId[
 export function askAttachColor(s: GameState, o: GameObject): void {
   if (o.zone !== "battlefield" || !o.attachedTo) return;
   const cc = compileCard(defOf(s, o));
-  if (!cc.attachChooseColor && !cc.attachChooseNameAndType) return;
+  if (!cc.attachChooseColor && !cc.attachChooseNameAndType && !cc.attachChooseCrafted) return;
   const host = s.objects[o.attachedTo];
   if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature")) return;
   if (cc.attachChooseColor) {
     if (s.entersChoices?.some((c) => c.id === o.id && c.what === "color")) return;
     (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "color" });
+    return;
+  }
+  // Dinosaur Headdress (round 448): "choose an exiled creature card used to craft ~", asked with the other "as ~ enters"
+  // choices (askEntersChoice "attachCopy").
+  if (cc.attachChooseCrafted) {
+    if (s.entersChoices?.some((c) => c.id === o.id && c.what === "attachCopy")) return;
+    (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "attachCopy" });
     return;
   }
   // Psychic Paper (round 446): "choose a creature card name and a creature type", the name first, as its text has them;
@@ -14754,6 +14832,19 @@ function askEntersChoice(s: GameState): boolean {
       }
       const per = compileCard(defOf(s, o)).entersRemoveCounters?.per ?? 1;
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "choose", what: "artifact, creature, or enchantment", options, count: options.length, min: 0, objectId: o.id, prompt: `remove all counters from any number of artifacts, creatures, and enchantments as it enters (${per === 1 ? "a +1/+1 counter" : `${per} +1/+1 counters`} for each counter removed): click them, then choose.` };
+      return true;
+    }
+    if (c.what === "attachCopy") {
+      // Dinosaur Headdress (round 448): one of the creature cards used to craft it still in exile (CR 702.167c), chosen
+      // as it becomes attached (CR 614.12); with one, that one; with none, nothing is chosen (the last chosen card stays).
+      const cards = olagCandidates(s, o);
+      if (cards.length < 2) {
+        q.shift();
+        if (cards[0]) headdressChosen(s, o, cards[0].id);
+        else log(s, `There's no creature card used to craft ${defOf(s, o).name} in exile, so nothing is chosen.`);
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "attachCopy", options: cards.map((x) => x.id), labels: cards.map((x) => restingDef(s.cards[x.cardId]!).name), objectId: o.id, prompt: `choose an exiled creature card used to craft ${defOf(s, o).name}: the equipped creature is a copy of it` };
       return true;
     }
     if (c.what === "transformCopy") {
@@ -15444,13 +15535,15 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
     }
     if (pend.discard) {
       // Then which cards to discard; the cards are discarded as the counter effect carries on (see counterOnStack).
-      if (p.hand.length < pend.discard) throw new RulesError(`you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
+      // "Ward—Discard an enchantment, instant, or sorcery card" (Saruman of Many Colors, round 449): only cards like that.
+      const able = unlessDiscardable(s, p.id, pend.discardFilter);
+      if (able.length < pend.discard) throw new RulesError(pend.discardFilter ? `you don't have ${pend.discard === 1 ? `${/^[aeiou]/i.test(pend.discardFilter.text) ? "an" : "a"} ${pend.discardFilter.text}` : `${pend.discard} ${pend.discardFilter.text}s`} to discard` : `you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
       r.scratch = { ...r.scratch, queue: [p.id], chosen: {} };
-      if (p.hand.length > pend.discard) {
-        s.pending = { kind: "discard", player: p.id, count: pend.discard, source: pend.source };
+      if (able.length > pend.discard) {
+        s.pending = { kind: "discard", player: p.id, count: pend.discard, source: pend.source, ...(pend.discardFilter ? { filter: pend.discardFilter } : {}) };
         return;
       }
-      r.scratch.chosen![p.id] = [...p.hand];
+      r.scratch.chosen![p.id] = able;
       s.pending = null;
       continueResolution(s);
       return;

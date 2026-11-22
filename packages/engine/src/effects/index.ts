@@ -15,7 +15,7 @@ export { takeInitiative, dungeonSBAs } from "./run-dungeons";
 export { ringBearer, isRingBearer, timesTempted, loseRingBearer, ringBearerOptions } from "./run-ring";
 export { harmfulCounter, reselectOptions } from "./run-permanents";
 export { tokenDef } from "./run-tokens";
-export { unlessCost, addDelayed, kickedMatches, changeTargetOptions } from "./run-spells";
+export { unlessCost, unlessDiscardable, addDelayed, kickedMatches, changeTargetOptions } from "./run-spells";
 export { discardCards, lengName, toTopName } from "./run-library";
 export { isSuspended, enterAttacking } from "./run-zones";
 export { canPayNow, timesPay } from "./run-choices";

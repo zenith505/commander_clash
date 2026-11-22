@@ -19,7 +19,7 @@ import { redistributions } from "./effects/run-round362";
 import { addedAbilityCosts, addedSacrificeCandidates } from "./added-costs";
 import { abilitiesOf, lethalLeft, basePower, baseToughness, canBeSacrificed, canSacrificeForCost, defOf, identityOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { commanderIdentity, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices, manaPenalty } from "./manaabilities";
-import { activatedQuality, manyX, manyOfferSizes, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { unlessDiscardable, activatedQuality, manyX, manyOfferSizes, reselectOptions, flagbearers, flagbearerRuleFor, bindChosen, bindAttachedToSource, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameManaValued, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, modeRange, manySlot, manySlots, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -35,6 +35,7 @@ import {
   abilityProblem,
   loyaltyChange,
   definedX,
+  unattachableEquipment,
   definedCastX,
   faceUpWays,
   faceUpFormsOf,
@@ -624,7 +625,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Grip of Amnesia: keep the spell unless the graveyard holds more than a few cards (they may be worth more).
     if (pend.kind === "payUnless" && pend.exileGraveyard) return [{ type: "payUnless", player: pid, pay: player(s, pid).graveyard.length <= 3 }];
     if (pend.kind === "payUnless" && pend.discardHand) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length <= 1 }];
-    if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
+    if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: unlessDiscardable(s, pid, pend.discardFilter).length >= pend.discard }];
     if (pend.kind === "payUnless" && pend.discardRandom) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discardRandom }];
     // Poison counters as a payment: only while we'd stay well short of ten (CR 704.5c).
     if (pend.kind === "payUnless" && pend.poison) return [{ type: "payUnless", player: pid, pay: (player(s, pid).poison ?? 0) + pend.poison < 8 }];
@@ -2442,7 +2443,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Assimilation Aegis (round 396): the biggest of the creature cards exiled with it.
     // Olag, Ludevic's Hubris (round 435): likewise as it transforms.
-    if (pend.kind === "chooseOption" && (pend.what === "aegisCopy" || pend.what === "transformCopy")) {
+    // Dinosaur Headdress (round 448): likewise for the creature it's attached to (bots attach it to their own creatures).
+    if (pend.kind === "chooseOption" && (pend.what === "aegisCopy" || pend.what === "transformCopy" || pend.what === "attachCopy")) {
       const size = (id: string) => (s.objects[id] ? defWorth(restingDef(s.cards[obj(s, id).cardId]!)) : 0);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => size(b) - size(a))[0]! }];
     }
@@ -8175,7 +8177,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const takesBlockers = takesBlocked && ab.body.effects.some((e) => e.type === "shuffleIntoLibrary" && e.what.ref === "inCombatWithSelf" && !e.what.blocked);
       if (takesBlocked && !(o.blocking ?? []).some((a) => s.objects[a]?.attacking !== undefined && mv(s, a) >= mv(s, id)) && !(takesBlockers && o.attacking !== undefined && (o.blockedBy ?? []).some((b) => s.objects[b]?.blocking !== undefined && mv(s, b) >= mv(s, id)))) continue;
       // Craft's "return this card" finds the card only once the cost has exiled it: the back face is what it's worth.
-      if (!craft && doesNothingNow(s, id, ab.body)) continue;
+      // Captain America, First Avenger (round 447): in our second main phase (its Catch attaches one again at our next
+      // combat), the attached Equipment with the greatest mana value, its X that mana value.
+      const thrown = ab.unattachEquipment ? (s.activePlayer === pid && s.step === "main2" ? unattachableEquipment(s, o).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0] : undefined) : undefined;
+      if (ab.unattachEquipment && thrown === undefined) continue;
+      const thrownBody = thrown !== undefined ? (JSON.parse(JSON.stringify(ab.body).replaceAll('{"count":{"kind":"x"}}', String(defMv(defOf(s, obj(s, thrown)))))) as typeof ab.body) : undefined;
+      if (!craft && doesNothingNow(s, id, thrownBody ?? ab.body)) continue;
       // "Search your library for a card named Sphinx Sovereign" (the Heralds): not with none of them left to find.
       if (ab.body.effects.some((e) => e.type === "search" && typeof e.filter?.named === "string" && e.filter.named !== "~" && !player(s, pid).library.some((c) => defOf(s, obj(s, c)).name === e.filter!.named))) continue;
       // Chainer, Nightmare Adept: a permission to cast from our graveyard only in our main phase, with none unused yet,
@@ -8264,7 +8271,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.modal && !modes) continue;
       const body = withModes(ab.body, modes);
       // Clay Golem: "the result" of the die its cost rolls, weighed at the middle of the die (rounded down).
-      const valued = ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
+      const valued = thrownBody ? withModes(thrownBody, modes) : ab.rollCost ? (JSON.parse(JSON.stringify(body).replaceAll('{"count":{"kind":"rollResult"}}', String(Math.floor((ab.rollCost + 1) / 2)))) as typeof body) : body;
       if (!craft && !vessel && !baubleTargets && (groupValue(s, pid, valued, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // Golgothian Sylex, Apocalypse Chime: only when the opponents lose more than we do, Chime's own sacrifice counted (Sylex
       // is one of the permanents it sacrifices).
@@ -8274,7 +8281,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Prototype Portal: X set by the ability (CR 107.3c).
       // Bargaining Table: the opponent with the fewest cards in hand, X the least (an opponent chosen, not targeted).
       const xOpponent = ab.xIs && typeof ab.xIs === "object" && "opponentHand" in ab.xIs ? opponents(s, pid).sort((a, b) => player(s, a).hand.length - player(s, b).hand.length)[0] : undefined;
-      const fixedX = definedX(s, o, ab, xOpponent !== undefined ? { xOpponent } : undefined);
+      const fixedX = definedX(s, o, ab, xOpponent !== undefined ? { xOpponent } : thrown !== undefined ? { unattachEquipment: thrown } : undefined);
       // Kaho, Minamo Historian: "cast a spell with mana value X from among cards exiled with ~": X matching one of them.
       const linkedMvX = cost.hasX && body.effects.some((e) => e.type === "castFromAmong" && e.fromLinked && e.exactMv !== undefined) ? [...new Set(linkedCards(s, id).map((l) => defMv(defOf(s, obj(s, l.id)))))].filter((v) => v <= availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost)).sort((a, b) => b - a) : undefined;
       if (linkedMvX && !linkedMvX.length) continue;
@@ -8301,7 +8308,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (only && targets.some((t) => t.kind === "object" && !objectMatches(s, only, obj(s, t.id), pid, false))) continue;
         const costs0 = discardX !== undefined ? (graveXPool(s, pid, id, ab) ? graveXCosts(s, pid, o, ab, targets, discardX) : discardXCosts(s, pid, o, ab, targets, discardX)) : abilityCosts(s, pid, o, ab, targets);
         if (costs0 === null) continue;
-        const costs = xOpponent !== undefined ? { ...costs0, xOpponent } : costs0;
+        const costs = xOpponent !== undefined ? { ...costs0, xOpponent } : thrown !== undefined ? { ...costs0, unattachEquipment: thrown } : costs0;
         if (titan && (costs?.sacrifice ?? []).reduce((a, c) => a + Math.max(0, power(s, obj(s, c))), 0) >= 10) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
         // Tree of Perdition, Tree of Redemption: only to lower an opponent's life total, or raise ours.

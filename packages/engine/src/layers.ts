@@ -1948,6 +1948,13 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "setName":
       // A text-changing effect (CR 123.6c, 613.1c): "named Legitimate Businessperson" (Witness Protection).
+      // Psychic Paper (round 446): "its name is the last chosen name", the one chosen as its source last became attached; a
+      // name too is changed by a text-changing effect (CR 123.6c, 613.1c), so in layer 3.
+      if (m.chosen) {
+        const name = e.sourceId ? s.objects[e.sourceId]?.chosen?.name : undefined;
+        if (name !== undefined) c.name = name;
+        return;
+      }
       c.name = m.name;
       return;
     case "setColors":

@@ -527,7 +527,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "turnFaceUp":
       requireNoPending(s);
-      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs, action.form, action.attach);
+      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs, action.form, action.attach, action.copy);
       break;
     case "suspend":
       requireNoPending(s);
@@ -2129,9 +2129,11 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     let key = copyKey(s, defOf(s, target), exceptNow);
     if (own.tapped) opts = { ...opts, tapped: true };
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
+    // Vesuvan Shapeshifter (round 446): "until this creature is turned face down" (run-permanents.ts turnFaceDown).
+    else if (own.untilFaceDown) addCopyEffect(s, o, key, "faceDown");
     else o.copyOf = key;
     // Moritte of the Frost: "if it's a creature, it ... has changeling": a creature as it enters, as this copy (rulings).
-    if (keywordsIfCreature?.length && !own.untilEndOfTurn) {
+    if (keywordsIfCreature?.length && !own.untilEndOfTurn && !own.untilFaceDown) {
       invalidateCharacteristics(s);
       if (objIsType(s, o, "Creature")) o.copyOf = key = copyKey(s, defOf(s, target), { ...exceptNow, keywords: [...(exceptNow.keywords ?? []), ...keywordsIfCreature] });
     }
@@ -14074,6 +14076,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "faceUpCopy") {
+    // Vesuvan Shapeshifter turned face up by an effect (round 446): the creature it becomes a copy of, then the effect goes on.
+    if (!pend.about || !r || !pend.options.includes(choice)) throw new RulesError("choose a creature for it to copy, or none");
+    ((r.scratch ??= {}).faceUpCopy ??= {})[pend.about] = choice;
+    log(s, choice === "none" ? `${p.name} chooses no creature for ${pend.source} to copy.` : `${p.name} chooses ${nameOf(s, choice)} for ${pend.source} to copy.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "faceUpAttach") {
     // Gift of Doom turned face up by an effect: the creature it's attached to as it's turned face up, then the effect goes on.
     if (!pend.about || !r || !pend.options.includes(choice)) throw new RulesError("choose a creature to attach it to, or none");
@@ -14648,11 +14658,20 @@ function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId | ObjectId[
  * (rulings).
  */
 export function askAttachColor(s: GameState, o: GameObject): void {
-  if (o.zone !== "battlefield" || !o.attachedTo || !compileCard(defOf(s, o)).attachChooseColor) return;
+  if (o.zone !== "battlefield" || !o.attachedTo) return;
+  const cc = compileCard(defOf(s, o));
+  if (!cc.attachChooseColor && !cc.attachChooseNameAndType) return;
   const host = s.objects[o.attachedTo];
   if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature")) return;
-  if (s.entersChoices?.some((c) => c.id === o.id && c.what === "color")) return;
-  (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "color" });
+  if (cc.attachChooseColor) {
+    if (s.entersChoices?.some((c) => c.id === o.id && c.what === "color")) return;
+    (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "color" });
+    return;
+  }
+  // Psychic Paper (round 446): "choose a creature card name and a creature type", the name first, as its text has them;
+  // both made as it becomes attached, as an "as ~ enters" choice is (CR 614.12), so its name and type change at once.
+  if (s.entersChoices?.some((c) => c.id === o.id && (c.what === "cardName" || c.what === "creatureType"))) return;
+  (s.entersChoices ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, what: "cardName", names: cc.attachChooseNameAndType!.names, purpose: "disguise" }, { id: o.id, zc: o.zoneChanges ?? 0, what: "creatureType" });
 }
 
 /**
@@ -15051,7 +15070,7 @@ function askEntersChoice(s: GameState): boolean {
         s.pending = { kind: "chooseOption", player: pairBy, source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}: spells with it can't be cast and lands with it can't be played${first ? ` (${player(s, pairBy === you ? opp! : you).name} chose ${first})` : ""}`, purpose: "deny" };
         return true;
       }
-      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: c.opponentHands ? "choose the name of a nonland card your opponents revealed: they can't cast spells with that name" : `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: c.opponentHands ? "choose the name of a nonland card your opponents revealed: they can't cast spells with that name" : c.purpose === "disguise" ? `choose a ${c.names?.text ?? "card"} name: the name ${nameOf(s, o.attachedTo ?? o.id)} has while equipped` : `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
     if (c.what === "form") {
@@ -18869,7 +18888,7 @@ export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s
 /** A morph or disguise cost with its {X} as the X chosen (CR 107.3d): "{X}{3}{W}" with X 2 is "{2}{3}{W}". */
 export const faceUpManaCost = (cost: string, x = 0) => cost.replace(/\{X\}/g, x ? `{${x}}` : "") || "{0}";
 
-function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number, attach?: ObjectId | "none") {
+function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices, form?: number, attach?: ObjectId | "none", copy?: ObjectId | "none") {
   const problem = turnFaceUpProblem(s, p.id, id, way, x, costs);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
@@ -18879,6 +18898,9 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   // Gift of Doom: the creature it's attached to, chosen with the special action (rulings: nothing happens in between); not
   // one sacrificed to pay for it.
   if (faceUpAttaches(s, o) && (attach === undefined || (attach !== "none" && !faceUpAttachOptions(s, o, costs?.sacrifice).includes(attach)))) throw new RulesError(`choose a creature to attach ${defOf(s, { ...o, faceDown: undefined }).name} to as it's turned face up, or none`);
+  // Vesuvan Shapeshifter: the creature it becomes a copy of, chosen with the special action (CR 702.37e, 614.1e), not one
+  // sacrificed to pay for it.
+  if (faceUpCopies(s, o) && (copy === undefined || (copy !== "none" && !faceUpCopyOptions(s, o, costs?.sacrifice).includes(copy)))) throw new RulesError(`choose a creature for ${defOf(s, { ...o, faceDown: undefined }).name} to copy as it's turned face up, or none`);
   const fd = faceUpWays(s, o)[way]!;
   // What pays it is chosen as it's paid (as for abilities, activateAbility): no skipping a cost by not saying.
   if (fd.costs?.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError("choose what to pay its morph cost with");
@@ -18887,8 +18909,43 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
   // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
   if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), { ability: o, faceUp: fd.kind });
-  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id, forms ? form : undefined, attach);
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id, forms ? form : undefined, attach, copy);
   s.passedInSuccession = [];
+}
+
+/** Vesuvan Shapeshifter (EntersAsCopy.faceUp, round 446): a face-down permanent that may become a copy of a creature as it's turned face up. */
+export function faceUpCopies(s: GameState, o: GameObject): boolean {
+  return !!o.faceDown && !!compileCard(defOf(s, { ...o, faceDown: undefined })).entersAsCopy?.faceUp;
+}
+
+/**
+ * Vesuvan Shapeshifter: "another creature on the battlefield" it could become a copy of as it's turned face up, anyone's,
+ * as the creatures are then (it's on the battlefield already, so not itself); not any of `without` (sacrificed to pay its
+ * morph cost).
+ */
+export function faceUpCopyOptions(s: GameState, o: GameObject, without: readonly ObjectId[] = []): ObjectId[] {
+  if (!faceUpCopies(s, o)) return [];
+  const own = compileCard(defOf(s, { ...o, faceDown: undefined })).entersAsCopy!;
+  return copyCandidates(s, o, own.filter).filter((id) => !without.includes(id));
+}
+
+/**
+ * Vesuvan Shapeshifter (round 446): as it's turned face up, it becomes a copy of `target` until it's turned face down, with
+ * the exceptions its own text gives (CR 707.9b), a copy effect with this timestamp (CR 613.7e); the copied creature's "as ~
+ * is turned face up" abilities then apply and its "when ~ is turned face up" ones trigger, not its "as ~ enters" ones
+ * (rulings).
+ */
+function faceUpCopy(s: GameState, o: GameObject, targetId: ObjectId) {
+  const own = compileCard(defOf(s, o)).entersAsCopy;
+  const target = s.objects[targetId];
+  if (!own?.faceUp || !target || target.zone !== "battlefield" || !objIsType(s, target, "Creature")) {
+    log(s, `${defOf(s, o).name} doesn't become a copy of anything.`);
+    return;
+  }
+  const { keywordsIfCreature: _, ...exceptNow } = exceptFor(s, o, own.except, realDefOf(s, o).name) ?? {};
+  const name = defOf(s, target).name;
+  addCopyEffect(s, o, copyKey(s, defOf(s, target), exceptNow), own.untilFaceDown ? "faceDown" : undefined);
+  log(s, `${realDefOf(s, o).name} becomes a copy of ${name}${own.untilFaceDown ? " until it's turned face down" : ""}.`);
 }
 
 /** Gift of Doom (CompiledCard.faceUpAttach): a face-down permanent that may be attached to a creature as it's turned face up. */
@@ -18924,7 +18981,7 @@ export function faceUpFormsOf(s: GameState, o: GameObject): CompiledCard["enters
  * Turns a face-down permanent face up. Its copiable values go back to the card's, or what a copy effect made it (CR
  * 708.8, 707.3); it's the same permanent, so nothing "enters". `megamorph`: its megamorph cost was paid (CR 702.37b).
  */
-function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number, attach?: ObjectId | "none") {
+function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number, attach?: ObjectId | "none", copy?: ObjectId | "none") {
   const forms = faceUpFormsOf(s, o);
   o.faceDown = undefined;
   o.turnedFaceUpTurn = s.turn;
@@ -18937,8 +18994,13 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
   if (forms && !chosenForm) throw new RulesError("choose what it becomes as it's turned face up");
   if (chosenForm) addCopyEffect(s, o, copyKey(s, copiableDef(s, o), chosenForm.except));
   invalidateCharacteristics(s);
-  const d = defOf(s, o);
   log(s, chosenForm ? `${text} It becomes ${chosenForm.text}.` : text);
+  // Vesuvan Shapeshifter (round 446): the copy chosen with turning it face up, part of it (CR 614.1e), before anything else.
+  if (copy !== undefined && copy !== "none" && compileCard(defOf(s, o)).entersAsCopy?.faceUp) {
+    faceUpCopy(s, o, copy);
+    invalidateCharacteristics(s);
+  }
+  const d = defOf(s, o);
   // Gift of Doom: attached as it's turned face up (CR 702.37e), to a creature it can enchant now, before anything else. Not
   // attached, the Aura is put into its owner's graveyard by state-based actions (CR 704.5m; rulings).
   if (compileCard(d).faceUpAttach) {
@@ -18960,7 +19022,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
  * (Unable to Scream); a manifested or cloaked instant or sorcery card is revealed and stays face down, and nothing
  * triggers (CR 701.40g, 701.58g). Whether it turned face up.
  */
-export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId, form?: number, attach?: ObjectId | "none"): boolean {
+export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId, form?: number, attach?: ObjectId | "none", copy?: ObjectId | "none"): boolean {
   if (o.zone !== "battlefield" || !o.faceDown) return false;
   if (characteristics(s, o).cantTurnFaceUp) {
     log(s, `${src}: that face-down permanent can't be turned face up.`);
@@ -18972,7 +19034,7 @@ export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?
     log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
     return false;
   }
-  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by, form, attach);
+  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by, form, attach, copy);
   return true;
 }
 

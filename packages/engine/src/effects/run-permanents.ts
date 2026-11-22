@@ -1,7 +1,8 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, opponentForbidsDiscard, realDefOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, faceUpAttaches, faceUpAttachOptions, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
+import { askAttachColor, seatOrder, turnFaceUpByEffect, faceUpFormsOf, faceUpAttaches, faceUpAttachOptions, faceUpCopies, faceUpCopyOptions, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, inCombatPhase, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds, isEnchanted } from "../game";
 import { nextRandom } from "../rng";
+import { restoreChosenType } from "../copies";
 import { characteristics, controllerOf, attachableBy, invalidateCharacteristics } from "../layers";
 import { controlGainable } from "../guardian";
 import { countersRemoved, countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withModular, withPutter } from "../counters";
@@ -85,6 +86,13 @@ export function turnFaceDown(s: GameState, o: GameObject, as: "cyberman" | "morp
   }
   o.faceDown = as;
   o.timestamp = s.nextTimestamp++;
+  // Vesuvan Shapeshifter (round 446): its copy effect "until this creature is turned face down" ends now (CR 611.2a), so
+  // turned face up again it's its own card, with that card's morph (rulings).
+  if (o.copyEffects?.some((c) => c.until === "faceDown")) {
+    o.copyEffects = o.copyEffects.filter((c) => c.until !== "faceDown");
+    if (!o.copyEffects.length) o.copyEffects = undefined;
+    restoreChosenType(o);
+  }
   invalidateCharacteristics(s);
   log(s, `${src} turns ${name} face down: it's a 2/2 ${as === "cyberman" ? "Cyberman artifact " : as === "horror" ? "Horror " : ""}creature.`);
 }
@@ -369,6 +377,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: name, what: "faceUpAttach", about: o.id, options: [...hosts, "none"], labels: [...hosts.map((id) => `Attach it to ${defOf(s, obj(s, id)).name}`), "Don't attach it (it's put into its owner's graveyard)"], prompt: `choose a creature to attach ${name} to as it's turned face up` };
           return "paused";
         }
+      // Vesuvan Shapeshifter (round 446): the creature it becomes a copy of as it's turned face up, chosen by its controller,
+      // asked the same way (CR 614.1e: nothing happens in between).
+      const copying = e.revealOnly || !s.resolving ? undefined : (s.resolving.scratch?.faceUpCopy ?? {});
+      if (copying)
+        for (const o of objects(s, e.what, ctx)) {
+          if (o.zone !== "battlefield" || characteristics(s, o).cantTurnFaceUp || (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) || !faceUpCopies(s, o) || copying[o.id] !== undefined) continue;
+          const name = defOf(s, { ...o, faceDown: undefined }).name;
+          const options = faceUpCopyOptions(s, o);
+          s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: name, what: "faceUpCopy", about: o.id, options: [...options, "none"], labels: [...options.map((id) => `Copy ${defOf(s, obj(s, id)).name}`), "Don't copy"], prompt: `you may choose another creature for ${name} to become a copy of as it's turned face up` };
+          return "paused";
+        }
       // Etrata, Deadly Fugitive (round 443): "If you can't, ..." follows: whether any of them turned face up.
       if (e.setDid && s.resolving) s.resolving.did = false;
       for (const o of objects(s, e.what, ctx)) {
@@ -379,7 +398,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           continue;
         }
         if (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) continue;
-        const up = turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id], attaching?.[o.id]);
+        const up = turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id], attaching?.[o.id], copying?.[o.id]);
         if (up && e.setDid && s.resolving) s.resolving.did = true;
       }
       return;

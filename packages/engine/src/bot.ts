@@ -7,6 +7,7 @@ import { couldBeBlockedByAll, couldBlockAll } from "./effects/run-laneb258";
 import { NONBASIC_LAND_TYPE_LIST } from "./effects/run-round435";
 import { allEffects, NON_AURA_ENCHANTMENT, refCovers, timedCondition, type AbilityBody, type StaticCondition, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
+import { copiableDef } from "./copies";
 import { chooseVote } from "./bot-votes";
 import { mayPayUse } from "./spend";
 import { payableShields, payShieldHolder } from "./pay-shields";
@@ -39,6 +40,8 @@ import {
   faceUpFormsOf,
   faceUpAttaches,
   faceUpAttachOptions,
+  faceUpCopies,
+  faceUpCopyOptions,
   faceUpManaCost,
   dredgeAmount,
   assistedRemaining,
@@ -355,6 +358,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Zur's Weirding (round B237): 2 life to keep an opponent from drawing a nonland card, while our life stays well above it.
+    // Vesuvan Shapeshifter's "At the beginning of your upkeep, you may turn ~ face down" (round 446): bots keep the copy (a
+    // face-down 2/2 is worth less, and turning it face up again costs its morph).
+    const faceDownMay = pend.kind === "chooseMay" && s.resolving ? s.resolving.body.effects[s.resolving.next] : undefined;
+    if (pend.kind === "chooseMay" && faceDownMay?.type === "may" && faceDownMay.effects.length === 1 && faceDownMay.effects[0]!.type === "turnFaceDown" && faceDownMay.effects[0]!.what.ref === "self") return [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "chooseMay" && pend.weirding) return [{ type: "chooseMay", player: pid, yes: pend.card !== undefined && !objIsType(s, obj(s, pend.card), "Land") && player(s, pid).life >= 12 }];
     // Breathstealer's Crypt (round B289): 3 life to keep a creature card costing 3 or more, while 10 life or more is left.
     // God-Eternal Kefnet (round B291): revealing only offers a copy to cast, which is decided as the trigger resolves.
@@ -1624,6 +1631,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // always take the card.
     if (pend.kind === "chooseOption" && pend.what === "reblockAttacker") return [{ type: "chooseOption", player: pid, choice: botReblock(s, pid, pend.about, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "cityCard") return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => o !== "none") ?? "none" }];
+    // Vesuvan Shapeshifter turned face up by an effect (round 446): the creature worth the most to copy, else none.
+    if (pend.kind === "chooseOption" && pend.what === "faceUpCopy") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const pick = o ? botFaceUpCopy(s, pid, o) : undefined;
+      return [{ type: "chooseOption", player: pid, choice: pick && pend.options.includes(pick) ? pick : "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "faceUpAttach") {
       const mine = pend.options.filter((id) => id !== "none" && controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
       return [{ type: "chooseOption", player: pid, choice: mine[0] ?? "none" }];
@@ -2769,7 +2782,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         // Gift of Doom: only with a creature of ours to attach it to.
         const attach = botFaceUpAttach(s, pid, o, costs?.sacrifice);
         if (attach === null) continue;
-        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs, botFaceUpForm(s, o), attach);
+        // Vesuvan Shapeshifter (round 446): only with a creature worth copying (it's a 0/0 itself).
+        const copy = botFaceUpCopy(s, pid, o, costs?.sacrifice);
+        if (copy === null) continue;
+        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs, botFaceUpForm(s, o), attach, copy);
         if (plan) return plan;
       }
     }
@@ -3083,6 +3099,25 @@ function botFormIndex(labels: string[]): number {
 
 /** Aquamorph Entity: the form it's turned face up as (CompiledCard.faceUpForms), undefined for the rest. */
 /**
+ * Vesuvan Shapeshifter (round 446): the creature on the battlefield worth the most to become a copy of as it's turned face
+ * up, anyone's, not a legend whose name we already have (the legend rule) nor one sacrificed to pay for it; undefined for a
+ * permanent with no such choice, null when there's none worth it (it's a 0/0 itself).
+ */
+function botFaceUpCopy(s: GameState, pid: PlayerId, o: GameObject, sacrificed: readonly ObjectId[] = []): ObjectId | undefined | null {
+  if (!faceUpCopies(s, o)) return undefined;
+  const ours = new Set(s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid).map((id) => characteristics(s, obj(s, id)).name));
+  const options = faceUpCopyOptions(s, o, sacrificed).filter((id) => !(characteristics(s, obj(s, id)).supertypes.includes("Legendary") && ours.has(characteristics(s, obj(s, id)).name)));
+  const ranked = options.map((id) => ({ id, v: copyWorth(s, pid, obj(s, id)) })).sort((a, b) => b.v - a.v);
+  return ranked[0] && ranked[0].v > 0 ? ranked[0].id : null;
+}
+
+/** What a copy of `o` is worth to `pid`: its worth as if it were ours (its copiable power and toughness and abilities). */
+function copyWorth(s: GameState, pid: PlayerId, o: GameObject): number {
+  const d = copiableDef(s, o);
+  return Math.max(0, Number(d.power ?? 0)) + Math.max(0, Number(d.toughness ?? 0)) + compileCard(d).triggers.length + compileCard(d).activated.length + compileCard(d).statics.length + d.keywords.length;
+}
+
+/**
  * Gift of Doom (round B255): the creature of ours worth the most to attach it to as it's turned face up (deathtouch and
  * indestructible), not one sacrificed to pay for it; undefined for a permanent with no such choice, null when there's none.
  */
@@ -3113,7 +3148,7 @@ function faceUpX(s: GameState, pid: PlayerId, o: GameObject, way: number): numbe
   // counts. What leaves the battlefield is scored by its worth now (Bane's face up): an opponent's for us, ours 1.5 times against.
   const before = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") || id === o.id).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0, v: (controllerOf(s, obj(s, id)) === pid ? -1.5 : 1) * (id === o.id ? Math.max(1, Number(card.power ?? 0) + Number(card.toughness ?? 0)) + 1 : worth(s, pid, obj(s, id))) }));
   const score = (x: number): number | null => {
-    const plan = planTurnFaceUp(s, pid, o.id, way, x, undefined, botFaceUpForm(s, o), botFaceUpAttach(s, pid, o) ?? "none");
+    const plan = planTurnFaceUp(s, pid, o.id, way, x, undefined, botFaceUpForm(s, o), botFaceUpAttach(s, pid, o) ?? "none", botFaceUpCopy(s, pid, o) ?? "none");
     if (!plan) return null;
     const u = cloneState(s);
     try {
@@ -5229,7 +5264,7 @@ function chooseSilencerFaceUp(s: GameState, pid: PlayerId): Action[] | null {
     const ways = faceUpWays(s, o);
     for (let i = 0; i < ways.length; i++) {
       if (ways[i]!.costs) continue;
-      const plan = planTurnFaceUp(s, pid, id, i, faceUpX(s, pid, o, i), undefined, botFaceUpForm(s, o), botFaceUpAttach(s, pid, o) ?? "none");
+      const plan = planTurnFaceUp(s, pid, id, i, faceUpX(s, pid, o, i), undefined, botFaceUpForm(s, o), botFaceUpAttach(s, pid, o) ?? "none", botFaceUpCopy(s, pid, o) ?? "none");
       if (plan) return plan;
     }
   }
@@ -7436,6 +7471,15 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
   if (pend.purpose === "guessHand") return most(tally(me.hand)) ?? pend.options[0]!;
   // Sphinx Ambassador (round 377): the creature card in our own library someone else would most like to take from it.
   if (pend.purpose === "guardLibrary") return ambassadorRanked(s, me.library)[0]?.name ?? pend.options[0]!;
+  // Psychic Paper (round 446): the equipped creature keeps its own name, so the legend rule and "named" effects don't change
+  // for it; else a name no permanent has.
+  if (pend.purpose === "disguise") {
+    const host = pend.objectId ? s.objects[s.objects[pend.objectId]?.attachedTo ?? ""] : undefined;
+    const own = host ? characteristics(s, host).name : undefined;
+    if (own !== undefined && options.has(own)) return own;
+    const taken = new Set(s.battlefield.map((id) => characteristics(s, obj(s, id)).name));
+    return pend.options.find((n) => !taken.has(n)) ?? pend.options[0]!;
+  }
   // Mindblaze: a card in that library. Ours we know; another player's, a card of theirs not yet seen anywhere (one they
   // have shown is out of their library in a singleton deck) is all there is to go on.
   if (pend.purpose === "inLibrary") {

@@ -42,6 +42,8 @@ import {
   faceUpFormsOf,
   faceUpAttaches,
   faceUpAttachOptions,
+  faceUpCopies,
+  faceUpCopyOptions,
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
@@ -531,7 +533,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 const addedWhat = (c: AdditionalCost): string => (c.kind !== "sacrifice" ? "" : c.oneOfEach ? `a ${c.filter.text}` : c.n === 1 ? `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}` : `${c.n} ${c.filter.text}`);
 
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined; ignore?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[]; instead?: ManaType; combo?: number; /** Springleaf Drum's pick, made before Brutal Suppression's or Drought's sacrifice. */ tap?: string[] }; draft?: undefined; activate?: undefined; faceUp?: undefined; ignore?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined; ignore?: undefined } | { /** Paying to ignore this permanent's effect this turn (CR 116.2d): Volrath's Curse, Lost in Thought. */ ignore: string; draft?: undefined; activate?: undefined; mana?: undefined; faceUp?: undefined }) & {
-  kind: "sacrifice" | /** Round B260: what Brutal Suppression and Drought add to a cost. */ "addedSacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell" | /** Gift of Doom: the creature it's attached to as it's turned face up (round B255). */ "attachFaceUp";
+  kind: "sacrifice" | /** Round B260: what Brutal Suppression and Drought add to a cost. */ "addedSacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft" | "counterOn" | "exileSpell" | /** Gift of Doom: the creature it's attached to as it's turned face up (round B255). */ "attachFaceUp" | /** Vesuvan Shapeshifter: the creature it becomes a copy of as it's turned face up (round 446). */ "copyFaceUp";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
@@ -570,7 +572,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; fac
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
 /** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
-type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[]; /** Gift of Doom (round B255): the creature it's attached to as it's turned face up, or "none". */ attach?: string };
+type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[]; /** Gift of Doom (round B255): the creature it's attached to as it's turned face up, or "none". */ attach?: string ; /** Vesuvan Shapeshifter (round 446): the creature it becomes a copy of as it's turned face up, or "none". */ copy?: string };
 type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; addedSacrifice?: string[]; discard?: string[]; reveal?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; counterOn?: string[]; exileSpell?: string[]; xOpponent?: PlayerId; /** Lodestone Bauble (round 417): the player chosen as it's activated with no target. */ yardPlayer?: PlayerId; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[]; instead?: ManaType };
 
@@ -1085,8 +1087,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const o = s.objects[d.objectId]!;
     if (faceUpAttaches(s, o) && d.attach === undefined)
       return setCostPick({ faceUp: d, kind: "attachFaceUp", label, what: "attach it to a creature, or don't (it's then put into your graveyard)", n: 1, candidates: faceUpAttachOptions(s, o, d.sacrifice ?? []), chosen: [] });
+    // Vesuvan Shapeshifter (round 446): "As ~ is turned face up, you may choose another creature on the battlefield", chosen
+    // with the special action.
+    if (faceUpCopies(s, o) && d.copy === undefined)
+      return setCostPick({ faceUp: d, kind: "copyFaceUp", label, what: "choose another creature for it to become a copy of, or don't (it's then a 0/0)", n: 1, candidates: faceUpCopyOptions(s, o, d.sacrifice ?? []), chosen: [] });
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}) };
-    dispatch(planTurnFaceUp(s, HUMAN, d.objectId, d.way, 0, costs, undefined, d.attach) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: d.objectId, ...(d.way ? { way: d.way } : {}), costs, ...(d.attach ? { attach: d.attach } : {}) }]);
+    dispatch(planTurnFaceUp(s, HUMAN, d.objectId, d.way, 0, costs, undefined, d.attach, d.copy) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: d.objectId, ...(d.way ? { way: d.way } : {}), costs, ...(d.attach ? { attach: d.attach } : {}), ...(d.copy ? { copy: d.copy } : {}) }]);
   }
 
   /**
@@ -1123,6 +1129,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pick.faceUp && pick.kind === "attachFaceUp") continueFaceUp({ ...pick.faceUp, attach: pick.chosen[0] ?? "none" });
+    else if (pick.faceUp && pick.kind === "copyFaceUp") continueFaceUp({ ...pick.faceUp, copy: pick.chosen[0] ?? "none" });
     else if (pick.faceUp) continueFaceUp({ ...pick.faceUp, [pick.kind]: pick.chosen });
     else if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
     else if (pick.setsX && s) continueCast({ ...pick.draft, [pick.kind]: pick.chosen, x: manaValue(parseManaCost(cardOf(s, pick.chosen[0]!).manaCost)) });
@@ -2084,7 +2091,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   const max = maxX((n) => planTurnFaceUp(s, HUMAN, menu, way, n));
                   return setXPick({ mode: "faceUp", objectId: menu, way, label: `Turn face up (${up.kind})`, cost: up.cost, max, value: max });
                 }
-                if (up?.costs) return continueFaceUp({ objectId: menu, way });
+                if (up?.costs || faceUpCopies(s, s.objects[menu]!)) return continueFaceUp({ objectId: menu, way });
                 dispatch(planTurnFaceUp(s, HUMAN, menu, way, 0, undefined, form) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}), ...(form !== undefined ? { form } : {}) }]);
               }}
               onClose={() => setMenu(null)}
@@ -2331,13 +2338,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "attachFaceUp" || costPick.kind === "sacrifice" || costPick.kind === "addedSacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
+          {costPick && (costPick.kind === "attachFaceUp" || costPick.kind === "copyFaceUp" || costPick.kind === "sacrifice" || costPick.kind === "addedSacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire" || costPick.kind === "counterOn") && (
             <CostPickBar
               pick={costPick}
               valid={(!costPick.share || costChoiceShares(s, costPick.share, costPick.chosen)) && (!costPick.each || fitsEach(s, HUMAN, costPick.each, costPick.chosen))}
               costPickMv={(id) => characteristics(s, s.objects[id]!).manaValue}
               onDone={() => finishCostPick(costPick)}
-              onSkip={costPick.kind === "attachFaceUp" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
+              onSkip={costPick.kind === "attachFaceUp" || costPick.kind === "copyFaceUp" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -2406,7 +2413,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSkip={() => dispatch([{ type: "collectEvidence", player: HUMAN, ids: [] }])}
             />
           )}
-          {costPick && costPick.kind !== "attachFaceUp" && costPick.kind !== "sacrifice" && costPick.kind !== "addedSacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && costPick.kind !== "counterOn" && (
+          {costPick && costPick.kind !== "attachFaceUp" && costPick.kind !== "copyFaceUp" && costPick.kind !== "sacrifice" && costPick.kind !== "addedSacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && costPick.kind !== "counterOn" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -3040,9 +3047,9 @@ function CostPickBar({ pick, valid = true, costPickMv = () => 0, onDone, onSkip,
       </span>
       {pick.totalMv !== undefined && <span> total mana value {pick.chosen.reduce((n, id) => n + costPickMv(id), 0)} of {pick.totalMv}</span>}
       <button disabled={(pick.totalMv !== undefined ? !pick.chosen.length || pick.chosen.reduce((n, id) => n + costPickMv(id), 0) !== pick.totalMv : pick.chosen.length !== pick.n) || !valid} onClick={onDone}>
-        {pick.kind === "attachFaceUp" ? "Attach and turn face up" : pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : pick.mana ? "Sacrifice for mana" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "attachFaceUp" ? "Attach and turn face up" : pick.kind === "copyFaceUp" ? "Copy and turn face up" : pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.ignore ? "Sacrifice" : pick.mana ? "Sacrifice for mana" : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
-      {onSkip && <button onClick={onSkip}>{pick.kind === "attachFaceUp" ? "Turn face up without attaching" : "Cast without"}</button>}
+      {onSkip && <button onClick={onSkip}>{pick.kind === "attachFaceUp" ? "Turn face up without attaching" : pick.kind === "copyFaceUp" ? "Turn face up without copying" : "Cast without"}</button>}
       <button className="ghost" onClick={onCancel}>
         Cancel
       </button>
@@ -3743,7 +3750,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
-            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : copyEnds && "untilLeaves" in copyEnds ? ` until ${s.objects[copyEnds.untilLeaves.id] ? characteristics(s, s.objects[copyEnds.untilLeaves.id]!).name : "its Aura"} leaves the battlefield` : ""}.`}
+            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds === "faceDown" ? " until it's turned face down" : copyEnds && "turnOf" in copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : copyEnds && "whileTapped" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileTapped.id] ? characteristics(s, s.objects[copyEnds.whileTapped.id]!).name : "that creature"} remains tapped` : copyEnds && "whileAttached" in copyEnds ? ` for as long as ${s.objects[copyEnds.whileAttached.id] ? characteristics(s, s.objects[copyEnds.whileAttached.id]!).name : "its Equipment"} remains attached to it` : copyEnds && "untilLeaves" in copyEnds ? ` until ${s.objects[copyEnds.untilLeaves.id] ? characteristics(s, s.objects[copyEnds.untilLeaves.id]!).name : "its Aura"} leaves the battlefield` : ""}.`}
           >
             Copy
           </span>
@@ -5991,7 +5998,7 @@ function Controls({
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
   // the legend rule's "keep which one?" (CR 704.5j); Gilgamesh's "attach one of them": hovering shows each card.
-  if (pending?.kind === "chooseOption" && (pending.what === "reblockAttacker" || pending.what === "cityCard" || pending.what === "faceUpAttach" || pending.what === "castFromHand" || pending.what === "lookedCard" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "auraForToken" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "reblockAttacker" || pending.what === "cityCard" || pending.what === "faceUpAttach" || pending.what === "faceUpCopy" || pending.what === "castFromHand" || pending.what === "lookedCard" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "auraForToken" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

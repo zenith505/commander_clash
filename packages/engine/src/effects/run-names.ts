@@ -265,7 +265,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       // Venture Forth: the cards are exiled one at a time until a land card is (CR 406.3), then go on from exile.
       if (e.exile) for (const id of seen) moveObject(s, id, "exile");
-      for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in the library.`);
+      // Auspicious Starrix (round 442): one exiled this way stays in exile.
+      for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in ${e.exile ? "exile" : "the library"}.`);
       // Several found for the battlefield enter at the same time (Open the Way, Kindred Summons).
       if (found === "graveyard") {
         // Old Stickfingers: all of them at once (CR 608.2c).
@@ -323,7 +324,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (e.rest === "graveyard") {
         for (const id of rest) moveObject(s, id, "graveyard");
         if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} into their graveyard.`);
-      } else for (const id of rest) moveObject(s, id, "exile");
+      } else for (const id of rest) if (obj(s, id).zone !== "exile") moveObject(s, id, "exile"); // Auspicious Starrix: already exiled
       if (e.lifePerRest && rest.length) {
         loseLife(s, p.id, rest.length);
         log(s, `${p.name} loses ${rest.length} life.`);

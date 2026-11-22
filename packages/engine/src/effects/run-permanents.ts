@@ -369,6 +369,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: name, what: "faceUpAttach", about: o.id, options: [...hosts, "none"], labels: [...hosts.map((id) => `Attach it to ${defOf(s, obj(s, id)).name}`), "Don't attach it (it's put into its owner's graveyard)"], prompt: `choose a creature to attach ${name} to as it's turned face up` };
           return "paused";
         }
+      // Etrata, Deadly Fugitive (round 443): "If you can't, ..." follows: whether any of them turned face up.
+      if (e.setDid && s.resolving) s.resolving.did = false;
       for (const o of objects(s, e.what, ctx)) {
         // Hauntwoods Shrieker: reveal it (CR 701.20a), then turn it face up only if the card is a creature card as printed
         // (rulings: effects on the permanent don't count; a double-faced card's front face).
@@ -377,7 +379,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           continue;
         }
         if (e.ifCreatureCard && !isType(realDefOf(s, o), "Creature")) continue;
-        turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id], attaching?.[o.id]);
+        const up = turnFaceUpByEffect(s, o, src, ctx.controller, forms?.[o.id], attaching?.[o.id]);
+        if (up && e.setDid && s.resolving) s.resolving.did = true;
       }
       return;
     }
@@ -2787,8 +2790,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
  * it has reconfigure (CR 301.5c); an Aura to what its enchant ability allows (CR 303.4d, 702.5d); neither to something
  * with protection from it (CR 702.16c-d).
  */
-export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId, asCreature?: boolean): boolean {
-  if (me.zone !== "battlefield") return false;
+export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId, asCreature?: boolean, /** Arna Kennerüd (round 442): `me` is a token about to enter attached to `host` (CR 301.5e). */ entering?: boolean): boolean {
+  if (me.zone !== "battlefield" && !entering) return false;
   const meChars = characteristics(s, me);
   const aura = meChars.subtypes.includes("Aura");
   // A Fortification is to lands what an Equipment is to creatures (CR 301.6): only to a land, and not while it's a

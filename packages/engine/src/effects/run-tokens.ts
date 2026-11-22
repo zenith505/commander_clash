@@ -8,6 +8,7 @@ import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault, fireEvent } from "./triggers";
 import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
+import { canAttachTo } from "./run-permanents";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { objectMatches } from "./targeting";
 import { defMv } from "../faces";
@@ -23,13 +24,14 @@ export function tokenCopyBatch(s: GameState, pid: PlayerId, base: CardDef): numb
   return tokenBatch(s, pid, s.cards[tokenCopyKey(s, base).key]!, 1, true).same;
 }
 
-export function tokenCopies(s: GameState, pid0: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true; /** Mirror Match: "that's blocking that creature": each one a creature enters blocking it (createToken's `blocking`). */ blocking?: GameObject } = {}) {
+export function tokenCopies(s: GameState, pid0: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true; /** Mirror Match: "that's blocking that creature": each one a creature enters blocking it (createToken's `blocking`). */ blocking?: GameObject; /** Arna Kennerüd (round 442): a copy that isn't an Aura, entering attached to this permanent if it could be attached to it (an Equipment or Fortification, CR 301.5e, 301.6), else unattached (CR 303.4h). */ attachTo?: ObjectId } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
   // Crafty Cutpurse: maybe another player creates them (tokenBatch's pid, CR 616.1b).
   const { pid, same: k, extra } = tokenBatch(s, pid0, s.cards[key]!, n);
   const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
   let made = 0;
+  let attachedNow = 0;
   enterTogether(s, () => {
     for (let i = 0; i < k; i++) {
       const o = newObject(s, s.cards[key]!, pid, "exile");
@@ -44,7 +46,11 @@ export function tokenCopies(s: GameState, pid0: PlayerId, base: CardDef, n: numb
       }
       // "Except it enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
       const counters = copyEnterCounters(opts.except, (type) => isType(s.cards[key]!, type));
-      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(host ?? {}) });
+      // Arna Kennerüd: an Equipment (or Fortification) copy enters attached only to a permanent it could be attached to (CR 301.5e).
+      const onto = opts.attachTo !== undefined ? s.objects[opts.attachTo] : undefined;
+      const attach = onto && canAttachTo(s, o, onto, false, true) ? { attachTo: onto.id } : undefined;
+      if (attach) attachedNow++;
+      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(host ?? {}), ...attach });
       // Worms of the Earth (round B258): a copy of a land that can't enter isn't created (CR 111.5).
       if (!s.objects[o.id]) continue;
       made++;
@@ -66,7 +72,7 @@ export function tokenCopies(s: GameState, pid0: PlayerId, base: CardDef, n: numb
     }
     createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender, ...(opts.blocking ? { blocking: opts.blocking } : {}) }, opts.attackAt?.slice(k));
   });
-  if (made) log(s, `${player(s, pid).name} creates ${made === 1 ? "a token that's a copy" : `${made} tokens that are copies`} of ${base.name}${opts.auraHost ? ` attached to ${auraHostName(s, opts.auraHost)}` : ""}.`);
+  if (made) log(s, `${player(s, pid).name} creates ${made === 1 ? "a token that's a copy" : `${made} tokens that are copies`} of ${base.name}${opts.auraHost ? ` attached to ${auraHostName(s, opts.auraHost)}` : opts.attachTo !== undefined ? (attachedNow ? ` attached to ${nameOf(s, opts.attachTo)}` : ", unattached") : ""}.`);
   else if (k) log(s, `${player(s, pid).name} can't create a token copy of ${base.name}: there's nothing it could enchant.`);
 }
 

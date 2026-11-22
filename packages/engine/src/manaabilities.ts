@@ -156,6 +156,9 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   if (p.kind === "noted") return [o.notedMana ?? "C"];
   // Charmed Pendant: nothing to choose as it's activated (what it adds is known after the mill); "C" names the activation.
   if (p.kind === "milledSymbols") return ["C"];
+  // Cryptic Spires (round 443): the colors circled on it, as its copiable values say (a copy's too, rulings); none on an
+  // object that only gained the ability (CR 607.2).
+  if (p.kind === "circled") return [...(defOf(s, o).circledColors ?? [])];
   return commanderIdentity(s, controllerOf(s, o));
 }
 
@@ -447,6 +450,7 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   if (p.kind === "landsCouldProduce") return Array<ManaType>(p.n ?? 1).fill(choice);
   if (p.kind === "chosenColor") return Array<ManaType>(p.n ?? 1).fill(choice);
   if (p.kind === "commanderIdentity" || p.kind === "colorsAmong") return [choice];
+  if (p.kind === "circled") return (defOf(s, o).circledColors as ManaType[] | undefined)?.includes(choice) ? [choice] : [];
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o, !!p.monocolored, !!p.linked);
   if (p.kind === "devotion") return Array<ManaType>(evalAmount(s, { count: { kind: "devotion", colors: [choice as Color] } }, { controller: controllerOf(s, o), sourceId: o.id })).fill(choice);
   if (!p.count) return p.mana;

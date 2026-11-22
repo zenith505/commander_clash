@@ -434,6 +434,8 @@ function parseManaProduced(text: string): ManaProduce | null {
   const any = new RegExp(`^${NUM} mana of any (?:one )?color$`).exec(text);
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };
+  // Cryptic Spires (round 443): a color circled on it as its deck was built (CR 207.5).
+  if (text === "one mana of either of the circled colors") return { kind: "circled" };
   if (text === "one mana of ~'s last noted type") return { kind: "noted" };
   const could = /^one mana of any (color|type) that a (land|Gate|basic land) (you control|an opponent controls) could produce$/.exec(text);
   if (could) return { kind: "landsCouldProduce", whose: could[3] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}), ...(could[2] === "Gate" ? { subtype: "Gate" } : {}), ...(could[2] === "basic land" ? { basic: true as const } : {}) };

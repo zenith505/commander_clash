@@ -3603,7 +3603,7 @@ export type Effect =
    * card, you may turn it face up": `revealOnly` reveals it (nothing turns), then `ifCreatureCard` turns it only if the card
    * is a creature card as printed (rulings: effects on the permanent don't count).
    */
-  | { type: "turnFaceUp"; what: ObjRef; revealOnly?: true; ifCreatureCard?: true }
+  | { type: "turnFaceUp"; what: ObjRef; revealOnly?: true; ifCreatureCard?: true; /** Etrata, Deadly Fugitive (round 443): "If you can't, ...": ResolvingState.did is whether any of them turned face up. */ setDid?: true }
   /**
    * Turn a permanent face down: Cyber Conversion's "Turn target creature face down. It's a 2/2 Cyberman artifact
    * creature." (CR 708.2, FaceDownKind "cyberman"); Wall of Deceit's "Turn ~ face down": a 2/2 with no text (708.2a, `as` "morph": turned face up again only by a morph
@@ -6287,6 +6287,20 @@ export type Effect =
    */
   | { type: "landTypeCopies"; of: ObjRef }
   /**
+   * Arna Kennerüd, Skycaptain (round 442): "for each nontoken permanent attached to it, create a token that's a copy of
+   * that permanent attached to that creature": `what` as it is now (CR 608.2h), each nontoken permanent attached to it
+   * then, its copiable values (CR 707.2) for a token you create entering attached to it: an Aura token that can't enchant
+   * it isn't created (CR 303.4i), an Equipment or Fortification token that can't be attached to it enters unattached (CR
+   * 301.5e, 301.6), anything else enters unattached (CR 303.4h; rulings).
+   */
+  | { type: "tokenCopiesOfAttached"; what: ObjRef }
+  /**
+   * Etrata, Deadly Fugitive (round 443): "exile it, then you may cast the exiled card without paying its mana cost": the
+   * source, still that object on the battlefield (CR 400.7), is exiled; then its controller may cast that card as this
+   * resolves, timing ignored (CR 608.2g). A token ceases to exist (CR 111.7); a card that can't be cast stays exiled.
+   */
+  | { type: "exileSelfCastFree" }
+  /**
    * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
    * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
    * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).
@@ -8370,6 +8384,12 @@ export type ManaProduce =
   | { kind: "noted"; /** Ice Cauldron (round B285): "Add ~'s last noted type and amount of mana": all of it, each mana as noted (GameObject.notedManaAll). */ all?: true }
   | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
+  /**
+   * Cryptic Spires (round 443): "one mana of either of the circled colors": a color circled on the card as its deck was built
+   * (CR 207.5), read from the permanent's copiable values (its CardDef.circledColors, a copy's too); an object with no
+   * colors circled (one that gained the ability without becoming a copy of the card) adds no mana (CR 607.2, rulings).
+   */
+  | { kind: "circled" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
   | { kind: "chosenColor"; also?: ManaType; /** "Four mana of the chosen color" (Throne of Eldraine): that many. */ n?: number }
   /**
@@ -10402,6 +10422,12 @@ export interface CompiledCard {
    * is a characteristic-defining ability linked to it (CR 604.3, 607.2p): that color in every zone, none without a choice.
    */
   pregameColorIsColor?: true;
+  /**
+   * Cryptic Spires (round 443): "As you create your deck, circle two of the colors below." (CR 207.5): the colors are chosen
+   * as the deck is built, CardDef.circledColors (cards.ts circleColors); a deck needs them for each such card (deck.ts,
+   * createGame).
+   */
+  circleTwoColors?: true;
   /** "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), applied first in layer 4 (613.3). */
   allNonbasicLandTypes?: true;
   /**

@@ -398,9 +398,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // your control (CR 701.40a); its owner is still that player.
   // Thieving Amalgam: "At the beginning of each opponent's upkeep, you manifest the top card of that player's library": the
   // same, that player the one whose upkeep it is.
-  if ((m = /^(?:you )?Manifest the top card of (that player's) library$/i.exec(s))) {
-    const library = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
-    return library && library.ref !== "you" ? [{ type: "dig", n: 1, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, library }] : null;
+  // Etrata, Deadly Fugitive (round 443): "cloak the top card of that player's library", the same, cloaked (CR 701.58a).
+  if ((m = /^(?:you )?(Manifest|Cloak) the top card of (that player's) library$/i.exec(s))) {
+    const library = parsePlayer(m[2]!.replace(/'s$/, ""), ctx);
+    const into = /^cloak$/i.test(m[1]!) ? "cloak" : "manifest";
+    return library && library.ref !== "you" ? [{ type: "dig", n: 1, count: 1, upTo: false, required: true, into, rest: "graveyard", reveal: false, library }] : null;
   }
   // "Up to two target players each manifest two cards from their hands" (Kozilek, the Broken Reality): each chooses that
   // many cards from their hand (all of them with fewer, rulings), and they're put onto the battlefield face down

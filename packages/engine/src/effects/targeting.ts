@@ -867,6 +867,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (o.zone !== (spec.linkedExile || spec.inExile ? "exile" : "graveyard") || s.players[o.owner]?.lost) return false;
     // "Target exiled card": a face-up one; a face-down card has no characteristics (CR 406.3, 702.143a, 702.75a).
     if (spec.inExile && (o.foretold || o.hiddenExile || o.faceDown)) return false;
+    // The Animus (round 444): "target creature card in exile with a memory counter on it": one or more of them on it (CR 122.1).
+    if (spec.inExile && spec.exiledWithCounter && !((o.counters[spec.exiledWithCounter] ?? 0) > 0)) return false;
     // Ground Seal: "Cards in graveyards can't be the targets of spells or abilities."
     if (o.zone === "graveyard" && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).graveyardUntargetable)) return false;
     // Tomik, Distinguished Advokist: not a land card, by an opponent of its controller.

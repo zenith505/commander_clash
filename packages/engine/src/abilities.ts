@@ -6301,6 +6301,14 @@ export type Effect =
    */
   | { type: "exileSelfCastFree" }
   /**
+   * Altaïr Ibn-La'Ahad (round 444): "Then for each creature card you own in exile with a memory counter on it, create a
+   * tapped and attacking token that's a copy of it.": each face-up card its controller owns in exile with one or more
+   * `counter` counters on it that matches `filter` by its printed characteristics (CR 406.3, 707.2), one token copy of each,
+   * all created at once (CR 608.2c), each attacking a player, planeswalker or battle its controller chooses (CR 508.4,
+   * rulings), never declared as an attacker. Then `ResolvingState.created` holds the tokens.
+   */
+  | { type: "tokenCopiesOfExiledWithCounter"; counter: CounterKind; filter: TargetSpec }
+  /**
    * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
    * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
    * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).

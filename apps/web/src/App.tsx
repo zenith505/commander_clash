@@ -5488,6 +5488,8 @@ function AbilityMenu({
               <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
               {x.mills ? "add one mana for each colored mana symbol in the milled card's mana cost" : x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
+              {/* Snowfall (round B298): the part a triggered mana ability adds with a spending restriction. */}
+              {x.limited ? <span data-limited={x.limited.map((l) => l.mana).join("")}> ({x.limited.map((l) => `{${l.mana}}`).join("")}: {x.limited[0]!.spend.text.replace(/^Spend this mana only /, "only ").replace(/\.$/, "")})</span> : null}
               {/* Rhystic Cave (round B254): each other player may pay to stop it. */}
               {ab.unlessAnyPays ? (
                 <>

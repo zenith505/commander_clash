@@ -8650,6 +8650,15 @@ export interface ManaTrigger {
   /** Overabundance: it deals its damage even when the land made no mana (rulings), adding nothing then. */
   evenWithoutMana?: true;
   /**
+   * Snowfall (round B298): "its controller may add an additional {U}": adding it is the player's choice as it resolves (CR
+   * 605.4a), one pick adding none; only with fixed mana.
+   */
+  may?: true;
+  /** Snowfall: "If that Island is snow, its controller may add an additional {U}{U} instead": this mana when the permanent tapped for mana is snow as it resolves. */
+  snowAdds?: ManaType[];
+  /** Snowfall: "Spend this mana only to pay cumulative upkeep costs." (CR 106.6): what the mana it adds can be spent on. */
+  spend?: ManaSpend;
+  /**
    * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
    * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
    * any type that land produced" (picking one of them if it made several, rulings on Mana Flare). The mana has none

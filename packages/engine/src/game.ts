@@ -1,5 +1,5 @@
 import { isRealKicker, kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, ManaSpend, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { addedAbilityCosts, addedSpellCosts, anyAddedSacrifice } from "./added-costs";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
@@ -7485,8 +7485,9 @@ export const isSnowSource = (s: GameState, o: GameObject) => o.zone === "battlef
  * Add the mana that triggered mana abilities add (CR 605.4a). Its source is each ability's source (CR 106.3): mana from
  * Utopia Sprawl on a snow Forest isn't snow mana, mana from a snow Mana Flare is.
  */
-export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][]; by?: PlayerId[]; damage?: ObjectId[] }): void {
-  picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [], ...(picked.by?.[i] !== undefined ? { by: picked.by[i] } : {}) }));
+export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][]; by?: PlayerId[]; damage?: ObjectId[]; spend?: (ManaSpend | undefined)[] }): void {
+  // Snowfall (round B298): its mana "only to pay cumulative upkeep costs" (CR 106.6).
+  picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [], ...(picked.by?.[i] !== undefined ? { by: picked.by[i] } : {}), ...(picked.spend?.[i] ? { only: picked.spend[i] } : {}) }));
   // Overabundance, Barbflare Gremlin: then 1 damage to that player from each source, as the triggered mana ability resolves
   // (CR 605.4a; no chance to respond, rulings). It can't stop for a question, so its shields are chosen as a bot would.
   for (const id of picked.damage ?? []) {

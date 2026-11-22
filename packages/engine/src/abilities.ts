@@ -6315,6 +6315,34 @@ export type Effect =
    */
   | { type: "tokenCopiesOfExiledWithCounter"; counter: CounterKind; filter: TargetSpec }
   /**
+   * Flamewar, Brash Veteran (round 445): "Put all exiled cards you own with intel counters on them into your hand.": every
+   * card its controller owns in exile with one or more `counter` counters on it, face up or face down (CR 406.3, 122.1),
+   * whatever exiled it, put into their hand at once.
+   */
+  | { type: "exiledWithCounterToHand"; counter: CounterKind }
+  /**
+   * Cosima, God of the Voyage (round 445): "If you do, it gains "<ability>"": the source, which the exile before it just
+   * moved there (setsDid; CR 400.7j: other parts of the effect find it in exile), gains this triggered ability in exile
+   * for as long as it stays there as that object (GameObject.gainedInExile, CR 400.7, 611.2c). `text` is the ability, "~"
+   * in it that card.
+   */
+  | { type: "gainInExile"; text: string }
+  /**
+   * Cosima's gained ability (round 445): "you may put a voyage counter on it. If you don't, return ~ to the battlefield with
+   * X +1/+1 counters on it and draw X cards, where X is the number of voyage counters on it.": the source, still that
+   * object in its owner's exile (CR 400.7); a `counter` counter put on it there, or else it returns under its owner's
+   * control (CR 110.2) with as many `plus` counters as it had `counter` counters in exile, then that many cards drawn
+   * (rulings: X counted in exile, as it was; no counters, it returns with none and no card is drawn).
+   */
+  | { type: "exiledSelfCounterOrReturn"; counter: CounterKind; plus: CounterKind }
+  /**
+   * The Omenkeel (round 445): "that player exiles that many cards from the top of their library. You may play lands from
+   * among those cards for as long as they remain exiled.": `who` exiles the top `n` of their library; this ability's
+   * controller may play the lands among them (MayPlay.landOnly: not cast any of them, CR 305.1, 601.2), only as their
+   * normal land plays (rulings), whoever controls The Omenkeel later (rulings).
+   */
+  | { type: "exileTopLandsPlayable"; who: PlayerRef; n: Amount }
+  /**
    * The Creation of Avacyn (round 433), chapter II: "Turn the exiled card face up. If it's a creature card, you lose life
    * equal to its mana value.": every card its chapter I exiled face down, still in exile (linked, CR 607.2a), turned face
    * up (CR 406.3); if any of them is a creature card, life lost equal to their total mana value (rulings).

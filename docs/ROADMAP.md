@@ -1,7 +1,7 @@
 # Roadmap
 
-31,878 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,967 of
+31,880 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,968 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -116,7 +116,7 @@ line blocks.
    Stalwart (two abilities chosen as it enters; only one chosen keyword is kept), Shelinda, Yevon Acolyte ("put a
    counter on that creature if ... Otherwise, put a counter on ~"), Gaea's Blessing ("put into your graveyard from your
    library" triggers). Round 167 went down the list to Accumulate Wisdom (rank 5,595).
-   Out after round 168: Cosima, God of the Voyage (an ability that works while it's exiled, like Dinosaurs on a
+   Out after round 168: Cosima, God of the Voyage (done in round 445) (an ability that works while it's exiled, like Dinosaurs on a
    Spaceship), Yasharn, Implacable Earth ("players can't pay life or sacrifice nonland permanents to cast spells or
    activate abilities": a check on every cost, autopay and bots included), Orvar, the All-Form ("when a spell or ability
    an opponent controls causes you to discard ~": who caused a discard isn't kept), Share the Spoils (each player plays
@@ -4769,6 +4769,34 @@ line blocks.
    gaps: bots exile an Assassin card with Altaïr whenever they can, and use The Animus in their main phase only when the
    exiled card is worth more than their legendary creature (by power and toughness), never on a legendary card whose name
    they already have on the battlefield.
+   Round 445 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Promise, Psychic Paper, Karn Liberated, Vesuvan Shapeshifter and the others still out, to two cards with cards in exile
+   that matter. Flamewar, Brash Veteran // Flamewar, Streetwise Operative's "Sacrifice another artifact: Put a +1/+1 counter
+   on Flamewar and convert it. Activate only as a sorcery." ("it" is Flamewar; converting is transforming, CR 701.28a, the
+   counter staying, rulings), "{1}, Discard your hand: Put all exiled cards you own with intel counters on them into your
+   hand." (face down ones too, whatever exiled them, CR 122.1; Effect exiledWithCounterToHand) and "Whenever Flamewar deals
+   combat damage to a player, exile that many cards from the top of your library face down. Put an intel counter on each of
+   them. Convert Flamewar." (the damage dealt, CR 510.2; cards nobody may look at, its controller included, CR 406.3,
+   rulings). Cosima, God of the Voyage // The Omenkeel's "At the beginning of your upkeep, you may exile Cosima. If you do,
+   it gains "Whenever a land you control enters, if Cosima is exiled, you may put a voyage counter on it. If you don't,
+   return Cosima to the battlefield with X +1/+1 counters on it and draw X cards, where X is the number of voyage counters on
+   it."" (new since it was left out: GameObject.gainedInExile, an ability the card in exile gained, for as long as it stays
+   that object, CR 400.7j, 611.2c, seen by abilitiesOf and the exile triggers, which now watch permanents entering too, CR
+   113.6k; its owner controls it, CR 113.8; an intervening if, CR 603.4, so gone from exile it does nothing, even back again,
+   rulings; X counted in exile, it returns with them, CR 122.6, then that many cards drawn, none with none, rulings; Effects
+   gainInExile, exiledSelfCounterOrReturn) and "Whenever a Vehicle you control deals combat damage to a player, that player
+   exiles that many cards from the top of their library. You may play lands from among those cards for as long as they
+   remain exiled." (MayPlay.landOnly: the lands only, never cast, as your normal land plays, whoever controls The Omenkeel
+   later, rulings; Effect exileTopLandsPlayable). Browser tests click through Flamewar's sacrifice of Sol Ring and its
+   "Discard your hand" for two face-down intel cards, Cosima's exile at your upkeep and its voyage counter (Yes) and return
+   with two (No), and The Omenkeel's attack, then Ana's Forest played from her exile. +2, 31,871 of 31,936 with main
+   f277baf (round 444 #741 merged), 31,879 with main c7b4692 (B293-B296 merged); the compiled text of every other card is unchanged.
+   Out after round 445 (looked at, not done): the lists after round 444 (still out, for their reasons); Harold and Bob,
+   First Numens and Nick Fury, Agent of S.H.I.E.L.D. were left to Lane B (done in round B295). Known gaps: a commander Cosima exiled by its own
+   ability goes to the command zone at once (owners always choose to, CR 903.9a), losing the voyage, so bots never exile
+   their commander Cosima; bots exile any other Cosima at their upkeep, add voyage counters until three (fewer with few cards
+   left in the library), use Flamewar's "Discard your hand" in their second main phase once it brings back two more cards
+   than their hand, and sacrifice only a noncreature artifact token (Treasure, Clue, Food) to convert it.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -6085,7 +6113,7 @@ line blocks.
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
-   Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
+   Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (done in round 445) (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
    (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (black mana
    symbols among exiled cards' costs); March from Velis Vel (done in round 435) (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
@@ -11993,8 +12021,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   payment out of every other payment (ManaOption.limited), so spells and abilities are paid without it, and takes it for a
   cumulative upkeep payment (the Pay button, bots). The mana menu labels the option "({U}: only to pay cumulative upkeep
   costs)". Browser tests: Pay keeps Snowfall with two age counters from one Snow-Covered Island; an Island tapped by hand
-  offers both options, and the restricted {U} can't help cast Divination. +1, 31,878 of 31,936 with main c7b4692 (through
-  round 444 and B296). The compiled text of every other card is unchanged.
+  offers both options, and the restricted {U} can't help cast Divination. +1, 31,878 of 31,936 on main c7b4692, 31,880
+  with main a10d465 (through round 445 and B296). The compiled text of every other card is unchanged.
 - Out after round B298 (looked at, not done): the lists after round B297 stay out; Ghostly Flame (its rulings make damage
   colorless only "whenever something looks at the damage", but not for triggers that look at the source; where each damage
   check falls is still unclear), Chef's Kiss (whether the current target is among those it can be reselected to at random,

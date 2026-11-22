@@ -1330,7 +1330,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.attachedToTarget === undefined ? undefined : [x.attachedToTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.powerAtMostOf, x.mvAtMostOf, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.blockedByTarget === undefined ? undefined : [x.blockedByTarget], x.attachedToTarget === undefined ? undefined : [x.attachedToTarget], x.controlledByOpponentOfTarget === undefined ? undefined : [x.controlledByOpponentOfTarget], x.differentControllerFrom, x.sameControllerAs, x.differentNameFrom, x.differentManaValueFrom, x.powerAtMostOf, x.mvAtMostOf, x.sharesCreatureTypeWith, x.sharesCardTypeWith, x.sharesNoCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -1346,6 +1346,16 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (ofPlayer?.kind === "player" && ofPlayer.id !== o.owner) return false;
   const byPlayer = spec.controlledByTarget === undefined ? undefined : chosen[spec.controlledByTarget];
   if (byPlayer?.kind === "player" && (o.zone !== "battlefield" || controllerOf(s, o) !== byPlayer.id)) return false;
+  // Glyph of Delusion (round B291): "target creature that target Wall blocked this turn": the Wall as the object it is now
+  // blocked this one, as the object it is now, this turn (TurnLog.blocks: assigned, banded or moved into or out of the
+  // block, rulings; CR 400.7).
+  const wall = spec.blockedByTarget === undefined ? undefined : chosen[spec.blockedByTarget];
+  if (wall?.kind === "object") {
+    const w = s.objects[wall.id];
+    const by = w ? `${w.id}@${w.zoneChanges ?? 0}` : "";
+    const me = `${o.id}@${o.zoneChanges ?? 0}`;
+    if (!w || w.zone !== "battlefield" || o.zone !== "battlefield" || !(s.turnLog?.blocks ?? []).some((b) => b.blocker === by && b.attacker === me)) return false;
+  }
   // Portal Manipulator: "their opponents control": anyone but that player (CR 102.3).
   const oppOf = spec.controlledByOpponentOfTarget === undefined ? undefined : chosen[spec.controlledByOpponentOfTarget];
   if (oppOf?.kind === "player" && (o.zone !== "battlefield" || controllerOf(s, o) === oppOf.id)) return false;
@@ -1568,7 +1578,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || (!!spec.many && !spec.manyMin);
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.mvAtMostOf?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.sameControllerAs?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.sharesCardTypeWith?.length || spec.sharesNoCreatureTypeWith?.length || spec.mvAtMostOf?.length || spec.blockedByTarget !== undefined || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {

@@ -12120,7 +12120,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cast.viaEachTurnLinked) for the card played with that permission only, not one played another way; the card it exiles is
   exiled with it too (CR 607.2a). Bots play from among those cards like any other playable exiled card. Browser tests: cast
   Share the Spoils, then Ana's exiled Lightning Bolt at her with a Forest, which exiles your top card, and Ben's exiled
-  Forest isn't playable after; play Ana's exiled Forest as your land. +1, 31,881 of 31,936 with main 499a31a (B297), 31,883 with main c8a3332 (round 446), 31,885 with main 2c9aae1 (B298-B299). The
+  Forest isn't playable after; play Ana's exiled Forest as your land. +1, 31,881 of 31,936 with main 499a31a (B297), 31,883 with main c8a3332 (round 446), 31,885 with main 2c9aae1 (B298-B299), 31,889 with main 5035246 (rounds 447-449). The
   compiled text of every other card is unchanged.
 - Out after round B300 (looked at, not done): the lists after round B299 stay out; about 48 unsupported
   cards remain, all of them hard. Known gaps under Share the Spoils: bots don't weigh which of those cards is best to play

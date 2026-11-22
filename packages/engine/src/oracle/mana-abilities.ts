@@ -298,6 +298,19 @@ export function parseManaAbility(line0: string): ManaAbility | null {
 export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   let m: RegExpExecArray | null;
   let what: string;
+  // Snowfall (round B298): "Whenever an Island is tapped for mana, its controller may add an additional {U}. If that Island
+  // is snow, its controller may add an additional {U}{U} instead. Spend this mana only to pay cumulative upkeep costs.": an
+  // optional triggered mana ability (CR 605.1b, 605.4a), more mana when the permanent tapped for mana is snow, and a
+  // spending restriction on the mana it adds (CR 106.6).
+  const may = /^(Whenever an? (\w+) is tapped for mana, its controller) may add an additional ((?:\{[WUBRGC]\})+)\.(?: If that (\w+) is snow, its controller may add an additional ((?:\{[WUBRGC]\})+) instead\.)?(?: (Spend this mana only [^.]+\.))?$/.exec(line);
+  if (may) {
+    if (may[4] !== undefined && may[4] !== may[2]) return "fail";
+    const base = parseManaTrigger(`${may[1]!} adds an additional ${may[3]!}.`);
+    if (!base || base === "fail" || base.adds.kind !== "fixed") return "fail";
+    const spend = may[6] ? parseManaSpend(may[6]) : undefined;
+    if (spend === null) return "fail";
+    return { ...base, text: line, may: true, ...(may[5] ? { snowAdds: [...may[5].matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1] as ManaType) } : {}), ...(spend ? { spend } : {}) };
+  }
   const out: Partial<ManaTrigger> = { text: line };
   let adds: string;
   let perOtherSameName = false;

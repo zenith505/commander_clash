@@ -1,7 +1,7 @@
 # Roadmap
 
-31,869 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,964 of
+31,878 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,967 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -11981,6 +11981,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Effigy, Benthic Anomaly). Browser tests: Havengul Laboratory transforms, returns Grizzly Bears, which dies to Murder and
   turns it back; Taskmaster copies Ana's Serra Angel card from her graveyard, then her Ornithopter. +2, 31,877 of 31,936
   with main f277baf (through round 444) and B293-B295. The compiled text of every other card is unchanged.
+- Round B298 (least played first, one card off the skip lists, not in Lane A's rounds 445-446 nor Lane B's B297):
+  Snowfall's "Whenever an Island is tapped for mana, its controller may add an additional {U}. If that Island is snow, its
+  controller may add an additional {U}{U} instead. Spend this mana only to pay cumulative upkeep costs." (out after rounds
+  B226, B285 and B294): a triggered mana ability (CR 605.1b) that resolves right after the Island's own (CR 605.4a), only
+  when the Island made mana (CR 106.12a), whatever type it made (rulings: the extra mana is blue). Its "may" is a pick of
+  the mana ability like Mana Flare's type (ManaTrigger.may: adding none is one of the menu's options, so it matters with
+  Yurlok of Scorch Thrash's mana burn); a snow Island, as it is when it resolves, gives {U}{U} instead (ManaTrigger.snowAdds);
+  its mana is spendable only on cumulative upkeep costs, any permanent's, generic ones too (CR 106.6, 702.24a; ManaTrigger.
+  spend, the same restriction as Adarkar Unicorn's). Autopay leaves any option whose triggered mana can't be spent on the
+  payment out of every other payment (ManaOption.limited), so spells and abilities are paid without it, and takes it for a
+  cumulative upkeep payment (the Pay button, bots). The mana menu labels the option "({U}: only to pay cumulative upkeep
+  costs)". Browser tests: Pay keeps Snowfall with two age counters from one Snow-Covered Island; an Island tapped by hand
+  offers both options, and the restricted {U} can't help cast Divination. +1, 31,878 of 31,936 with main c7b4692 (through
+  round 444 and B296). The compiled text of every other card is unchanged.
+- Out after round B298 (looked at, not done): the lists after round B297 stay out; Ghostly Flame (its rulings make damage
+  colorless only "whenever something looks at the damage", but not for triggers that look at the source; where each damage
+  check falls is still unclear), Chef's Kiss (whether the current target is among those it can be reselected to at random,
+  no ruling), Captain America, First Avenger (the division is announced before the cost picks the Equipment, CR 601.2d,
+  601.2h) and Pulmonic Sliver were looked at again. About 50 unsupported cards remain, all of them hard. Known gaps: the
+  mana pool can't be filled by hand while a payment is asked (the Pay button autopays, using Snowfall's mana for cumulative
+  upkeep); an Island with an activated mana ability whose mana isn't known until it resolves can't be activated under
+  Snowfall, as under Mana Flare (game.ts: what tapping it triggers needs a pick).
 - Out after round B296 (looked at, not done): the lists after round B295 stay out; about 65 unsupported cards remain, all
   of them hard. Known gap: bots pick Taskmaster's target as they pick any copy target, not weighing that it ends at their
   next turn.
@@ -12025,7 +12047,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8), 31,871 with main cf06b92 (through round 443) and B293's head a9dbd248 merged in. The compiled text of every other card is unchanged.
 - Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind ("toughness minus 1" read inside
   its own layer 7c effect, no ruling), Codie, Ravenous Codex ("a prepared spell" still isn't defined, CR 722), Cosima, God of
-  the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo and Snowfall were looked
+  the Voyage, Share the Spoils, Finale of Promise, Equinox, Saruman of Many Colors, Baron Helmut Zemo and Snowfall (done in round B298) were looked
   at again and stay out for the reasons in the earlier lists; about 69 unsupported cards remain, all of them hard. Judgment
   calls and known gaps: with another replacement of the same mana (Contamination's {B}, a color chosen for Pulse of
   Llanowar), False Dawn is applied last, the order its controller would choose (CR 616.1), so the mana is white; moving mana
@@ -12250,7 +12272,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lane A's round 437, which pushed it first. Browser tests click through the Cauldron's X and hand pick, and cast the
   exiled Lightning Bolt from the exile pile with the Cauldron's {R}. +1, 31,835 of 31,936 on B284's branch (main 85500b6,
   round 435, merged in). The compiled text of every other card is unchanged.
-- Out after round B285 (looked at, not done): the lists after round B284 stay out. Snowfall stays out (its "may add" in
+- Out after round B285 (looked at, not done): the lists after round B284 stay out. Snowfall (done in round B298) stays out (its "may add" in
   a triggered mana ability is a real choice with Yurlok's mana burn, and its mana, spendable only on cumulative upkeep,
   would need a "none" pick and a restricted part in the triggered mana that autopay keeps apart). Codie, Ravenous Codex
   stays out ("a prepared spell" still isn't defined, CR 722). Known gaps: bots never activate Ice Cauldron; the pool shows
@@ -13126,7 +13148,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   choose which applies (CR 616.1), and so whether it gets a blood counter (rulings); the engine applies the first one it
   finds. Escaped Shapeshifter doesn't count "protection from everything" (CR 702.16j) as protection from a color.
 - Out after round B227 (looked at, not done): the lists after round B226 stay out.
-- Out after round B226 (looked at, not done): Snowfall (its "may add" in a triggered mana ability, a choice that matters
+- Out after round B226 (looked at, not done): Snowfall (done in round B298) (its "may add" in a triggered mana ability, a choice that matters
   with mana burn like Yurlok of Scorch Thrash's, and mana from a trigger spendable only on cumulative upkeep, which autopay
   would have to keep apart), Jasmine Boreal of the Seven (done in round 426) (a creature spell with no abilities, counting abilities other
   permanents give spells, rulings), Mana Cache (a mana ability any player may activate), Worms of the Earth (done in round B258) ("Lands can't
@@ -13789,7 +13811,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (CR 104.2a).
 - Mana: "until end of turn, whenever a player taps an Island for mana" (High Tide, Bubbling Muck), "tapped for mana"
   triggers that aren't mana abilities (Manabarbs) or have conditions (Regal Behemoth, Barbflare Gremlin), "may add"
-  (Snowfall), "for each Elf" (Elvish Guidance); replacing mana ("produces twice as much", Mana Reflection,
+  (Snowfall, done in round B298), "for each Elf" (Elvish Guidance); replacing mana ("produces twice as much", Mana Reflection,
   Contamination). Autopay skips a land whose own mana can't be spent on the cost even when the extra mana from
   Mana Flare (which has no restriction) could be.
 - "One or more creatures enter/die" (once per batch), "whenever ~ connives", "while ~ is in your graveyard".

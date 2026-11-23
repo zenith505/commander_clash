@@ -11,7 +11,7 @@ const TOP = ["Hill Giant", "Shock", "Sol Ring"];
 test("The Celestial Toymaker: attacking Ana, you put Hill Giant in the face-down pile; both piles are exiled and Ana picks one for your hand", async ({ page }) => {
   const s = scene({ board: [...LANDS, "The Celestial Toymaker"], library: TOP });
   const toy = idsOf(s, "The Celestial Toymaker", "battlefield")[0]!;
-  const [giant, shock, ring] = TOP.map((n) => idsOf(s, n, "library", 0)[0]!);
+  const [giant, shock, ring] = TOP.map((n) => idsOf(s, n, "library", 0)[0]!) as [string, string, string];
   await open(page, s);
   await controls(page).getByRole("button", { name: "Pass" }).click();
   await resolveUntil(page, (st) => st.pending?.kind === "declareAttackers");

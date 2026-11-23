@@ -11832,6 +11832,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "33c722cf-b4bf-431f-aefd-ee96241a7fbf",
+  "name": "Crucible of Worlds",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may play lands from your graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mps",
+  "releasedAt": "2016-09-30",
+  "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecfbebc9-7fc7-474e-8c59-8ede800e082e",
   "name": "Crucible of the Spirit Dragon",
   "manaCost": "",
@@ -38901,6 +38923,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "49d4aef7-d2d1-4f66-bc2a-79ec8cc96565",
+  "name": "Panglacial Wurm",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wurm"
+  ],
+  "oracleText": "Trample\nWhile you're searching your library, you may cast this card from your library.",
+  "power": "9",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "76678885-3674-443d-b9a2-2a460cf6aac0",
   "name": "Panharmonicon",
   "manaCost": "{4}",
@@ -41102,6 +41156,32 @@
   ]
  },
  {
+  "oracleId": "79f0d763-5a71-470a-867f-86fc72e9db6d",
+  "name": "Psychic Battle",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a player chooses one or more targets, each player reveals the top card of their library. The player who reveals the card with the greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or targets remain unchanged. Changing targets this way doesn't trigger abilities of permanents named Psychic Battle.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "110b601c-bf38-4985-8de6-fcb477f543a8",
   "name": "Psychic Paper",
   "manaCost": "{2}",
@@ -42913,6 +42993,68 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "fa38394b-6ac4-460c-ae3a-54d50037715b",
+  "name": "Research // Development",
+  "manaCost": "{G}{U} // {3}{U}{R}",
+  "cmc": 7,
+  "typeLine": "Instant // Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Shuffle up to four cards you own from outside the game into your library.",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Research",
+    "manaCost": "{G}{U}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Shuffle up to four cards you own from outside the game into your library.",
+    "colors": [
+     "U",
+     "G"
+    ]
+   },
+   {
+    "name": "Development",
+    "manaCost": "{3}{U}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Create a 3/1 red Elemental creature token unless any opponent has you draw a card. Repeat this process two more times.",
+    "colors": [
+     "U",
+     "R"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "42e4d4d8-e4e0-4cf8-a6d0-887a17513280",
@@ -46097,6 +46239,32 @@
   "set": "sld",
   "releasedAt": "2026-09-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "619d8d81-9e10-4353-b30d-a0f9c3451cd2",
+  "name": "Shaman's Trance",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Other players can't play lands or cast spells from their graveyards this turn. You may play lands and cast spells from other players' graveyards this turn as though those cards were in your graveyard.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -52770,6 +52938,43 @@
   "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "388fe92a-0bc0-4c0a-a7c6-910c5e71e342",
+  "name": "The Celestial Toymaker",
+  "manaCost": "{W}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Rogue Artificer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rogue",
+   "Artificer"
+  ],
+  "oracleText": "Whenever The Celestial Toymaker attacks, look at the top three cards of your library. Exile any number of them in a face-down pile and the rest in a face-up pile. Defending player chooses one of those piles. Put that pile into your hand.\nAt the beginning of each end step, each opponent loses 2 life for each spell or ability that caused one or more players to guess or to group cards or permanents into a pile this turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-12-11",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

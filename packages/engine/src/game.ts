@@ -6915,6 +6915,12 @@ export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: Playe
   if (o.zone !== "graveyard" || !isType(defOf(s, o), "Land")) return false;
   // Tomik, Distinguished Advokist: not while an opponent controls one (rulings: over any permission).
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsCantPlayYardLands && controllerOf(s, obj(s, id)) !== pid)) return false;
+  // Shaman's Trance (round B305): another player's barring them from playing lands from their own graveyard.
+  if (o.owner === pid && tranceBars(s, pid) !== undefined) return false;
+  // Shaman's Trance: a land card in another player's graveyard as though it were in theirs, with what lets them play lands
+  // from their own graveyard (Crucible of Worlds, Yawgmoth's Will, Muldrotha); not the card's own permission for its owner
+  // (Tablet of Discovery) or mayhem, which needs them to have discarded it.
+  if (o.owner !== pid && tranced(s, pid)) return landsFromGraveyardNow(s, pid, o, false) || !!landPermit(s, pid, o);
   // Coram, the Undertaker (round 381): a land card in another player's graveyard, with its permission only.
   if (o.owner !== pid) return !!landPermit(s, pid, o);
   return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid, o) || !!landPermit(s, pid, o);
@@ -6935,7 +6941,7 @@ function ownGraveyardPlay(s: GameState, o: GameObject, pid: PlayerId): boolean {
  * Every land may be played from `pid`'s graveyard now: Crucible of Worlds, or an effect this turn (Yawgmoth's Will); or
  * this land card `o`, by its subtype (Titania, Nature's Force's Forests).
  */
-function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): boolean {
+function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject, /** Shaman's Trance (round B305): false for a card in another player's graveyard, which `pid` didn't surveil. */ ownYard = true): boolean {
   const typed = (id: ObjectId) => {
     const of = abilitiesOf(s, obj(s, id)).landsFromGraveyardOf;
     return !!of && of.some((st) => characteristics(s, o).subtypes.includes(st));
@@ -6945,7 +6951,7 @@ function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): bool
     return !!cond && staticConditionNow(s, cond, id, pid);
   };
   // Eye of Duskmantle (round 405): a land card its owner surveilled into their graveyard this turn.
-  const surveilled = (id: ObjectId) => !!abilitiesOf(s, obj(s, id)).landsFromGraveyardSurveilled && arrivedThisTurn(s, o, "surveilled");
+  const surveilled = (id: ObjectId) => ownYard && !!abilitiesOf(s, obj(s, id)).landsFromGraveyardSurveilled && arrivedThisTurn(s, o, "surveilled");
   return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id) || anchored(id) || surveilled(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
@@ -6964,8 +6970,23 @@ function arrivedThisTurn(s: GameState, o: GameObject, how: "fromLibrary" | "notF
   return how === "fromLibrary" ? o.fromLibraryTurn === s.turn : o.fromBattlefieldTurn !== s.turn;
 }
 
-/** Coram, the Undertaker (round 381): `pid` controls a permanent that lets them play cards from any graveyard. */
+/**
+ * Shaman's Trance (round B305): "You may play lands and cast spells from other players' graveyards this turn as though
+ * those cards were in your graveyard": `pid` resolved one this turn, so what lets them play a card from their own graveyard
+ * lets them play one from another player's (rulings: flashback too; not activated abilities of those cards).
+ */
+export function tranced(s: GameState, pid: PlayerId): boolean {
+  return !!s.tranceTurn?.some((t) => t.player === pid && t.turn === s.turn);
+}
+
+/** Shaman's Trance (round B305): "Other players can't play lands or cast spells from their graveyards this turn": whose, if one bars `pid`. */
+export function tranceBars(s: GameState, pid: PlayerId): string | undefined {
+  return s.tranceTurn?.find((t) => t.player !== pid && t.turn === s.turn && !player(s, t.player).lost)?.source;
+}
+
+/** Coram, the Undertaker (round 381): `pid` controls a permanent that lets them play cards from any graveyard. Shaman's Trance (round B305) this turn too. */
 export function playsFromAnyGraveyard(s: GameState, pid: PlayerId): boolean {
+  if (tranced(s, pid)) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && (!!abilitiesOf(s, o).landFromAnyGraveyard || !!abilitiesOf(s, o).graveyardGrants?.some((g) => g.anyGraveyard));
@@ -6984,7 +7005,8 @@ function landPermit(s: GameState, pid: PlayerId, o?: GameObject): string | undef
     const once = controllerOf(s, p) === pid ? abilitiesOf(s, p).landFromGraveyardOnce : undefined;
     if (!once) continue;
     // Coram, the Undertaker (round 381): any graveyard's; the others, only the player's own.
-    if (o && o.owner !== pid && !abilitiesOf(s, p).landFromAnyGraveyard) continue;
+    // Shaman's Trance (round B305): another player's graveyard as though it were theirs.
+    if (o && o.owner !== pid && !abilitiesOf(s, p).landFromAnyGraveyard && !tranced(s, pid)) continue;
     const arrived = abilitiesOf(s, p).landFromGraveyardArrived;
     if (arrived && (!o || !arrivedThisTurn(s, o, arrived))) continue;
     // The Eighth Doctor: a historic land only (CR 700.6).
@@ -7324,7 +7346,9 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
   // Coram's land from another player's graveyard (round 381): always its permission.
-  if (o.zone === "graveyard" && (o.owner !== p.id || (!ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)))) {
+  // Shaman's Trance (round B305): another player's land as though in their graveyard, Crucible of Worlds's way first too.
+  const tranceFree = o.zone === "graveyard" && o.owner !== p.id && tranced(s, p.id) && landsFromGraveyardNow(s, p.id, o, false);
+  if (o.zone === "graveyard" && !tranceFree && (o.owner !== p.id || (!ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)))) {
     const permit = landPermit(s, p.id, o)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.
@@ -8053,6 +8077,9 @@ export function castProblem(
   if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   // An aftermath half can't be cast from any zone other than a graveyard (CR 702.127a).
   if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
+  // Shaman's Trance (round B305): "Other players can't ... cast spells from their graveyards this turn", whatever lets them.
+  const barredBy = o.zone === "graveyard" && o.owner === pid ? tranceBars(s, pid) : undefined;
+  if (barredBy !== undefined) return `${d.name} can't be cast from your graveyard this turn (${barredBy})`;
   const via = graveyardWay(s, o, choices?.via, pid);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   // Mosswood Dreadknight's permission is for its Adventure only (the face is chosen first, above).
@@ -10192,7 +10219,10 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
   const granted = grantedWays(s, o, d, caster ?? o.owner);
   const escapeEot = granted.some((g) => g.kind === "grantedEscape") ? [] : grantedEscapeUntilEot(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure, ...grantedCastUntilEot(s, o, d, [...(compileCard(d).fromGraveyard ?? []), ...granted])];
+  const all = [...(compileCard(d).fromGraveyard ?? []), ...grantedFlashbackWays(s, o, d), ...granted, ...escapeEot, ...asAdventure, ...grantedCastUntilEot(s, o, d, [...(compileCard(d).fromGraveyard ?? []), ...granted])];
+  // Shaman's Trance (round B305): a card in another player's graveyard, as though it were in the caster's, with its own
+  // ways (flashback, rulings) and the caster's permissions for their graveyard (grantedWays).
+  return caster !== undefined && caster !== o.owner && o.zone === "graveyard" && tranced(s, caster) ? all.map((w) => (w.anyOwner ? w : { ...w, anyOwner: true as const })) : all;
 }
 
 /**
@@ -10246,9 +10276,11 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
     for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
       // Coram, the Undertaker (round 381, `anyGraveyard`): its controller's, for a card in any graveyard; the others, the
       // card's owner's, for their own graveyard.
-      if (g.anyGraveyard ? holder !== caster : holder !== o.owner) continue;
+      // Shaman's Trance (round B305): the caster's own permissions reach other players' graveyards this turn.
+      const trance = !g.anyGraveyard && holder === caster && holder !== o.owner && tranced(s, caster);
+      if (g.anyGraveyard ? holder !== caster : holder !== o.owner && !trance) continue;
       if (g.yourTurn && s.activePlayer !== holder) continue;
-      if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
+      if (g.if && !staticConditionNow(s, g.if, p.id, trance ? holder : o.owner)) continue;
       // Yixlid Jailer (round B297): escape, flashback, retrace or jump-start a permanent gives the card is an ability the card
       // has (CR 113.6, 613.1f), gone if the permanent's timestamp is the earlier one (CR 613.7a); a permission to cast it
       // isn't an ability of the card's (rulings).
@@ -10261,7 +10293,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
       if (g.maxMv !== undefined && defMv(d) > g.maxMv) continue;
       // Arcade Gannon: "less than or equal to the number of quest counters on ~", counted now.
-      if (g.maxMvCount !== undefined && defMv(d) > evalAmount(s, g.maxMvCount, { controller: o.owner, sourceId: p.id })) continue;
+      if (g.maxMvCount !== undefined && defMv(d) > evalAmount(s, g.maxMvCount, { controller: trance ? holder : o.owner, sourceId: p.id })) continue;
       // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
       if (g.once) {
         const used = s.turnLog?.gravePermits ?? [];
@@ -10292,7 +10324,9 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
   // Its caster would choose it over a permission that exiles the spell afterwards (Vohar's).
-  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.topOnly && !g.costs && !g.entersWith && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
+  // Shaman's Trance (round B305): the caster's, for a card in another player's graveyard.
+  const yours = (pid: PlayerId) => pid === o.owner || (pid === caster && tranced(s, caster));
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && !g.topOnly && !g.costs && !g.entersWith && yours(g.player) && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !permissionBurden(w))) {
     const i = out.findIndex((w) => w.kind === "permission");
     if (i >= 0) out.splice(i, 1);
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
@@ -10300,7 +10334,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // Osteomancer Adept: "Until end of turn, you may cast creature spells from your graveyard by foraging in addition to
   // paying their other costs. If you cast a spell this way, that creature enters with a finality counter on it.": when no
   // other permission lets it be cast from there (its caster would pick one without the cost).
-  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && !g.topOnly && (!!g.costs || !!g.entersWith) && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  const costly = d.manaCost ? s.graveyardTurn?.find((g) => !g.anyGraveyard && !g.topOnly && (!!g.costs || !!g.entersWith) && yours(g.player) && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
   if (costly && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: costly.costs ?? [], exile: false, ...(costly.entersWith ? { entersWith: costly.entersWith } : {}) });
   // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
   // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
@@ -10318,7 +10352,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   const used = s.turnLog?.gravePermits ?? [];
   // Locke, Treasure Hunter: one spell from among the cards milled, for its controller, whoever owns them.
   // Whispersteel Dagger: for its controller, a card in the graveyard of the player its creature damaged.
-  const fits = (g: NonNullable<GameState["graveGrants"]>[number]) => (g.cards ? g.player === caster && g.cards.some((c) => c.id === o.id && c.zc === (o.zoneChanges ?? 0)) : g.fromYardOf !== undefined ? g.player === caster && o.owner === g.fromYardOf : g.player === o.owner);
+  const fits = (g: NonNullable<GameState["graveGrants"]>[number]) => (g.cards ? g.player === caster && g.cards.some((c) => c.id === o.id && c.zc === (o.zoneChanges ?? 0)) : g.fromYardOf !== undefined ? g.player === caster && o.owner === g.fromYardOf : yours(g.player));
   const grants = d.manaCost ? (s.graveGrants ?? []).filter((g) => fits(g) && g.turn === s.turn && !used.includes(g.key) && printedMatches(g.filter, d)).map((g) => g.key) : [];
   if (grants.length) {
     const had = out.find((w) => w.kind === "turnPermission");
@@ -13090,6 +13124,8 @@ function chooseNewTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     if (pend.allOrNone && changed.some((c) => c) && targets.some((t, i) => (pend.current[i]?.kind ?? "none") !== "none" && (!changed[i] || t.kind === "none"))) throw new RulesError("change all of its targets, or none of them");
     // "Change any targets" (CR 115.7c): a changed target goes to another legal one, never to nothing (115.7a).
     if (pend.changeAny && targets.some((t, i) => changed[i] && (t.kind === "none" || (pend.current[i]?.kind ?? "none") === "none"))) throw new RulesError("a target can only be changed to another legal target");
+    // Psychic Battle (round 453, rulings): "You can't ... make something get targeted more than once."
+    if (pend.noRepeat && targets.some((t, i) => changed[i] && t.kind !== "none" && targets!.some((u, j) => j !== i && sameTarget(u, t)))) throw new RulesError("nothing can be targeted more than once");
     const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     const q = stackItemQuality(s, item);
     for (let i = 0; i < targets.length; i++) {

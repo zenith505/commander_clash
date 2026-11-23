@@ -6,6 +6,7 @@ import { livingPlayers, log, moveObject, enterTogether, obj, player, syncControl
 import { controllerOf, characteristics, invalidateCharacteristics } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { type ResolveCtx, apnap, objects, players, runEffect } from "./resolve";
+import { notePileOrGuess } from "./run-laneb306";
 import { inCombat } from "./triggers";
 import { chooseAnOpponent, toBottom } from "./run-library";
 
@@ -28,6 +29,7 @@ export function runGuessTopKindEffect(s: GameState, e: Extract<Effect, { type: "
     const opp: PlayerId | undefined | "paused" = chooseAnOpponent(s, ctx, src, "choose an opponent to guess");
     if (opp === "paused") return "paused";
     if (sc.either === undefined && opp !== undefined && !player(s, opp).lost) {
+      notePileOrGuess(s); // The Celestial Toymaker (round B306): a guess.
       s.pending = { kind: "chooseOption", player: opp, source: src, what: "either", options: ["0", "1"], labels: [`Guess it's ${what}`, `Guess it isn't ${what}`], prompt: `${GUESS_PROMPT} ${p.name}'s library is ${what} (${p.name} chose ${kind})` };
       return "paused";
     }

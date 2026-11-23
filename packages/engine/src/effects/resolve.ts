@@ -58,6 +58,7 @@ import { runChooseLinkedCardEffect } from "./run-round399";
 import { runGainActivatedOfEffect, runWhenCastGainsActivatedEffect } from "./run-round400";
 import { runExileFromHandOrYardEffect } from "./run-round401";
 import { runRestartGameEffect } from "./run-round452";
+import { runPsychicBattleEffect } from "./run-round453";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
 import { runNoteCreatureTypeEffect } from "./run-round380";
@@ -114,6 +115,9 @@ import { runLaneB234Effect } from "./run-laneb234";
 import { runLaneB235Effect } from "./run-laneb235";
 import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB296Effect } from "./run-laneb296";
+import { runLaneB304Effect } from "./run-laneb304";
+import { runLaneB305Effect } from "./run-laneb305";
+import { groupsIntoPiles, notePileOrGuess, runLaneB306Effect } from "./run-laneb306";
 import { runLaneB238Effect } from "./run-laneb238";
 import { runLaneB254Effect } from "./run-laneb254";
 import { runLaneB255Effect } from "./run-laneb255";
@@ -1287,6 +1291,8 @@ function sameDamageEvent(a: Effect, b: Effect | undefined): Effect | undefined {
 }
 
 export function runEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
+  // The Celestial Toymaker (round B306): this spell or ability groups cards or permanents into piles (CR 700.3).
+  if (groupsIntoPiles(e)) notePileOrGuess(s);
   // Counters an effect puts on are put by the ability's controller (Vorinclex rulings), all at once (round 416).
   const result = withPutter(ctx.controller, () => batchCountersPut(s, () => runEffectInner(s, e, ctx)));
   invalidateCharacteristics(s);
@@ -1998,6 +2004,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runWarpWorldEffect(s, ctx, src);
     case "restartGame":
       return runRestartGameEffect(s, ctx, src);
+    case "psychicBattle":
+      return runPsychicBattleEffect(s, ctx, src);
     case "glimpseOfTomorrow":
       return runGlimpseOfTomorrowEffect(s, ctx, src);
     case "faceDownPile":
@@ -2219,6 +2227,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB236Effect(s, e, ctx, src);
     case "putWithLink":
       return runLaneB296Effect(s, e, ctx, src);
+    case "outsideGame":
+      return runLaneB304Effect(s, e, ctx, src);
+    case "shamansTrance":
+      return runLaneB305Effect(s, e, ctx, src);
+    case "exilePilesDefenderChooses":
+      return runLaneB306Effect(s, e, ctx, src);
     case "consulateRedirect":
     case "piracy":
       return runLaneB238Effect(s, e, ctx, src);

@@ -10,6 +10,7 @@ import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../ty
 import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, playerProtectedFrom, printedMatches, spellManaValue } from "./targeting";
 import { phaseOut } from "../phasing";
 import { ResolveCtx, apnap, startingWith, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
+import { notePileOrGuess } from "./run-laneb306";
 import { enterBlocking } from "./run-laneb256";
 import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -3105,6 +3106,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       if (st.guess === undefined) {
         const now = e.overCount ? ` (now ${amountNow(s, e.overCount, ctx)})` : "";
+        notePileOrGuess(s); // The Celestial Toymaker (round B306): a guess.
         s.pending = { kind: "chooseOption", player: guesser, source: src, what: "predicamentGuess", options: ["over", "notOver"], labels: [`Greater than ${than}${now}`, `${e.overCount ? "Not greater than that" : `${e.over} or less`}`], prompt: `${you.name} chose a card in their hand. Guess whether its mana value is greater than ${than}${now}: if you guess wrong, they may cast it without paying its mana cost` };
         return "paused";
       }

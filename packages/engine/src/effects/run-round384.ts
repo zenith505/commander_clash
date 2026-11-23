@@ -3,6 +3,7 @@ import type { Effect } from "../abilities";
 import { log, loseLife, player } from "../game";
 import type { GameState } from "../types";
 import { type ResolveCtx, runEffect } from "./resolve";
+import { notePileOrGuess } from "./run-laneb306";
 import { chooseAnOpponent } from "./run-library";
 
 /** The Toymaker's Trap's guess prompt starts with this (bots guess at random, see bot.ts). */
@@ -54,6 +55,7 @@ export function runSecretNumberGuessEffect(s: GameState, e: Extract<Effect, { ty
     if (st.guess === undefined) {
       const chosen = s.numbersChosenFor?.[key] ?? [];
       const earlier = chosen.slice(0, -1);
+      notePileOrGuess(s); // The Celestial Toymaker (round B306): a guess.
       s.pending = { kind: "chooseOption", player: st.guesser, source: src, what: "toyGuess", options: Array.from({ length: e.max }, (_, i) => String(i + 1)), prompt: `${TOY_GUESS_PROMPT} ${me.name} chose for ${src} (chosen before: ${earlier.length ? earlier.join(", ") : "none"}): if you're wrong, you lose life equal to your guess and ${me.name} draws a card; if you're right, ${me.name} sacrifices it` };
       return "paused";
     }

@@ -4576,7 +4576,8 @@ function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecisio
     const t = next[j]!;
     if (t.kind === "none" || (harm[j] ? !isMine(s, pid, t) : isMine(s, pid, t))) continue;
     // Not one a kept "another target" names (CR 115.7d).
-    const clash = (x: ChosenTarget) => pend.specs.some((sp, k) => k !== j && sp.distinctFrom?.includes(j) && sameTarget(next[k], x));
+    // Psychic Battle (round 453): nor one it already targets elsewhere (pend.noRepeat).
+    const clash = (x: ChosenTarget) => pend.specs.some((sp, k) => k !== j && (sp.distinctFrom?.includes(j) || !!pend.noRepeat) && sameTarget(next[k], x));
     const options = changeTargetOptions(s, item, pend.specs[j]!, t).filter(
       (x): x is ChosenTarget => x.kind !== "none" && (harm[j] ? !isMine(s, pid, x) : isMine(s, pid, x)) && !(x.kind === "stack" && x.id === item.id) && !clash(x) && canChooseTarget(s, pend.specs, next, j, x, pend.controller, q, item.sourceId),
     );
@@ -7746,6 +7747,14 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       }
       case "continuous":
         v += e.what.ref === "target" && harm[e.what.index] ? 5 : 2;
+        break;
+      // Round B304: nothing from outside the game in Commander (Mastermind's Acquisition's second mode).
+      case "outsideGame":
+        break;
+      // Shaman's Trance (round B305): what it opens up, the cards in other players' graveyards with a way of their own to be
+      // cast from there (flashback); nothing else is counted (a gap: our own permissions for our graveyard aren't weighed).
+      case "shamansTrance":
+        v += s.turnOrder.filter((q) => q !== pid && !player(s, q).lost).flatMap((q) => player(s, q).graveyard).filter((id) => !!compileCard(defOf(s, obj(s, id))).fromGraveyard?.length).length;
         break;
       default:
         v += 1;

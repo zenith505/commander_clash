@@ -146,6 +146,8 @@ export type Count =
   | { kind: "selfChosenNumber" }
   /** Bell Borca, Spectral Sergeant (round B239): "the greatest number noted for it this turn": the greatest mana value its controller's ~ noted this turn as a card was put into exile while it was on the battlefield as this object (GameObject.exiledMvNoted); 0 with none, or off the battlefield (rulings). */
   | { kind: "selfNotedExiledMv" }
+  /** The Celestial Toymaker (round B306): "each spell or ability that caused one or more players to guess or to group cards or permanents into a pile this turn" (TurnLog.pileOrGuess). */
+  | { kind: "pileOrGuessSources" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
   /** "The number of times that spell was kicked" (Rumbling Aftershocks): its kicker costs paid as it was cast, multikicker's each time (CR 702.33d). */
@@ -3165,6 +3167,12 @@ export type Effect =
    * those cards onto the battlefield under your control." (CR 727, restart.ts): the cards linked to the source (CR 607.2a).
    */
   | { type: "restartGame" }
+  /**
+   * Round 453, Psychic Battle: "each player reveals the top card of their library. The player who reveals the card with the
+   * greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or targets
+   * remain unchanged." The spell or ability is the trigger's cause.
+   */
+  | { type: "psychicBattle" }
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true; /** Hofri Ghostforge's Spirit token: "the exiled card" is the one the ability that created this token linked to it (round354.ts), not one an exile ability of its own took. */ createdLink?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
@@ -5047,6 +5055,20 @@ export type Effect =
    */
   | { type: "putWithLink"; target: number }
   /**
+   * Lane B round B304: an instruction that brings a card you own from outside the game into the game (Mastermind's
+   * Acquisition, North Wind Avatar, Legion Angel, Vivien, Arkbow Ranger, The Raven's Warning, Granted, Research, Spawnsire of
+   * Ulamog). "Parts of abilities which bring other traditional card(s) you own from outside the game into the game ... do
+   * not function in Commander" (Commander format rule 10), and players here have no sideboard (CR 100.4, 400.11a): it does
+   * nothing but say so in the log. `text` is the instruction as printed.
+   */
+  | { type: "outsideGame"; text: string }
+  /**
+   * Shaman's Trance (round B305): "Other players can't play lands or cast spells from their graveyards this turn. You may
+   * play lands and cast spells from other players' graveyards this turn as though those cards were in your graveyard." For
+   * the rest of the turn (GameState.tranceTurn; game.ts tranced, tranceBars).
+   */
+  | { type: "shamansTrance" }
+  /**
    * Captured by the Consulate (round B238): "change the target to enchanted creature if able": the spell whose cast
    * triggered this (ctx.cause), if it still has a single target (CR 603.4), gets the creature this Aura is attached to, or
    * was as it last existed (CR 608.2h), as its target, only if that's a legal target for it (CR 115.7, rulings).
@@ -6247,6 +6269,12 @@ export type Effect =
    */
   /** Hostile Negotiations: two piles of `n` cards exiled face down from the top of your library, one turned face up by you, an opponent choosing the one for your hand (see runFaceDownPilesEffect). */
   | { type: "faceDownPiles"; n: number }
+  /**
+   * The Celestial Toymaker (round B306): "look at the top `n` cards of your library. Exile any number of them in a face-down
+   * pile and the rest in a face-up pile. Defending player chooses one of those piles. Put that pile into your hand." The
+   * other pile stays in exile (effects/run-laneb306.ts).
+   */
+  | { type: "exilePilesDefenderChooses"; n: number }
   /** Abstract Performance (round B270): `n` cards exiled face down in a pile, then `n` face up in another; an opponent you choose picks one for your graveyard, and you look at the other (the cards a castFromAmong `fromDug` then casts from, ResolvingInfo.dugExiled; see effects/run-laneb270.ts). */
   | { type: "abstractPiles"; n: number }
   /** Gollum, Scheming Guide: an opponent you choose guesses whether the top card of your library is of the kind chosen just
@@ -7131,6 +7159,8 @@ export type TriggerEvent =
   | "selfManaAbilityResolves"
   /** Grip of Chaos (round B267): "Whenever a spell or ability is put onto the stack, if it has a single target": any spell or ability, cast, activated, triggered or copied (CR 707.10), with exactly one target chosen; the event's cause is it. */
   | "stackItemSingleTarget"
+  /** Psychic Battle (round 453): "Whenever a player chooses one or more targets": for a spell or ability on the stack (the event's cause), as it's cast, activated or put on the stack, or new ones a player picks for it or its copy (TriggerEvent "targeted" `chose`). */
+  | "targetsChosen"
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
   /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */
@@ -10371,6 +10401,8 @@ export interface CompiledCard {
   noMaxHandSize?: boolean | "all";
   /** Haakon, Stromgald Scourge: "You may cast ~ from your graveyard, but not from anywhere else" (game.ts castProblem). */
   castOnlyFromGraveyard?: true;
+  /** Panglacial Wurm (round B305): "While you're searching your library, you may cast ~ from your library" (effects/run-laneb305.ts castWhileSearching). */
+  castWhileSearching?: true;
   /** Liesa, Shroud of Dusk: its commander tax is paid as 2 life for each previous cast from the command zone, not {2} (game.ts commanderTaxLife). */
   commanderTaxAsLife?: true;
   /** Ensnaring Bridge: "Creatures with power greater than the number of cards in your hand can't attack" (any player's, checked as attackers are declared, rulings). */

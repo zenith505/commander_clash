@@ -4750,7 +4750,7 @@ line blocks.
    identity, CR 207.5, 903.4); bots use Etrata's ability only in their second main phase, for an instant or sorcery card
    or a creature card of mana value 3 or more, and don't weigh it in combat.
    Round 444 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
-   of Promise, Psychic Paper, Karn Liberated, Vesuvan Shapeshifter and the others still out, to two cards with memory
+   of Promise, Psychic Paper, Karn Liberated (done in round 452), Vesuvan Shapeshifter and the others still out, to two cards with memory
    counters on cards in exile. Altaïr Ibn-La'Ahad's "Whenever Altaïr attacks, exile up to one target Assassin creature card
    from your graveyard with a memory counter on it. Then for each creature card you own in exile with a memory counter on
    it, create a tapped and attacking token that's a copy of it. Exile those tokens at end of combat." (the counter on the
@@ -4770,7 +4770,7 @@ line blocks.
    exiled card is worth more than their legendary creature (by power and toughness), never on a legendary card whose name
    they already have on the battlefield.
    Round 445 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Psychic Paper, Karn Liberated, Vesuvan Shapeshifter and the others still out, to two cards with cards in exile
+   Promise, Psychic Paper, Karn Liberated (done in round 452), Vesuvan Shapeshifter and the others still out, to two cards with cards in exile
    that matter. Flamewar, Brash Veteran // Flamewar, Streetwise Operative's "Sacrifice another artifact: Put a +1/+1 counter
    on Flamewar and convert it. Activate only as a sorcery." ("it" is Flamewar; converting is transforming, CR 701.28a, the
    counter staying, rulings), "{1}, Discard your hand: Put all exiled cards you own with intel counters on them into your
@@ -4824,7 +4824,7 @@ line blocks.
    it face up (or answer an effect turning it face up) as a copy of the creature with the most power, toughness and
    abilities, not a legend whose name they have, never as a 0/0.
    Round 447 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Karn Liberated and Secret of Bloodbending (still out, for their reasons) to two cards back off the lists, each
+   Promise, Karn Liberated (done in round 452) and Secret of Bloodbending (still out, for their reasons) to two cards back off the lists, each
    settled by reading closer. Captain America, First Avenger's "Throw ... — {3}, Unattach an Equipment from Captain America:
    He deals damage equal to that Equipment's mana value divided as you choose among one, two, or three targets." ("Throw
    ..." and "... Catch" one flavor word, CR 207.2d; "He" is the card, CR 201.5): the division is announced before the cost
@@ -4848,7 +4848,7 @@ line blocks.
    in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
    even when the thrown Equipment's mana value leaves room for fewer (the division then refuses them).
    Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
+   Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
    round B299) to Paleontologist's Pick-Axe, out since round 334, whose pieces are there now. Its back face, Dinosaur
    Headdress: "As this Equipment becomes attached to a creature, choose an exiled creature card used to craft this
    Equipment." (asked each time it becomes attached, by its enters trigger, an equip ability or an effect, as Sanctuary
@@ -4872,7 +4872,7 @@ line blocks.
    card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
    card with the most power, toughness and abilities.
    Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
-   Kiss, Finale of Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
+   Kiss, Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
    Bracelet and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
    are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
    unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
@@ -4909,7 +4909,7 @@ line blocks.
    Ana takes 9 and discards two, both cards exiled) and X = 3 with Fact or Fiction (mana value 4) offered no slot and Night's
    Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in), 31,891 with main 60ad21b (B300, B301); the compiled text of every other card and face is unchanged.
    Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
-   unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (restarting the game), Secret of
+   unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (done in round 452) (restarting the game), Secret of
    Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: bots cast the cards in
    the order targeted and make the copies in the order cast.
@@ -4932,12 +4932,39 @@ line blocks.
    is unchanged. The top 5,000 are all supported now.
    Out after round 451 (looked at, not done): the lists after round 450 (still out, for their reasons; Share the Spoils
    was done in round B300): Chef's Kiss ("reselect the targets at random": whether the current target is among them, no rule
-   or ruling), Karn Liberated (restarting the game), Secret of Bloodbending and The Dominion Bracelet (controlling another
+   or ruling), Karn Liberated (done in round 452) (restarting the game), Secret of Bloodbending and The Dominion Bracelet (controlling another
    player), Pulmonic Sliver (an optional replacement in the middle of any move to a graveyard), Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: the human's own
    simultaneous triggers are ordered automatically (no prompt), so Ulalek's may go below another trigger of yours from the
    same spell; the automatic payment for the Eldrazi spell may tap the colorless sources Ulalek's {C}{C} would need, and a
    trigger whose payment can't be made isn't asked about; bots always pay, and copy in the order the stack holds.
+   Round 452 went on down `npm run popular`, most played first, past Chef's Kiss (still out, for its reason) to Karn
+   Liberated (rank 7,138), out since the first rounds for "restarting the game", which CR 727 and the card's rulings
+   settle: "−14: Restart the game, leaving in exile all non-Aura permanent cards exiled with Karn. Then put those cards onto
+   the battlefield under your control." (a whole line in oracle/round452.ts; Effect "restartGame", restart.ts). The game
+   ends with no winner, loser or draw and every player still in it begins a new one by rule 103 (727.1), Karn's controller
+   going first (727.1a): every card each of them owns, wherever it is, is in the new game, ownership unchanged (727.2;
+   tokens, copies and emblems aren't cards), commanders in the command zone, the rest shuffled into their library; life
+   back to 40, no counters, emblems, commander tax or commander damage, no effects (rulings); a player who left isn't in it
+   (rulings). Opening hands, mulligans (the first free, CR 103.5c) and the opening hands' actions (Leylines, 103.6) happen
+   as at the start (createGame's pieces: blankGame, seatPlayer, openGame). The cards "exiled with Karn" are those its +4
+   ("Target player exiles a card from their hand.") and −3 ("Exile target permanent.") exiled, linked to this object
+   (rulings, CR 607.2a; oracle/round452.ts linkRestartExiles); the non-Aura permanent cards among them still in exile stay
+   out of the restart (727.5), a commander among them staying that deck's commander outside the command zone (727.5a), and
+   just before the first untap step they enter under Karn's controller's control all at once (727.4: GameState
+   restartEnters, after the opening actions; "as it enters" choices are made then, before the first turn), under that
+   player's control since their first turn began, so they can attack then (rulings, CR 302.6); what they trigger waits for
+   the first upkeep (rulings). Bots use the −14 when the cards left in exile are worth more than their lead in permanents
+   and life (value.ts). Browser test: Karn with Ana's Mulldrifter exiled with it: −14, the new game's mulligan prompt
+   (turn 1, everyone at 40, an empty battlefield), Keep, then Mulldrifter enters under your control and draws you two in
+   your first upkeep. +1, 31,893 of 31,936 on this stacked branch (round 451 #756); the compiled text of every other card
+   and face is unchanged.
+   Out after round 452 (looked at, not done): the lists after round 451 (still out, for their reasons): Chef's Kiss,
+   Secret of Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition
+   and Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: state-based
+   actions are checked during the new game's mulligans as at any game's start, so a player who'd draw from an empty library
+   then would lose then, not in the first upkeep (CR 727.3; no deck here has fewer than seven cards left after a restart);
+   bots weigh the restart by the worth of permanents and life only, not the cards in hand or library.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -7002,7 +7029,7 @@ line blocks.
    block ~ this turn", Electric Eel):
    - Exiling from hand still out: "you may play that card" or face down (Fiend of the Shadows, Kheru Mind-Eater,
      Lightstall Inquisitor (done in round 298)), "until ~ leaves the battlefield" (Intellect Devourer (done in round 298)), Arcane Artisan (done in round B200), Ashiok's -3, Muse
-     Vessel's second ability (done in round B152), Karn Liberated's -14, Ruthless Negotiation ("if ~ was cast from a graveyard"). Bots
+     Vessel's second ability (done in round B152), Karn Liberated's -14 (done in round 452), Ruthless Negotiation ("if ~ was cast from a graveyard"). Bots
      exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
    - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
      what it would do.

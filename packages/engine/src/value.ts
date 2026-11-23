@@ -9,6 +9,7 @@ import { characteristics, controllerOf } from "./layers";
 import { compileCard } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type PlayerId } from "./types";
 import { defMv } from "./faces";
+import { restartExempt } from "./restart";
 
 const mv = (s: GameState, id: string) => defMv(defOf(s, obj(s, id)));
 
@@ -103,6 +104,21 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     const sum = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);
     const opps = livingPlayers(s).filter((p) => p !== pid);
     return opps.length ? opps.reduce((n, p) => n + sum(p), 0) / opps.length - sum(pid) : 0;
+  }
+  // Karn Liberated (round 452): a new game for everyone (CR 727), but the cards left in exile come back for us at once,
+  // so when those are worth more than how far ahead we are now: our permanents against the opponents' on average, and
+  // our life total against theirs (all back to the starting life total).
+  if (body.effects.some((e) => e.type === "restartGame")) {
+    const src = sourceId ? s.objects[sourceId] : undefined;
+    const kept = restartExempt(s, src ? `${src.id}@${src.zoneChanges ?? 0}` : undefined).reduce((n, o) => {
+      const d = defOf(s, o);
+      return n + (d.types.includes("Land") ? 3 : d.types.includes("Creature") ? Math.max(1, Number(d.power) + Number(d.toughness) || 0) + 1 : 1 + mv(s, o.id));
+    }, 0);
+    const board = (p: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== sourceId && controllerOf(s, o) === p).reduce((n, o) => n + worth(s, pid, o), 0);
+    const opps = livingPlayers(s).filter((p) => p !== pid);
+    if (!opps.length) return -1;
+    const avg = (f: (p: PlayerId) => number) => opps.reduce((n, p) => n + f(p), 0) / opps.length;
+    return kept + avg(board) - board(pid) + (avg((p) => player(s, p).life) - player(s, pid).life) / 4;
   }
   // Glimpse of Tomorrow (round 390): our permanents (tokens and all) for as many cards from the top of our library, only
   // its permanent cards staying (worth what they'd be worth there, a token's nothing), so only when what we have is worth

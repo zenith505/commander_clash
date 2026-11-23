@@ -1,6 +1,6 @@
 # Roadmap
 
-31,901 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,903 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,974 of
 9,979 (99%).
 
@@ -4911,7 +4911,7 @@ line blocks.
    Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
    unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (restarting the game), Secret of
    Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
-   Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: bots cast the cards in
+   Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (done in round B305) (cast while searching). Known gaps: bots cast the cards in
    the order targeted and make the copies in the order cast.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
@@ -6201,7 +6201,7 @@ line blocks.
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (done in round B285) (noted
    mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
-   spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (other players' graveyards as yours);
+   spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (done in round B305) (other players' graveyards as yours);
    Pygmy Hippo (done in round B286); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion (done in round B291) and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
@@ -6265,7 +6265,7 @@ line blocks.
    resolves chosen as mana is spent).
    Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (damage replaced by milling,
    ordered with prevention and other replacements, CR 616.1); Turtles Forever (done in round B303) (a search of your library and outside the
-   game); Panglacial Wurm (cast from your library while searching it).
+   game); Panglacial Wurm (done in round B305) (cast from your library while searching it).
    Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
    the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
    Daydreamer and Rod of Absorption (spells exiled as they resolve, cast later from among them); Risky Move (done in round B241) ("When you gain
@@ -12107,6 +12107,37 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B305 (least played first, two cards off the skip lists, not in Lane A's rounds 451-452): Panglacial Wurm (out
+  since round 286: cast while searching) and Shaman's Trance (out after rounds 294 and B293: other players' graveyards as
+  yours). Panglacial Wurm's "While you're searching your library, you may cast ~ from your library.": an ability of the
+  card in its owner's library (CR 113.6b, CompiledCard.castWhileSearching). When a player starts a search of their own
+  library (the search effect, "search each library ... and exile", and a search of a player's graveyard, hand and library
+  for cards named one, when that player is the searcher; effects/run-laneb305.ts castWhileSearching), each such card there
+  is offered to them once before anything is found (rulings: "before you find any cards with the search effect"), as
+  PendingDecision "castFree" `how` "paid" `whileSearching`: cast for its mana cost and any additional costs, timing
+  ignored, mana abilities allowed to pay for it (rulings, CR 605.3a), onto the stack (CR 601.2a); it can't be found by the
+  search, several may be cast in one search, and the search goes on; the active player gets priority with it on the stack
+  once the search's spell or ability has resolved (rulings). Not for a search of another player's library (Bribery). Shaman's
+  Trance's "Other players can't play lands or cast spells from their graveyards this turn. You may play lands and cast
+  spells from other players' graveyards this turn as though those cards were in your graveyard.": one effect for the turn
+  (GameState.tranceTurn; game.ts tranced, tranceBars). The other players can't cast a spell or play a land from their own
+  graveyards by any permission (castProblem, mayPlayLandFromGraveyard), though one with a permission for any graveyard may
+  still use another's. Its controller casts and plays cards in other players' graveyards with what lets them do it from
+  their own: the card's own ways (rulings: flashback; not activated abilities, so not unearth), permanents' permissions
+  for "your graveyard" (Muldrotha, Lurrus, Crucible of Worlds, Ramunap Excavator), and "this turn" permissions (Yawgmoth's
+  Will, Chainer); the card is still its owner's (exiled by flashback, returned to its owner's zones). Judgment calls (no
+  ruling): with an opponent's Aven Mindcensor, only a Wurm among the top cards searched is offered; Bösium Strip's "top of
+  your graveyard" and Eye of Duskmantle's "cards you've surveilled" don't reach other players' graveyards (those cards were
+  never on top of, or surveilled into, yours). Browser tests: Rampant Growth's search offers the Wurm, cast (then a Forest
+  found) or declined; with Shaman's Trance you flash back Think Twice from Ana's graveyard and play her Forest with your
+  Crucible of Worlds. +2, 31,903 of 31,936 on B304's head 03f8a3f2 (main 7917d27). The compiled text of every other card is
+  unchanged.
+- Out after round B305 (looked at, not done): the lists after round B304 stay out. About 33 unsupported cards remain: the
+  Wishes (left out by choice), control of another player (Word of Command, Secret of Bloodbending, The Dominion Bracelet),
+  text changes (Swirl the Mists, Volrath's Shapeshifter, Spy Kit), and the others in the earlier lists for their reasons.
+  Known gaps: the Wurm isn't offered while an opponent's Opposition Agent controls its owner's search (CR 723.5: that
+  player would choose), nor during Archmage Ascension's search instead of a draw; bots value Shaman's Trance only by the
+  cards in other graveyards with a way of their own to be cast (flashback), not by their own permissions.
 - Round B304 (least played first, eight cards off the skip lists, not in Lane A's rounds 450-452): the cards whose only gap
   was a card from outside the game. "Parts of abilities which bring other traditional card(s) you own from outside the game
   into the game (such as Living Wish; Spawnsire of Ulamog; Karn, the Great Creator; Wish) do not function in Commander"
@@ -12268,7 +12299,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   one); a permission to cast it (Yawgmoth's Will, Muldrotha, Karador) isn't an ability of the card's. Browser test: Think
   Twice isn't offered from your graveyard under Ana's Jailer; after Murder kills it, it's cast with its flashback. +1.
   The compiled text of every other card is unchanged.
-- Out after round B297 (looked at, not done): the lists after round B296 stay out; Panglacial Wurm (still out: casting it
+- Out after round B297 (looked at, not done): the lists after round B296 stay out; Panglacial Wurm (done in round B305) (still out: casting it
   pauses every search of its owner's library, about 80 places a search starts, and pays for a spell in the middle of a
   resolution) and Pulmonic Sliver were looked at again. About 51 unsupported cards remain, all of them hard. Known gaps under
   Yixlid Jailer: a card cast from a graveyard by a permission keeps its own "cast this spell only ..." restrictions; bots
@@ -12367,7 +12398,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (done in round 447) (the division of damage is
   announced before the cost picks the Equipment whose mana value is the amount, CR 601.2d, 601.2h), Ghostly Flame (its
   rulings make damage colorless only for some checks: protection and prevention, not "a red spell deals damage"
-  triggers), Shaman's Trance (every "your graveyard" permission would have to reach other players' graveyards) and
+  triggers), Shaman's Trance (done in round B305) (every "your graveyard" permission would have to reach other players' graveyards) and
   Yixlid Jailer were looked at again and stay out. Judgment calls and known gaps: Titania's Song that has lost its
   abilities as it leaves (Mycosynth Lattice makes it a noncreature artifact, so its own effect takes them away) leaves no
   effect behind, the "continues" being part of the ability it no longer has; bots don't weigh Titania's Song against their

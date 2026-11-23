@@ -5050,6 +5050,12 @@ export type Effect =
    */
   | { type: "outsideGame"; text: string }
   /**
+   * Shaman's Trance (round B305): "Other players can't play lands or cast spells from their graveyards this turn. You may
+   * play lands and cast spells from other players' graveyards this turn as though those cards were in your graveyard." For
+   * the rest of the turn (GameState.tranceTurn; game.ts tranced, tranceBars).
+   */
+  | { type: "shamansTrance" }
+  /**
    * Captured by the Consulate (round B238): "change the target to enchanted creature if able": the spell whose cast
    * triggered this (ctx.cause), if it still has a single target (CR 603.4), gets the creature this Aura is attached to, or
    * was as it last existed (CR 608.2h), as its target, only if that's a legal target for it (CR 115.7, rulings).
@@ -10373,6 +10379,8 @@ export interface CompiledCard {
   noMaxHandSize?: boolean | "all";
   /** Haakon, Stromgald Scourge: "You may cast ~ from your graveyard, but not from anywhere else" (game.ts castProblem). */
   castOnlyFromGraveyard?: true;
+  /** Panglacial Wurm (round B305): "While you're searching your library, you may cast ~ from your library" (effects/run-laneb305.ts castWhileSearching). */
+  castWhileSearching?: true;
   /** Liesa, Shroud of Dusk: its commander tax is paid as 2 life for each previous cast from the command zone, not {2} (game.ts commanderTaxLife). */
   commanderTaxAsLife?: true;
   /** Ensnaring Bridge: "Creatures with power greater than the number of cards in your hand can't attack" (any player's, checked as attackers are declared, rulings). */

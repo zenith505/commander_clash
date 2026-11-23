@@ -7750,6 +7750,11 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       // Round B304: nothing from outside the game in Commander (Mastermind's Acquisition's second mode).
       case "outsideGame":
         break;
+      // Shaman's Trance (round B305): what it opens up, the cards in other players' graveyards with a way of their own to be
+      // cast from there (flashback); nothing else is counted (a gap: our own permissions for our graveyard aren't weighed).
+      case "shamansTrance":
+        v += s.turnOrder.filter((q) => q !== pid && !player(s, q).lost).flatMap((q) => player(s, q).graveyard).filter((id) => !!compileCard(defOf(s, obj(s, id))).fromGraveyard?.length).length;
+        break;
       default:
         v += 1;
     }

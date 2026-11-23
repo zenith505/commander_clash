@@ -11832,6 +11832,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "33c722cf-b4bf-431f-aefd-ee96241a7fbf",
+  "name": "Crucible of Worlds",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may play lands from your graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mps",
+  "releasedAt": "2016-09-30",
+  "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecfbebc9-7fc7-474e-8c59-8ede800e082e",
   "name": "Crucible of the Spirit Dragon",
   "manaCost": "",
@@ -38842,6 +38864,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "49d4aef7-d2d1-4f66-bc2a-79ec8cc96565",
+  "name": "Panglacial Wurm",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wurm"
+  ],
+  "oracleText": "Trample\nWhile you're searching your library, you may cast this card from your library.",
+  "power": "9",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "76678885-3674-443d-b9a2-2a460cf6aac0",
   "name": "Panharmonicon",
   "manaCost": "{4}",
@@ -46038,6 +46092,32 @@
   "set": "sld",
   "releasedAt": "2026-09-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "619d8d81-9e10-4353-b30d-a0f9c3451cd2",
+  "name": "Shaman's Trance",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Other players can't play lands or cast spells from their graveyards this turn. You may play lands and cast spells from other players' graveyards this turn as though those cards were in your graveyard.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "jud",
+  "releasedAt": "2002-05-27",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

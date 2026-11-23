@@ -114,6 +114,7 @@ import { runLaneB235Effect } from "./run-laneb235";
 import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB296Effect } from "./run-laneb296";
 import { runLaneB304Effect } from "./run-laneb304";
+import { runLaneB305Effect } from "./run-laneb305";
 import { runLaneB238Effect } from "./run-laneb238";
 import { runLaneB254Effect } from "./run-laneb254";
 import { runLaneB255Effect } from "./run-laneb255";
@@ -2219,6 +2220,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB296Effect(s, e, ctx, src);
     case "outsideGame":
       return runLaneB304Effect(s, e, ctx, src);
+    case "shamansTrance":
+      return runLaneB305Effect(s, e, ctx, src);
     case "consulateRedirect":
     case "piracy":
       return runLaneB238Effect(s, e, ctx, src);

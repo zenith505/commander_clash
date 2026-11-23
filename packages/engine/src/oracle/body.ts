@@ -19,6 +19,7 @@ import { X_MODES_MAX } from "../modes";
 import { round318Sentence } from "./round318";
 import { roundB166Sentence } from "./laneb166";
 import { developmentBody, outsideGameBody } from "./laneb304";
+import { shamansTranceBody } from "./laneb305";
 import { roundB167Sentence } from "./laneb167";
 import { roundB170WholeText } from "./laneb170";
 import { round319WholeText } from "./round319";
@@ -1209,6 +1210,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Cards from outside the game (round B304, laneb304.ts): the instruction does nothing in Commander.
   const outside = outsideGameBody(text);
   if (outside) return outside;
+  // Shaman's Trance (round B305, laneb305.ts): the whole spell.
+  const trance = opts.spell ? shamansTranceBody(text) : null;
+  if (trance) return trance;
   const development = opts.spell ? developmentBody(text, (t) => parseBody(t, { spell: true })) : undefined;
   if (development !== undefined) return development;
   if ((opts.spell || opts.activated) && (/\btarget\b[^.]*? of an opponent's choice\b/.test(text) || /^An opponent chooses target creature they control\. /.test(text))) return opponentChosenTargets(text, opts);

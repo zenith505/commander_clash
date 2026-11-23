@@ -919,6 +919,9 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     if (extra.some((x) => x.firstDrawLook)) hit.firstDrawLook = true;
     // Realmbreaker's "If this land would leave the battlefield, exile it instead ..." (CR 614.1a).
     if (extra.some((x) => x.exileIfLeavesSelf)) hit.exileIfLeavesSelf = true;
+    // Pulmonic Sliver's granted "If this permanent would be put into a graveyard, you may put it on top of its owner's
+    // library instead" (round 457): one choice however many instances it has (CR 614.5: each could apply once, to the same end).
+    if (extra.some((x) => x.mayTopInsteadOfGraveyard)) hit.mayTopInsteadOfGraveyard = true;
     // Can't Stay Away's granted "If this creature would die, exile it instead" (CR 614.1a), beside any of its own.
     if (!base.exileInsteadOfDying?.self && extra.some((x) => x.exileInsteadOfDying?.self)) hit.exileInsteadOfDying = base.exileInsteadOfDying ? { ...base.exileInsteadOfDying, alsoSelf: true } : { self: true };
     // Nerd Rage's granted "You have no maximum hand size": the creature's controller's (CR 109.5, 402.2; see hasNoMaxHandSize in game.ts).

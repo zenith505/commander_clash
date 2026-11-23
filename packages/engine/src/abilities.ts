@@ -9304,6 +9304,11 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If this land would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a), as an ability it has (Realmbreaker's gift). */
   exileIfLeavesSelf?: true;
+  /**
+   * Pulmonic Sliver's granted "If this permanent would be put into a graveyard, you may put it on top of its owner's
+   * library instead." (round 457, CR 614.1a): asked of its controller as it would be put there (move-questions.ts).
+   */
+  mayTopInsteadOfGraveyard?: true;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   /** Ugin's Nexus: "If ~ would be put into a graveyard from the battlefield, instead exile it and take an extra turn after this one." (game.ts moveObject). */
   exileForExtraTurn?: true;

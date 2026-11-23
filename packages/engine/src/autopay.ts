@@ -69,7 +69,9 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
   const isCreature = (id: string) => objIsType(s, obj(s, id), "Creature");
   // Round B260: mana abilities Brutal Suppression or Drought add a sacrifice to are activated by hand, never automatically.
   const adding = anyAddedCosts(s);
-  const handOnly = (o: GameObject, ab: ManaAbility) => adding && addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf).length > 0;
+  // Round 457: so are those sacrificing a permanent with Pulmonic Sliver's "you may put it on top of its owner's library
+  // instead", whose question stops the activation (move-questions.ts), and the rest of a plan with it.
+  const handOnly = (o: GameObject, ab: ManaAbility) => (adding && addedAbilityCosts(s, pid, o, ab.manaCost, ab.sacrificeSelf).length > 0) || (!!ab.sacrificeSelf && !!abilitiesOf(s, o).mayTopInsteadOfGraveyard);
   return s.battlefield
     .filter((id) => !exclude.includes(id))
     .map((id) => obj(s, id))

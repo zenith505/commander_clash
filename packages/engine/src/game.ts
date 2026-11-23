@@ -45,6 +45,7 @@ import { channelMana } from "./channel";
 import { nextRandom, randomWatch, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
+import { answerMoveQuestion, answersMoveQuestion, asking, moveAnswer, MoveQuestionPause, questionPending } from "./move-questions";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
 import { circledProblem } from "./deck";
 import { spendPlan } from "./value";
@@ -414,7 +415,15 @@ export function waitingOn(s: GameState): PlayerId | null {
 export function applyAction(state: GameState, action: Action): GameState {
   if (state.over) throw new RulesError("game is over");
   const s = cloneState(state);
-  applyInPlace(s, action);
+  try {
+    asking(s, () => applyInPlace(s, action));
+  } catch (e) {
+    // Round 457: a move stopped to ask (move-questions.ts): the action is undone, and redone once it's answered.
+    if (!(e instanceof MoveQuestionPause)) throw e;
+    const back = cloneState(state);
+    back.pending = questionPending(e.q, action, state.pending);
+    return back;
+  }
   return s;
 }
 
@@ -425,6 +434,8 @@ export function applyAction(state: GameState, action: Action): GameState {
 export function applyInPlace(s: GameState, action: Action): void {
   if (s.over) throw new RulesError("game is over");
   invalidateCharacteristics(s); // a fresh copy would start with nothing cached
+  // Round 457: the answer to a question a move asked redoes the action it stopped (move-questions.ts).
+  if (answersMoveQuestion(s, action)) return answerMoveQuestion(s, action);
   const p = player(s, action.player);
   if (action.type === "concede") {
     playerLoses(s, p.id, "conceded", true);
@@ -1069,6 +1080,9 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // Pulmonic Sliver (round 457): which permanents have its granted replacement just before the first of the permanents
+  // leaving at the same time leaves (s.leftTogether `mayTop`).
+  const mayTopBefore = fromZone === "battlefield" && !s.leftTogether?.length ? mayTopKeys(s) : undefined;
   // Syrix, Carrier of the Flame: "if a creature card left your graveyard this turn": a creature card as it was there.
   const creatureCardLeavesYard = fromZone === "graveyard" && to !== "graveyard" && !o.isToken && objIsType(s, o, "Creature");
   // "Can't be sacrificed": an instruction to sacrifice it does nothing (rulings on Alexios, CR 701.21).
@@ -1217,6 +1231,20 @@ export function moveObject(
   // aren't on the battlefield yet either). One sacrifice for each Land Equilibrium that applies (CR 614.5), made right after
   // the instruction or action that put it there (equilibriumSacrifices).
   if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged") equilibriumOwed(s, o, opts, fromZone);
+  // Pulmonic Sliver (round 457): "If this permanent would be put into a graveyard, you may put it on top of its owner's
+  // library instead" (CR 614.1a): the permanent's ability as it would leave, or as it was just before the first of the
+  // permanents leaving with it left (rulings: it applies to Pulmonic Sliver and the Slivers dying with it). Its controller
+  // ("you") chooses, and with other replacements of this move chooses which applies first (CR 616.1, 616.1e): taking this
+  // one first, it goes to the library and the ones that put a card going to a graveyard elsewhere no longer apply
+  // (616.1f); declining, they apply as they would. One that exiles it from leaving at all (unearth, Realmbreaker's) still
+  // applies to the move to the library, so nothing is asked then. The question stops the action (move-questions.ts).
+  let toppedInstead = false;
+  if (fromZone === "battlefield" && to === "graveyard" && o.exileIfLeaves !== "battlefield" && !abilitiesOf(s, o).exileIfLeavesSelf && hasMayTop(s, o, mayTopBefore) && topInstead(s, o) === "top") {
+    to = "library";
+    opts = { ...opts, top: true };
+    toppedInstead = true;
+    log(s, `${characteristics(s, o).name} is put on top of its owner's library instead of into a graveyard.`);
+  }
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -1430,7 +1458,7 @@ export function moveObject(
     // powers then, for "the greatest power among creatures that player controls" as it looks back (CR 603.10a), while
     // something has such an ability.
     const before = !s.leftTogether?.length && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).triggers.some((t) => t.dies?.greatestPowerOfController)) ? s.battlefield.flatMap((b) => (objIsType(s, obj(s, b), "Creature") ? [{ id: b, controller: controllerOf(s, obj(s, b)), power: power(s, obj(s, b)) }] : [])) : undefined;
-    (s.leftTogether ??= []).push({ ...(before ? { before } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
+    (s.leftTogether ??= []).push({ ...(before ? { before } : {}), ...(mayTopBefore?.length ? { mayTop: mayTopBefore } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     // Spellweaver Volute (round B273): the card in a graveyard it enchanted, if that card is still there as that object.
     const enchanted = o.enchantsCard && host && host.id === o.enchantsCard.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === o.enchantsCard.zc ? { enchantsCard: { ...o.enchantsCard } } : {};
@@ -1688,6 +1716,8 @@ export function moveObject(
   // Temporal Aperture's card no longer remains on top once another card is put there (CR 611.2b).
   if (to === "library" && opts.top && s.topFreePlays?.some((g) => g.player === o.owner && g.card !== id)) endTopFreePlays(s, o.owner);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
+  // Pulmonic Sliver (round 457): cards put on top of a library together are arranged by their owner (CR 401.4, rulings).
+  if (toppedInstead && to === "library" && !o.isToken) (s.libraryTopBatch ??= []).push({ id, zc: o.zoneChanges ?? 0 });
   // "If a card left your graveyard this turn" (Gau, Feral Youth): a card, not a token (CR 111.1).
   if (fromZone === "graveyard" && to !== "graveyard" && !o.isToken) {
     const left = ((s.turnLog ??= {}).leftGraveyard ??= []);
@@ -3006,6 +3036,46 @@ function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; cont
 }
 
 /** Necromancer's Magemark: the name of a permanent whose "return it to its owner's hand instead" applies to `o` dying. */
+/** Pulmonic Sliver (round 457): the permanents with its granted replacement now (CompiledCard.mayTopInsteadOfGraveyard), as `${id}@${zoneChanges}`. */
+function mayTopKeys(s: GameState): string[] | undefined {
+  let out: string[] | undefined;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (abilitiesOf(s, o).mayTopInsteadOfGraveyard) (out ??= []).push(`${id}@${o.zoneChanges ?? 0}`);
+  }
+  return out;
+}
+
+/** Does `o`, about to leave the battlefield, have Pulmonic Sliver's granted replacement, now or just before the first permanent leaving with it left? */
+function hasMayTop(s: GameState, o: GameObject, before: string[] | undefined): boolean {
+  if (abilitiesOf(s, o).mayTopInsteadOfGraveyard) return true;
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return !!(before ?? s.leftTogether?.find((l) => l.mayTop)?.mayTop)?.includes(key);
+}
+
+/**
+ * Pulmonic Sliver (round 457): "top" or "graveyard", chosen by the permanent's controller (move-questions.ts). A bot puts a
+ * card on top; a token would only cease to exist in the library (CR 111.7), so it lets that go to the graveyard and "die".
+ */
+function topInstead(s: GameState, o: GameObject): string {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return moveAnswer(s, key, () => {
+    const you = controllerOf(s, o);
+    const name = characteristics(s, o).name;
+    const theirs = o.owner === you ? "your" : `${player(s, o.owner).name}'s`;
+    return {
+      player: you,
+      key,
+      about: o.id,
+      source: name,
+      prompt: `put it on top of ${theirs} library instead of into ${theirs} graveyard?`,
+      options: ["top", "graveyard"],
+      labels: [`Put it on top of ${theirs} library`, `Put it into ${theirs} graveyard`],
+      botChoice: o.isToken ? "graveyard" : "top",
+    };
+  });
+}
+
 function handInsteadOfDying(s: GameState, o: GameObject): string | undefined {
   for (const id of s.battlefield) {
     const f = abilitiesOf(s, obj(s, id)).handInsteadOfDying;
@@ -14734,6 +14804,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "transformCopy") throw new RulesError("nothing to choose");
   // Dinosaur Headdress's card (round 448) is chosen as it becomes attached, with an objectId (askEntersChoice).
   if (pend.what === "attachCopy") throw new RulesError("nothing to choose");
+  // Pulmonic Sliver's question (round 457) is answered before anything else (applyInPlace, move-questions.ts).
+  if (pend.what === "moveInstead") throw new RulesError("nothing to choose");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };

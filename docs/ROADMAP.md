@@ -5086,6 +5086,37 @@ line blocks.
    pause for it), Word of Command, Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask and Camouflage. Known
    gaps: bots cast Chef's Kiss as they cast Commandeer (at an opponent's spell), without weighing where the random targets
    may land.
+   Round 457 took Pulmonic Sliver (out since the lists after round 453: "the zone change can't pause for it"). All Slivers
+   have "If this permanent would be put into a graveyard, you may put it on top of its owner's library instead." (a whole
+   granted line in oracle/round457.ts, CompiledCard.mayTopInsteadOfGraveyard, a granted static kind in grants.ts): a
+   replacement effect (CR 614.1a) of a Sliver permanent (CR 109.2), optional, chosen by its controller ("you", CR 109.5) as
+   it would be put into a graveyard from the battlefield; with other replacements of that move the controller chooses which
+   applies first (CR 616.1e-f, its example): taking this one, it goes on top and the ones that would put a card going to a
+   graveyard elsewhere (Rest in Peace, a finality counter) no longer apply; declining, they apply as before. A replacement
+   that exiles it from leaving at all (unearth) applies to the move to the library too, so nothing is asked then. Slivers
+   dying with Pulmonic Sliver have the ability too (rulings): replacements look at the event before it happens, so the
+   permanents with it just before the first of those leaving at once are kept (GameState.leftTogether `mayTop`). Several of
+   one owner's put on top at once are arranged by that owner, without revealing the order (rulings, CR 401.4:
+   GameState.libraryTopBatch, asked with the orderLibrary prompt a merged permanent's cards use, graveyard.ts). A Sliver
+   token goes there and ceases to exist (CR 111.7).
+   The move can happen anywhere (a state-based action, a cost, any instruction of a resolution) and none of those can
+   stop halfway, so the question stops the whole action instead (move-questions.ts): applyAction undoes it, asks (a
+   chooseOption "moveInstead" that carries the action and the decision pending before it), and once it's answered
+   applies the same action again from the same state, which reaches the same move and takes the answer
+   (GameState.moveAnswers, kept until the action is done; a second Sliver asks the same way). The state is plain JSON
+   with its randomness seeded in it, so the action goes the same way again. Only the state applyAction is working on
+   asks: a bot's look ahead on a copy, a shortcut repeating a loop in place (applyInPlace), and the engine's own look
+   aheads make the choice as a bot would (a card on top, a token to the graveyard), as bots answer. dealPlanned puts its
+   event batches back when an action is undone partway through. Mana abilities that sacrifice such a permanent are
+   activated by hand, never by the autopay (the question would stop the rest of a plan). Browser tests: Lightning Bolt a
+   Muscle Sliver and put it on top; Wrath of God two Slivers, keep both and arrange them. +1, 31,913 of 31,936 on round
+   456's head dfb03503; the compiled text of every other card is unchanged.
+   Out after round 457 (looked at, not done): the lists after round 456 (still out, for their reasons): Word of Command,
+   Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask, Camouflage, Snowblind, and the Wishes (left out by
+   choice: nothing outside the game here). Known gaps: while the question is asked, the board shows the game as it was
+   before the action (the action hasn't happened yet); a shortcut (CR 732) that went through the question stops there
+   (repeated in place, nothing asks); the human answers a Sliver's question again if a damage shield question comes later
+   in the same instruction; bots always put a nontoken Sliver on top.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

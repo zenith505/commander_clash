@@ -232,6 +232,7 @@ import { round448Line } from "./round448";
 import { round449Line } from "./round449";
 import { round455Line } from "./round455";
 import { round456Line } from "./round456";
+import { round457Line } from "./round457";
 import { round450Line } from "./round450";
 import { round451Line } from "./round451";
 import { linkRestartExiles, round452Line } from "./round452";
@@ -1161,6 +1162,8 @@ export function compile(d: CardDef): CompiledCard {
     if (round455Line(line, raw, out, isSpell)) continue;
     // Round 456: oracle/round456.ts.
     if (round456Line(line, raw, out, isSpell)) continue;
+    // Round 457: oracle/round457.ts.
+    if (round457Line(line, raw, out, isSpell)) continue;
     // Round 450: oracle/round450.ts.
     if (round450Line(line, raw, out, isSpell)) continue;
     // Round 449: oracle/round449.ts.

@@ -4332,6 +4332,10 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
   // it into your hand" is the "reveal it, and put it" search (the sentence splitter would break it at ", then").
   text = text.replace(/\b(search your library and\/or graveyard for a card named [^.]+?, reveal it), then put it into your hand\./i, "$1, and put it into your hand.");
   text = text.replace(/\b([Ss])earch your library, graveyard, and\/or outside the game for (an? [a-z ]+? card) you own, /, "$1earch your library and/or graveyard for $2, ");
+  // Turtles Forever (round B303): "Search your library and/or outside the game for exactly four legendary creature cards
+  // you own with different names, then reveal those cards. An opponent chooses two of them. Put the chosen cards into your
+  // hand and shuffle the rest into your library.": likewise only the library, where every card is one you own (CR 400.3).
+  text = text.replace(/\bSearch your library and\/or outside the game for (exactly (?:two|three|four) [a-z ]+? cards) you own with different names, then reveal those cards\. An opponent chooses two of them\. Put the chosen cards into your hand and shuffle the rest into your library\./, "Search your library for $1 with different names; an opponent chooses two; put them into your hand and the rest into your library.");
   // Karn, the Great Creator: "You may reveal an artifact card you own from outside the game or choose a face-up artifact
   // card you own in exile. Put that card into your hand." Likewise only the exiled card (see zones.ts).
   text = text.replace(/\b[Yy]ou may reveal an? ([A-Za-z ]+? card) you own from outside the game or choose a face-up \1 you own in exile\. Put that card into your hand\./g, "You may put a face-up $1 you own in exile into your hand.");

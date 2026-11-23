@@ -1795,7 +1795,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const shuffledIn = [...new Set(moves.filter((m) => dest(m.pid, m.id).shuffleIn && obj(s, m.id).zone === "library").map((m) => m.pid))];
       for (const pid of shuffledIn) {
         shuffleLibrary(s, libOf(pid));
-        log(s, `${libOf(pid).name} shuffles ${moves.filter((m) => m.pid === pid && dest(m.pid, m.id).shuffleIn).length === 1 ? "a card" : "the chosen cards"} into their library.`);
+        // Turtles Forever (round B303): the cards not chosen are the ones shuffled back.
+        const back = moves.filter((m) => m.pid === pid && dest(m.pid, m.id).shuffleIn);
+        log(s, `${libOf(pid).name} shuffles ${back.length === 1 ? "a card" : e.split && back.every((m) => !picked.includes(m.id)) ? "the rest" : "the chosen cards"} into their library.`);
       }
       // "Put those cards on top in any order" (Goblin Recruiter): the searcher orders the cards now on top.
       const onTop = moves.filter((m) => !e.dest.third && !dest(m.pid, m.id).shuffleIn && dest(m.pid, m.id).zone === "libraryTop" && obj(s, m.id).zone === "library");

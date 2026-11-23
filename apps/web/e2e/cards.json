@@ -37222,6 +37222,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9109437a-da80-463f-a92a-77d693d05d91",
+  "name": "North Star",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{4}, {T}: For one spell this turn, you may spend mana as though it were mana of any type to pay that spell's mana cost. (Additional costs are still paid normally.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f8dab16e-1d50-443e-9431-8b6f1cf61c9c",
   "name": "Notion Thief",
   "manaCost": "{2}{U}{B}",
@@ -45583,6 +45605,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "743fa824-18cb-4225-ba7b-5b0bbc3c8d41",
+  "name": "Secret of Bloodbending",
+  "manaCost": "{U}{U}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery — Lesson",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Lesson"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may waterbend {10}.\nYou control target opponent during their next combat phase. If this spell's additional cost was paid, you control that player during their next turn instead. (You see all cards that player could see and make all decisions for them.)\nExile Secret of Bloodbending.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dffc6785-31b0-487c-b9a0-980bca39753d",
   "name": "Security Rhox",
   "manaCost": "{2}{R}{G}",
@@ -53090,6 +53142,34 @@
   "commanderLegal": "legal",
   "set": "afr",
   "releasedAt": "2021-07-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c017f8ae-9103-4965-a07a-f259f44a157d",
+  "name": "The Dominion Bracelet",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +1/+1 and has \"{15}, Exile The Dominion Bracelet: You control target opponent during their next turn. This ability costs {X} less to activate, where X is this creature's power. Activate only as a sorcery.\" (You see all cards that player could see and make all decisions for them.)\nEquip {1}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

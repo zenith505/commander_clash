@@ -3191,6 +3191,11 @@ export type Effect =
    * remain unchanged." The spell or ability is the trigger's cause.
    */
   | { type: "psychicBattle" }
+  /**
+   * Round 455, North Star: "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+   * spell's mana cost." (GameState.anyTypeSpells, CostChoices.anyTypeMana; CR 609.4b).
+   */
+  | { type: "anyTypeOneSpell" }
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true; /** Hofri Ghostforge's Spirit token: "the exiled card" is the one the ability that created this token linked to it (round354.ts), not one an exile ability of its own took. */ createdLink?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
@@ -6541,9 +6546,10 @@ export type Effect =
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player
-   * takes an extra turn" (Emrakul, the Promised End).
+   * takes an extra turn" (Emrakul, the Promised End). `combat` (Secret of Bloodbending, round 454): "during their next combat
+   * phase" instead, the next combat phase of their turns that `who` actually takes (rulings).
    */
-  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true }
+  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true; combat?: true }
   /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
   /**
    * Teyo, Geometric Tactician: "Until your next turn, each player may attack only the nearest opponent in the last chosen
@@ -8290,9 +8296,9 @@ export interface ActivatedAbility {
    * (ObjRef grantSource), which must still be that object, under the activating player's control to be sacrificed (CR
    * 701.21a) or attached to this permanent to be unattached (CR 701.3d, 602.2b). "removeAllCounters" (Hankyu's "Remove all
    * aim counters from Hankyu"): every `counter` counter on it, none included, the number for "removed this way"
-   * (StackItem.countersRemoved).
+   * (StackItem.countersRemoved). "exile" (The Dominion Bracelet, round 454): exiled, whoever controls it (CR 602.2b).
    */
-  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
+  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "exile" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;
@@ -9666,6 +9672,13 @@ export interface CompiledCard {
    * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).
    */
   preventToMinusCounters?: true;
+  /**
+   * Ghostly Flame (round 455): "Black and/or red permanents and spells are colorless sources of damage." Damage from a
+   * permanent or spell of one of these colors is seen as coming from a colorless source wherever the damage is looked at
+   * (prevention, protection, replacement, CR 609.7b, 702.16e), every other color forgotten; the source keeps its colors,
+   * so what triggers on it dealing damage still sees them (rulings). See seenAsDamage in damage.ts.
+   */
+  colorlessDamageSources?: Color[];
   /**
    * Khârn the Betrayer: "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control
    * of it" (CR 615.5): the control change happens right away, also when the damage can't be prevented (615.12).

@@ -73,7 +73,7 @@ const objectMatchesFor = (s: GameState, spec: TargetSpec, id: ObjectId, you: Pla
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
  * it (modes, X, kicker, what was sacrificed), with these targets. It isn't cast.
  */
-export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept, cardThen?: GameObject) {
+export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept, cardThen?: GameObject, chose?: boolean) {
   // `cardThen`: the spell's object as it last was on the stack, once it has left (Psychic Rebuttal, CR 707.10).
   const card = cardThen ?? (orig.objectId ? s.objects[orig.objectId] : undefined);
   if (!card) return;
@@ -111,19 +111,23 @@ export function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId
   s.stack.push({ ...rest, id, objectId: o.id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
   fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true, copyOf: orig.id }); // magecraft: "cast or copy"
-  fireEvent(s, { type: "targeted", stackId: id });
+  // `chose`: its controller picked new targets for it (CR 707.10c), for Psychic Battle.
+  fireEvent(s, { type: "targeted", stackId: id, chose: !!chose });
 }
+
+/** Whether a copy's controller changed any of its targets from the original's (CR 707.10c: "chooses to change"). */
+const choseNew = (picked: TargetChoice[] | undefined, orig: StackItem) => !!picked && picked.some((t, j) => t.kind !== "none" && !sameTarget((orig.targets ?? [])[j], t));
 
 /**
  * A copy of an activated or triggered ability on the stack (CR 707.10): its source, choices and event are the original's,
  * and the player copying it controls it (CR 707.10c). It wasn't activated, so nothing about activating triggers.
  */
-function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined) {
+function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, chose?: boolean) {
   const id = `s${s.nextId++}`;
   const name = orig.description.replace(/ \(copy\)$/, "");
   s.stack.push({ ...structuredClone(orig), id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
-  fireEvent(s, { type: "targeted", stackId: id });
+  fireEvent(s, { type: "targeted", stackId: id, chose: !!chose });
 }
 
 /** Spinerock Tyrant: a spell on the stack gains these until it leaves it (GameObject.spellGains; its damage, CR 702.80a). */
@@ -721,9 +725,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Radiate (round 415): a player or a permanent, in place of every target (all of them named the one it copies for).
         const asChoice = (id: string): TargetChoice => (/^p\d+$/.test(id) ? { kind: "player", id: Number(id.slice(1)) as PlayerId } : { kind: "object", id });
         const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (e.n === "eachOther" && e.eachOther?.orPlayers ? (t.kind === "none" ? t : asChoice(one)) : t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
-        if (orig.kind === "ability") putAbilityCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets);
+        // Psychic Battle: new targets its controller picked (CR 707.10c), not ones the effect specifies (707.10d-e).
+        const chose = !aimed && choseNew(c.targets, orig);
+        if (orig.kind === "ability") putAbilityCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, chose);
         else {
-          putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
+          putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card, chose);
           if (e.thoseGain) thoseGain(s, e.thoseGain, s.stack[s.stack.length - 1]!, ctx.controller, src);
         }
         c.targets = undefined;
@@ -735,7 +741,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: c.by ?? ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
           return "paused";
         }
-        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card);
+        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, except, countered?.card, choseNew(c.targets, orig));
         c.targets = undefined;
         c.extra--;
       }
@@ -764,7 +770,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             s.pending = { kind: "copyTargets", player: c.opp, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.oppLeft };
             return "paused";
           }
-          putSpellCopy(s, orig, c.opp, c.targets ?? orig.targets);
+          putSpellCopy(s, orig, c.opp, c.targets ?? orig.targets, undefined, undefined, undefined, choseNew(c.targets, orig));
           c.targets = undefined;
           c.oppLeft--;
         }
@@ -1980,7 +1986,8 @@ export function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by:
   const next = amount !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount } : t;
   item.targets = item.targets!.map((x, i) => (slots.includes(i) ? stampTargets(s, [next])![0]! : x));
   log(s, `${by} changes the target of ${item.description}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
-  fireEvent(s, { type: "targeted", stackId: item.id, only: next.kind === "object" ? [next.id] : [] });
+  // A new target its controller chose among the legal ones (Psychic Battle), not one the effect names ("to ~").
+  fireEvent(s, { type: "targeted", stackId: item.id, only: next.kind === "object" ? [next.id] : [], chose: !toSelf });
 }
 
 /**
@@ -2027,7 +2034,7 @@ function changeATargetToSelf(s: GameState, ctx: ResolveCtx, stackId: string, by:
  * keeping any, legal or not, and changing others to legal ones. Its new targets become targets of it ("becomes the
  * target" triggers, ward); the ones it keeps don't again. With nothing it could change to, nothing is asked.
  */
-function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true, changeAny?: true, chooser?: PlayerId): "paused" | void {
+export function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, allOrNone?: true, changeAny?: true, chooser?: PlayerId, psychic?: true): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -2041,7 +2048,8 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, 
       log(s, `${item.description} has no other legal targets, so its targets stay the same.`);
       return;
     }
-    s.pending = { kind: "newTargets", player: chooser ?? ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}), ...(changeAny ? { changeAny } : {}) };
+    // Psychic Battle (round 453): nothing may become targeted more than once (rulings).
+    s.pending = { kind: "newTargets", player: chooser ?? ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current, ...(allOrNone ? { allOrNone } : {}), ...(changeAny ? { changeAny } : {}), ...(psychic ? { noRepeat: true as const } : {}) };
     return "paused";
   }
   const next = sc.retargets;
@@ -2052,7 +2060,8 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string, 
   }
   item.targets = next.map((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? stampTargets(s, [t])![0]! : t));
   log(s, `${by} changes the targets of ${item.description}${describeTargets(s, item.targets).replace(/^ targeting/, " to")}.`);
-  fireEvent(s, { type: "targeted", stackId: item.id, only: changed.flatMap((t) => (t.kind === "object" ? [t.id] : [])) });
+  // A player chose them (Psychic Battle's trigger), unless Psychic Battle changed them.
+  fireEvent(s, { type: "targeted", stackId: item.id, only: changed.flatMap((t) => (t.kind === "object" ? [t.id] : [])), chose: true, ...(psychic ? { psychicBattle: true as const } : {}) });
 }
 
 /** The legal new targets for a spell's one target (see changeTarget). */

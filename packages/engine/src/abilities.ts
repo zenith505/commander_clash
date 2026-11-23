@@ -5584,6 +5584,8 @@ export type Effect =
       ifMvX?: true;
       /** Ertai's Trickery: "Counter target spell if it was kicked": any spell can be targeted; only a kicked one is countered. */
       ifKicked?: true;
+      /** Equinox (round B302): "Counter target spell if it would destroy a land you control": only if that spell, resolved right then, would destroy a land this ability's controller controls (rulings; game.ts spellWouldDestroyLand). */
+      ifDestroysLand?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
       ifCostCardName?: true;
       /** "Counter target spell if it has the same mana value as the discarded card" (Hisoka, Minamo Sensei): the discard cost's card, X as 0. */

@@ -271,6 +271,8 @@ function dawnCost(cost: ParsedCost, anyType: boolean): ParsedCost {
     ...cost,
     symbols: cost.symbols.map((x): CostSymbol => {
       if (x.kind === "colored") return x.color === "C" ? (anyType ? { kind: "generic", amount: 1 } : { kind: "hybrid", options: ["U", "B", "R", "G"], orC: true }) : { kind: "colored", color: "W" };
+      // A colorless hybrid symbol ({C/W}, round 451): white mana pays its colored half, other mana its colorless half.
+      if (x.kind === "hybrid" && !x.distinct && x.orC && !x.life) return { kind: "generic", amount: 1 };
       if (x.kind === "hybrid" && !x.distinct) return x.life ? { kind: "phyrexian", color: "W", ...(x.phyrexian ? {} : { krrik: true as const }) } : { kind: "colored", color: "W" };
       if (x.kind === "twoHybrid") return { kind: "twoHybrid", color: "W", ...(x.life ? { life: true as const } : {}) };
       if (x.kind === "phyrexian") return { kind: "phyrexian", color: "W", ...(x.krrik ? { krrik: true as const } : {}) };

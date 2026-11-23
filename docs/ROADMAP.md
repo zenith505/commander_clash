@@ -1,6 +1,6 @@
 # Roadmap
 
-31,890 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,892 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,972 of
 9,979 (99%).
 
@@ -6244,7 +6244,7 @@ line blocks.
    ("Target opponent whose turn it is puts ... onto the battlefield under their control"); Forger's Foundry (an exile as it
    resolves chosen as mana is spent).
    Out after round 286 (looked at, not done): Undead Alchemist and Szadek, Lord of Secrets (done in round 297) (damage replaced by milling,
-   ordered with prevention and other replacements, CR 616.1); Turtles Forever (a search of your library and outside the
+   ordered with prevention and other replacements, CR 616.1); Turtles Forever (done in round B303) (a search of your library and outside the
    game); Panglacial Wurm (cast from your library while searching it).
    Out after round 285 (looked at, not done): Koh, the Face Stealer, Rex, Cyber-Hound, Symbiote Spider-Man, Idris, Soul of
    the TARDIS and Territory Forge (abilities of cards in exile or granted from a graveyard card); Forger's Foundry, Goliath
@@ -12087,6 +12087,21 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B303 (least played first, one card off the skip lists, not in Lane A's rounds 450-451): Turtles Forever (out
+  after round 286: a search of your library and outside the game). "Search your library and/or outside the game for
+  exactly four legendary creature cards you own with different names, then reveal those cards. An opponent chooses two of
+  them. Put the chosen cards into your hand and shuffle the rest into your library.": players here have no sideboard (CR
+  100.4: one is optional) and nothing else outside the game, as for Invasion of Arcavios and learn, so it's a search of
+  the library, where every card is one you own (CR 400.3). "Exactly four" is four or none, as Burning-Rune Demon's
+  "exactly two": the searcher may fail to find (CR 701.23b), but can't find three; one of each name is offered. "An
+  opponent" is chosen as it resolves (rulings on Steam Augury), and picks two of the four for your hand (opponentPicks);
+  the other two are shuffled back into your library (the split search's `dest` shuffleIn, the log saying "the rest").
+  Bots search for four and, as the opponent, pick the two that would help you least. Browser test: three found keeps Done off,
+  four with one of two Isamarus and not Mother of Runes; Ben picks the two for your hand. +1, 31,892 of 31,936 on B302's
+  head 99a00cad (main 60ad21bc). The compiled text of every other card is unchanged.
+- Out after round B303 (looked at, not done): the lists after round B302 stay out. About 44 unsupported cards remain, all
+  of them hard; most are the Wishes and other cards that only reach outside the game (left out: they'd do nothing here),
+  control of another player, and text changes.
 - Round B302 (least played first, one card off the skip lists, not in Lane A's rounds 447-450): Equinox (out after rounds
   B247-B301: whether a spell would destroy a land needs a look ahead into what it would do). "Enchanted land has "{T}:
   Counter target spell if it would destroy a land you control."": any spell can be targeted, and as the ability resolves

@@ -1804,10 +1804,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               <span className="thinking">{deciderOf(s, waiting) === waiting ? `${s.players[waiting]!.name} is thinking…` : `${s.players[deciderOf(s, waiting)]!.name} is thinking for ${waiting === YOU ? "you" : s.players[waiting]!.name}…`}</span>
             )}
             {s.controlledTurn && deciderOf(s, s.controlledTurn.controlled) !== s.controlledTurn.controlled && (
-              <span className="control-note" title="Controlling another player (CR 723): the controller makes all of that player's choices and decisions this turn, with that player's cards and mana.">
+              <span className="control-note" title={`Controlling another player (CR 723): the controller makes all of that player's choices and decisions ${s.controlledTurn.combat ? "this combat phase" : "this turn"}, with that player's cards and mana.`}>
                 {s.controlledTurn.controller === YOU
-                  ? `You control ${s.players[s.controlledTurn.controlled]!.name} this turn`
-                  : `${s.players[s.controlledTurn.controller]!.name} controls ${s.controlledTurn.controlled === YOU ? "you" : s.players[s.controlledTurn.controlled]!.name} this turn`}
+                  ? `You control ${s.players[s.controlledTurn.controlled]!.name} ${s.controlledTurn.combat ? "this combat phase" : "this turn"}`
+                  : `${s.players[s.controlledTurn.controller]!.name} controls ${s.controlledTurn.controlled === YOU ? "you" : s.players[s.controlledTurn.controlled]!.name} ${s.controlledTurn.combat ? "this combat phase" : "this turn"}`}
               </span>
             )}
           </div>

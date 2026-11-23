@@ -5324,15 +5324,46 @@ export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning"
  */
 function takeControl(s: GameState) {
   const pid = s.activePlayer;
-  const mine = s.playerControls?.filter((c) => c.controlled === pid) ?? [];
+  // Ones waiting for a combat phase wait on (beginCombatControl).
+  const mine = s.playerControls?.filter((c) => c.controlled === pid && !c.combat) ?? [];
   if (!mine.length) return;
-  s.playerControls = s.playerControls!.filter((c) => c.controlled !== pid);
+  s.playerControls = s.playerControls!.filter((c) => !mine.includes(c));
   if (!s.playerControls.length) s.playerControls = undefined;
-  const controller = mine.filter((c) => !c.ended).pop()?.controller ?? pid;
+  const works = mine.filter((c) => !c.ended).pop();
+  const controller = works?.controller ?? pid;
   const extraTurns = mine.filter((c) => c.extraTurnAfter).length;
-  s.controlledTurn = { controlled: pid, controller, ...(extraTurns ? { extraTurns } : {}) };
+  s.controlledTurn = { controlled: pid, controller, ...(extraTurns ? { extraTurns } : {}), ...(works?.created !== undefined ? { created: works.created } : {}) };
   // Controlling yourself changes nothing (CR 723.9).
   if (controller !== pid) log(s, `${player(s, controller).name} controls ${player(s, pid).name} during this turn.`);
+}
+
+/**
+ * Secret of Bloodbending (round 454): "You control target opponent during their next combat phase": the effects waiting for
+ * the active player's next combat phase apply to this one, which is beginning (rulings: one that's skipped waits for the
+ * next one they take, as CR 723.1b). Of all the player-controlling effects that apply to them now, the last one created
+ * works (CR 723.1a): a later one of these overrides the control of this turn (Mindslaver's) for this phase, which is back
+ * when the phase ends (endCombatControl); an earlier one is overridden, and its phase is spent all the same.
+ */
+function beginCombatControl(s: GameState) {
+  const pid = s.activePlayer;
+  const mine = s.playerControls?.filter((c) => c.controlled === pid && c.combat) ?? [];
+  if (!mine.length) return;
+  s.playerControls = s.playerControls!.filter((c) => !mine.includes(c));
+  if (!s.playerControls.length) s.playerControls = undefined;
+  const works = mine.filter((c) => !c.ended).pop();
+  if (!works) return;
+  const now = s.controlledTurn?.controlled === pid ? s.controlledTurn : undefined;
+  if (now && (now.created ?? -1) > (works.created ?? -1)) return;
+  s.controlledTurn = { controlled: pid, controller: works.controller, ...(works.created !== undefined ? { created: works.created } : {}), combat: now ? { before: now } : {} };
+  if (works.controller !== pid) log(s, `${player(s, works.controller).name} controls ${player(s, pid).name} during this combat phase.`);
+}
+
+/** The control of a player for one combat phase ends with that phase (round 454); the control of the turn it overrode, if any, is back. */
+function endCombatControl(s: GameState) {
+  const c = s.controlledTurn;
+  if (!c?.combat) return;
+  s.controlledTurn = c.combat.before;
+  if (c.controller !== c.controlled && !player(s, c.controller).lost) log(s, `${player(s, c.controller).name} no longer controls ${player(s, c.controlled).name}.`);
 }
 
 /**
@@ -5346,7 +5377,8 @@ export function deciderOf(s: GameState, pid: PlayerId): PlayerId {
 }
 
 /** The combat phase's steps (CR 506.1). */
-export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
+const COMBAT_STEPS = new Set<Step>(["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"]);
+export const inCombatPhase = (s: GameState) => COMBAT_STEPS.has(s.step);
 
 /** The creatures that entered this turn, as they entered (turnLog.entered), for GameState.lastTurn. */
 function creaturesEnteredOf(s: GameState): { creaturesEntered?: { controller: PlayerId; id?: ObjectId; zc?: number }[] } {
@@ -5362,6 +5394,7 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}), ...(noncombat.length ? { noncombatDamaged: noncombat } : {}), ...creaturesEnteredOf(s) };
   // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
   // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
+  endCombatControl(s);
   const controlled = s.controlledTurn;
   s.controlledTurn = undefined;
   for (let i = 0; i < (controlled?.extraTurns ?? 0); i++) (s.extraTurns ??= []).push({ player: controlled!.controlled });
@@ -5744,6 +5777,9 @@ function takeSkip(s: GameState, pid: PlayerId, what: SkipWhat): boolean {
 
 /** Enter a step, perform its turn-based actions, and give the active player priority if the step has priority. */
 function beginStep(s: GameState, step: Step): void {
+  // A combat phase that's over (one ended early too, CR 724.1d; or another one beginning) ends the control of a player
+  // during it (round 454).
+  if (s.controlledTurn?.combat && (!COMBAT_STEPS.has(step) || step === "beginCombat")) endCombatControl(s);
   s.step = step;
   invalidateCharacteristics(s); // "during your turn", "during your end step": statics that hold only in some steps
   s.passedInSuccession = [];
@@ -5908,6 +5944,9 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
+      // Secret of Bloodbending (round 454): control of the active player during this combat phase, as it begins, before
+      // anything triggers on it (CR 723.5).
+      beginCombatControl(s);
       // Territorial Hellkite: "your last combat" is the one before this one.
       player(s, ap).combatsBegun = [...(player(s, ap).combatsBegun ?? []), { turn: s.turn, combat: s.combatsThisTurn }].slice(-2);
       // "Attacks this combat if able" holds in one combat only.
@@ -12081,6 +12120,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (ab.grantSourceCost.action === "unattach" && g.attachedTo !== o.id) return `${nameOf(s, g.id)} isn't attached to ${d.name}`;
     // "Tap Fishing Pole": an untapped one (CR 701.26a); the cost doesn't ask who controls it (unlike "you control").
     if (ab.grantSourceCost.action === "tap" && g.tapped) return `${nameOf(s, g.id)} is tapped`;
+    // The Dominion Bracelet (round 454): "Exile The Dominion Bracelet": the Equipment that gave it, still that object, whoever
+    // controls it (the cost doesn't say "you control", CR 602.2b; only the creature's controller can activate the ability,
+    // CR 301.5d), so being still there is all it needs.
   }
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
   if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
@@ -12819,6 +12861,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.revealSecretType && o.secretType) log(s, `${p.name} reveals the creature type chosen for ${d.name}: ${o.secretType.type}.`);
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true, cost: true });
   if (ab.grantSourceCost?.action === "sacrifice" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) moveObject(s, granter.id, "graveyard", { sacrificed: true, cost: true });
+  // "Exile The Dominion Bracelet" (round 454): the Equipment that gave the ability, if it's still that object (CR 400.7).
+  if (ab.grantSourceCost?.action === "exile" && granter?.zone === "battlefield" && (granter.zoneChanges ?? 0) === ab.grantSourceCost.zc) {
+    log(s, `${p.name} exiles ${nameOf(s, granter.id)}.`);
+    moveObject(s, granter.id, "exile");
+  }
   const costSacrificed = (s.turnLog?.sacrificed?.length ?? 0) > sacrificesBefore;
   const costLifePaid = lifePaidTally - lifeTallyBefore;
   // Unpredictable Cyclone (round B286): the card cycled and its card types as it was cycled, in its owner's hand.

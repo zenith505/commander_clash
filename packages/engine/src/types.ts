@@ -2853,14 +2853,19 @@ export interface GameState {
    * created: the last one for a player is the one that works (723.1a). `extraTurnAfter`: that player takes an extra turn
    * after that turn (Emrakul, the Promised End: each one makes its own, rulings).
    */
-  /** `ended`: its controller left the game (CR 800.4a), so only its extra turn is left. */
-  playerControls?: { controlled: PlayerId; controller: PlayerId; extraTurnAfter?: true; ended?: true }[];
+  /**
+   * `ended`: its controller left the game (CR 800.4a), so only its extra turn is left. `combat` (Secret of Bloodbending, round
+   * 454): it waits for the controlled player's next combat phase instead of their next turn (taken as that phase begins,
+   * beginCombatControl). `created`: the order the effects were created in (a timestamp), for which one works (CR 723.1a).
+   */
+  playerControls?: { controlled: PlayerId; controller: PlayerId; extraTurnAfter?: true; ended?: true; combat?: true; created?: number }[];
   /**
    * The turn being taken now is controlled by another player (CR 723): `controller` makes all of the active player's
    * choices and decisions until the next turn begins (723.1, 723.5). `extraTurns`: extra turns that player takes after
-   * this one.
+   * this one. `created`: when the effect that works was created (CR 723.1a). `combat` (round 454): the control lasts only
+   * for this combat phase (endCombatControl), `combat.before` the control of this turn it overrides, back when the phase ends.
    */
-  controlledTurn?: { controlled: PlayerId; controller: PlayerId; extraTurns?: number };
+  controlledTurn?: { controlled: PlayerId; controller: PlayerId; extraTurns?: number; created?: number; combat?: { before?: Omit<NonNullable<GameState["controlledTurn"]>, "combat"> } };
   /** During extra turns: the player whose turn came before them in the normal order, who the next normal turn follows. */
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */

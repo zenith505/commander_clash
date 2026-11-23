@@ -1,7 +1,7 @@
 # Roadmap
 
-31,895 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,975 of
+31,897 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,976 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4824,7 +4824,7 @@ line blocks.
    it face up (or answer an effect turning it face up) as a copy of the creature with the most power, toughness and
    abilities, not a legend whose name they have, never as a 0/0.
    Round 447 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Karn Liberated (done in round 452) and Secret of Bloodbending (still out, for their reasons) to two cards back off the lists, each
+   Promise, Karn Liberated (done in round 452) and Secret of Bloodbending (done in round 454) (still out, for their reasons) to two cards back off the lists, each
    settled by reading closer. Captain America, First Avenger's "Throw ... — {3}, Unattach an Equipment from Captain America:
    He deals damage equal to that Equipment's mana value divided as you choose among one, two, or three targets." ("Throw
    ..." and "... Catch" one flavor word, CR 207.2d; "He" is the card, CR 201.5): the division is announced before the cost
@@ -4848,7 +4848,7 @@ line blocks.
    in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
    even when the thrown Equipment's mana value leaves room for fewer (the division then refuses them).
    Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
+   Promise, Karn Liberated (done in round 452), Secret of Bloodbending (done in round 454), Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
    round B299) to Paleontologist's Pick-Axe, out since round 334, whose pieces are there now. Its back face, Dinosaur
    Headdress: "As this Equipment becomes attached to a creature, choose an exiled creature card used to craft this
    Equipment." (asked each time it becomes attached, by its enters trigger, an equip ability or an effect, as Sanctuary
@@ -4872,8 +4872,8 @@ line blocks.
    card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
    card with the most power, toughness and abilities.
    Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
-   Kiss, Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
-   Bracelet and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
+   Kiss, Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending (done in round 454), Pulmonic Sliver, Mastermind's Acquisition, The Dominion
+   Bracelet (done in round 454) and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
    are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
    unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
    118.3, rulings; with one such card it's discarded without asking; UnlessPays.discardFilter, the payUnless and discard
@@ -4889,7 +4889,7 @@ line blocks.
    Bolt's copy is cast at Ana. +1, 31,886 of 31,936 on this stacked branch (round 448 #750), 31,888 with round 448's head 39bb057 (main
    2c9aae1, B298-B299) merged in; the compiled text of every other card and face is unchanged.
    Out after round 449 (looked at, not done): Mastermind's Acquisition and Spawnsire of Ulamog (still out: cards from outside
-   the game), The Dominion Bracelet (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
+   the game), The Dominion Bracelet (done in round 454) (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
    lists after round 448 (still out, for their reasons). Known gaps: bots pay the ward whenever they hold such a card, and
    discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
    can.
@@ -4910,7 +4910,7 @@ line blocks.
    Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in), 31,891 with main 60ad21b (B300, B301); the compiled text of every other card and face is unchanged.
    Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
    unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (done in round 452) (restarting the game), Secret of
-   Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
+   Bloodbending (done in round 454) and The Dominion Bracelet (done in round 454) (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: bots cast the cards in
    the order targeted and make the copies in the order cast.
    Round 451 went on down `npm run popular`, most played first, to the top of it: Ulalek, Fused Atrocity (rank 4,747), out
@@ -4932,7 +4932,7 @@ line blocks.
    is unchanged. The top 5,000 are all supported now.
    Out after round 451 (looked at, not done): the lists after round 450 (still out, for their reasons; Share the Spoils
    was done in round B300): Chef's Kiss ("reselect the targets at random": whether the current target is among them, no rule
-   or ruling), Karn Liberated (done in round 452) (restarting the game), Secret of Bloodbending and The Dominion Bracelet (controlling another
+   or ruling), Karn Liberated (done in round 452) (restarting the game), Secret of Bloodbending (done in round 454) and The Dominion Bracelet (done in round 454) (controlling another
    player), Pulmonic Sliver (an optional replacement in the middle of any move to a graveyard), Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: the human's own
    simultaneous triggers are ordered automatically (no prompt), so Ulalek's may go below another trigger of yours from the
@@ -4960,11 +4960,41 @@ line blocks.
    your first upkeep. +1, 31,893 of 31,936 on this stacked branch (round 451 #756), 31,895 with main 7917d27 (B302,
    B303) merged in; the compiled text of every other card and face is unchanged.
    Out after round 452 (looked at, not done): the lists after round 451 (still out, for their reasons): Chef's Kiss,
-   Secret of Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition
+   Secret of Bloodbending (done in round 454) and The Dominion Bracelet (done in round 454) (controlling another player), Pulmonic Sliver, Mastermind's Acquisition
    and Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: state-based
    actions are checked during the new game's mulligans as at any game's start, so a player who'd draw from an empty library
    then would lose then, not in the first upkeep (CR 727.3; no deck here has fewer than seven cards left after a restart);
    bots weigh the restart by the worth of permanents and life only, not the cards in hand or library.
+   Round 454 went on down `npm run popular`, most played first, past Chef's Kiss (still out, for its reason) to Secret of
+   Bloodbending (rank 7,770) and The Dominion Bracelet (rank 10,030), out for "controlling another player", which
+   Mindslaver's turn control (CR 723; GameState playerControls, controlledTurn, deciderOf) already covers. Secret of
+   Bloodbending's "You control target opponent during their next combat phase. If this spell's additional cost was paid,
+   you control that player during their next turn instead." (a whole line in oracle/round454.ts; its "you may waterbend
+   {10}" is the additional cost, CR 701.67a) waits, like a turn's control, for the next combat phase of that player's own
+   turns they actually take (rulings: a skipped one doesn't count, as 723.1b; Effect controlPlayer `combat`), from its
+   beginning of combat step, before anything triggers there, to the end of its end of combat step (CR 506.1; an additional
+   combat phase is another one, CR 500.8, and a turn ended early ends it, 724.1d): you make all their choices and
+   decisions then (723.5), with their resources (723.5a), as for a turn. Of several control effects that apply to a player
+   at once, the last one created works (CR 723.1a, rulings; each one has a timestamp now): a Secret created after
+   Mindslaver's effect takes that combat phase from it and the turn's control is back after the phase; one created before
+   it is overridden, and its phase is spent. The Dominion Bracelet's "Equipped creature gets +1/+1 and has "{15}, Exile The
+   Dominion Bracelet: You control target opponent during their next turn. This ability costs {X} less to activate, where X
+   is this creature's power. Activate only as a sorcery."" now compiles: "Exile The Dominion Bracelet" in the granted
+   ability exiles the Equipment that gave it, still that object (ActivatedAbility grantSourceCost "exile", as "Sacrifice
+   Blazing Torch"), whoever controls it (the cost doesn't say "you control"; only the creature's controller activates it,
+   CR 301.5d), and its cost is the creature's power less, locked in before costs are paid (rulings, CR 601.2f), the
+   Bracelet's +1/+1 included. The note over the table says "this combat phase" for the combat's control. Browser tests:
+   Secret of Bloodbending cast without its waterbend (Pay waterbend greyed out, "Don't pay"), then Ana's Grizzly Bears
+   attack Ben from her seat in her combat phase and she is her own again in her second main phase; the Bracelet equipped
+   to Hill Giant, its ability paid with eleven lands, the Bracelet exiled, and Ana's next turn yours. +2, 31,897 of 31,936
+   on main d305cbf; the compiled text of every other card and face is unchanged.
+   Out after round 454 (looked at, not done): the lists after round 452 (still out, for their reasons): Chef's Kiss,
+   Pulmonic Sliver, Psychic Battle (round 453's), Panglacial Wurm and Shaman's Trance (Lane B's round B305), the cards from
+   outside the game (Lane B's round B304), Word of Command (control of a player only while a spell resolves, with limits on
+   their mana abilities: no such limited control yet), The Celestial Toymaker, Swirl the Mists, Volrath's Shapeshifter,
+   Spy Kit, Illusionary Mask, Camouflage, Snowblind, Ghostly Flame and North Star. Known gaps: bots never activate the
+   Bracelet's ability (as with Mindslaver's); a bot controlling a player's combat phase declares no attacks for them, as
+   it does for a whole turn.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

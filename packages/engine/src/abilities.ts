@@ -6495,9 +6495,10 @@ export type Effect =
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player
-   * takes an extra turn" (Emrakul, the Promised End).
+   * takes an extra turn" (Emrakul, the Promised End). `combat` (Secret of Bloodbending, round 454): "during their next combat
+   * phase" instead, the next combat phase of their turns that `who` actually takes (rulings).
    */
-  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true }
+  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true; combat?: true }
   /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
   /**
    * Teyo, Geometric Tactician: "Until your next turn, each player may attack only the nearest opponent in the last chosen
@@ -8242,9 +8243,9 @@ export interface ActivatedAbility {
    * (ObjRef grantSource), which must still be that object, under the activating player's control to be sacrificed (CR
    * 701.21a) or attached to this permanent to be unattached (CR 701.3d, 602.2b). "removeAllCounters" (Hankyu's "Remove all
    * aim counters from Hankyu"): every `counter` counter on it, none included, the number for "removed this way"
-   * (StackItem.countersRemoved).
+   * (StackItem.countersRemoved). "exile" (The Dominion Bracelet, round 454): exiled, whoever controls it (CR 602.2b).
    */
-  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
+  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "exile" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;

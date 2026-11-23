@@ -155,6 +155,8 @@ import {
   conspireInstances,
   replicateGranted,
   chorusFor,
+  anyTypeManaUsable,
+  anyTypeSpellFor,
   availableMana,
   offspringGranted,
   REPLICATE_MAX,
@@ -477,6 +479,8 @@ type CastDraft = {
   number?: number;
   /** Chorus of the Conclave (round B284): the mana paid for its additional cost (CostChoices.chorus). */
   chorus?: number;
+  /** North Star (round 455): whether to use its "mana of any type" for this spell's mana cost (CostChoices.anyTypeMana). */
+  anyTypeMana?: boolean;
   /** Creatures tapped for teamwork; empty when it isn't paid. */
   teamwork?: string[];
   /** Cast using harmonize: the creature tapped for it, or null for none (CR 702.180a-b). */
@@ -523,6 +527,8 @@ type XOpponentPick = { label: string; what: string; options: PlayerId[]; /** But
 /** Captain America, First Avenger (round 447): which Equipment attached to it "Unattach an Equipment from ~" unattaches, before its targets. */
 type UnattachPick = { label: string; options: string[]; labels: string[]; onPick: (id: string) => void };
 
+/** North Star (round 455): spend mana as though it were mana of any type for this spell's mana cost, or not (CR 609.4b). */
+type AnyTypePick = { draft: CastDraft; label: string; from: string };
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
 
@@ -681,6 +687,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [replicatePick, setReplicatePick] = useState<ReplicatePick | null>(null);
   const [offspringPick, setOffspringPick] = useState<OffspringPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
+  const [anyTypePick, setAnyTypePick] = useState<AnyTypePick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [xOppPick, setXOppPick] = useState<XOpponentPick | null>(null);
   const [unattachPick, setUnattachPick] = useState<UnattachPick | null>(null);
@@ -736,7 +743,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || replicatePick || offspringPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || unattachPick || castTypePick || buybackPick);
+  const picking = !!(xPick || kickPick || replicatePick || offspringPick || costPick || costOrPick || numberPick || foragePick || delvePick || dividing || giftPick || xOppPick || unattachPick || castTypePick || buybackPick || anyTypePick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -1178,7 +1185,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
     const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}), ...(d.offering?.length ? { offering: d.offering[0]! } : {}) };
-    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}), ...(d.offspring?.some((n) => n > 0) ? { offspring: d.offspring } : {}), ...(d.chorus ? { chorus: d.chorus } : {}) };
+    const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}), ...(d.replicate?.some((n) => n > 0) ? { replicate: d.replicate } : {}), ...(d.offspring?.some((n) => n > 0) ? { offspring: d.offspring } : {}), ...(d.chorus ? { chorus: d.chorus } : {}), ...(d.anyTypeMana ? { anyTypeMana: true as const } : {}) };
     // Offering: the permanent to sacrifice is chosen as the spell is announced (CR 702.48b), and sets its cost and when
     // it can be cast. Skipping isn't offered when it couldn't be cast now without it.
     if (d.offering === undefined && compiled.offering && !free) {
@@ -1219,6 +1226,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const ch = chorusFor(s, HUMAN, card, d.alt as CostChoices["alt"]);
       const most = Math.max(0, availableMana(s, HUMAN) - (free ? 0 : card.cmc ?? 0));
       if (ch !== undefined && most > 0) return setNumberPick({ draft: d, label: card.name, min: 0, max: most, chorus: cardOf(s, ch).name });
+    }
+    // North Star (round 455): "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+    // spell's mana cost": asked for each spell it would make a difference for until it's used (CR 609.4b), before X and the
+    // targets, so what can be paid is known.
+    if (d.anyTypeMana === undefined && !free) {
+      const from = anyTypeSpellFor(s, HUMAN);
+      if (from !== undefined && anyTypeManaUsable(s, HUMAN, d.objectId, kicks)) return setAnyTypePick({ draft: d, label: card.name, from });
     }
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
     const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;
@@ -1804,10 +1818,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               <span className="thinking">{deciderOf(s, waiting) === waiting ? `${s.players[waiting]!.name} is thinking…` : `${s.players[deciderOf(s, waiting)]!.name} is thinking for ${waiting === YOU ? "you" : s.players[waiting]!.name}…`}</span>
             )}
             {s.controlledTurn && deciderOf(s, s.controlledTurn.controlled) !== s.controlledTurn.controlled && (
-              <span className="control-note" title="Controlling another player (CR 723): the controller makes all of that player's choices and decisions this turn, with that player's cards and mana.">
+              <span className="control-note" title={`Controlling another player (CR 723): the controller makes all of that player's choices and decisions ${s.controlledTurn.combat ? "this combat phase" : "this turn"}, with that player's cards and mana.`}>
                 {s.controlledTurn.controller === YOU
-                  ? `You control ${s.players[s.controlledTurn.controlled]!.name} this turn`
-                  : `${s.players[s.controlledTurn.controller]!.name} controls ${s.controlledTurn.controlled === YOU ? "you" : s.players[s.controlledTurn.controlled]!.name} this turn`}
+                  ? `You control ${s.players[s.controlledTurn.controlled]!.name} ${s.controlledTurn.combat ? "this combat phase" : "this turn"}`
+                  : `${s.players[s.controlledTurn.controller]!.name} controls ${s.controlledTurn.controlled === YOU ? "you" : s.players[s.controlledTurn.controlled]!.name} ${s.controlledTurn.combat ? "this combat phase" : "this turn"}`}
               </span>
             )}
           </div>
@@ -2232,6 +2246,32 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 if (plan) dispatch(plan);
               }}
             />
+          )}
+          {anyTypePick && (
+            <div className="targeting">
+              <span>
+                <strong>{anyTypePick.label}</strong>: spend mana as though it were mana of any type to pay its mana cost ({anyTypePick.from}, for one spell this turn)? Its additional costs are paid normally.
+              </span>
+              <button
+                onClick={() => {
+                  setAnyTypePick(null);
+                  continueCast({ ...anyTypePick.draft, anyTypeMana: true });
+                }}
+              >
+                Use {anyTypePick.from}
+              </button>
+              <button
+                onClick={() => {
+                  setAnyTypePick(null);
+                  continueCast({ ...anyTypePick.draft, anyTypeMana: false });
+                }}
+              >
+                Pay normally
+              </button>
+              <button className="ghost" onClick={() => setAnyTypePick(null)}>
+                Cancel
+              </button>
+            </div>
           )}
           {buybackPick && (
             <div className="targeting">

@@ -1,7 +1,7 @@
 # Roadmap
 
-31,907 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,976 of
+31,911 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,977 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4824,7 +4824,7 @@ line blocks.
    it face up (or answer an effect turning it face up) as a copy of the creature with the most power, toughness and
    abilities, not a legend whose name they have, never as a 0/0.
    Round 447 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Karn Liberated (done in round 452) and Secret of Bloodbending (still out, for their reasons) to two cards back off the lists, each
+   Promise, Karn Liberated (done in round 452) and Secret of Bloodbending (done in round 454) (still out, for their reasons) to two cards back off the lists, each
    settled by reading closer. Captain America, First Avenger's "Throw ... — {3}, Unattach an Equipment from Captain America:
    He deals damage equal to that Equipment's mana value divided as you choose among one, two, or three targets." ("Throw
    ..." and "... Catch" one flavor word, CR 207.2d; "He" is the card, CR 201.5): the division is announced before the cost
@@ -4848,7 +4848,7 @@ line blocks.
    in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
    even when the thrown Equipment's mana value leaves room for fewer (the division then refuses them).
    Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
-   Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
+   Promise, Karn Liberated (done in round 452), Secret of Bloodbending (done in round 454), Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
    round B299) to Paleontologist's Pick-Axe, out since round 334, whose pieces are there now. Its back face, Dinosaur
    Headdress: "As this Equipment becomes attached to a creature, choose an exiled creature card used to craft this
    Equipment." (asked each time it becomes attached, by its enters trigger, an equip ability or an effect, as Sanctuary
@@ -4872,8 +4872,8 @@ line blocks.
    card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
    card with the most power, toughness and abilities.
    Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
-   Kiss, Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition (done in round B304), The Dominion
-   Bracelet and Spawnsire of Ulamog (done in round B304) (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
+   Kiss, Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending (done in round 454), Pulmonic Sliver, Mastermind's Acquisition (done in round B304), The Dominion
+   Bracelet (done in round 454) and Spawnsire of Ulamog (done in round B304) (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
    are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
    unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
    118.3, rulings; with one such card it's discarded without asking; UnlessPays.discardFilter, the payUnless and discard
@@ -4889,7 +4889,7 @@ line blocks.
    Bolt's copy is cast at Ana. +1, 31,886 of 31,936 on this stacked branch (round 448 #750), 31,888 with round 448's head 39bb057 (main
    2c9aae1, B298-B299) merged in; the compiled text of every other card and face is unchanged.
    Out after round 449 (looked at, not done): Mastermind's Acquisition (done in round B304) and Spawnsire of Ulamog (done in round B304) (still out: cards from outside
-   the game), The Dominion Bracelet (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
+   the game), The Dominion Bracelet (done in round 454) (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
    lists after round 448 (still out, for their reasons). Known gaps: bots pay the ward whenever they hold such a card, and
    discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
    can.
@@ -4910,7 +4910,7 @@ line blocks.
    Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in), 31,891 with main 60ad21b (B300, B301); the compiled text of every other card and face is unchanged.
    Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
    unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (done in round 452) (restarting the game), Secret of
-   Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition (done in round B304) and
+   Bloodbending (done in round 454) and The Dominion Bracelet (done in round 454) (controlling another player), Pulmonic Sliver, Mastermind's Acquisition (done in round B304) and
    Spawnsire of Ulamog (done in round B304) (cards from outside the game), Panglacial Wurm (done in round B305) (cast while searching). Known gaps: bots cast the cards in
    the order targeted and make the copies in the order cast.
    Round 451 went on down `npm run popular`, most played first, to the top of it: Ulalek, Fused Atrocity (rank 4,747), out
@@ -4932,7 +4932,7 @@ line blocks.
    is unchanged. The top 5,000 are all supported now.
    Out after round 451 (looked at, not done): the lists after round 450 (still out, for their reasons; Share the Spoils
    was done in round B300): Chef's Kiss ("reselect the targets at random": whether the current target is among them, no rule
-   or ruling), Karn Liberated (done in round 452) (restarting the game), Secret of Bloodbending and The Dominion Bracelet (controlling another
+   or ruling), Karn Liberated (done in round 452) (restarting the game), Secret of Bloodbending (done in round 454) and The Dominion Bracelet (done in round 454) (controlling another
    player), Pulmonic Sliver (an optional replacement in the middle of any move to a graveyard), Mastermind's Acquisition (done in round B304) and
    Spawnsire of Ulamog (done in round B304) (cards from outside the game), Panglacial Wurm (done in round B305) (cast while searching). Known gaps: the human's own
    simultaneous triggers are ordered automatically (no prompt), so Ulalek's may go below another trigger of yours from the
@@ -4960,12 +4960,12 @@ line blocks.
    your first upkeep. +1, 31,893 of 31,936 on this stacked branch (round 451 #756), 31,895 with main 7917d27 (B302,
    B303) merged in; the compiled text of every other card and face is unchanged.
    Out after round 452 (looked at, not done): the lists after round 451 (still out, for their reasons): Chef's Kiss,
-   Secret of Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition (done in round B304)
+   Secret of Bloodbending (done in round 454) and The Dominion Bracelet (done in round 454) (controlling another player), Pulmonic Sliver, Mastermind's Acquisition (done in round B304)
    and Spawnsire of Ulamog (done in round B304) (cards from outside the game), Panglacial Wurm (done in round B305) (cast while searching). Known gaps: state-based
    actions are checked during the new game's mulligans as at any game's start, so a player who'd draw from an empty library
    then would lose then, not in the first upkeep (CR 727.3; no deck here has fewer than seven cards left after a restart);
    bots weigh the restart by the worth of permanents and life only, not the cards in hand or library.
-   Round 453 went on down `npm run popular`, most played first, past Chef's Kiss, Secret of Bloodbending, Pulmonic Sliver,
+   Round 453 went on down `npm run popular`, most played first, past Chef's Kiss, Secret of Bloodbending (done in round 454), Pulmonic Sliver,
    The Dominion Bracelet and Panglacial Wurm (still out, for their reasons), Mastermind's Acquisition, Spawnsire of Ulamog
    and Vivien, Arkbow Ranger (Lane B's round B304: nothing outside the game in Commander) and Turtles Forever (Lane B's
    round B303) to Psychic Battle (rank 16,972), out since round B282 for having "not one hook yet": "Whenever a player
@@ -4992,10 +4992,74 @@ line blocks.
    (controlling another player), Illusionary Mask (the face-up replacement against prevention and damage already
    determined, no ruling), Shaman's Trance (whether it permits casting by itself or only through other graveyard
    permissions: its rulings mention flashback only), Camouflage (piles of blockers), Snowblind ("toughness minus 1" read
-   inside its own effect), Ghostly Flame, North Star (Lane B's skip lists). Judgment calls: "change the target to ~"
+   inside its own effect), Ghostly Flame (done in round 455), North Star (done in round 455) (Lane B's skip lists). Judgment calls: "change the target to ~"
    (Spellskite, Muck Drubb) and copies aimed by their effect (CR 707.10d-e) aren't a player choosing targets; a copy's
    controller who keeps every target chose none. Known gaps: bots weigh nothing about Psychic Battle before casting, and
    as winners use the usual new-target choice (harmful ones away from themselves, helpful ones to their own).
+   Round 454 went on down `npm run popular`, most played first, past Chef's Kiss (still out, for its reason) to Secret of
+   Bloodbending (rank 7,770) and The Dominion Bracelet (rank 10,030), out for "controlling another player", which
+   Mindslaver's turn control (CR 723; GameState playerControls, controlledTurn, deciderOf) already covers. Secret of
+   Bloodbending's "You control target opponent during their next combat phase. If this spell's additional cost was paid,
+   you control that player during their next turn instead." (a whole line in oracle/round454.ts; its "you may waterbend
+   {10}" is the additional cost, CR 701.67a) waits, like a turn's control, for the next combat phase of that player's own
+   turns they actually take (rulings: a skipped one doesn't count, as 723.1b; Effect controlPlayer `combat`), from its
+   beginning of combat step, before anything triggers there, to the end of its end of combat step (CR 506.1; an additional
+   combat phase is another one, CR 500.8, and a turn ended early ends it, 724.1d): you make all their choices and
+   decisions then (723.5), with their resources (723.5a), as for a turn. Of several control effects that apply to a player
+   at once, the last one created works (CR 723.1a, rulings; each one has a timestamp now): a Secret created after
+   Mindslaver's effect takes that combat phase from it and the turn's control is back after the phase; one created before
+   it is overridden, and its phase is spent. The Dominion Bracelet's "Equipped creature gets +1/+1 and has "{15}, Exile The
+   Dominion Bracelet: You control target opponent during their next turn. This ability costs {X} less to activate, where X
+   is this creature's power. Activate only as a sorcery."" now compiles: "Exile The Dominion Bracelet" in the granted
+   ability exiles the Equipment that gave it, still that object (ActivatedAbility grantSourceCost "exile", as "Sacrifice
+   Blazing Torch"), whoever controls it (the cost doesn't say "you control"; only the creature's controller activates it,
+   CR 301.5d), and its cost is the creature's power less, locked in before costs are paid (rulings, CR 601.2f), the
+   Bracelet's +1/+1 included. The note over the table says "this combat phase" for the combat's control. Browser tests:
+   Secret of Bloodbending cast without its waterbend (Pay waterbend greyed out, "Don't pay"), then Ana's Grizzly Bears
+   attack Ben from her seat in her combat phase and she is her own again in her second main phase; the Bracelet equipped
+   to Hill Giant, its ability paid with eleven lands, the Bracelet exiled, and Ana's next turn yours. +2, 31,897 of 31,936
+   on main d305cbf, 31,909 with main 4be39a6 (round 453, B304-B306) merged in; the compiled text of every other card and
+   face is unchanged.
+   Out after round 454 (looked at, not done): the lists after round 452 (still out, for their reasons): Chef's Kiss,
+   Pulmonic Sliver, Psychic Battle (done in round 453), Panglacial Wurm and Shaman's Trance (done in round B305), the cards
+   from outside the game (done in round B304), The Celestial Toymaker (done in round B306), Word of Command (control of a
+   player only while a spell resolves, with limits on their mana abilities: no such limited control yet), Swirl the Mists, Volrath's Shapeshifter,
+   Spy Kit, Illusionary Mask, Camouflage, Snowblind, Ghostly Flame and North Star (done in round 455). Known gaps: bots never activate the
+   Bracelet's ability (as with Mindslaver's); a bot controlling a player's combat phase declares no attacks for them, as
+   it does for a whole turn.
+   Round 455 took the two hard cards left that no open round had, both from the bottom of `npm run popular` (Lane B's
+   skip lists), each settled by its rulings and the rules on how a payment or a shield looks at things. Ghostly Flame's
+   "Black and/or red permanents and spells are colorless sources of damage." (CompiledCard.colorlessDamageSources,
+   oracle/round455.ts): the rulings say the effect "applies whenever something looks at the damage", that the spells and
+   permanents keep their colors ("a red spell can't target a creature with protection from red"), and that "things that
+   trigger on a red spell doing damage will still trigger. The damage itself thinks it came from a colorless source." So
+   everything that applies to damage as it would be dealt sees a colorless source (damage.ts planShields, seenAsDamage):
+   prevention shields, which recheck the source as the damage would be dealt (CR 609.7b: Circle of Protection: Red's chosen
+   red source no longer fits, and the shield isn't used up), protection's prevention (CR 702.16e; its targeting and blocking
+   parts aren't damage), replacements (Torbran's "a red source you control would deal damage", CR 614.1a) and the "if
+   damage from a black source is prevented this way" riders; what's dealt is dealt by the source with its colors back, so
+   triggers on it and the turn's records of what dealt damage see it as it is (The Red Terror still gets its counter). Only
+   a permanent (or one that has left, as it last existed, CR 608.2h) or a spell (CR 112.1) is affected, not a card in
+   another zone or a spell that has finished resolving (Deflecting Palm's damage). North Star's "{4}, {T}: For one spell
+   this turn, you may spend mana as though it were mana of any type to pay that spell's mana cost. (Additional costs are
+   still paid normally.)" (Effect anyTypeOneSpell, GameState.anyTypeSpells): one use for its controller this turn, chosen
+   as they cast a spell (CostChoices.anyTypeMana; the UI asks "Use North Star / Pay normally" for each spell it would make a
+   difference for, until it's used, before X and the targets): each symbol of the mana cost it's cast for (a prototype's
+   too, CR 718.3b) is paid with mana of any type (CR 609.4b: only how the cost is paid changes), a Phyrexian one with any
+   mana or 2 life; kicker, buyback, commander tax and other additional costs are paid as they are (CR 601.2f), and a spell
+   cast for an alternative cost (evoke, flashback, madness, face down) doesn't pay its mana cost (CR 118.9), so it's not
+   offered there. Browser test: North Star activated, then Divination cast with three Mountains: Use North Star. +2, 31,897
+   of 31,936 on main d305cbf, 31,898 with main 957ba2c (round 453) merged in, 31,911 with round 454's head a523551 (main 4be39a6, B304-B306)
+   merged in; the compiled text of every other card and face is unchanged.
+   Out after round 455 (looked at, not done): the lists after round 454 (still out, for their reasons): Word of Command
+   (control only while a spell resolves, mana-ability limits), Chef's Kiss, Pulmonic Sliver, Swirl the Mists (a text change
+   on every spell and permanent: the definition key, cardIdOf, is read without the game state), Volrath's Shapeshifter (the
+   same, with the top card of the graveyard), Spy Kit (every nonlegendary creature card's name: the 258 places a
+   permanent's one name is read), Illusionary Mask, Camouflage, Snowblind ("toughness minus 1" read inside its own layer 7c
+   effect, no ruling). Known gaps: bots don't activate North Star (its worth
+   for a spell in hand isn't weighed) and use one only for a spell they can't cast without it; when a cost reduction takes
+   off a colored symbol both the mana cost and an additional cost have, it's taken off the additional cost's (the cost is
+   one total, CR 601.2f, no ruling says which).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -6293,7 +6357,7 @@ line blocks.
    by that creature's controller); Frankenstein's Monster (done in round B171) (a counter chosen for each exiled card as it enters); Cyclopean
    Tomb; Apocalypse Chime, Golgothian Sylex and City in a Bottle (done in round B290) (names first printed in a set); Reflecting Mirror;
    Extrapolate the Impossible and Golden Wish (cards from outside the game); Search the City (done in round B256); Minamo's Meddling (done in round B260) (spliced
-   cards); Ghostly Flame; Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
+   cards); Ghostly Flame (done in round 455); Steamflogger Boss (done in round B226) (Contraptions); Vodalian War Machine (Merfolk tapped to pay its costs).
    Out after round 292 (looked at, not done): Balthier and Fran (a Vehicle "crewed by ~ this turn" attacking in the first
    combat phase); Eriette, the Beguiler (control while an Aura stays attached); The Fourteenth Doctor (Doctor cards put
    into your graveyard from your library this turn); Tahngarth, First Mate (done in round B284) (given to an attacking opponent until end of
@@ -8400,7 +8464,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   source (Volatile Rig), X/X plus one with "the colors" (Fractalize), "becomes all colors" (Scrapbasket), "are the
   chosen color" (Shifting Sky), "if you cast it during your main phase" (Sentinel's Mark, addendum, CR 207.2c).
   +26 (27,547 of 31,936 with B35 and rounds 202 to 206).
-- Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (done in round B239) (prevent damage only
+- Out after round B36: North Star (done in round 455) (spend mana as though any type for one spell), Silhouette (done in round B239) (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
   opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent (done in round B128) ("for each {U}{U}
   spent"), Wall of Shadows (done in round B199) ("spells that can target only Walls"), Fickle Efreet (done in round B153) (a delayed flip at end of combat, then
@@ -12334,7 +12398,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   copy from exile at the Eater; Codie's copy targets Grizzly Bears instead. +1, 31,886 of 31,936 on B300's head 65c7e36
   (main 2c9aae1), 31,890 with main 5035246 (rounds 447-449). The compiled text of every other card is unchanged.
 - Out after round B301 (looked at, not done): the lists after round B300 stay out; Snowblind ("toughness minus 1" read
-  inside its own layer 7c effect), North Star, Equinox (done in round B302), Spy Kit and Pulmonic Sliver were looked at again. About 47
+  inside its own layer 7c effect), North Star (done in round 455), Equinox (done in round B302), Spy Kit and Pulmonic Sliver were looked at again. About 47
   unsupported cards remain, all of them hard. Known gap: bots don't weigh Codie's copy when picking which prepared copy to
   cast.
 - Round B300 (least played first, one card off the skip lists, not in Lane A's rounds 447-448): Share the Spoils (out after
@@ -12375,7 +12439,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   445 and B296), 31,881 with main 499a31a (B297), 31,884 with main c8a3332 (round 446)
   and B298's head da03752. The compiled text of every other card is unchanged.
 - Out after round B299 (looked at, not done): the lists after round B298 stay out; Saruman of Many Colors (its ward needs a
-  discard of a kind, and "that spell" of its reflexive trigger), North Star and Finale of Promise were looked at again.
+  discard of a kind, and "that spell" of its reflexive trigger), North Star (done in round 455) and Finale of Promise were looked at again.
   About 49 unsupported cards remain, all of them hard. Known gaps: bots pick which copies to cast by their usual worth, not
   weighing which ones are worth the most cast for free; the black mana symbols are read from the card's mana cost as printed
   (a graveyard card's mana cost isn't changed by any effect here).
@@ -12393,7 +12457,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   costs)". Browser tests: Pay keeps Snowfall with two age counters from one Snow-Covered Island; an Island tapped by hand
   offers both options, and the restricted {U} can't help cast Divination. +1, 31,878 of 31,936 on main c7b4692, 31,880
   with main a10d465 (through round 445 and B296). The compiled text of every other card is unchanged.
-- Out after round B298 (looked at, not done): the lists after round B297 stay out; Ghostly Flame (its rulings make damage
+- Out after round B298 (looked at, not done): the lists after round B297 stay out; Ghostly Flame (done in round 455) (its rulings make damage
   colorless only "whenever something looks at the damage", but not for triggers that look at the source; where each damage
   check falls is still unclear), Chef's Kiss (whether the current target is among those it can be reselected to at random,
   no ruling), Captain America, First Avenger (the division is announced before the cost picks the Equipment, CR 601.2d,
@@ -12516,7 +12580,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B293 (looked at, not done): the lists after round B292 stay out. Spy Kit (every check of a name in the
   engine would have to know every nonlegendary creature card's name), Pulmonic Sliver (a "you may" in the middle of a zone
   move, several Slivers dying at once ordered by their owner), Captain America, First Avenger (done in round 447) (the division of damage is
-  announced before the cost picks the Equipment whose mana value is the amount, CR 601.2d, 601.2h), Ghostly Flame (its
+  announced before the cost picks the Equipment whose mana value is the amount, CR 601.2d, 601.2h), Ghostly Flame (done in round 455) (its
   rulings make damage colorless only for some checks: protection and prevention, not "a red spell deals damage"
   triggers), Shaman's Trance (done in round B305) (every "your graveyard" permission would have to reach other players' graveyards) and
   Yixlid Jailer were looked at again and stay out. Judgment calls and known gaps: Titania's Song that has lost its
@@ -12740,10 +12804,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B284 (looked at, not done): the lists after round B283 stay out, Psychic Battle and Titania's Song too.
   Vivien, Arkbow Ranger (done in round B304) stays out with the Wishes (cards from outside the game, CR 400.11). Breathstealer's Crypt stays
   out: its "they draw a card and reveal it" is a draw other replacements can still replace (CR 614.5, 616.1), and no
-  ruling says what "it" is when that draw becomes two (an Archive) or none (dredge). North Star ("for one spell this turn":
+  ruling says what "it" is when that draw becomes two (an Archive) or none (dredge). North Star (done in round 455) ("for one spell this turn":
   which spell, and when it's used up, has no ruling), False Dawn (done in round B294) (every colored mana your spells and abilities add becomes
   white: a replacement on all mana production, not only lands tapped for mana), Snowblind ("toughness minus 1" read inside
-  its own layer 7c effect, no ruling) and Ghostly Flame (damage from a "colorless source" that's still red, wherever color
+  its own layer 7c effect, no ruling) and Ghostly Flame (done in round 455) (damage from a "colorless source" that's still red, wherever color
   of damage is looked at) were looked at again and stay out. Judgment calls and known gaps: Chorus's counters need it still
   on the battlefield as the creature enters (no ruling either way; CR 113.6); a copy of the creature spell doesn't get them
   (as for Boreal Outrider's); with two Choruses (the legend rule aside) only the first is offered.
@@ -13007,7 +13071,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   each Aura is attached to the one of them its owner chooses (the card's wording assumes one permanent); a Takklemaggot
   whose chooser has left the game returns as a non-Aura enchantment whose upkeep trigger never triggers; the Coffin's
   "you may choose not to untap" uses the existing untap-step prompt. Next in line (not looked at closely yet): the
-  remaining bottom cards are all in earlier skip lists (North Star, Golgothian Sylex, Ghostly Flame, the Wishes and other
+  remaining bottom cards are all in earlier skip lists (North Star (done in round 455), Golgothian Sylex, Ghostly Flame (done in round 455), the Wishes and other
   "outside the game" cards stay out); Secret Invasion, Runesword and Equinox (done in round B302) are the next to look at again.
 - Round B274 (least played first, from the Lane B skip lists, neither in Lane A's round 427): Dimensional Breach's "Exile
   all permanents. For as long as any of those cards remain exiled, at the beginning of each player's upkeep, that player
@@ -13031,7 +13095,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Wurm, mana value 6, not offered) and its return at the end step, and casting Dimensional Breach and choosing Grizzly
   Bears over Sol Ring at your next upkeep. +2, 31,787 of 31,936 on B273's branch, 31,790 with main through round 426 merged in. The
   compiled text of every other card is unchanged.
-- Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star, Ghostly Flame, Snowblind,
+- Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star (done in round 455), Ghostly Flame (done in round 455), Snowblind,
   Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion (done in round B291) and Guardian Beast (done in round B292)
   were looked at again and stay out for the reasons in the earlier lists; the Wishes and other "outside the game" cards
   stay out (nothing outside the game here). Judgment calls and known gaps: Dimensional Breach's upkeep trigger goes on
@@ -13068,7 +13132,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the copied card was in, which only matters to effects about "your graveyard" while it's being cast; moving Volute to a
   card in a graveyard fires no "becomes attached" trigger (none could apply to a card); the rulings' Aura that's also an
   artifact under Brawl (an Aura Equipment) isn't tested. No fresh card is left at the bottom of the list: every remaining unsupported
-  card is in an earlier skip list (North Star, Ghostly Flame, Golgothian Sylex and the others), so the next Lane B round
+  card is in an earlier skip list (North Star (done in round 455), Ghostly Flame (done in round 455), Golgothian Sylex and the others), so the next Lane B round
   starts by looking at those again, least played first.
 - Round B272 (least played first, the two cards round B271 named next in line, neither in Lane A's rounds 426-427):
   Cass, Hand of Vengeance's "Whenever ~ or another creature you control dies, if it was enchanted or equipped, return any
@@ -13288,7 +13352,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B266 (looked at, not done): the lists after round B265 stay out. Judgment calls and known gaps:
   Defensive Formation's division is made for its controller the way banding's is (the engine has no damage assignment
   prompt for blocked attackers), so a human controller isn't asked how to divide it; bots don't attack around Defensive
-  Formation. North Star, Emblazoned Golem, Noxious Vapors, Snowblind, Land Equilibrium, Chorus of the Conclave (done in round B284) and
+  Formation. North Star (done in round 455), Emblazoned Golem, Noxious Vapors, Snowblind, Land Equilibrium, Chorus of the Conclave (done in round B284) and
   Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
 - Round B265 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-420): Reversal of
   Fortune ("Target opponent reveals their hand. You may copy an instant or sorcery card in it. If you do, you may cast the
@@ -13344,7 +13408,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   spell logic; Dimensional Breach (an effect lasting while its cards stay exiled, returning one at each player's upkeep),
   Defensive Formation (done in round B266) (the defending player assigning an attacker's combat damage), Takklemaggot (returned as a non-Aura
   enchantment that loses "enchant creature"), Pygmy Hippo (done in round B286) (another player activating a mana ability of each of their lands)
-  and North Star were looked at again and stay out for the reasons in the earlier lists.
+  and North Star (done in round 455) were looked at again and stay out for the reasons in the earlier lists.
 - Round B263 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 416-418): Guardian Angel
   ("Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you
   could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this
@@ -13460,8 +13524,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (Y counted from the
   toughness so far in layer 7c: other 7c effects apply first, as it depends on them, CR 613.8, but counters apply in
   timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (done in round 447) (as before: one
-  creature in two target slots), Mangara's Equity (done in round B261) (as before), Ghostly Flame (its rulings make only the damage colorless,
-  not the source for triggers, and leave prevention by color open) and North Star ("for one spell": which spell, and only
+  creature in two target slots), Mangara's Equity (done in round B261) (as before), Ghostly Flame (done in round 455) (its rulings make only the damage colorless,
+  not the source for triggers, and leave prevention by color open) and North Star (done in round 455) ("for one spell": which spell, and only
   its mana cost, not additional or alternative costs). Known gaps: Elemental Resonance's {2/W} reading follows its reminder
   text, no ruling covers it; bots don't aim spells at Swans of Bryn Argoll to draw, nor avoid attacking into it.
 - Out after round B251 (looked at, not done): the lists after round B250 stay out. Known gaps: a villainous choice whose
@@ -13516,7 +13580,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B240 (looked at, not done): the lists after round B239 stay out, and Chorus of the Conclave (done in round B284) (still out: no
   ruling says whether a creature spell paid for with its extra mana still enters with the counters once Chorus has left the
   battlefield, the "if you do" being part of its static ability). Known gap: bots don't plan around Bösium Strip's permission.
-- Out after round B239 (looked at, not done): the lists after round B238 stay out, and Ghostly Flame (still out: its rulings
+- Out after round B239 (looked at, not done): the lists after round B238 stay out, and Ghostly Flame (done in round 455) (still out: its rulings
   make black and red sources colorless only "when something looks at the damage", not for triggers on a red spell's damage,
   which every damage-color check would have to tell apart). Known gaps: Charmed Pendant isn't activated while a replacement
   would ask for a color for its mana or a triggered mana ability would add to it (Kinnan); bots don't activate it; bots
@@ -13535,7 +13599,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Titania's Song (as before). Known gaps: another player can use Mana Cache only through automatic payment (not by clicking it),
   and bots don't count another player's Cache as mana they have when planning; Enduring
   Renewal counts the Renewals that already applied in a chain of draws, not which ones, as Blood Scrivener does.
-- Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star ("for one spell this turn":
+- Out after round B235 (looked at, not done): the lists after round B234 stay out, and North Star (done in round 455) ("for one spell this turn":
   only the mana cost's symbols, not additional costs, and the player picks the spell), Sanctuary Blade (a choice in the middle
   of every way an Equipment becomes attached), Hollow Warrior (done in round B259) (attack and block costs that tap another creature), Blood of the
   Martyr (done in round B263) (an optional redirection asked for each damage event) and Guardian Angel (done in round B263) (paying {1} any time you could cast an
@@ -13569,7 +13633,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   B230 stay out. Known gaps: bots don't weigh Rain of Gore when they cast life gain spells; a Kheru Mind-Eater card exiled
   by a bot's choice is the one worth least to that bot, not to Kheru's controller.
 - Out after round B230 (looked at, not done): Glyph of Delusion (done in round B291) ("target creature that target Wall blocked this turn": a
-  target whose legality depends on another target), Runesword (done in round B276), Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame, Torrent of Lava (done in round B263)
+  target whose legality depends on another target), Runesword (done in round B276), Mangara's Equity (done in round B261), Silhouette (done in round B239), Ghostly Flame (done in round 455), Torrent of Lava (done in round B263)
   and the lists after round B229 stay out. Known gaps: a creature put onto the battlefield blocking (Aetherplasm-like
   effects; Aetherplasm done in round B261) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
@@ -13581,7 +13645,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   weighing the Merfolk its death would destroy.
 - Out after round B228 (looked at, not done): Hollow Warrior (done in round B259) (attack and block costs that tap another creature that
   isn't attacking or blocking: attack costs that aren't mana only sacrifice or return, and no block cost asks for a pick), Reflecting Mirror (its {X} set by
-  the target spell's mana value: definedX doesn't see an ability's targets yet), North Star ("for one spell this turn": the
+  the target spell's mana value: definedX doesn't see an ability's targets yet), North Star (done in round 455) ("for one spell this turn": the
   player picks the spell the permission is used on), Brutal Suppression and Drought (done in round B260) (a sacrifice added to other abilities'
   costs). Known gap: with Rayami and another "exile it instead" effect (Rest in Peace), the creature's controller should
   choose which applies (CR 616.1), and so whether it gets a blood counter (rulings); the engine applies the first one it
@@ -13842,7 +13906,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   or {U}": one of three payments), Cheering Fanatic (done in round B158) ("spells with the chosen name cost {1} less to cast this turn").
 - Out after round B144 (looked at, not done): Merseine (done in round B211) ("pay enchanted creature's mana cost" as a cost, activated only
   by that creature's controller), Yare (done in round B145) and Blaze of Glory (done in round B145) ("target creature defending player controls" on a spell, with
-  several defending players, CR 508.5a), North Star (mana spent as though any type for one spell), Lumbering Laundry (done in round B186)
+  several defending players, CR 508.5a), North Star (done in round 455) (mana spent as though any type for one spell), Lumbering Laundry (done in round B186)
   (looking at face-down creatures), Guard Dogs (a prevention shield tied to a permanent chosen as it resolves), Butcher
   Orgg (combat damage divided among the player and their creatures).
 - Out after round B143 (looked at, not done): Preferred Selection (done in round B216) (the two cards looked at should be shown with the

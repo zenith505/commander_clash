@@ -1732,6 +1732,12 @@ export interface CostChoices {
    */
   chorus?: number;
   /**
+   * North Star (round 455): use a "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+   * spell's mana cost" this player has (GameState.anyTypeSpells) for this spell: each mana symbol of its mana cost may be paid
+   * with mana of any type, its additional costs as they are (CR 609.4b, 601.2f-h).
+   */
+  anyTypeMana?: true;
+  /**
    * Round 410: whether to pay each instance of offspring a permanent gives the spell (Zinnia, Valley's Voice), 1 or 0, in the
    * order `offspringGranted` lists them; the spell's own offspring is `kicks` (CR 702.175a-b, paid once each).
    */
@@ -2732,6 +2738,12 @@ export interface GameState {
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
+  /**
+   * North Star (round 455): "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+   * spell's mana cost": one entry for each, used up by the spell its player casts with CostChoices.anyTypeMana. Only the
+   * entries of the turn they were made in count.
+   */
+  anyTypeSpells?: { player: PlayerId; turn: number; source: string }[];
   graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider; /** Locke: only these cards (as they were then), in any player's graveyard. */ cards?: { id: ObjectId; zc: number }[]; /** Whispersteel Dagger: from this player's graveyard (not `player`'s own). */ fromYardOf?: PlayerId; /** Whispersteel Dagger: "you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b). */ anyType?: true }[];
   /**
    * "You may cast spells from your graveyard this turn", "until end of turn, you may play lands ... from your graveyard",
@@ -2857,14 +2869,19 @@ export interface GameState {
    * created: the last one for a player is the one that works (723.1a). `extraTurnAfter`: that player takes an extra turn
    * after that turn (Emrakul, the Promised End: each one makes its own, rulings).
    */
-  /** `ended`: its controller left the game (CR 800.4a), so only its extra turn is left. */
-  playerControls?: { controlled: PlayerId; controller: PlayerId; extraTurnAfter?: true; ended?: true }[];
+  /**
+   * `ended`: its controller left the game (CR 800.4a), so only its extra turn is left. `combat` (Secret of Bloodbending, round
+   * 454): it waits for the controlled player's next combat phase instead of their next turn (taken as that phase begins,
+   * beginCombatControl). `created`: the order the effects were created in (a timestamp), for which one works (CR 723.1a).
+   */
+  playerControls?: { controlled: PlayerId; controller: PlayerId; extraTurnAfter?: true; ended?: true; combat?: true; created?: number }[];
   /**
    * The turn being taken now is controlled by another player (CR 723): `controller` makes all of the active player's
    * choices and decisions until the next turn begins (723.1, 723.5). `extraTurns`: extra turns that player takes after
-   * this one.
+   * this one. `created`: when the effect that works was created (CR 723.1a). `combat` (round 454): the control lasts only
+   * for this combat phase (endCombatControl), `combat.before` the control of this turn it overrides, back when the phase ends.
    */
-  controlledTurn?: { controlled: PlayerId; controller: PlayerId; extraTurns?: number };
+  controlledTurn?: { controlled: PlayerId; controller: PlayerId; extraTurns?: number; created?: number; combat?: { before?: Omit<NonNullable<GameState["controlledTurn"]>, "combat"> } };
   /** During extra turns: the player whose turn came before them in the normal order, who the next normal turn follows. */
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */

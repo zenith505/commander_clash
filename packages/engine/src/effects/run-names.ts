@@ -13,6 +13,8 @@ import { cantSearch, searchBarred, toBottom } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics, controllerOf } from "../layers";
 import { ResolveCtx, amountCtx, amountNow, apnap, players, runEffect, subjectCreatureTypes } from "./resolve";
+import { castWhileSearching } from "./run-laneb305";
+
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
 export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -46,6 +48,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.forced = e.all ? p.graveyard.filter(match) : [];
         // Ashiok, Dream Render: not your own library, if it's yours this searches. Stranglehold: no library.
         const lib = (pid === ctx.controller && searchBarred(s, pid)) || cantSearch(s, ctx.controller) ? [] : p.library;
+        // Panglacial Wurm (round B305): searching your own library, it may be cast before anything is found.
+        if (pid === ctx.controller && lib.length && castWhileSearching(s, pid, src, sc, undefined) === "paused") return "paused";
         const cards = [...(e.all ? [] : p.graveyard.filter(match)), ...p.hand.filter(match), ...lib.filter(match)];
         const max = Math.min(e.max ?? cards.length, cards.length);
         if (cards.length) {

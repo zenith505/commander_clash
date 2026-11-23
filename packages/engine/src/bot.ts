@@ -7751,6 +7751,14 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "continuous":
         v += e.what.ref === "target" && harm[e.what.index] ? 5 : 2;
         break;
+      // Round B304: nothing from outside the game in Commander (Mastermind's Acquisition's second mode).
+      case "outsideGame":
+        break;
+      // Shaman's Trance (round B305): what it opens up, the cards in other players' graveyards with a way of their own to be
+      // cast from there (flashback); nothing else is counted (a gap: our own permissions for our graveyard aren't weighed).
+      case "shamansTrance":
+        v += s.turnOrder.filter((q) => q !== pid && !player(s, q).lost).flatMap((q) => player(s, q).graveyard).filter((id) => !!compileCard(defOf(s, obj(s, id))).fromGraveyard?.length).length;
+        break;
       default:
         v += 1;
     }
@@ -7999,8 +8007,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (oldWipe && (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length)) continue;
       // Lodestone Bauble (round 417): sacrificed when it's worth it (baubleTargets below).
       if (((ab.sacrificeSelf && !cashIn && !oldWipe && !flips && !voidPlay && !hoard && !ab.choosesYardPlayer) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
-      // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too.
-      if (ab.grantSourceCost?.action === "sacrifice") continue;
+      // "Sacrifice Blazing Torch" in an ability the Equipment gives: keep the Equipment too. The Dominion Bracelet's "Exile
+      // The Dominion Bracelet" (round 454) as well: bots don't take another player's turn this way (nor with Mindslaver).
+      if (ab.grantSourceCost?.action === "sacrifice" || ab.grantSourceCost?.action === "exile") continue;
       // Hankyu: "Remove all aim counters from Hankyu" for that much damage: only once three have built up.
       if (ab.grantSourceCost?.action === "removeAllCounters" && ((ab.grantSourceCost.id ? s.objects[ab.grantSourceCost.id]?.counters[ab.grantSourceCost.counter ?? ""] : 0) ?? 0) < 3) continue;
       // Mechtitan Core: itself and four others exiled for a 10/10, in our main phase with the stack empty (and only when

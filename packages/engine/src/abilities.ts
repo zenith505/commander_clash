@@ -146,6 +146,8 @@ export type Count =
   | { kind: "selfChosenNumber" }
   /** Bell Borca, Spectral Sergeant (round B239): "the greatest number noted for it this turn": the greatest mana value its controller's ~ noted this turn as a card was put into exile while it was on the battlefield as this object (GameObject.exiledMvNoted); 0 with none, or off the battlefield (rulings). */
   | { kind: "selfNotedExiledMv" }
+  /** The Celestial Toymaker (round B306): "each spell or ability that caused one or more players to guess or to group cards or permanents into a pile this turn" (TurnLog.pileOrGuess). */
+  | { kind: "pileOrGuessSources" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
   /** "The number of times that spell was kicked" (Rumbling Aftershocks): its kicker costs paid as it was cast, multikicker's each time (CR 702.33d). */
@@ -5063,6 +5065,20 @@ export type Effect =
    */
   | { type: "putWithLink"; target: number }
   /**
+   * Lane B round B304: an instruction that brings a card you own from outside the game into the game (Mastermind's
+   * Acquisition, North Wind Avatar, Legion Angel, Vivien, Arkbow Ranger, The Raven's Warning, Granted, Research, Spawnsire of
+   * Ulamog). "Parts of abilities which bring other traditional card(s) you own from outside the game into the game ... do
+   * not function in Commander" (Commander format rule 10), and players here have no sideboard (CR 100.4, 400.11a): it does
+   * nothing but say so in the log. `text` is the instruction as printed.
+   */
+  | { type: "outsideGame"; text: string }
+  /**
+   * Shaman's Trance (round B305): "Other players can't play lands or cast spells from their graveyards this turn. You may
+   * play lands and cast spells from other players' graveyards this turn as though those cards were in your graveyard." For
+   * the rest of the turn (GameState.tranceTurn; game.ts tranced, tranceBars).
+   */
+  | { type: "shamansTrance" }
+  /**
    * Captured by the Consulate (round B238): "change the target to enchanted creature if able": the spell whose cast
    * triggered this (ctx.cause), if it still has a single target (CR 603.4), gets the creature this Aura is attached to, or
    * was as it last existed (CR 608.2h), as its target, only if that's a legal target for it (CR 115.7, rulings).
@@ -6263,6 +6279,12 @@ export type Effect =
    */
   /** Hostile Negotiations: two piles of `n` cards exiled face down from the top of your library, one turned face up by you, an opponent choosing the one for your hand (see runFaceDownPilesEffect). */
   | { type: "faceDownPiles"; n: number }
+  /**
+   * The Celestial Toymaker (round B306): "look at the top `n` cards of your library. Exile any number of them in a face-down
+   * pile and the rest in a face-up pile. Defending player chooses one of those piles. Put that pile into your hand." The
+   * other pile stays in exile (effects/run-laneb306.ts).
+   */
+  | { type: "exilePilesDefenderChooses"; n: number }
   /** Abstract Performance (round B270): `n` cards exiled face down in a pile, then `n` face up in another; an opponent you choose picks one for your graveyard, and you look at the other (the cards a castFromAmong `fromDug` then casts from, ResolvingInfo.dugExiled; see effects/run-laneb270.ts). */
   | { type: "abstractPiles"; n: number }
   /** Gollum, Scheming Guide: an opponent you choose guesses whether the top card of your library is of the kind chosen just
@@ -6511,9 +6533,10 @@ export type Effect =
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player
-   * takes an extra turn" (Emrakul, the Promised End).
+   * takes an extra turn" (Emrakul, the Promised End). `combat` (Secret of Bloodbending, round 454): "during their next combat
+   * phase" instead, the next combat phase of their turns that `who` actually takes (rulings).
    */
-  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true }
+  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true; combat?: true }
   /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
   /**
    * Teyo, Geometric Tactician: "Until your next turn, each player may attack only the nearest opponent in the last chosen
@@ -8260,9 +8283,9 @@ export interface ActivatedAbility {
    * (ObjRef grantSource), which must still be that object, under the activating player's control to be sacrificed (CR
    * 701.21a) or attached to this permanent to be unattached (CR 701.3d, 602.2b). "removeAllCounters" (Hankyu's "Remove all
    * aim counters from Hankyu"): every `counter` counter on it, none included, the number for "removed this way"
-   * (StackItem.countersRemoved).
+   * (StackItem.countersRemoved). "exile" (The Dominion Bracelet, round 454): exiled, whoever controls it (CR 602.2b).
    */
-  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
+  grantSourceCost?: { ref: "grantSource"; action: "sacrifice" | "unattach" | "tap" | "exile" | "removeAllCounters"; counter?: CounterKind; id?: ObjectId; zc?: number };
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;
@@ -10395,6 +10418,8 @@ export interface CompiledCard {
   noMaxHandSize?: boolean | "all";
   /** Haakon, Stromgald Scourge: "You may cast ~ from your graveyard, but not from anywhere else" (game.ts castProblem). */
   castOnlyFromGraveyard?: true;
+  /** Panglacial Wurm (round B305): "While you're searching your library, you may cast ~ from your library" (effects/run-laneb305.ts castWhileSearching). */
+  castWhileSearching?: true;
   /** Liesa, Shroud of Dusk: its commander tax is paid as 2 life for each previous cast from the command zone, not {2} (game.ts commanderTaxLife). */
   commanderTaxAsLife?: true;
   /** Ensnaring Bridge: "Creatures with power greater than the number of cards in your hand can't attack" (any player's, checked as attackers are declared, rulings). */

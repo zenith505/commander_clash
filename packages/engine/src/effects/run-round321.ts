@@ -7,6 +7,8 @@ import { shuffleLibrary } from "../rng";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import type { ResolveCtx } from "./resolve";
 import { printedMatches } from "./targeting";
+import { castWhileSearching } from "./run-laneb305";
+
 
 /**
  * Eivor, Wolf-Kissed: "you mill that many cards. You may put a Saga card and/or a land card from among them onto the
@@ -103,6 +105,8 @@ export function runSearchEachExileEffect(s: GameState, e: Extract<Effect, { type
       sc.searchEach.shift();
       continue;
     }
+    // Panglacial Wurm (round B305): searching your own library, it may be cast before anything is found.
+    if (pid === you.id && castWhileSearching(s, pid, src, sc, undefined) === "paused") return "paused";
     const cards = p.library.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))));
     // Nothing there to find: searched, nothing found (CR 701.19b).
     if (!cards.length) {

@@ -23,8 +23,8 @@ test("Development from the split card's menu: each time, an opponent has you dra
   await card(page, "Research // Development", s).click();
   await menu(page).getByRole("button", { name: /^Cast Development/ }).click();
   const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.objects[rd]!.zone === "graveyard");
-  // Three times: a card drawn or a token each time.
-  expect(after.players[0]!.hand.length + elementals(after, 0)).toBe(3);
+  // Three times: a card drawn (it left your library) or a token each time.
+  expect(s.players[0]!.library.length - after.players[0]!.library.length + elementals(after, 0)).toBe(3);
   expect(pageErrors(page)).toEqual([]);
 });
 
@@ -44,7 +44,8 @@ test("Development cast by Ana: Ben and Cy say no, and you have her draw a card i
   // The first time, the opponents in turn order after Ana: Ben and Cy (bots) say no; you are the last.
   for (let i = 0; i < 4 && s.pending?.kind === "chooseOption" && s.pending.player !== 0; i++) s = applyAction(s, { type: "chooseOption", player: s.pending.player, choice: "none" });
   expect(s.pending).toMatchObject({ kind: "chooseOption", player: 0, what: "punisher" });
-  const hand = s.players[1]!.hand.length;
+  // Her draws, counted from her library: she may play a land or cast a card she drew before the poll sees her hand.
+  const library = s.players[1]!.library.length;
   await open(page, s);
   await expect(controls(page)).toContainText("they draw a card");
   await controls(page).getByRole("button", { name: "Have them draw a card", exact: true }).click();
@@ -57,7 +58,8 @@ test("Development cast by Ana: Ben and Cy say no, and you have her draw a card i
   }
   expect(after).toBeDefined();
   // The first time she drew rather than making a token; three cards and tokens in all.
-  expect(after!.players[1]!.hand.length - hand + elementals(after!, 1)).toBe(3);
-  expect(after!.players[1]!.hand.length - hand).toBeGreaterThanOrEqual(1);
+  const drawn = library - after!.players[1]!.library.length;
+  expect(drawn + elementals(after!, 1)).toBe(3);
+  expect(drawn).toBeGreaterThanOrEqual(1);
   expect(pageErrors(page)).toEqual([]);
 });

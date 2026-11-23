@@ -146,6 +146,8 @@ export type Count =
   | { kind: "selfChosenNumber" }
   /** Bell Borca, Spectral Sergeant (round B239): "the greatest number noted for it this turn": the greatest mana value its controller's ~ noted this turn as a card was put into exile while it was on the battlefield as this object (GameObject.exiledMvNoted); 0 with none, or off the battlefield (rulings). */
   | { kind: "selfNotedExiledMv" }
+  /** The Celestial Toymaker (round B306): "each spell or ability that caused one or more players to guess or to group cards or permanents into a pile this turn" (TurnLog.pileOrGuess). */
+  | { kind: "pileOrGuessSources" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
   /** "The number of times that spell was kicked" (Rumbling Aftershocks): its kicker costs paid as it was cast, multikicker's each time (CR 702.33d). */
@@ -6261,6 +6263,12 @@ export type Effect =
    */
   /** Hostile Negotiations: two piles of `n` cards exiled face down from the top of your library, one turned face up by you, an opponent choosing the one for your hand (see runFaceDownPilesEffect). */
   | { type: "faceDownPiles"; n: number }
+  /**
+   * The Celestial Toymaker (round B306): "look at the top `n` cards of your library. Exile any number of them in a face-down
+   * pile and the rest in a face-up pile. Defending player chooses one of those piles. Put that pile into your hand." The
+   * other pile stays in exile (effects/run-laneb306.ts).
+   */
+  | { type: "exilePilesDefenderChooses"; n: number }
   /** Abstract Performance (round B270): `n` cards exiled face down in a pile, then `n` face up in another; an opponent you choose picks one for your graveyard, and you look at the other (the cards a castFromAmong `fromDug` then casts from, ResolvingInfo.dugExiled; see effects/run-laneb270.ts). */
   | { type: "abstractPiles"; n: number }
   /** Gollum, Scheming Guide: an opponent you choose guesses whether the top card of your library is of the kind chosen just

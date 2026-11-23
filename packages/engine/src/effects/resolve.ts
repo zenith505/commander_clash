@@ -116,6 +116,7 @@ import { runLaneB236Effect } from "./run-laneb236";
 import { runLaneB296Effect } from "./run-laneb296";
 import { runLaneB304Effect } from "./run-laneb304";
 import { runLaneB305Effect } from "./run-laneb305";
+import { groupsIntoPiles, notePileOrGuess, runLaneB306Effect } from "./run-laneb306";
 import { runLaneB238Effect } from "./run-laneb238";
 import { runLaneB254Effect } from "./run-laneb254";
 import { runLaneB255Effect } from "./run-laneb255";
@@ -1289,6 +1290,8 @@ function sameDamageEvent(a: Effect, b: Effect | undefined): Effect | undefined {
 }
 
 export function runEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
+  // The Celestial Toymaker (round B306): this spell or ability groups cards or permanents into piles (CR 700.3).
+  if (groupsIntoPiles(e)) notePileOrGuess(s);
   // Counters an effect puts on are put by the ability's controller (Vorinclex rulings), all at once (round 416).
   const result = withPutter(ctx.controller, () => batchCountersPut(s, () => runEffectInner(s, e, ctx)));
   invalidateCharacteristics(s);
@@ -2225,6 +2228,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB304Effect(s, e, ctx, src);
     case "shamansTrance":
       return runLaneB305Effect(s, e, ctx, src);
+    case "exilePilesDefenderChooses":
+      return runLaneB306Effect(s, e, ctx, src);
     case "consulateRedirect":
     case "piracy":
       return runLaneB238Effect(s, e, ctx, src);

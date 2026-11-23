@@ -1,6 +1,6 @@
 # Roadmap
 
-31,905 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,906 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,976 of
 9,979 (99%).
 
@@ -4203,7 +4203,7 @@ line blocks.
    Out after round 421 (looked at, not done): The Dragon-Kami Reborn (done in round B283) (hatching counters on cards exiled face down), The
    Face of Boe (a spell cast for its suspend cost: the "Suspend X" cards' {X} in that cost isn't worked out), Skyway
    Robber, Parnesse, the Subtle Brush, Uvilda, Dean of Perfection (done in round B283), Nihiloor (a reflexive trigger for each creature tapped,
-   one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker, Unpredictable Cyclone (done in round B286), Redemptor
+   one per opponent), Psychic Battle, Hama, the Bloodbender, The Celestial Toymaker (done in round B306), Unpredictable Cyclone (done in round B286), Redemptor
    Dreadnought (an optional additional cost exiling one creature card; note its Plasma Incinerator line compiles "the
    power of the exiled card" as a sacrificed cost's, which an attack trigger has none of: fix that with the cost),
    Selective Adaptation, Tahngarth, First Mate (done in round B284) and the rest of `npm run popular` above rank 15,100 (still out, for the
@@ -6269,7 +6269,7 @@ line blocks.
    combat, attacking for them); Ertai's Meddling (done in round B282) (delay counters, then put onto the stack as a copy); Expose the Culprit (done in round 391)
    (cloaking a face-down pile of disguise creatures); Lady Loki, Agent of Chaos; The Dragon-Kami Reborn (done in round B283) (hatching
    counters); The Face of Boe (casting a suspend card for its suspend cost); Parnesse, the Subtle Brush; Nihiloor (a tap
-   for each opponent, then control by power); The Celestial Toymaker (counting what made players group cards into piles);
+   for each opponent, then control by power); The Celestial Toymaker (done in round B306) (counting what made players group cards into piles);
    Ogre Battlecaster (done in round 401) ({R}{R} added to the graveyard spell's costs, then +X/+0 as it's cast); Kylox's Voltstrider (done in round 401) (spells
    from the cards its collect evidence exiled); Reversal of Fortune (done in round B265) (a copy of a card in an opponent's hand, cast from
    there); Dubious Challenge (done in round B152); Evolving Door (a creature card exactly one color more); Storm Herald (Auras returned
@@ -12159,6 +12159,42 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B306 (least played first, one card off the skip lists, not in Lane A's rounds 453-454): The Celestial Toymaker
+  (out after rounds 292 and 421: counting what made players group cards into piles). "Whenever ~ attacks, look at the top three
+  cards of your library. Exile any number of them in a face-down pile and the rest in a face-up pile. Defending player
+  chooses one of those piles. Put that pile into your hand." (Effect exilePilesDefenderChooses, effects/run-laneb306.ts):
+  you look (nothing is revealed) and choose the face-down pile, none or all of them too (CR 700.3d); both piles are exiled
+  at once, the face-down one seen only by you (CR 406.3); the defending player is the trigger's player, the player it
+  attacked or the controller (protector) of the planeswalker (battle) it attacked (CR 506.2), and sees the face-up pile and
+  only the size of the other; the pile they choose goes into your hand, the other stays in exile as it is. "At the beginning
+  of each end step, each opponent loses 2 life for each spell or ability that caused one or more players to guess or to
+  group cards or permanents into a pile this turn.": every end step, counted as it resolves (CR 608.2h; Count
+  pileOrGuessSources). Each spell or ability is its stack item, counted once however many players or piles (TurnLog
+  pileOrGuess, reset each turn): the effects that separate or exile cards or permanents into piles (Fact or Fiction and the
+  other "separate ... into two piles", Liliana of the Veil, Whims of the Fates, Bend or Break, Stand or Fall, Fight or
+  Flight, Raging River, Brilliant Ultimatum, Ghastly Conscription, Become Anonymous, Expose the Culprit, Mangara's Tome,
+  Parallel Thoughts, Hostile Negotiations, Abstract Performance, Triumph of Saint Katherine, the Toymaker's own trigger),
+  whatever they find (a pile may be empty, CR 700.3d), Phyrexian Portal only once its ten-card check passes; and the
+  instructions that say "guess" (Gollum, Scheming Guide, Liar's Pendulum, Master of Predicaments, The Seventh Doctor, The
+  Toymaker's Trap), as the guess is asked. Judgment call, no ruling: naming a card (Conundrum Sphinx) and calling a coin
+  flip (CR 705.2) aren't guesses, as their text doesn't say so; a spell or ability that's countered or fizzles caused
+  nothing. Bots split the cards into piles as evenly as they can and, as the defending player, choose the pile worth less
+  (the face-down one by its size). Browser tests: you split the top three when your Toymaker attacks Ana, and Ana's Toymaker
+  attacking you has you choose her pile, the face-down one shown as card backs. +1, 31,906 of 31,936 on B305's head
+  f54dad76 (main d305cbf). The compiled text of every other card is unchanged.
+- Out after round B306 (looked at, not done): the lists after round B305 stay out. About 30 unsupported cards remain: the
+  Wishes (left out by choice), control of another player (Word of Command; Lane A's round 454 has Secret of Bloodbending
+  and The Dominion Bracelet, round 453 Psychic Battle), text changes (Swirl the Mists, Spy Kit), and the others in the
+  earlier lists for their reasons. Looked at again: Volrath's Shapeshifter (the full text of the top card of its
+  controller's graveyard is a layer 3 text change that also sets its name, types and power and toughness, and which
+  graveyard depends on its controller, from layer 2: game.ts reads the definition before the layers, so it needs a
+  definition worked out between layers 2 and 3); Pulmonic Sliver (its granted "you may put it on top of its owner's library
+  instead" is the only optional replacement of a move to a graveyard: game.ts moveObject can't stop for a question, and
+  several Slivers dying at once go on top in an order their owner chooses, rulings); Illusionary Mask (when the face-down
+  creature "would deal damage" outside combat, whether the amount is worked out again once it's face up has no ruling);
+  Camouflage (piles of blockers: what a pile does with a menace attacker, or a creature that can block only one of the
+  piles it's in, has no ruling); Chef's Kiss (left to Lane A, the most played remaining card). Known gap: bots don't weigh
+  the Toymaker's end step when casting pile or guess spells.
 - Round B305 (least played first, two cards off the skip lists, not in Lane A's rounds 451-453): Panglacial Wurm (out
   since round 286: cast while searching) and Shaman's Trance (out after rounds 294 and B293: other players' graveyards as
   yours). Panglacial Wurm's "While you're searching your library, you may cast ~ from your library.": an ability of the

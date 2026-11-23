@@ -4915,6 +4915,8 @@ function LibrarySearch({
             {" "}
             {pending.piles && /played from/.test(dig?.rest ?? "")
               ? `The rest form the second pile. A pile may be empty. ${pending.forPlayer !== undefined ? s.players[pending.forPlayer]!.name : "You"} ${pending.forPlayer !== undefined ? "chooses" : "choose"} one to play lands and cast spells from without paying their mana costs; the other stays in exile.`
+              : pending.piles && /both piles are exiled/.test(dig?.rest ?? "")
+              ? "The rest form the face-up pile. Both piles are exiled; a pile may be empty. The defending player chooses one for your hand; the other stays in exile."
               : pending.piles
               ? `The rest form the ${dig?.to === "for the face-down pile" ? "face-up" : "second"} pile. A pile may be empty. ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name} chooses one for their hand` : "An opponent chooses one for your hand"}, the other goes ${/bottom/.test(dig?.rest ?? "") ? "on the bottom of the library" : "to the graveyard"}.`
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)

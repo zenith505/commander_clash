@@ -52885,6 +52885,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "388fe92a-0bc0-4c0a-a7c6-910c5e71e342",
+  "name": "The Celestial Toymaker",
+  "manaCost": "{W}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Rogue Artificer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rogue",
+   "Artificer"
+  ],
+  "oracleText": "Whenever The Celestial Toymaker attacks, look at the top three cards of your library. Exile any number of them in a face-down pile and the rest in a face-up pile. Defending player chooses one of those piles. Put that pile into your hand.\nAt the beginning of each end step, each opponent loses 2 life for each spell or ability that caused one or more players to guess or to group cards or permanents into a pile this turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-12-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7f32344f-06d8-4862-bfeb-f90a3e1d7fc2",
   "name": "The Creation of Avacyn",
   "manaCost": "{1}{B}{B}",

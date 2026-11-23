@@ -2157,6 +2157,8 @@ export interface TurnLog {
   loyaltyAtInstantSpeed?: { player: PlayerId; subtype: string }[];
   /** Predatory Focus: the players whose creatures assign their combat damage this turn as though they weren't blocked (CR 510.1c). */
   unblockedDamage?: PlayerId[];
+  /** The Celestial Toymaker (round B306): the spells and abilities (stack item ids) that caused one or more players to guess or to group cards or permanents into a pile this turn (CR 700.3), each once (effects/run-laneb306.ts notePileOrGuess). */
+  pileOrGuess?: string[];
   /** Power Surge: the untapped lands the active player controlled as this turn began, before its untap step (CR 502.3); left out when none. */
   untappedLands?: number;
   /** The most total power each player attacked with in one declaration of attackers this turn (Desert Were-Worm). */

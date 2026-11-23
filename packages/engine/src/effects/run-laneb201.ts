@@ -8,6 +8,7 @@ import { nextRandom } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import type { ResolveCtx } from "./resolve";
 import { objects, players, runEffect } from "./resolve";
+import { notePileOrGuess } from "./run-laneb306";
 import { flipsRigged, noteFlipped } from "./run-dice";
 import { paidUnless } from "./run-spells";
 import { isSuspended } from "./run-zones";
@@ -109,6 +110,7 @@ export function runLaneB201Effect(s: GameState, e: B201Effect, ctx: ResolveCtx, 
       const sc = (s.resolving!.scratch ??= {});
       const st = (sc.liarGuess ??= {});
       if (st.guess === undefined) {
+        notePileOrGuess(s); // The Celestial Toymaker (round B306): a guess.
         s.pending = { kind: "chooseOption", player: guesser, source: src, what: "liarGuess", options: ["in", "out"], labels: [`${name} is in their hand`, `${name} isn't in their hand`], prompt: `${you.name} named ${name}. Guess whether a card with that name is in their hand: if they reveal their hand and you guessed wrong, they draw a card` };
         return "paused";
       }

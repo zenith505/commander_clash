@@ -18,6 +18,7 @@ import { parsePunisherOptions } from "./sentences/basics";
 import { X_MODES_MAX } from "../modes";
 import { round318Sentence } from "./round318";
 import { roundB166Sentence } from "./laneb166";
+import { developmentBody, outsideGameBody } from "./laneb304";
 import { roundB167Sentence } from "./laneb167";
 import { roundB170WholeText } from "./laneb170";
 import { round319WholeText } from "./round319";
@@ -431,7 +432,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx, nameChosen?: boo
   // once for each creature (CR 603.7b).
   // Jace, Cunning Castaway: "Whenever one or more creatures you control deal combat damage to a player this turn": once for
   // each player dealt it, and again in another combat damage step (rulings).
-  const dealt = /^Whenever (one or more creatures you control deal combat damage to (?:one or more players|a player)|a creature you control deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s);
+  // The Raven's Warning (round B304): "Whenever one or more creatures you control with flying deal combat damage to a player
+  // this turn, look at that player's hand and draw a card": only those creatures count (TriggeredAbility.group), once for
+  // each player dealt it (CR 603.2c).
+  const dealt = /^Whenever (one or more creatures you control(?: with [a-z]+)? deal combat damage to (?:one or more players|a player)|a creature you control deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
   // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn, that player loses 1
   // life": once for each card (CR 603.7b), not a token (rulings), each opponent's.
@@ -1202,6 +1206,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // target creature they control. Create a token that's a copy of that creature" (Echo Chamber): read without the
   // chooser, then each of those targets marked as chosen by an opponent its controller chooses, as it's cast or activated
   // (TargetSpec.chosenBy "opponent", CR 601.2c, 602.2b; rulings). "Of your choice" beside one (Diaochan) is an ordinary target.
+  // Cards from outside the game (round B304, laneb304.ts): the instruction does nothing in Commander.
+  const outside = outsideGameBody(text);
+  if (outside) return outside;
+  const development = opts.spell ? developmentBody(text, (t) => parseBody(t, { spell: true })) : undefined;
+  if (development !== undefined) return development;
   if ((opts.spell || opts.activated) && (/\btarget\b[^.]*? of an opponent's choice\b/.test(text) || /^An opponent chooses target creature they control\. /.test(text))) return opponentChosenTargets(text, opts);
   // "An opponent chooses one —" (Misfortune, Fatal Lore, Library of Lat-Nam): a spell's mode chosen by an opponent its caster
   // chooses (CR 700.2e), "that player" in its modes being that opponent (modal.chooser, opponentChosenModes).

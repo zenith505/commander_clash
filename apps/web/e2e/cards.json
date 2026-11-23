@@ -42798,6 +42798,68 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fa38394b-6ac4-460c-ae3a-54d50037715b",
+  "name": "Research // Development",
+  "manaCost": "{G}{U} // {3}{U}{R}",
+  "cmc": 7,
+  "typeLine": "Instant // Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Shuffle up to four cards you own from outside the game into your library.",
+  "colors": [
+   "G",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "rare",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Research",
+    "manaCost": "{G}{U}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Shuffle up to four cards you own from outside the game into your library.",
+    "colors": [
+     "U",
+     "G"
+    ]
+   },
+   {
+    "name": "Development",
+    "manaCost": "{3}{U}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Create a 3/1 red Elemental creature token unless any opponent has you draw a card. Repeat this process two more times.",
+    "colors": [
+     "U",
+     "R"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "42e4d4d8-e4e0-4cf8-a6d0-887a17513280",
   "name": "Reservoir Kraken",
   "manaCost": "{2}{U}{U}",

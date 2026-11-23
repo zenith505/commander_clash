@@ -5042,6 +5042,14 @@ export type Effect =
    */
   | { type: "putWithLink"; target: number }
   /**
+   * Lane B round B304: an instruction that brings a card you own from outside the game into the game (Mastermind's
+   * Acquisition, North Wind Avatar, Legion Angel, Vivien, Arkbow Ranger, The Raven's Warning, Granted, Research, Spawnsire of
+   * Ulamog). "Parts of abilities which bring other traditional card(s) you own from outside the game into the game ... do
+   * not function in Commander" (Commander format rule 10), and players here have no sideboard (CR 100.4, 400.11a): it does
+   * nothing but say so in the log. `text` is the instruction as printed.
+   */
+  | { type: "outsideGame"; text: string }
+  /**
    * Captured by the Consulate (round B238): "change the target to enchanted creature if able": the spell whose cast
    * triggered this (ctx.cause), if it still has a single target (CR 603.4), gets the creature this Aura is attached to, or
    * was as it last existed (CR 608.2h), as its target, only if that's a legal target for it (CR 115.7, rulings).

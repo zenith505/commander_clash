@@ -60,6 +60,9 @@ export function ofPlayerPick(s: GameState, pid: PlayerId, body: AbilityBody, i: 
  * less the reverse. Null if the body has none. `chosen`: what we'd choose for its source ("the chosen type").
  */
 export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chosen?: Chosen, sourceId?: string): number | null {
+  // Round B304: an ability that only brings cards from outside the game does nothing in Commander (laneb304.ts): not worth
+  // casting or activating (Research, Granted, Vivien, Arkbow Ranger's −5, Spawnsire of Ulamog's {20}).
+  if (body.effects.length && body.effects.every((e) => e.type === "outsideGame")) return -1;
   // "Destroy all creatures target player controls": as good as it is for the player we'd target (see ofPlayerPick).
   const of = ofPlayerTargets(body);
   if (of.length && !ofPick) {

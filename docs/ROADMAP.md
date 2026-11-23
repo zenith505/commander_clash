@@ -1,7 +1,7 @@
 # Roadmap
 
-31,892 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,972 of
+31,900 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,973 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -211,7 +211,7 @@ line blocks.
    among exiled cards), Azra Oddsmaker (done in round 311) ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
    attacked player, activated by that player), Aggressive Mining ("you can't play
    lands"), Hunting Wilds and Overwhelming Splendor (done in round 275), Gandalf, Goblins' Bane
-   (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
+   (Flameshape's face-down exile with play permission), Mastermind's Acquisition (done in round B304) (a card from outside the game), Qal
    Sisma Behemoth (an attack cost of its own), The Ancient One (a reflexive mill from a discard), Deathgorge Scavenger
    ("you may exile" with two "if it's a" results), Tithe (done in round 277). Round 175 went down the list from Detention Sphere to
    Capricopian (rank 8,592), then took the easy cards from there to about rank 9,100 (Plate Armor, Indebted Spirit,
@@ -2349,7 +2349,7 @@ line blocks.
    name is cast, cast as the trigger resolves); Yavimaya Bloomsage's Channel (done in round B294) (paying life whenever a mana ability could be
    activated); Throne of the Grim Captain (done in round 334) (craft with four named creature types); Uvilda, Dean of Perfection (done in round B283) (refine
    counters on a card exiled from hand, granted triggers in exile); Blood of the Martyr (done in round B263) (a redirection chosen for each
-   damage event); The Raven's Warning, Fae of Wishes, North Wind Avatar (cards from outside the game); Bishop of Binding,
+   damage event); The Raven's Warning (done in round B304), Fae of Wishes (done in round B304), North Wind Avatar (done in round B304) (cards from outside the game); Bishop of Binding,
    Caller of the Hunt (done in round B245), Enigmatic Incarnation (how it was cast); Don't Blink (done in round B252) (entering from exile replaced by a shuffle);
    Cloak and Dagger, Entwined (done in round 420) (a nonland card from the hand or the chosen creature, exiled until it leaves); Close Encounter
    (an additional cost choosing a creature or a warped card in exile); Captured by the Consulate (done in round B238) (changing a single
@@ -3461,7 +3461,7 @@ line blocks.
    Rowan's +2. +4, 31,558 of 31,936 with main's rounds B232 and B233 merged into the Lane A chain. The compiled text of
    every other card is unchanged.
    Out after round 391 (looked at, not done): Metamorphic Alteration (still out: an Aura's copy effect of a chosen
-   creature); Mastermind's Acquisition and Spawnsire of Ulamog (cards from outside the game); Swans of Bryn Argoll (done in round B252)
+   creature); Mastermind's Acquisition (done in round B304) and Spawnsire of Ulamog (done in round B304) (cards from outside the game); Swans of Bryn Argoll (done in round B252)
    (draws in the middle of damage); Sala, Deck Boss (exhaust creatures given haste); The Enigma Jewel (craft with four or
    more nonlands with activated abilities); Psychic Paper and the rest above rank 15,000 (still out, for the reasons in
    their earlier lists).
@@ -4872,8 +4872,8 @@ line blocks.
    card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
    card with the most power, toughness and abilities.
    Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
-   Kiss, Finale of Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
-   Bracelet and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
+   Kiss, Finale of Promise, Karn Liberated, Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition (done in round B304), The Dominion
+   Bracelet and Spawnsire of Ulamog (done in round B304) (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
    are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
    unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
    118.3, rulings; with one such card it's discarded without asking; UnlessPays.discardFilter, the payUnless and discard
@@ -4888,7 +4888,7 @@ line blocks.
    after Divination and Night's Whisper: Ana mills Lightning Bolt and Mind Rot, Mind Rot (mana value 3) isn't offered, the
    Bolt's copy is cast at Ana. +1, 31,886 of 31,936 on this stacked branch (round 448 #750), 31,888 with round 448's head 39bb057 (main
    2c9aae1, B298-B299) merged in; the compiled text of every other card and face is unchanged.
-   Out after round 449 (looked at, not done): Mastermind's Acquisition and Spawnsire of Ulamog (still out: cards from outside
+   Out after round 449 (looked at, not done): Mastermind's Acquisition (done in round B304) and Spawnsire of Ulamog (done in round B304) (still out: cards from outside
    the game), The Dominion Bracelet (still out: controlling another player), Share the Spoils (Lane B's round B300), and the
    lists after round 448 (still out, for their reasons). Known gaps: bots pay the ward whenever they hold such a card, and
    discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
@@ -4977,7 +4977,7 @@ line blocks.
    graveyard grant on your turn with a life cost, as Noctis's and Hades's, CR 601.2f, h; the spells keep their timing).
    +4, 31,111 of 31,936 with B185 and B186. The compiled text of every other card is unchanged. Bots sacrifice to Greater Gargadon only
    what the usual sacrifice-cost rule lets them spare (no lands below eight, no creatures but cheap tokens).
-   Out after round 346 (looked at, not done): Mastermind's Acquisition (outside-the-game wishes stay out on purpose);
+   Out after round 346 (looked at, not done): Mastermind's Acquisition (done in round B304) (outside-the-game wishes stay out on purpose);
    Tamiyo, Inquisitive Student and Nephalia Academy (their discard replacements cut across every discard path); Sokrates,
    Athenian Teacher and Swans of Bryn Argoll (done in round B252) (draws in the middle of damage, and the damage code can't pause for draw
    replacements such as dredge); Sunken Palace (mana that copies the ability it's spent on); Spectral Searchlight
@@ -5608,7 +5608,7 @@ line blocks.
    30,713 of 31,936 with B156 and B157.
    Out after round 318 (looked at, not done): Moxite Refinery (X counters of any kinds removed from one permanent as a
    cost), Night Soil (a cost exiling cards from any single graveyard), Mogg Assassin (a second target chosen by the
-   first target's controller), Mastermind's Acquisition and the wishes (cards from outside the game), Encroaching
+   first target's controller), Mastermind's Acquisition (done in round B304) and the wishes (cards from outside the game), Encroaching
    Mycosynth, Biotransference, Crucible of the Spirit Dragon, Jinnie Fay, Mirrormind Crown, Moonlit Meditation, Guff
    Rewrites History, Possibility Storm, Sokrates, Sunken Palace, Ulalek, Surge to Victory, Norman Osborn, Filigree Vector
    and the rest above rank 6,800 (still out, for the reasons in their earlier lists); Kusari-Gama, Urgent Necropsy (done in round B247),
@@ -6209,7 +6209,7 @@ line blocks.
    spell you control" as a cost); Jacob Hauken, Inspector (a face-down card exiled from your hand, then a transform paid for
    as it resolves); Mimeoplasm, Revered One ("as ~ enters, exile up to X creature cards from your graveyard", then copies of
    them); Verrak, Warped Sengir (done in round 423), Ashnod the Uncaring (done in round 422) and Dynaheir, Invoker Adept (copying an ability by what paid its cost);
-   Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (done in round 445) (convert, intel counters); Spawnsire of Ulamog, Vivien, Arkbow Ranger
+   Prowl, Stoic Strategist (done in round B269) and Flamewar, Brash Veteran (done in round 445) (convert, intel counters); Spawnsire of Ulamog (done in round B304), Vivien, Arkbow Ranger (done in round B304)
    (cards from outside the game); Lucy MacLean, Positively Armed (done in round B269); Three Dog, Galaxy News DJ (done in round 368); Baron Helmut Zemo (done in round B299) (black mana
    symbols among exiled cards' costs); March from Velis Vel (done in round 435) (lands of a chosen type become copies); Judgment of Alexander;
    The Brothers' War (done in round 388) (chapter II's attack requirement); Duelist's Flame (done in round 402); Spirit of Resilience; Eye of Ojer Taq and Ore-Rich
@@ -12087,6 +12087,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B304 (least played first, eight cards off the skip lists, not in Lane A's rounds 450-452): the cards whose only gap
+  was a card from outside the game. "Parts of abilities which bring other traditional card(s) you own from outside the game
+  into the game (such as Living Wish; Spawnsire of Ulamog; Karn, the Great Creator; Wish) do not function in Commander"
+  (Commander format rule 10, mtgcommander.net), and players here have no sideboard (CR 100.4, 400.11a), as already read for
+  learn, Invasion of Arcavios, Karn, the Great Creator and Turtles Forever. Such an instruction, when it's a whole ability
+  or mode, compiles to an `outsideGame` effect (oracle/laneb304.ts) that does nothing but say so in the log; no "you may" is
+  asked. Mastermind's Acquisition (its second mode), North Wind Avatar and Legion Angel (their enter triggers), Vivien,
+  Arkbow Ranger's −5 (the loyalty is still paid), Spawnsire of Ulamog's {20} (still paid), Fae of Wishes // Granted (Granted
+  still sends the card on an adventure, CR 715.3d), Research, and The Raven's Warning's chapter III. New with them: The
+  Raven's Warning's chapter II, "Whenever one or more creatures you control with flying deal combat damage to a player this
+  turn, look at that player's hand and draw a card" (a delayed trigger for the turn, CR 603.7b, counting only the fliers,
+  once for each player dealt damage), and Development's "Create a 3/1 red Elemental creature token unless any opponent has
+  you draw a card. Repeat this process two more times.": three times, each opponent in turn order may have you draw; once
+  one does, no one else is asked that time, and if none does, you get the token (rulings: three tokens, two and a card, one
+  and two cards, or three cards). Bots never cast or activate an ability that only reaches outside the game, choose
+  Mastermind's Acquisition's search, and always let the caster draw rather than get a 3/1. The Wishes that would only exile
+  themselves (Burning, Cunning, Death, Glittering, Golden, Living Wish, Wish, Extrapolate the Impossible, Ring of Ma'rûf)
+  stay out by choice: as cards they'd do nothing here. Browser tests: you cast Development from the split card's menu; Ana
+  casts it and you have her draw a card. +8, 31,900 of 31,936 on B303's head f23e044 (main 60ad21bc). The compiled text
+  of every other card is unchanged.
+- Out after round B304 (looked at, not done): the lists after round B303 stay out. About 36 unsupported cards remain: the
+  Wishes above (left out by choice), control of another player (Word of Command, Secret of Bloodbending, The Dominion
+  Bracelet), text changes (Swirl the Mists, Volrath's Shapeshifter, Spy Kit), and the others in the earlier lists for their
+  reasons. Known gap: bots weigh Development's draw against a 3/1 token as always worth giving the card.
 - Round B303 (least played first, one card off the skip lists, not in Lane A's rounds 450-451): Turtles Forever (out
   after round 286: a search of your library and outside the game). "Search your library and/or outside the game for
   exactly four legendary creature cards you own with different names, then reveal those cards. An opponent chooses two of
@@ -12543,7 +12567,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   pick (Ana attacks you and Ben; it attacks Ben for her) and Chorus's amount (Grizzly Bears with three counters). +2,
   31,824 of 31,936 on B283's branch. The compiled text of every other card is unchanged.
 - Out after round B284 (looked at, not done): the lists after round B283 stay out, Psychic Battle and Titania's Song too.
-  Vivien, Arkbow Ranger stays out with the Wishes (cards from outside the game, CR 400.11). Breathstealer's Crypt stays
+  Vivien, Arkbow Ranger (done in round B304) stays out with the Wishes (cards from outside the game, CR 400.11). Breathstealer's Crypt stays
   out: its "they draw a card and reveal it" is a draw other replacements can still replace (CR 614.5, 616.1), and no
   ruling says what "it" is when that draw becomes two (an Archive) or none (dredge). North Star ("for one spell this turn":
   which spell, and when it's used up, has no ruling), False Dawn (done in round B294) (every colored mana your spells and abilities add becomes
@@ -12580,7 +12604,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B283 (looked at, not done): the lists after round B282 stay out; Nihiloor and Parnesse, the Subtle Brush
   stay out, for the reasons in their earlier lists. Known gaps: bots never activate Uvilda (they attack with it); the Egg's
   trigger is logged under the Saga's name (the front face's). Next in line (not looked at closely yet): Tahngarth, First
-  Mate (done in round B284), Vivien, Arkbow Ranger, Breathstealer's Crypt.
+  Mate (done in round B284), Vivien, Arkbow Ranger (done in round B304), Breathstealer's Crypt.
 - Round B282 (least played first, two of the three cards round B281 named next, neither in Lane A's rounds 433-434):
   Ertai's Meddling's "X can't be 0." (CR 107.3b, so it can't be cast without paying its mana cost, rulings), "Target spell's
   controller exiles it with X delay counters on it." (exiled, not countered, so a spell that can't be countered goes too,
@@ -13379,7 +13403,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   effects; Aetherplasm done in round B261) isn't in TurnLog.blocks, so Glyph of Reincarnation and Glyph of Doom don't see it, nor Sea Troll; only blue
   creatures' colors are kept with a block (Sea Troll is the only reader).
 - Out after round B229 (looked at, not done): Divine Intervention (done in round B259) (still out: who removed the last counter isn't kept on
-  the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel and Research // Development (nothing outside
+  the 23 places that remove counters), the Wishes, Ring of Ma'rûf, Legion Angel (done in round B304) and Research // Development (done in round B304) (nothing outside
   the game here), Golgothian Sylex, Apocalypse Chime and City in a Bottle (done in round B290) (the set a name was originally
   printed in isn't in the card data). Known gaps: damage a spell deals through its own reflexive or delayed trigger (CR 603.7d, 603.12) counts for
   Suffocation but isn't counted as a cast spell's for Backdraft; bots activate Vodalian War Machine's abilities without
@@ -13826,7 +13850,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   other legendary creatures" lands (done in round B161) (banding), Shield Dancer (a combat damage redirection to its source), Mirror-Shield
   Hoplite (copy a backup ability), Speedball (new targets for that spell), Bill Ferny (done in round 272), Elemental Expressionist (a granted replacement and exile trigger), Wormfang Drake and Wormfang Crab (returns
   for a card exiled by a different ability), Split the Spoils (done in round B153) (piles), Swindler's Scheme (counter and cast the revealed
-  card; done in round 424), Legion Angel (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
+  card; done in round 424), Legion Angel (done in round B304) (outside the game, as the Wishes). (B97 had Brilliance Unleashed's robot become one only after it
   entered; B98 fixed that: see round B98.)
 - Out after round B96 (looked at, not done): Sword of the Ages and Emrakul's Evangel ("Sacrifice ~ and any number of
   creatures" as a cost: a cost choice of any number of permanents, no picker yet), Tainted Specter ("discards a card

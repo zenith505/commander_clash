@@ -7744,6 +7744,9 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "continuous":
         v += e.what.ref === "target" && harm[e.what.index] ? 5 : 2;
         break;
+      // Round B304: nothing from outside the game in Commander (Mastermind's Acquisition's second mode).
+      case "outsideGame":
+        break;
       default:
         v += 1;
     }

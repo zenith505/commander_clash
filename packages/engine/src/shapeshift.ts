@@ -19,7 +19,7 @@ import { compileCard } from "./oracle";
 import { copiableKeyOf, ownDefOf } from "./cards";
 import { restingDef } from "./faces";
 import { controllerOf, invalidateCharacteristics } from "./layers";
-import type { CardDef, GameObject, GameState } from "./types";
+import type { CardDef, GameObject, GameState, PlayerId } from "./types";
 
 /** The form `o` should have now (GameObject.shapeOf), or undefined: not a Shapeshifter, or the top card isn't a creature card. */
 export function shapeWanted(s: GameState, o: GameObject): GameObject["shapeOf"] {
@@ -43,7 +43,7 @@ export function shapeWanted(s: GameState, o: GameObject): GameObject["shapeOf"] 
  * The top card of a player's graveyard: the last put there (CR 404.1), not a token (a token isn't a card, CR 108.2, 111.1;
  * one in a graveyard ceases to exist as state-based actions are checked, 704.5d).
  */
-function topCard(s: GameState, pid: string): GameObject | undefined {
+function topCard(s: GameState, pid: PlayerId): GameObject | undefined {
   const yard = s.players[pid]?.graveyard ?? [];
   for (let i = yard.length - 1; i >= 0; i--) {
     const c = s.objects[yard[i]!];

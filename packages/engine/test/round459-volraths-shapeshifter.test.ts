@@ -157,10 +157,11 @@ describe("Volrath's Shapeshifter (round 459)", () => {
     toYard(s0, ids[0]!);
     expect(nameOf(s0, sh)).toBe("Shivan Dragon");
     let s = cast(s0, ap, ids[1]!);
-    if (s.pending?.kind === "chooseOption" || s.pending?.kind === "chooseTarget" || s.pending) {
-      const p = s.pending as { kind: string; player: PlayerId; options?: string[] };
-      if (p.kind === "chooseOption") s = act(s, { type: "chooseOption", player: p.player, choice: sh });
-    }
+    // As it enters, Clone's controller chooses what it copies (CR 707.5).
+    const p = s.pending;
+    if (p?.kind !== "chooseOption") throw new Error(`no copy question: ${JSON.stringify(p)?.slice(0, 300)}`);
+    expect(p.options).toContain(sh);
+    s = act(s, { type: "chooseOption", player: p.player, choice: sh });
     s = passAll(s);
     const cl = ids[1]!;
     expect(s.objects[cl]!.zone).toBe("battlefield");

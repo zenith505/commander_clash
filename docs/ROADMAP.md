@@ -1,7 +1,7 @@
 # Roadmap
 
-31,889 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,972 of
+31,891 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,973 of
 9,979 (99%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -4907,7 +4907,7 @@ line blocks.
    one to each spell's, CR 614.1a). Browser tests click through X = 10 on Lightning Bolt and Mind Rot (Mind Rot cast first,
    both at Ana, then the copies' order: Bolt, Mind Rot, Bolt, then Mind Rot's last without a question, keeping their targets;
    Ana takes 9 and discards two, both cards exiled) and X = 3 with Fact or Fiction (mana value 4) offered no slot and Night's
-   Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in); the compiled text of every other card and face is unchanged.
+   Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in), 31,891 with main 60ad21b (B300, B301); the compiled text of every other card and face is unchanged.
    Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
    unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (restarting the game), Secret of
    Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
@@ -12107,6 +12107,44 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B301 (least played first, one card off the skip lists, not in Lane A's rounds 447-449): Codie, Ravenous Codex (out
+  after rounds 204, 448 and B294: "a prepared spell" isn't a term of CR 722). "Whenever you cast a prepared spell, copy it.
+  You may choose new targets for the copy.": read as "a spell cast as a prepare spell" (CR 722.3d), the copy of a prepared
+  permanent's prepare spell its controller casts from exile (722.3c), the only way a prepare spell is ever cast (722.3); a
+  preparation card cast from a hand has only its normal characteristics (722.4) and isn't one (castSpell trigger
+  `cast.prepared`, the spell's GameObject.preparedFrom). Judgment call, no ruling names the term: the card's reminder text
+  and every other prepare card speak only of casting that copy, so no other reading is open. The copy it makes isn't cast
+  (CR 707.10), so it doesn't trigger Codie again; a copy of a prepare spell is one too (722.3d), which matters only to
+  "cast" triggers here. "{W}{U}{B}{R}{G}, {T}: Each creature you control becomes prepared." was already parsed;
+  each creature with a prepare spell that isn't prepared gets one copy (722.3a). Bots cast those copies as before and let
+  Codie copy them with the usual new-target choice. Browser test: cast Adventurous Eater (no trigger), then Have a Bite's
+  copy from exile at the Eater; Codie's copy targets Grizzly Bears instead. +1, 31,886 of 31,936 on B300's head 65c7e36
+  (main 2c9aae1), 31,890 with main 5035246 (rounds 447-449). The compiled text of every other card is unchanged.
+- Out after round B301 (looked at, not done): the lists after round B300 stay out; Snowblind ("toughness minus 1" read
+  inside its own layer 7c effect), North Star, Equinox, Spy Kit and Pulmonic Sliver were looked at again. About 47
+  unsupported cards remain, all of them hard. Known gap: bots don't weigh Codie's copy when picking which prepared copy to
+  cast.
+- Round B300 (least played first, one card off the skip lists, not in Lane A's rounds 447-448): Share the Spoils (out after
+  rounds 356 and B294: each player plays from the cards exiled with it). "When ~ enters and whenever an opponent loses the
+  game, exile the top card of each player's library.": one ability with two trigger events (CR 603.2), every library's top
+  card exiled face up in turn order (CR 406.3) and linked to the permanent (CR 607.2a); an opponent is any other player
+  (no teams, CR 102.3), and a Share the Spoils its losing owner had leaves with them and doesn't trigger (CR 800.4a,
+  rulings). "During each player's turn, that player may play a land or cast a spell from among cards exiled with ~, and
+  they may spend mana as though it were mana of any color to cast that spell.": a static ability (CompiledCard
+  playLinkedEachTurn, game.ts eachTurnSource) for every player, its controller or not, on their own turn, whoever owns the
+  card, a land as their land play or a spell with the usual timing (rulings), mana as though of any color for the spell
+  (CR 609.4b); one land or one spell each turn for that object (rulings; TurnLog.eachTurnLinked), only while it's on the
+  battlefield as that object (CR 400.7, rulings). Its permission gives way to every other one the player has for the card
+  (useEachTurnLinked runs before the others are used up, as Hauken's Insight's gives way). "When they do, exile the top
+  card of their library.": a triggered ability of the permanent's (a castSpell trigger with orPlaysLand and
+  cast.viaEachTurnLinked) for the card played with that permission only, not one played another way; the card it exiles is
+  exiled with it too (CR 607.2a). Bots play from among those cards like any other playable exiled card. Browser tests: cast
+  Share the Spoils, then Ana's exiled Lightning Bolt at her with a Forest, which exiles your top card, and Ben's exiled
+  Forest isn't playable after; play Ana's exiled Forest as your land. +1, 31,881 of 31,936 with main 499a31a (B297), 31,883 with main c8a3332 (round 446), 31,885 with main 2c9aae1 (B298-B299), 31,889 with main 5035246 (rounds 447-449). The
+  compiled text of every other card is unchanged.
+- Out after round B300 (looked at, not done): the lists after round B299 stay out; about 48 unsupported
+  cards remain, all of them hard. Known gaps under Share the Spoils: bots don't weigh which of those cards is best to play
+  with the one card a turn, or that "When they do" exiles their own top card.
 - Round B299 (least played first, one card off the skip lists, not in Lane A's rounds 446-447 nor Lane B's B297-B298):
   Baron Helmut Zemo's "Boast — Exile any number of black cards from your graveyard with fifteen or more black mana symbols
   among their mana costs: Copy those exiled cards. You may cast up to three of the copies without paying their mana costs."

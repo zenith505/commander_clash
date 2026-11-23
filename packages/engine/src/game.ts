@@ -6331,11 +6331,43 @@ export function checkAscend(s: GameState) {
  * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
-function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOthersTurn?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId, notOthersTurn?: true, notEachTurn?: true): false | "anyType" | "anyColor" | "life" | "plain" | "snowAny" {
   if (o.zone !== "exile") return false;
   const how = ownLinkedPlayPermission(s, o, pid);
+  if (how || notOthersTurn) return how;
   // Ian Malcolm, Chaotician (round B271): anyone's Ian, with no other permission of `pid`'s for the card.
-  return how || notOthersTurn || !othersTurnSource(s, o, pid) ? how : "anyType";
+  if (othersTurnSource(s, o, pid)) return "anyType";
+  // Share the Spoils (round B300): anyone's, mana as though of any color for a spell (CR 609.4b).
+  return !notEachTurn && eachTurnSource(s, o, pid) ? "anyColor" : false;
+}
+
+/**
+ * Share the Spoils (round B300): the permanent ("id@zoneChanges") whose "During each player's turn, that player may play a
+ * land or cast a spell from among cards exiled with ~" lets `pid` play this exiled card now: during `pid`'s turn, whoever
+ * controls it, a card its exile abilities exiled (CR 607.2a) as that object (CR 400.7), face up, its one card this turn
+ * not played yet (rulings; TurnLog.eachTurnLinked).
+ */
+function eachTurnSource(s: GameState, o: GameObject, pid: PlayerId): string | undefined {
+  if (o.zone !== "exile" || !s.linkedExile || s.activePlayer !== pid || o.faceDown) return undefined;
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (!abilitiesOf(s, p).playLinkedEachTurn) continue;
+    const key = `${id}@${p.zoneChanges ?? 0}`;
+    if ((s.turnLog?.eachTurnLinked ?? []).some((e) => e.src === key)) continue;
+    if ((s.linkedExile[key] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) return key;
+  }
+  return undefined;
+}
+
+/**
+ * Share the Spoils (round B300): playing this exiled card when that permission is the only one `pid` has for it uses up
+ * that permanent's one card this turn, and records the card for its "When they do" (TriggeredAbility cast.viaEachTurnLinked).
+ * It gives way to every other permission (checked before any of them is used up), as Hauken's Insight's does.
+ */
+function useEachTurnLinked(s: GameState, o: GameObject, pid: PlayerId): void {
+  const key = eachTurnSource(s, o, pid);
+  if (!key || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || preparedCopyCastable(s, o, pid) || linkedPlayGrant(s, o, pid) >= 0 || linkedPlayPermission(s, o, pid, undefined, true)) return;
+  ((s.turnLog ??= {}).eachTurnLinked ??= []).push({ src: key, id: o.id, zc: o.zoneChanges ?? 0 });
 }
 
 /**
@@ -6696,7 +6728,8 @@ function useLinkedSpellOnce(s: GameState, o: GameObject, pid: PlayerId): void {
 
 /** Playing this exiled card with a one-card GameState.linkedPlays grant (no other permission of its) uses the grant up. */
 function useLinkedPlay(s: GameState, o: GameObject, pid: PlayerId): void {
-  if (o.zone !== "exile" || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid)) return;
+  // Share the Spoils (round B300) gives way to the grant (useEachTurnLinked), so it isn't counted here.
+  if (o.zone !== "exile" || ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || linkedPlayPermission(s, o, pid, undefined, true) || preparedCopyCastable(s, o, pid)) return;
   const at = linkedPlayGrant(s, o, pid);
   if (at >= 0 && !s.linkedPlays![at]!.all) s.linkedPlays!.splice(at, 1);
 }
@@ -7155,8 +7188,8 @@ export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): st
 export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, untapped?: boolean, face?: number): void {
   // Ziatora's Envoy (round 392): a modal double-faced card played as its land face (CR 712.12).
   const o = obj(s, id);
-  if (face !== undefined && o.face !== face) return asFace(s, o, face, () => putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id), face));
-  putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id));
+  if (face !== undefined && o.face !== face) return asFace(s, o, face, () => putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id), face, true));
+  putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id), undefined, true);
 }
 
 /** Visions of Phyrexia: a card played from exile this turn, a land or a spell (TurnLog.playedFromExile). */
@@ -7164,10 +7197,12 @@ function notePlayedFromExile(s: GameState, pid: PlayerId): void {
   if (!(s.turnLog?.playedFromExile ?? []).includes(pid)) ((s.turnLog ??= {}).playedFromExile ??= []).push(pid);
 }
 
-function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number): void {
+/** `byEffect`: played as an effect resolves (playLandByEffect), not with a permission to play it. */
+function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number, byEffect?: true): void {
   const o = obj(s, id);
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
+  if (!byEffect) useEachTurnLinked(s, o, p.id); // Share the Spoils (round B300): before any other permission is used up, giving way to them
   useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429), before any other permission is used up
   useCounteredGrant(s, o, p.id); // Lara Croft, Tomb Raider (round 432): after Evelyn's, which gives way to it
   useLinkedLandOnce(s, o, p.id); // Hauken's Insight (round 432): after the others, which it gives way to
@@ -9539,6 +9574,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (linkedRider) o.extraCounters = { ...o.extraCounters, [linkedRider.counter]: (o.extraCounters?.[linkedRider.counter] ?? 0) + linkedRider.n };
   // Dawnhand Dissident (round 438): its permission's costs, kept as the card moves to the stack (paid with the rest, CR 601.2h).
   const linkedCosts = castFrom === "exile" && choices.alt !== "linkedFree" ? linkedCastCosts(s, o, p.id) : [];
+  if (choices.alt !== "linkedFree" && !choices.via) useEachTurnLinked(s, o, p.id); // Share the Spoils (round B300): first, giving way to the others
   if (choices.alt !== "linkedFree") useExiledOnce(s, o, p.id); // Evelyn, the Covetous (round 429)
   if (choices.alt !== "linkedFree") useCounteredGrant(s, o, p.id); // Lara Croft, Tomb Raider (round 432): after Evelyn's
   if (choices.alt !== "linkedFree") useLinkedPlay(s, o, p.id);

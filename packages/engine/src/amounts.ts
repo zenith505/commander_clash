@@ -234,6 +234,21 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (d === undefined || s.players[d]?.lost) return 0;
       return s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === d && objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false)).length;
     }
+    case "affectedDefenderOrControllerPermanents": {
+      // Snowblind (round B307): an attacking creature's own defending player (CR 506.2, 802.2a), otherwise its controller.
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const ch = o && view(o);
+      if (!o || !ch || o.zone !== "battlefield") return 0;
+      const who = o.attacking !== undefined ? o.attacking : ch.controller;
+      if (s.players[who]?.lost) return 0;
+      let n = 0;
+      for (const id of s.battlefield) {
+        const x = s.objects[id]!;
+        const xc = view(x);
+        if (xc && xc.controller === who && objectMatches(s, c.filter, x, ctx.controller, false, undefined, xc, ctx.view)) n++;
+      }
+      return n;
+    }
     case "affectedControllerHand": {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const who = o && view(o)?.controller;
@@ -1536,6 +1551,8 @@ function describeCount(c: Count): string {
       return "#poison counters its controller has";
     case "affectedDefenderPermanents":
       return `#${c.filter.text} its defending player controls`;
+    case "affectedDefenderOrControllerPermanents":
+      return `#${c.filter.text} its defending player (if attacking) or its controller controls`;
     case "cardsInLibrary":
       return "#cards in library";
     case "opponentsVotedOtherwise":

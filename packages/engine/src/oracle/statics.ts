@@ -11,6 +11,7 @@ import { parseSearchFilter } from "./search";
 import { parseDamageMod } from "./damage-mods";
 import { QUOTED_SOURCE_NAME } from "./compile";
 import { parseBecomes } from "./sentence";
+import { snowblindStatic } from "./laneb307";
 
 /** Every land type (CR 205.3i): the basic ones (Forest, Island, Mountain, Plains, Swamp) and the others. */
 const ALL_LAND_TYPES = ["Cave", "Desert", "Forest", "Gate", "Island", "Lair", "Locus", "Mine", "Mountain", "Plains", "Planet", "Power-Plant", "Sphere", "Swamp", "Tower", "Town", "Urza's"];
@@ -2737,6 +2738,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  // Snowblind (round B307, laneb307.ts).
+  const snowblind = snowblindStatic(line);
+  if (snowblind) return snowblind;
   // Magnigoth Treefolk: "Domain — For each basic land type among lands you control, ~ has landwalk of that type": each
   // basic land type among them as the layers apply it (YOURS_BASIC_LANDWALK; the ability word has no rules meaning, CR 207.2c).
   if (/^(?:Domain — )?For each basic land type among lands you control, ~ has landwalk of that type\.$/.test(line)) return { affects: { kind: "self" }, mods: [{ kind: "addKeywords", keywords: [YOURS_BASIC_LANDWALK] }], text: line };

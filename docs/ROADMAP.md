@@ -12124,7 +12124,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Killian) can now be cast when only the reduced cost is affordable (App.tsx cheaperWithTargets tries a different legal
   target for each one, creatures first; the engine checks the real targets as it's cast). Browser test: Frost Breath at
   two creatures with a Thaumaturge and only an Island and a Mountain. +1, 31,891 of 31,936 on B301's head 10c007a1 (main
-  5035246). The compiled text of every other card is unchanged.
+  5035246), 31,892 with main fa73a14 (round 450). The compiled text of every other card is unchanged.
 - Out after round B302 (looked at, not done): the lists after round B301 stay out; Battlefield Thaumaturge was found done
   in round 447 (its reading, a creature in two target slots counting twice, kept). About 45 unsupported cards remain, all
   of them hard. Known gaps: the hand's "playable" glow for a target-dependent reduction tries one set of targets only (a

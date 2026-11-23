@@ -1,6 +1,6 @@
 # Roadmap
 
-31,900 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,901 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,987 of 4,988 (99%), top 10,000: 9,973 of
 9,979 (99%).
 
@@ -4893,6 +4893,26 @@ line blocks.
    lists after round 448 (still out, for their reasons). Known gaps: bots pay the ward whenever they hold such a card, and
    discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
    can.
+   Round 450 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300) and Chef's
+   Kiss (still out, for their reasons) to Finale of Promise (rank 5,610), out since round 342, whose pieces are there now: "You may cast up to one target instant card and/or up to one target sorcery card
+   from your graveyard each with mana value X or less without paying their mana costs. If a spell cast this way would be put
+   into your graveyard, exile it instead. If X is 10 or more, copy each of those spells twice. You may choose new targets for
+   the copies." (two "up to one" targets, CR 115.6, with mana value no more than its X, chosen before targets, CR 601.2b-c,
+   107.3a; cast as it resolves in either order, the controller choosing the first when both can be cast, rulings, CR 608.2g,
+   castTargetFree `chooseOrder`, chooseOption "castFirst"; X as 0, no alternative costs, mandatory additional costs paid,
+   rulings; a split card that's both may be both targets but is cast once, rulings; exiled instead of going to your
+   graveyard, CR 614.1a; then, if X is 10 or more, two copies of each spell cast this way, ResolvingState.castThisWay, copy
+   "castThisWay", put on the stack in any order, rulings: while two spells have copies to make, chooseOption "copyNextOf"
+   asks which one the next copy is of; copies aren't cast, CR 707.10, and may have new targets, 707.10c; Twinning Staff adds
+   one to each spell's, CR 614.1a). Browser tests click through X = 10 on Lightning Bolt and Mind Rot (Mind Rot cast first,
+   both at Ana, then the copies' order: Bolt, Mind Rot, Bolt, then Mind Rot's last without a question, keeping their targets;
+   Ana takes 9 and discards two, both cards exiled) and X = 3 with Fact or Fiction (mana value 4) offered no slot and Night's
+   Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in), 31,891 with main 60ad21b (B300, B301); the compiled text of every other card and face is unchanged.
+   Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
+   unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (restarting the game), Secret of
+   Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
+   Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: bots cast the cards in
+   the order targeted and make the copies in the order cast.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -12105,7 +12125,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mastermind's Acquisition's search, and always let the caster draw rather than get a 3/1. The Wishes that would only exile
   themselves (Burning, Cunning, Death, Glittering, Golden, Living Wish, Wish, Extrapolate the Impossible, Ring of Ma'rûf)
   stay out by choice: as cards they'd do nothing here. Browser tests: you cast Development from the split card's menu; Ana
-  casts it and you have her draw a card. +8, 31,900 of 31,936 on B303's head f23e044 (main 60ad21bc). The compiled text
+  casts it and you have her draw a card. +8, 31,900 of 31,936 on B303's head f23e044 (main 60ad21bc), 31,901 with B303's head 95247b0 (main fa73a14, round 450). The compiled text
   of every other card is unchanged.
 - Out after round B304 (looked at, not done): the lists after round B303 stay out. About 36 unsupported cards remain: the
   Wishes above (left out by choice), control of another player (Word of Command, Secret of Bloodbending, The Dominion
@@ -12122,7 +12142,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the other two are shuffled back into your library (the split search's `dest` shuffleIn, the log saying "the rest").
   Bots search for four and, as the opponent, pick the two that would help you least. Browser test: three found keeps Done off,
   four with one of two Isamarus and not Mother of Runes; Ben picks the two for your hand. +1, 31,892 of 31,936 on B302's
-  head 99a00cad (main 60ad21bc). The compiled text of every other card is unchanged.
+  head 99a00cad (main 60ad21bc), 31,893 with B302's head 05689eb0 (main fa73a14, round 450). The compiled text of every other card is unchanged.
 - Out after round B303 (looked at, not done): the lists after round B302 stay out. About 44 unsupported cards remain, all
   of them hard; most are the Wishes and other cards that only reach outside the game (left out: they'd do nothing here),
   control of another player, and text changes.
@@ -12143,7 +12163,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Killian) can now be cast when only the reduced cost is affordable (App.tsx cheaperWithTargets tries a different legal
   target for each one, creatures first; the engine checks the real targets as it's cast). Browser test: Frost Breath at
   two creatures with a Thaumaturge and only an Island and a Mountain. +1, 31,891 of 31,936 on B301's head 10c007a1 (main
-  5035246). The compiled text of every other card is unchanged.
+  5035246), 31,892 with main fa73a14 (round 450). The compiled text of every other card is unchanged.
 - Out after round B302 (looked at, not done): the lists after round B301 stay out; Battlefield Thaumaturge was found done
   in round 447 (its reading, a creature in two target slots counting twice, kept). About 45 unsupported cards remain, all
   of them hard. Known gaps: the hand's "playable" glow for a target-dependent reduction tries one set of targets only (a

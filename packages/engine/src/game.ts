@@ -14383,6 +14383,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "castFirst" || pend.what === "copyNextOf") {
+    // Finale of Promise (round 450): the target card cast first; the spell the next copy is of.
+    if (!pend.options.includes(choice)) throw new RulesError("not one of the options");
+    const sc = (r.scratch ??= {});
+    if (pend.what === "castFirst") sc.castFirst = choice;
+    else sc.wayPick = choice;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice}${pend.what === "castFirst" ? " to cast first" : " for the next copy"} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "copyOrder") {
     const c = r.scratch?.copies;
     if (!c?.each) throw new RulesError("no copies to order");

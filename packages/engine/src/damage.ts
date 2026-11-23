@@ -57,6 +57,11 @@ export interface DamageSource {
   noRedirect?: true;
   /** Its mana value, a spell's with its X (CR 202.3), for protection from a mana value. */
   manaValue?: number;
+  /**
+   * Ghostly Flame (round 455): its colors while the damage it deals is seen as colorless (`colors` is empty then), put back
+   * once the shields have looked at it (seenAsDamage, planShields).
+   */
+  seenColorless?: Color[];
 }
 
 /**
@@ -723,6 +728,48 @@ function ruleCovers(s: GameState, r: DamageRule, to: Rec): boolean {
   return !!t.objects && objectMatches(s, t.objects, o, r.controller, false);
 }
 
+/** The color conditions of `spec` against a damage source's colors. */
+function sourceColorsMatch(spec: Pick<TargetSpec, "colors" | "bothColors" | "notColors" | "colorCount">, colors: readonly Color[]): boolean {
+  if (spec.colors?.length && !spec.colors.some((c) => colors.includes(c))) return false;
+  if (spec.bothColors?.some((c) => !colors.includes(c))) return false;
+  if (spec.notColors?.some((c) => colors.includes(c))) return false;
+  const n = colors.length;
+  return !(spec.colorCount && (spec.colorCount === "colorless" ? n !== 0 : spec.colorCount === "monocolored" ? n !== 1 : spec.colorCount === "two" ? n !== 2 : spec.colorCount === "notTwo" ? n === 2 : spec.colorCount === "three" ? n !== 3 : spec.colorCount === "colored" ? n === 0 : spec.colorCount === "all" ? n < 5 : spec.colorCount === "notAll" ? n >= 5 : n < 2));
+}
+
+/**
+ * Ghostly Flame (round 455): "Black and/or red permanents and spells are colorless sources of damage." The colors whose
+ * permanents' and spells' damage is seen as colorless now, from the permanents with that ability.
+ */
+function colorlessDamageColors(s: GameState): Color[] {
+  const out = new Set<Color>();
+  for (const id of s.battlefield) for (const c of abilitiesOf(s, obj(s, id)).colorlessDamageSources ?? []) out.add(c);
+  return [...out];
+}
+
+/**
+ * Ghostly Flame (round 455): the source as the damage it deals is seen (rulings: "applies whenever something looks at the
+ * damage"): colorless, every other color forgotten, when it's a permanent (as it is now, or as it last existed for an
+ * ability of a permanent that has left, CR 608.2h) or a spell (a spell's reflexive ability too, as it last existed, CR
+ * 113.7a) with one of `flame`'s colors. A card in another zone, an emblem, or a spell or ability that has finished
+ * resolving (Deflecting Palm's damage) isn't a permanent or spell, and keeps its colors.
+ */
+function seenAsDamage(s: GameState, src: DamageSource, flame: Color[]): DamageSource {
+  if (src.seenColorless || !src.colors.some((c) => flame.includes(c))) return src;
+  const ref = src.ref;
+  const o = ref ? s.objects[ref.object] : undefined;
+  const permanent = !!ref && ((!!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === ref.zc) || s.lastKnown?.[ref.object]?.zc === ref.zc);
+  if (!src.spell && !permanent) return src;
+  return { ...src, colors: [], seenColorless: [...src.colors] };
+}
+
+/** The source with its own colors back (seenAsDamage). */
+function unseen(src: DamageSource): DamageSource {
+  if (!src.seenColorless) return src;
+  const { seenColorless, ...rest } = src;
+  return { ...rest, colors: seenColorless };
+}
+
 /**
  * Does the source fit `spec` as it deals the damage (CR 609.7b)? A permanent is checked as it is now; anything else
  * (a spell, a gone permanent's ability) by its characteristics as it deals it, and not for what only a permanent can
@@ -730,7 +777,13 @@ function ruleCovers(s: GameState, r: DamageRule, to: Rec): boolean {
  */
 function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, controller: PlayerId): boolean {
   const o = src.ref ? s.objects[src.ref.object] : undefined;
-  if (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === src.ref!.zc) return objectMatches(s, spec, o, controller, false);
+  if (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === src.ref!.zc) {
+    // Ghostly Flame (round 455): a permanent whose damage is seen as colorless: its colors as a source of damage are none
+    // (the shield rechecks them as the damage would be dealt, CR 609.7b), the rest as it is now.
+    if (!src.seenColorless) return objectMatches(s, spec, o, controller, false);
+    const { colors, bothColors, notColors, colorCount, ...rest } = spec;
+    return sourceColorsMatch({ colors, bothColors, notColors, colorCount }, []) && objectMatches(s, rest as TargetSpec, o, controller, false);
+  }
   // A spell's mana value counts its X (CR 202.3e); a gone permanent's is its card's.
   if (spec.manaValue && (src.manaValue === undefined || !inRange(src.manaValue, spec.manaValue))) return false;
   if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.supertypes || spec.notSupertypes || spec.anyOf || spec.chosen) return false;
@@ -738,11 +791,7 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
   const kw = (k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.types?.length && !spec.types.some((t) => src.types.includes(t)) && !spec.orSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.allTypes?.some((t) => !src.types.includes(t)) || spec.notTypes?.some((t) => src.types.includes(t))) return false;
-  if (spec.colors?.length && !spec.colors.some((c) => src.colors.includes(c))) return false;
-  if (spec.bothColors?.some((c) => !src.colors.includes(c))) return false;
-  if (spec.notColors?.some((c) => src.colors.includes(c))) return false;
-  const n = src.colors.length;
-  if (spec.colorCount && (spec.colorCount === "colorless" ? n !== 0 : spec.colorCount === "monocolored" ? n !== 1 : spec.colorCount === "two" ? n !== 2 : spec.colorCount === "notTwo" ? n === 2 : spec.colorCount === "three" ? n !== 3 : spec.colorCount === "colored" ? n === 0 : spec.colorCount === "all" ? n < 5 : spec.colorCount === "notAll" ? n >= 5 : n < 2)) return false;
+  if (!sourceColorsMatch(spec, src.colors)) return false;
   if (spec.subtypes?.length && !(spec.allSubtypes ? spec.subtypes.every((t) => src.subtypes.includes(t)) : spec.subtypes.some((t) => src.subtypes.includes(t)))) return false;
   if (spec.notSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.keywords?.some((k) => !kw(k)) || spec.notKeywords?.some(kw)) return false;
@@ -964,6 +1013,15 @@ function* permutations<T>(xs: T[]): Generator<T[]> {
  * (rulings), and the permanent or player it's redirected to can have shields of its own (CR 616.2).
  */
 export function planShields(s: GameState, events: DamageEvent[], answers: number[], auto = false): ShieldPlan {
+  // Ghostly Flame (round 455): the shields look at the damage as from a colorless source (seenAsDamage); what's dealt is
+  // still dealt by the source as it is, its colors back for what triggers on it (rulings).
+  const flame = colorlessDamageColors(s);
+  if (!flame.length) return planShieldsSeen(s, events, answers, auto);
+  const plan = planShieldsSeen(s, events.map((e) => ({ ...e, src: seenAsDamage(s, e.src, flame) })), answers, auto);
+  return { ...plan, final: plan.final.map((e) => ({ ...e, src: unseen(e.src) })), ops: plan.ops.map((op) => ("src" in op && op.src ? { ...op, src: unseen(op.src) } : op)) };
+}
+
+function planShieldsSeen(s: GameState, events: DamageEvent[], answers: number[], auto: boolean): ShieldPlan {
   let next = 0;
   let ask: ShieldQuestion | undefined;
   const choose = (q: ShieldQuestion): number | null => {

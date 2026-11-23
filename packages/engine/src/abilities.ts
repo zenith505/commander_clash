@@ -3165,6 +3165,11 @@ export type Effect =
    * those cards onto the battlefield under your control." (CR 727, restart.ts): the cards linked to the source (CR 607.2a).
    */
   | { type: "restartGame" }
+  /**
+   * Round 455, North Star: "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+   * spell's mana cost." (GameState.anyTypeSpells, CostChoices.anyTypeMana; CR 609.4b).
+   */
+  | { type: "anyTypeOneSpell" }
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true; /** Hofri Ghostforge's Spirit token: "the exiled card" is the one the ability that created this token linked to it (round354.ts), not one an exile ability of its own took. */ createdLink?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
@@ -9618,6 +9623,13 @@ export interface CompiledCard {
    * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).
    */
   preventToMinusCounters?: true;
+  /**
+   * Ghostly Flame (round 455): "Black and/or red permanents and spells are colorless sources of damage." Damage from a
+   * permanent or spell of one of these colors is seen as coming from a colorless source wherever the damage is looked at
+   * (prevention, protection, replacement, CR 609.7b, 702.16e), every other color forgotten; the source keeps its colors,
+   * so what triggers on it dealing damage still sees them (rulings). See seenAsDamage in damage.ts.
+   */
+  colorlessDamageSources?: Color[];
   /**
    * Khârn the Betrayer: "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control
    * of it" (CR 615.5): the control change happens right away, also when the damage can't be prevented (615.12).

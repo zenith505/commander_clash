@@ -163,6 +163,7 @@ import {
   conspireInstances,
   replicateGranted,
   chorusFor,
+  anyTypeSpellFor,
   offspringGranted,
   walkersFreeToAttack,
   attackTargetScore,
@@ -5689,6 +5690,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
         .map((o) => obj(s, o))
         .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && extra.casualty !== o.id && extra.bargain !== o.id && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && (o.isToken || worth(s, pid, o) <= 3))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+  // North Star (round 455): its "mana of any type" for one spell this turn, used only when the spell can't be cast without it.
+  for (const anyTypeMana of anyTypeSpellFor(s, pid) !== undefined && !free ? [false, true] : [false])
   for (const chorus of chorusOptions(s, pid, id, alt, free))
   for (const replicate of replicateOptions(s, pid, id, free))
   for (const offspring of offspringOptions(s, pid, id, free))
@@ -5700,7 +5703,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
           // Splice costs beyond mana (Torrent of Stone's "sacrifice two Mountains"): paid as our other costs would be.
           const spliceCosts = splice?.costly && !buyback && !kicks.length ? chooseExtraCosts(s, pid, id, all ?? [], via, alt, extra.costOr, x ?? 0, modes, false, undefined, splice.ids) : undefined;
           if (splice?.costly && !spliceCosts) continue;
-          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(offspring ? { offspring } : {}), ...(chorus ? { chorus } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(spliceCosts ?? {}), ...(kicks.length ? { kicks } : {}), ...(replicate ? { replicate } : {}), ...(offspring ? { offspring } : {}), ...(chorus ? { chorus } : {}), ...(anyTypeMana ? { anyTypeMana } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
           if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
           if (plan) return plan;

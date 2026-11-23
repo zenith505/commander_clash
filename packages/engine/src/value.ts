@@ -105,6 +105,9 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     const opps = livingPlayers(s).filter((p) => p !== pid);
     return opps.length ? opps.reduce((n, p) => n + sum(p), 0) / opps.length - sum(pid) : 0;
   }
+  // North Star (round 455): mana of any type for one spell's mana cost this turn: not weighed (whether a spell we hold
+  // could be cast with it after paying {4} for it isn't worked out), so bots don't use it.
+  if (body.effects.some((e) => e.type === "anyTypeOneSpell")) return -1;
   // Karn Liberated (round 452): a new game for everyone (CR 727), but the cards left in exile come back for us at once,
   // so when those are worth more than how far ahead we are now: our permanents against the opponents' on average, and
   // our life total against theirs (all back to the starting life total).

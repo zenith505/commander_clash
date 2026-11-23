@@ -8278,6 +8278,9 @@ export function castProblem(
   if (rp) return rp;
   const chp = chorusProblem(s, pid, choices?.faceDown ? FACE_DOWN : d, choices);
   if (chp) return chp;
+  // North Star (round 455): only with one of its permissions this turn, for a spell cast for its mana cost.
+  if (choices?.anyTypeMana && anyTypeSpellFor(s, pid) === undefined) return "nothing lets you spend mana as though it were mana of any type for a spell this turn";
+  if (choices?.anyTypeMana && (choices.faceDown || (choices.alt && choices.alt !== "prototype"))) return "mana of any type would pay only its mana cost, which isn't paid this way";
   const op = offspringProblem(s, pid, d, choices?.offspring, !!choices?.faceDown);
   if (op) return op;
   const or = compileCard(d).costOr;
@@ -8345,7 +8348,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate" | "offspring" | "chorus"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "offering" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor" | "permit" | "replicate" | "offspring" | "chorus" | "anyTypeMana"> & { targets?: TargetChoice[]; modes?: number[]; /** Soul Burn (round B234): filled with the mana paying X and whether any type pays colored symbols. */ xOut?: { part?: number; any?: boolean } } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -8549,7 +8552,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const way = graveyardWay(s, o, how.via, pid);
   const wayMana = way && !(how.alt && permissionWay(way)) ? way.mana : undefined;
   const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid, o)?.mana ?? airbent ?? d.manaCost);
-  const mana = anyType(lessColored(parseManaCost(base + kickCost + moreMana)));
+  // North Star (round 455): "you may spend mana as though it were mana of any type to pay that spell's mana cost": the
+  // symbols of the mana cost it's cast for (a prototype's too, CR 718.3b; not an alternative cost, CR 118.9), not its
+  // additional costs (kicker, buyback, commander tax; the card's reminder text, CR 601.2f).
+  const ownAny = !!how.anyTypeMana && !anyTypeNow && ownManaCostPaid(how, madness, wayMana, airbent) && anyTypeSpellFor(s, pid) !== undefined;
+  const mana0 = anyType(lessColored(parseManaCost(base + kickCost + moreMana)));
+  const mana = ownAny ? anyTypeOwnCost(mana0, parseManaCost(base)) : mana0;
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
@@ -8606,7 +8614,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const onXHybrid = compileCard(d).spendOnlyOnXHybrid;
   // Soul Burn: how much mana paid X (CR 601.2h), and whether mana of any type could pay the colored symbols (CR 609.4b).
   if (how.xOut && compileCard(d).spentOnXOf) (how.xOut.part = how.faceDown ? 0 : Math.min(extra, Math.max(0, x * xCount(mana) - less))), (how.xOut.any = anyTypeNow || anyColorNow);
-  const xPaid = (onX || onXHybrid) && !how.faceDown && !anyTypeNow && !anyColorNow ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
+  const xPaid = (onX || onXHybrid) && !how.faceDown && !anyTypeNow && !anyColorNow && !ownAny ? Math.min(extra, Math.max(0, x * xCount(mana) - less)) : 0;
   if (xPaid && onXHybrid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "hybrid" as const, options: [...onXHybrid] }))] }, extra: extra - xPaid });
   if (xPaid) return costAtLeast(s, { cost: { ...reducedCost, symbols: [...reducedCost.symbols, ...Array.from({ length: xPaid }, () => ({ kind: "colored" as const, color: onX! }))] }, extra: extra - xPaid });
   // Emblazoned Golem (round B279): X's part of the generic mana, less the reductions (which may take off X, as Drain Life's
@@ -8614,6 +8622,67 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // of any type or color pays only its own color here, a payment that's legal either way.
   if (golemKicked) return costAtLeast(s, oneOfEachColorX({ cost: reducedCost, extra }, Math.max(0, x - less)));
   return costAtLeast(s, { cost: reducedCost, extra });
+}
+
+/**
+ * North Star (round 455): is the spell cast for its mana cost (CR 601.2f), not face down, for an alternative cost (CR
+ * 118.9; prototyped is its mana cost, CR 718.3b), madness, a graveyard permission's own cost or airbend's?
+ */
+function ownManaCostPaid(how: Pick<CostChoices, "faceDown" | "alt">, madness: string | undefined, wayMana: string | undefined, airbent: string | undefined): boolean {
+  return !how.faceDown && (!how.alt || how.alt === "prototype") && madness === undefined && wayMana === undefined && airbent === undefined;
+}
+
+/** North Star (round 455): use up the first of `pid`'s permissions this turn; the card it's from. */
+function useAnyTypeSpell(s: GameState, pid: PlayerId): string | undefined {
+  const i = s.anyTypeSpells?.findIndex((e) => e.player === pid && e.turn === s.turn) ?? -1;
+  if (i < 0) return undefined;
+  const [e] = s.anyTypeSpells!.splice(i, 1);
+  if (!s.anyTypeSpells!.length) s.anyTypeSpells = undefined;
+  return e!.source;
+}
+
+/** North Star (round 455): the card that lets `pid` spend mana as though it were mana of any type for one spell this turn, if any (GameState.anyTypeSpells). */
+export function anyTypeSpellFor(s: GameState, pid: PlayerId): string | undefined {
+  return s.anyTypeSpells?.find((e) => e.player === pid && e.turn === s.turn)?.source;
+}
+
+/**
+ * North Star (round 455): can `pid` use one of their "spend mana as though it were mana of any type to pay that spell's
+ * mana cost" for this spell cast this way: one is there this turn, and it pays its mana cost, some of it colored (otherwise
+ * mana of any type pays it already).
+ */
+export function anyTypeManaUsable(s: GameState, pid: PlayerId, id: ObjectId, how: CostChoices = {}): boolean {
+  if (anyTypeSpellFor(s, pid) === undefined) return false;
+  const o = obj(s, id);
+  if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => anyTypeManaUsable(s, pid, id, { ...how, face: undefined }));
+  const d = defOf(s, o);
+  if (freeCastOf(s, pid) === o.id || how.faceDown || (how.alt && how.alt !== "prototype")) return false;
+  const without = spellCost(s, pid, o, 0, how.kicks ?? [], { ...how, anyTypeMana: undefined });
+  const withIt = spellCost(s, pid, o, 0, how.kicks ?? [], { ...how, anyTypeMana: true });
+  return !!d && JSON.stringify(without) !== JSON.stringify(withIt);
+}
+
+/**
+ * North Star (round 455): `c` with the symbols of `own` (the spell's mana cost) payable with mana of any type, as though it
+ * were each one's type (CR 609.4b): a colored, colorless or hybrid symbol is one mana of any type, {2/W} one mana of any
+ * type, a Phyrexian one any mana or 2 life; {S} still takes mana from a snow source (snow isn't a type) and generic stays.
+ * When a cost reduction took off a colored symbol both the mana cost and an additional cost have, it took the additional
+ * cost's (the cost is one total, CR 601.2f, and that way is never worse for its player).
+ */
+function anyTypeOwnCost(c: ParsedCost, own: ParsedCost): ParsedCost {
+  const key = (y: CostSymbol) => JSON.stringify(y);
+  const left = own.symbols.map(key);
+  const symbols = c.symbols.map((y): CostSymbol => {
+    if (y.kind === "generic" || y.kind === "x" || y.kind === "snow" || y.kind === "unsupported") return y;
+    const i = left.indexOf(key(y));
+    if (i < 0) return y;
+    left.splice(i, 1);
+    if (y.kind === "phyrexian") return y.krrik ? { kind: "generic", amount: 1 } : { ...y, any: true };
+    if (y.kind === "hybrid" && y.life) return { kind: "phyrexian", color: y.options[0]!, any: true };
+    if (y.kind === "twoHybrid" && y.life) return { kind: "phyrexian", color: y.color, any: true };
+    return { kind: "generic", amount: 1 };
+  });
+  return { ...c, symbols };
 }
 
 /**
@@ -9687,6 +9756,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (rider?.subtypes?.length) (o.spellGains ??= []).push({ mods: [{ kind: "addTypes", types: [], subtypes: rider.subtypes }], timestamp: s.nextTimestamp++, controller: p.id, source: s.graveGrants!.find((g) => g.key === permit)!.source, forever: true });
   }
   // Chorus of the Conclave (round B284): the mana paid for its additional cost, for the counters the creature enters with.
+  // North Star (round 455): the spell its "for one spell this turn" was used for; it's used up (GameState.anyTypeSpells).
+  const anyTypeFrom = choices.anyTypeMana ? useAnyTypeSpell(s, p.id) : undefined;
   const chorus = choices.chorus ? chorusFor(s, p.id, d, choices.alt) : undefined;
   o.chorusPaid = chorus !== undefined ? { source: chorus, zc: obj(s, chorus).zoneChanges ?? 0, payer: p.id, n: choices.chorus! } : undefined;
   // Undead Sprinter: "If you do, ~ enters with a +1/+1 counter on it": the spell cast with that permission (CR 614.1c).
@@ -9808,6 +9879,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
   const offspringText = offspringPaid.map((g) => `, paying offspring ${g.cost} (from ${nameOf(s, g.source)})`).join("");
+  const anyTypeText = anyTypeFrom ? `, spending mana as though it were mana of any type for its mana cost (${anyTypeFrom})` : "";
   const chorusText = o.chorusPaid ? `, paying {${o.chorusPaid.n}} more (${nameOf(s, o.chorusPaid.source)})` : "";
   const replicateText = replicated.map((r) => `, paying replicate ${replicateNow.find((g) => g.source === r.source)!.cost}${r.times === 1 ? " once" : r.times === 2 ? " twice" : ` ${r.times} times`} (from ${nameOf(s, r.source)})`).join("");
   // The Infamous Cruelclaw, Anrakyr the Traveller, Jadzi: the alternative cost it was cast for as that resolved.
@@ -9823,7 +9895,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
-  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${castTypeChosen(d, choices) && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${chorusText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${castTypeChosen(d, choices) && choices.creatureType ? `, choosing ${choices.creatureType}` : ""}${kickText}${replicateText}${offspringText}${chorusText}${anyTypeText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${taxLife ? ` (commander tax ${taxLife} life)` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Ethereal Forager: the cards delve exiled are linked to the permanent this spell becomes, one zone change from now
   // (rulings, CR 607.2q).

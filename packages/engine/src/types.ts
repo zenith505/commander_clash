@@ -1732,6 +1732,12 @@ export interface CostChoices {
    */
   chorus?: number;
   /**
+   * North Star (round 455): use a "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+   * spell's mana cost" this player has (GameState.anyTypeSpells) for this spell: each mana symbol of its mana cost may be paid
+   * with mana of any type, its additional costs as they are (CR 609.4b, 601.2f-h).
+   */
+  anyTypeMana?: true;
+  /**
    * Round 410: whether to pay each instance of offspring a permanent gives the spell (Zinnia, Valley's Voice), 1 or 0, in the
    * order `offspringGranted` lists them; the spell's own offspring is `kicks` (CR 702.175a-b, paid once each).
    */
@@ -2730,6 +2736,12 @@ export interface GameState {
   flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
+  /**
+   * North Star (round 455): "For one spell this turn, you may spend mana as though it were mana of any type to pay that
+   * spell's mana cost": one entry for each, used up by the spell its player casts with CostChoices.anyTypeMana. Only the
+   * entries of the turn they were made in count.
+   */
+  anyTypeSpells?: { player: PlayerId; turn: number; source: string }[];
   graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider; /** Locke: only these cards (as they were then), in any player's graveyard. */ cards?: { id: ObjectId; zc: number }[]; /** Whispersteel Dagger: from this player's graveyard (not `player`'s own). */ fromYardOf?: PlayerId; /** Whispersteel Dagger: "you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b). */ anyType?: true }[];
   /**
    * "You may cast spells from your graveyard this turn", "until end of turn, you may play lands ... from your graveyard",

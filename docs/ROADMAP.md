@@ -1,6 +1,6 @@
 # Roadmap
 
-31,897 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,898 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,975 of
 9,979 (99%).
 
@@ -4965,6 +4965,37 @@ line blocks.
    actions are checked during the new game's mulligans as at any game's start, so a player who'd draw from an empty library
    then would lose then, not in the first upkeep (CR 727.3; no deck here has fewer than seven cards left after a restart);
    bots weigh the restart by the worth of permanents and life only, not the cards in hand or library.
+   Round 453 went on down `npm run popular`, most played first, past Chef's Kiss, Secret of Bloodbending, Pulmonic Sliver,
+   The Dominion Bracelet and Panglacial Wurm (still out, for their reasons), Mastermind's Acquisition, Spawnsire of Ulamog
+   and Vivien, Arkbow Ranger (Lane B's round B304: nothing outside the game in Commander) and Turtles Forever (Lane B's
+   round B303) to Psychic Battle (rank 16,972), out since round B282 for having "not one hook yet": "Whenever a player
+   chooses one or more targets, each player reveals the top card of their library. The player who reveals the card with
+   the greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or
+   targets remain unchanged. Changing targets this way doesn't trigger abilities of permanents named ~." (a whole line in
+   oracle/round453.ts; TriggerEvent "targetsChosen", Effect "psychicBattle", effects/run-round453.ts). A player chooses
+   targets as a spell is cast, an ability activated or a triggered ability put on the stack (CR 601.2c, 602.2b, 603.3d),
+   and when they pick new targets for a copy (707.10c: "if the player chooses to change some or all of the targets") or
+   as an effect lets them (Redirect, Deflection, Boltbender, CR 115.7); the "targeted" event says so (`chose`). Not: a
+   copy's copied targets (707.10) or ones the effect specifies (707.10d-e: Radiate, Zevlor, "change the target to ~"),
+   Grip of Chaos's random reselection, nor Psychic Battle's own change (`psychicBattle`, skipping permanents named
+   Psychic Battle). Its trigger has no target. As it resolves, every player still in the game reveals their top card (none
+   from an empty library, and only the cards revealed count, rulings; a split card's mana value is its halves' together,
+   rulings); one greatest may change all, some or none of the targets of that spell or ability if it's still on the stack,
+   each to another legal one, never their number, nor making anything targeted more than once (rulings; the "newTargets"
+   prompt with `changeAny` and the new `noRepeat`); a tie, or no card revealed, leaves them unchanged. Browser tests: your
+   Lightning Bolt at Ana's Hill Giant, you reveal Serra Angel and keep the target; Ana's Bolt at your Grizzly Bears, you
+   reveal Serra Angel and click her Hill Giant. +1, 31,894 of 31,936 on round 452's branch, 31,896 with main d305cbf (B302, B303, rounds 451-452); the
+   compiled text of every other card and face is unchanged.
+   Out after round 453 (looked at, not done): the lists after round 452 (still out, for their reasons), and The
+   Celestial Toymaker (every spell or ability that made players guess or group cards or permanents into piles this turn:
+   no list of those in the rules), Swirl the Mists, Volrath's Shapeshifter and Spy Kit (text and names), Word of Command
+   (controlling another player), Illusionary Mask (the face-up replacement against prevention and damage already
+   determined, no ruling), Shaman's Trance (whether it permits casting by itself or only through other graveyard
+   permissions: its rulings mention flashback only), Camouflage (piles of blockers), Snowblind ("toughness minus 1" read
+   inside its own effect), Ghostly Flame (done in round 455), North Star (done in round 455) (Lane B's skip lists). Judgment calls: "change the target to ~"
+   (Spellskite, Muck Drubb) and copies aimed by their effect (CR 707.10d-e) aren't a player choosing targets; a copy's
+   controller who keeps every target chose none. Known gaps: bots weigh nothing about Psychic Battle before casting, and
+   as winners use the usual new-target choice (harmful ones away from themselves, helpful ones to their own).
    Round 455 took the two hard cards left that no open round had, both from the bottom of `npm run popular` (Lane B's
    skip lists), each settled by its rulings and the rules on how a payment or a shield looks at things. Ghostly Flame's
    "Black and/or red permanents and spells are colorless sources of damage." (CompiledCard.colorlessDamageSources,
@@ -4987,8 +5018,9 @@ line blocks.
    mana or 2 life; kicker, buyback, commander tax and other additional costs are paid as they are (CR 601.2f), and a spell
    cast for an alternative cost (evoke, flashback, madness, face down) doesn't pay its mana cost (CR 118.9), so it's not
    offered there. Browser test: North Star activated, then Divination cast with three Mountains: Use North Star. +2, 31,897
-   of 31,936 on main d305cbf; the compiled text of every other card and face is unchanged.
-   Out after round 455 (looked at, not done): the lists after round 454 (still out, for their reasons): Word of Command
+   of 31,936 on main d305cbf, 31,898 with main 957ba2c (round 453) merged in; the compiled text of every other card and face is
+   unchanged.
+   Out after round 455 (looked at, not done): the lists after round 453 and round 454's (PR #762) (still out, for their reasons): Word of Command
    (control only while a spell resolves, mana-ability limits), Chef's Kiss, Pulmonic Sliver, Swirl the Mists (a text change
    on every spell and permanent: the definition key, cardIdOf, is read without the game state), Volrath's Shapeshifter (the
    same, with the top card of the graveyard), Spy Kit (every nonlegendary creature card's name: the 258 places a

@@ -2121,7 +2121,7 @@ export type PendingDecision =
    * "You may choose new targets for target spell or ability" (CR 115.7d): keep them all, or choose them again; any kept
    * may be illegal, any changed must be legal for that spell, whose controller is `controller`.
    */
-  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[]; /** "Change the targets" (CR 115.7a): change every target or none. */ allOrNone?: true; /** "Change any targets" (CR 115.7c): any of them, each to another legal one, never to none. */ changeAny?: true }
+  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[]; /** "Change the targets" (CR 115.7a): change every target or none. */ allOrNone?: true; /** "Change any targets" (CR 115.7c): any of them, each to another legal one, never to none. */ changeAny?: true; /** Psychic Battle (round 453): a changed target can't be one the spell or ability already targets otherwise (rulings: nothing targeted more than once). */ noRepeat?: true }
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
@@ -3458,6 +3458,8 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /** Effect "psychicBattle" (Psychic Battle, round 453): the player who revealed the greatest mana value, choosing new targets. */
+    psychicWinner?: PlayerId;
     /** Effect "revealColorsExile" (Sanar, Innovative First-Year, round B287): the cards revealed, asked about once. */
     sanar?: { seen: ObjectId[] };
     /** Effect "nihiloorTap" (Nihiloor, round B288): the opponents in turn order and the creature chosen for each (null for none). */

@@ -13115,6 +13115,8 @@ function chooseNewTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     if (pend.allOrNone && changed.some((c) => c) && targets.some((t, i) => (pend.current[i]?.kind ?? "none") !== "none" && (!changed[i] || t.kind === "none"))) throw new RulesError("change all of its targets, or none of them");
     // "Change any targets" (CR 115.7c): a changed target goes to another legal one, never to nothing (115.7a).
     if (pend.changeAny && targets.some((t, i) => changed[i] && (t.kind === "none" || (pend.current[i]?.kind ?? "none") === "none"))) throw new RulesError("a target can only be changed to another legal target");
+    // Psychic Battle (round 453, rulings): "You can't ... make something get targeted more than once."
+    if (pend.noRepeat && targets.some((t, i) => changed[i] && t.kind !== "none" && targets!.some((u, j) => j !== i && sameTarget(u, t)))) throw new RulesError("nothing can be targeted more than once");
     const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     const q = stackItemQuality(s, item);
     for (let i = 0; i < targets.length; i++) {

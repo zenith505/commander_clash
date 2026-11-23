@@ -58,6 +58,7 @@ import { runChooseLinkedCardEffect } from "./run-round399";
 import { runGainActivatedOfEffect, runWhenCastGainsActivatedEffect } from "./run-round400";
 import { runExileFromHandOrYardEffect } from "./run-round401";
 import { runRestartGameEffect } from "./run-round452";
+import { runPsychicBattleEffect } from "./run-round453";
 import { runAnyTypeOneSpellEffect } from "./run-round455";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
@@ -1999,6 +2000,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runWarpWorldEffect(s, ctx, src);
     case "restartGame":
       return runRestartGameEffect(s, ctx, src);
+    case "psychicBattle":
+      return runPsychicBattleEffect(s, ctx, src);
     case "anyTypeOneSpell":
       return runAnyTypeOneSpellEffect(s, ctx, src);
     case "glimpseOfTomorrow":

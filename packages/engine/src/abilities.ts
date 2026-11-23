@@ -3166,6 +3166,12 @@ export type Effect =
    */
   | { type: "restartGame" }
   /**
+   * Round 453, Psychic Battle: "each player reveals the top card of their library. The player who reveals the card with the
+   * greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or targets
+   * remain unchanged." The spell or ability is the trigger's cause.
+   */
+  | { type: "psychicBattle" }
+  /**
    * Round 455, North Star: "For one spell this turn, you may spend mana as though it were mana of any type to pay that
    * spell's mana cost." (GameState.anyTypeSpells, CostChoices.anyTypeMana; CR 609.4b).
    */
@@ -7135,6 +7141,8 @@ export type TriggerEvent =
   | "selfManaAbilityResolves"
   /** Grip of Chaos (round B267): "Whenever a spell or ability is put onto the stack, if it has a single target": any spell or ability, cast, activated, triggered or copied (CR 707.10), with exactly one target chosen; the event's cause is it. */
   | "stackItemSingleTarget"
+  /** Psychic Battle (round 453): "Whenever a player chooses one or more targets": for a spell or ability on the stack (the event's cause), as it's cast, activated or put on the stack, or new ones a player picks for it or its copy (TriggerEvent "targeted" `chose`). */
+  | "targetsChosen"
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
   /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */

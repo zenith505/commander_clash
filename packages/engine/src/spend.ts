@@ -16,7 +16,7 @@ import type { CardDef, Color, FaceDownKind, GameObject, GameState, ManaLot, Mana
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Myr Superion's "Spend only mana produced by creatures to cast ~" (CompiledCard.creatureManaOnly). */ creatureOnly?: true; /** Imperiosaur's "Spend only mana produced by basic lands to cast ~" (CompiledCard.basicLandManaOnly). */ basicLandOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** Cast from a graveyard (CR 601.2a), for "only to cast a spell from your graveyard" (Lord of the Forsaken), with `owner`. */ fromGraveyard?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true; /** The X announced for it (CR 601.2b), for its mana value on the stack (CR 202.3e): "only to cast spells with mana value 4 or greater" (Ashling, Rimebound, round 387). */ x?: number; /** The card being cast, where it is as it's paid for (game.ts spellHow), for "creature spells with no abilities" (Jasmine Boreal of the Seven, round 426): what's given to it as it's cast. */ castObject?: GameObject } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** Blue mana pays its colored symbols (Grell Philosopher's gained abilities, round 400, CR 609.4b). */ blueAny?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true; /** Not an ability: foretelling this card, a special action (CR 702.143a, 116.2h), for "to foretell cards" (Niko Defies Destiny). */ foretell?: true } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Myr Superion's "Spend only mana produced by creatures to cast ~" (CompiledCard.creatureManaOnly). */ creatureOnly?: true; /** Imperiosaur's "Spend only mana produced by basic lands to cast ~" (CompiledCard.basicLandManaOnly). */ basicLandOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** Cast from a graveyard (CR 601.2a), for "only to cast a spell from your graveyard" (Lord of the Forsaken), with `owner`. */ fromGraveyard?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true; /** The X announced for it (CR 601.2b), for its mana value on the stack (CR 202.3e): "only to cast spells with mana value 4 or greater" (Ashling, Rimebound, round 387). */ x?: number; /** The card being cast, where it is as it's paid for (game.ts spellHow), for "creature spells with no abilities" (Jasmine Boreal of the Seven, round 426): what's given to it as it's cast. */ castObject?: GameObject } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** Blue mana pays its colored symbols (Grell Philosopher's gained abilities, round 400, CR 609.4b). */ blueAny?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** A mana ability's cost (CR 605.1a), for Word of Command's mana (round 460, ManaSpend.commanded). */ manaAbility?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true; /** Not an ability: foretelling this card, a special action (CR 702.143a, 116.2h), for "to foretell cards" (Niko Defies Destiny). */ foretell?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
 export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
@@ -27,7 +27,8 @@ export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): 
   const x = { ...(/\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {}), ...(ab.equip ? { equip: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}) };
   const only = ab.spendOnlyChosenColor ? (o.chosen?.color ? [o.chosen.color] : []) : ab.spendOnly;
   const blue = ab.blueAsAny ? { blueAny: true as const } : {};
-  return only ? { ability: o, onlyColors: only, ...level, ...x, ...(anyColor ? { anyColor } : {}), ...blue } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}), ...blue };
+  const mana = ab.mana ? { manaAbility: true as const } : {};
+  return only ? { ability: o, onlyColors: only, ...level, ...x, ...(anyColor ? { anyColor } : {}), ...blue, ...mana } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}), ...blue, ...mana };
 }
 
 /** What a "you may pay" question's mana is spent on: a permanent's cumulative upkeep (Adarkar Unicorn's mana), or other. */
@@ -96,6 +97,18 @@ export const costHasC = (cost?: ParsedCost): boolean => !!cost?.symbols.some((x)
 
 /** Can mana restricted this way be spent on `use`? `cost`: the cost being paid, when it's known. */
 export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse, cost?: ParsedCost): boolean {
+  // Word of Command (round 460): only to cast the card the player was made to play, the object it was in their hand as the
+  // mana was made (CR 400.7), any part of its total cost, or on mana abilities of lands they control (CR 723.7); and as
+  // the land's own restriction says, if it has one.
+  if (only.commanded) {
+    if (only.also && !spendAllows(s, pid, only.also, use, cost)) return false;
+    if (use === "other") return false;
+    if ("spell" in use) {
+      const o = use.castObject ?? use.object;
+      return !!o && !!only.card && o.id === only.card.id && (o.zoneChanges ?? 0) === only.card.zc;
+    }
+    return !!use.manaAbility && use.ability.zone === "battlefield" && objIsType(s, use.ability, "Land") && controllerOf(s, use.ability) === pid;
+  }
   // Ice Cauldron (round B285): "Spend this mana only to cast the last card exiled with ~": casting that card, the object
   // it was in exile as the mana was made (CR 400.7), any part of its total cost (rulings: additional costs too).
   if (only.lastExiled) {
@@ -475,11 +488,31 @@ export function falseDawnMana(s: GameState, by: PlayerId, mana: ManaType[]): Man
 }
 
 /**
+ * Word of Command (round 460): while `pid` is made to cast a card (PendingDecision castFree `how` "commanded"), the
+ * restriction on the mana a mana ability of a land they control (`source`) makes: only for that card, or for mana
+ * abilities of lands they control (CR 723.7); `own`, the land's own restriction, kept with it. Otherwise undefined.
+ */
+export function commandSpend(s: GameState, pid: PlayerId, own: ManaSpend | undefined, source: ObjectId | undefined): ManaSpend | undefined {
+  const pend = s.pending;
+  if (pend?.kind !== "castFree" || pend.how !== "commanded" || pend.player !== pid || source === undefined) return undefined;
+  if (own?.commanded) return undefined;
+  const o = s.objects[source];
+  if (!o || !(o.zone === "battlefield" ? objIsType(s, o, "Land") && controllerOf(s, o) === pid : isType(defOf(s, o), "Land"))) return undefined;
+  const card = s.objects[pend.objectId];
+  const name = card ? defOf(s, card).name : "that card";
+  return { commanded: true, card: card ? { id: card.id, zc: card.zoneChanges ?? 0 } : null, ...(own ? { also: own } : {}), text: `Spend this mana only to cast ${name} or to activate mana abilities of lands you control (Word of Command).${own ? ` ${own.text}` : ""}` };
+}
+
+/**
  * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
  * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
 export function addMana(s: GameState, pid: PlayerId, mana0: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; hasteType?: string; commanderCounters?: true; creatureCounter?: ManaLot["creatureCounter"]; uncounterableInstantSorcery?: true; source?: string; riot?: string; /** Who controls the spell or ability adding it, when that isn't `pid` (False Dawn, round B294). */ by?: PlayerId } = {}): void {
   const p = s.players[pid]!;
+  // Word of Command (round 460): mana an activated mana ability of a land with a resolution of its own makes while its
+  // controller is made to play a card (the ManaAbility ones are tagged as they're activated, game.ts activateMana).
+  const tagged = commandSpend(s, pid, how.only, s.resolving?.item.manaAbility ? s.resolving.item.sourceId : undefined);
+  if (tagged) how = { ...how, only: tagged };
   // False Dawn (round B294): the callers have already replaced it for their logs; done here too so that none is missed.
   const mana = falseDawnMana(s, how.by ?? pid, mana0);
   const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;

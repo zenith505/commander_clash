@@ -5170,6 +5170,32 @@ line blocks.
    game here). Known gaps: after an exchange of text boxes with a Shapeshifter (Deadpool), neither creature shapeshifts; a copy made from it as
    it last existed (a token copy of a sacrificed or destroyed one) copies the form it had (the same for any text change);
    the log names its triggered abilities after the card it is now; bots don't plan around its form when they discard.
+   Round 460 took Word of Command (out since the lists after round 453). "Look at target opponent's hand and choose a card
+   from it. You control that player until Word of Command finishes resolving. The player plays that card if able. While
+   doing so, the player can activate mana abilities only if they're from lands that player controls and only if mana they
+   produce is spent to activate other mana abilities of lands the player controls and/or to play that card. If the chosen
+   card is cast as a spell, you control the player while that spell is resolving." (oracle/round460.ts,
+   effects/run-round460.ts). You see the hand (only you: a private log line) and choose the card in secret (chooseOption
+   "commandCard"). Control of a player for a limited time (CR 723.2) is GameState.resolveControls, one entry per stack
+   item, which deciderOf reads beside a controlled turn: the later control effect wins (CR 723.1a), and you make every
+   choice they'd make with their resources (723.5, 723.5a), in the UI acting as them, as for a controlled turn. They play
+   the card if able (rulings): a land only on their turn with a land play left (CR 305.2, 305.3), a spell as they could
+   cast it with priority, its timing ignored (CR 608.2g), any way they could: a face, an alternative cost (rulings: Gush
+   for its Islands). PendingDecision "castFree" `how` "commanded" is that cast; it can't be declined while the card can be
+   cast. Meanwhile only their lands' mana abilities can be activated (manaabilities.ts commandedProblem), and the mana
+   those make is restricted to that card and their lands' mana abilities (spend.ts commandSpend, ManaSpend `commanded`),
+   whether the land's mana ability is a plain one or a body (Ancient Tomb's damage, Cloudpost). A card that's both (a
+   modal double-faced land) is played the way you choose (chooseOption "commandPlay"). If it's cast, you control them again
+   while that spell resolves (a control effect on that stack item, created then). With browser tests. +1, 31,917 of 31,936
+   on round 459's head f57cd2c; the compiled text of every other card is unchanged.
+   Out after round 460 (looked at, not done): Swirl the Mists (as after round 459: a text change from the moment a spell is
+   cast), Spy Kit (every name of every card), Camouflage (piles of blockers: menace and "can block only" piles have no
+   ruling), and the Wishes (left out by choice: nothing outside the game here). The rest of the 19 unsupported are the 7
+   meld results, which aren't cards of their own. Known gaps of Word of Command: mana already in their pool isn't
+   restricted (the text limits which mana abilities they activate, not mana they had); Rhystic Cave can't be activated
+   while they play the card (its "unless any player pays {1}" would ask mid-cast); triggered mana (Mana Flare) isn't
+   restricted; bots choose the castable card with the greatest mana value, else a card they can't play, and bots
+   controlling a player make that player's choices as that player would; "if able" is worked out by the cast planner.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

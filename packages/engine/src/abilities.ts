@@ -3207,6 +3207,11 @@ export type Effect =
    * its mana cost." and the replacement that card gets (GameObject.maskFaceUp) (effects/run-round458.ts).
    */
   | { type: "illusionaryMask" }
+  /**
+   * Word of Command (round 460): look at the target opponent's hand and choose a card; you control them while this
+   * resolves, they play it if able, and you control them while the spell they cast resolves (effects/run-round460.ts).
+   */
+  | { type: "wordOfCommand"; who: PlayerRef }
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true; /** Hofri Ghostforge's Spirit token: "the exiled card" is the one the ability that created this token linked to it (round354.ts), not one an exile ability of its own took. */ createdLink?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
@@ -8829,6 +8834,13 @@ export interface ManaSpend {
    */
   lastExiled?: true;
   card?: { id: ObjectId; zc: number } | null;
+  /**
+   * Word of Command (round 460): mana a mana ability of a land made while its controller was made to play `card` (CR 723.7):
+   * spent only to cast that card (any part of its total cost) or to activate mana abilities of lands that player controls;
+   * `also`, the land's own restriction on it, if any (CR 106.6).
+   */
+  commanded?: true;
+  also?: ManaSpend;
   text: string;
 }
 

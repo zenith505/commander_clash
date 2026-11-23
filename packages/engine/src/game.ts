@@ -13,7 +13,7 @@ import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, borrowedTriggerSources, castCardAs, lethalLeft, lethalDamageMarked, enchantOf, canBeSacrificed, canSacrificeForCost, discardShieldOf, opponentForbidsDiscard, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, FACE_DOWN_CYBERMAN, FACE_DOWN_HORROR, FACE_DOWN_ARTIFACT_55, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, commandedProblem, landCouldProduce, manaAbilityCost, manaAbilityCostOf, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax, insteadChoices, PIRACY_SPEND, milledSymbolCombos, tappedForMana } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, cardPT, inRange, linkedCards, manyOfferSizes, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { activatedQuality, itemQuality, peaceTalksNow, legalTargets, flagbearerProblem, takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, lengName, toTopName, printedMatches, unlessDiscardable, bindChosen, bindAttachedToSource, sourceQuality, spellQuality, stampTargets, fireEvent, bent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, declareAttackersDue, COLOR_NAMES } from "./effects";
@@ -22,6 +22,7 @@ import { cardSource, dealDamage, dealPlanned, hitsBy, objectSource, planShields,
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { maskApplies, maskBeforeDamage, maskFirst, maskTurnsUp } from "./effects/run-round458";
+import { commandCastable, resolveControlOf } from "./effects/run-round460";
 import { isSuspended } from "./effects/run-zones";
 import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
@@ -41,7 +42,7 @@ import { castTimeTargets, compileCard, compileGranted, mutateTarget, spellTarget
 import { MENTOR_TEXT } from "./oracle/keyword-abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type CostSymbol, type ParsedCost } from "./mana";
 import { evalAmount, halve, manaSymbolsOf } from "./amounts";
-import { abilityUse, addMana, boundSpend, canPayFromPool, falseDawnMana, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { abilityUse, addMana, boundSpend, commandSpend, canPayFromPool, falseDawnMana, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { channelMana } from "./channel";
 import { nextRandom, randomWatch, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
@@ -715,7 +716,15 @@ export function castPayFor(s: GameState, pay: CastPay, id: ObjectId): CastPay {
 
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
 export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
-  return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
+  return s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.how !== "commanded" ? s.pending.objectId : undefined;
+}
+
+/**
+ * Word of Command (round 460): the card `pid` casts right now as they're controlled (castFree `how` "commanded"): from their
+ * hand as they could with priority, its costs paid (any alternative cost, rulings), its timing ignored (CR 608.2g).
+ */
+export function commandedCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
+  return s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.how === "commanded" ? s.pending.objectId : undefined;
 }
 
 /** Illusionary Mask (round 458): the card `pid` may cast face down right now as its ability resolves (castFree `how` "mask"). */
@@ -744,7 +753,7 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || !!pd.pay || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "pickPermanents" && !!pd.payEach) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || pd.how === "commanded" || !!pd.pay || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -5456,9 +5465,14 @@ function endCombatControl(s: GameState) {
  * themselves (723.8, 723.9). The engine still waits on `pid` (waitingOn), and actions name `pid`: only who chooses
  * them changes, using `pid`'s resources (723.5a).
  */
-export function deciderOf(s: GameState, pid: PlayerId): PlayerId {
+export function deciderOf(s: GameState, pid: PlayerId, depth = 0): PlayerId {
   const c = s.controlledTurn;
-  return c && c.controlled === pid && c.controller !== pid && !player(s, c.controller).lost ? c.controller : pid;
+  const turn = c && c.controlled === pid && c.controller !== pid && !player(s, c.controller).lost ? c : undefined;
+  // Word of Command (round 460): control while a stack item resolves; of all the effects controlling `pid` now, the last
+  // one created works (CR 723.1a). Its controller decides as whoever makes their own decisions (CR 723.5).
+  const r = resolveControlOf(s, pid);
+  if (r && (!turn || r.created > (turn.created ?? -1))) return depth < 4 ? deciderOf(s, r.controller, depth + 1) : r.controller;
+  return turn ? turn.controller : pid;
 }
 
 /** The combat phase's steps (CR 506.1). */
@@ -7549,7 +7563,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   // Doubling Cube's cost is paid with the mana from the pool chosen for it (`combo`).
   const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : manaAbilityCostOf(s, p.id, o, ab);
-  const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o, ...(ab.blueAsAny ? { blueAny: true as const } : {}) }) : null;
+  const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o, manaAbility: true, ...(ab.blueAsAny ? { blueAny: true as const } : {}) }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
   queueSpentOnAbility(s, p.id, manaPaid?.spentTriggers); // Sunken Palace (round 439): nothing to copy
   // Rhystic Cave (round B254): "unless any player pays {1}": the other players are asked below, once its cost is paid; it's
@@ -7636,7 +7650,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     if (adds.length && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id, made: [...adds] });
   }
   else if (unless) s.manaUnless = { player: p.id, id: o.id, zc: o.zoneChanges ?? 0, adds, from, picked, queue: turnOrderFrom(s, s.activePlayer).filter((q) => q !== p.id && !player(s, q).lost), cost: unless, source: name };
-  else if (!theyChoose) addMana(s, getter, adds, { by: p.id, only: pirated ? PIRACY_SPEND : boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  else if (!theyChoose) addMana(s, getter, adds, { by: p.id, only: pirated ? PIRACY_SPEND : (commandSpend(s, getter, boundSpend(o, ab.spendOnly), o.id) ?? boundSpend(o, ab.spendOnly)), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: ab.spentCreatureCounter } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Tyvar the Bellicose: "Whenever a mana ability of this creature resolves" (CR 605.3b), the mana it made.
   if (o.zone === "battlefield" && !unless) fireEvent(s, { type: "manaAbilityResolved", id: o.id, amount: adds.length });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -7857,7 +7871,8 @@ function chooserProblem(s: GameState, pid: PlayerId, specs0: TargetSpec[], targe
 
 /** Casting a spell: as it's cast without paying its mana cost while an ability resolves (cascade), or with priority. */
 function runCast(s: GameState, p: Player, action: Extract<Action, { type: "castSpell" }>) {
-  if (freeCastOf(s, p.id) === action.objectId) {
+  // Word of Command (round 460): the card the controlled player plays as it resolves, cast the same way (CR 608.2g).
+  if (freeCastOf(s, p.id) === action.objectId || commandedCastOf(s, p.id) === action.objectId) {
     // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
     if (askModeChooser(s, p, action, s.pending ?? undefined) || askChoosers(s, p, action, s.pending ?? undefined)) return;
     const cyclone = s.pending?.kind === "castFree" ? s.pending.cyclone : undefined;
@@ -8159,6 +8174,8 @@ export function castProblem(
   if (barred) return `${d.name} can't be played until ${player(s, barred.player).name}'s next turn (${barred.card})`;
   const fromCommand = o.zone === "command";
   const free = freeCastOf(s, pid) === id;
+  // Word of Command (round 460): cast as it resolves, as though with priority otherwise (CR 608.2g).
+  const commanded = commandedCastOf(s, pid) === id;
   const madness = madnessCastOf(s, pid, id);
   // Cast plotted, without paying its mana cost: an alternative cost (CR 702.170d, 118.9a).
   const plotted = !free && plottedCast(s, pid, o);
@@ -8312,7 +8329,7 @@ export function castProblem(
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
-  if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
+  if (!free && !commanded && (s.priority !== pid || s.pending)) return "you don't have priority";
   // Timely Ward: with a commander among its targets; before they're chosen, a commander on the battlefield to target.
   const commanderTarget = !!compileCard(d).flashIfTargetsCommander && (targets ? targets.some((t) => t.kind === "object" && !!s.objects[t.id]?.isCommander && s.objects[t.id]!.zone === "battlefield") : s.battlefield.some((b) => obj(s, b).isCommander));
   const yoursTarget = !!compileCard(d).flashIfTargetsYours && (targets ? targets.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, s.objects[t.id]!) === pid) : s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid));
@@ -8330,7 +8347,7 @@ export function castProblem(
   const instantSpeed = choices?.alt === "sneak" || choices?.alt === "grantedSneak" || (choices?.alt === "alternative" && !!altCost(d, "alternative")?.flash) || (choices?.alt === "payZero" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!)) || (choices?.alt === "energyForSpell" && !!s.objects[id] && payZeroFlash(s, pid, s.objects[id]!, "energy")) || yoursTarget || smallX || beholdFlash || tapFlash || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner) || (!!s.objects[id] && linkedFlash(s, s.objects[id]!, pid)) || (!via && !!s.objects[id] && topFlash(s, s.objects[id]!, pid, choices?.alt === "citadel" ? "life" : "mana"));
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
-  if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
+  if (!free && !commanded && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
@@ -9777,7 +9794,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
-  const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
+  const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && commandedCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
   const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices, o, x), cost.cost).pool);
@@ -12281,6 +12298,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.mana) {
     // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).
     if (!(s.priority === pid && !s.pending) && !(paysManaNow(s) && waitingOn(s) === pid)) return "you can't activate mana abilities now";
+    // Word of Command (round 460): only mana abilities of lands they control while made to play a card (CR 723.7).
+    const commanded = commandedProblem(s, pid, o);
+    if (commanded) return commanded;
   } else {
     if (s.priority !== pid || s.pending) return "you don't have priority";
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
@@ -14343,6 +14363,24 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "commandCard") {
+    // Word of Command (round 460): the card chosen from the target opponent's hand (not revealed).
+    const st = r.scratch?.command;
+    if (!st || st.card !== "" || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    st.card = choice;
+    log(s, `${player(s, pend.player).name} chooses a card from ${player(s, st.opp).name}'s hand (${pend.source}).`);
+    log(s, `You choose ${nameOf(s, choice)}.`, pend.player);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "commandPlay") {
+    // Word of Command (round 460): how the controlled player plays the chosen card, a land or a spell.
+    const st = r.scratch?.command;
+    if (!st || st.play !== "" || !pend.options.includes(choice)) throw new RulesError("choose one of the ways offered");
+    st.play = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "maskCard") {
     // Illusionary Mask (round 458): the creature card in your hand chosen, or none; not revealed (only its controller sees it).
     if (r.scratch?.mask?.card !== "" || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
@@ -15640,7 +15678,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   const r = s.resolving;
   if (pend?.kind === "castFree" && pend.player === p.id && r && !yes) {
     // "Casts it ... if able" (Omen Machine, Wild Evocation): not while it can be cast (rulings).
-    if (pend.must && freeCastable(s, p.id, pend.objectId, false, true)) throw new RulesError(`${nameOf(s, pend.objectId)} must be cast if able`);
+    if (pend.must && (pend.how === "commanded" ? commandCastable(s, p.id, pend.objectId) : freeCastable(s, p.id, pend.objectId, false, true))) throw new RulesError(`${nameOf(s, pend.objectId)} must be cast if able`);
     // Declining cascade's free cast; casting it is a castSpell action instead.
     log(s, `${p.name} chooses not to cast ${nameOf(s, pend.objectId)}.`);
     s.pending = null;

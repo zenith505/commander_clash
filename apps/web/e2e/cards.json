@@ -45410,6 +45410,67 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4a8d41fe-e04d-484b-a7d1-19be311e6ca7",
+  "name": "Sea Gate Restoration // Sea Gate, Reborn",
+  "manaCost": "{4}{U}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Sorcery // Land",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw cards equal to the number of cards in your hand plus one. You have no maximum hand size for the rest of the game.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Sea Gate Restoration",
+    "manaCost": "{4}{U}{U}{U}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Draw cards equal to the number of cards in your hand plus one. You have no maximum hand size for the rest of the game.",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/1/9/193071fe-180b-4d35-ba78-9c16675c29fc.jpg?1783929396",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/1/9/193071fe-180b-4d35-ba78-9c16675c29fc.jpg?1783929396"
+   },
+   {
+    "name": "Sea Gate, Reborn",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {U}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/1/9/193071fe-180b-4d35-ba78-9c16675c29fc.jpg?1783929396",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/1/9/193071fe-180b-4d35-ba78-9c16675c29fc.jpg?1783929396"
+   }
+  ]
+ },
+ {
   "oracleId": "91f34686-cb96-49c0-b4a7-49dd1fd076e2",
   "name": "Sea Gate Wreckage",
   "manaCost": "",
@@ -60215,6 +60276,32 @@
   "commanderLegal": "legal",
   "set": "leg",
   "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e8ad3a77-b293-4d69-b080-27ca9f95d443",
+  "name": "Word of Command",
+  "manaCost": "{B}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at target opponent's hand and choose a card from it. You control that player until Word of Command finishes resolving. The player plays that card if able. While doing so, the player can activate mana abilities only if they're from lands that player controls and only if mana they produce is spent to activate other mana abilities of lands the player controls and/or to play that card. If the chosen card is cast as a spell, you control the player while that spell is resolving.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

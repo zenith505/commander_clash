@@ -3467,6 +3467,11 @@ export interface Resolving {
   /** Jester's Mask: how many cards this resolution put on top of a library from a hand (Count handPutOnTopThisWay). */
   handPutOnTop?: number;
   scratch?: {
+    /**
+     * Effect "chefsKiss" (Chef's Kiss, round 456): the stack's size before the copy was made, the copy made (the original copy,
+     * not Twinning Staff's additional ones, rulings), and that the reselections are done.
+     */
+    chef?: { base: number; copied?: true; copy?: string };
     /** Effect "psychicBattle" (Psychic Battle, round 453): the player who revealed the greatest mana value, choosing new targets. */
     psychicWinner?: PlayerId;
     /** Effect "revealColorsExile" (Sanar, Innovative First-Year, round B287): the cards revealed, asked about once. */

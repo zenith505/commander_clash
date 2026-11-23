@@ -2132,7 +2132,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     }
     case "modifyPT": {
-      const [p, t] = [num(m.power), num(m.toughness)];
+      const p = num(m.power);
+      // Snowblind (round B307): Y is the smaller of X and its toughness minus 1, as layer 7c has left it so far (it applies
+      // after every other 7c effect and the counters, computeLayers); a negative result is 0 (CR 107.1b).
+      const t = m.leaveToughness !== undefined ? -Math.max(0, Math.min(-num(m.toughness), c.toughness - m.leaveToughness)) : num(m.toughness);
       c.power += p;
       c.toughness += t;
       c.pt.push({ source: e.sourceName, kind: "modify", power: p, toughness: t, untilEndOfTurn: e.untilEndOfTurn });
@@ -2548,6 +2551,12 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
         if (o.suspendHaste !== undefined && o.suspendHaste === c.controller && !c.keywords.includes("Haste")) c.keywords.push("Haste");
       }
     let rem = insts.filter((e) => modsIn(e, layer).length && (e.locked || exists(s, e, chars)));
+    // Snowblind (round B307): "Y is equal to X or to enchanted creature's toughness minus 1, whichever is smaller" changes
+    // with every other layer 7c effect and counter on that creature, so it depends on them and applies after them (CR
+    // 613.8a-b); everything else in 7c only adds, so no other effect there depends on it. Several of them form a dependency
+    // loop and apply in timestamp order (613.8b).
+    const capped = layer === "7c" ? rem.filter(isCappedPT) : [];
+    if (capped.length) rem = rem.filter((e) => !capped.includes(e));
     while (rem.length) {
       // CR 613.8b-c: apply the earliest effect that doesn't wait on another; re-evaluate after each.
       // In a dependency loop, timestamp order wins.
@@ -2603,10 +2612,14 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
         c.toughness += dt;
         c.pt.push({ source: "counters", kind: "counters", power: dp, toughness: dt, untilEndOfTurn: false });
       }
+      for (const e of capped) if (e.locked || exists(s, e, chars)) applyInLayer(s, e, layer, chars, true);
     }
   }
   return chars;
 }
+
+/** Snowblind (round B307): an effect whose layer 7c part reads the toughness it's applied to (Modification leaveToughness). */
+const isCappedPT = (e: Inst) => modsIn(e, "7c").some((m) => m.kind === "modifyPT" && m.leaveToughness !== undefined);
 
 // ---------------------------------------------------------------------------
 // Cache. Computing every permanent at once is needed (effects look at each other), so the

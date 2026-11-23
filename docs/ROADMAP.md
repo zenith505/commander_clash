@@ -1,6 +1,6 @@
 # Roadmap
 
-31,912 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,913 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,978 of
 9,979 (99%).
 
@@ -4989,9 +4989,9 @@ line blocks.
    Out after round 453 (looked at, not done): the lists after round 452 (still out, for their reasons), and The
    Celestial Toymaker (every spell or ability that made players guess or group cards or permanents into piles this turn:
    no list of those in the rules), Swirl the Mists, Volrath's Shapeshifter and Spy Kit (text and names), Word of Command
-   (controlling another player), Illusionary Mask (the face-up replacement against prevention and damage already
+   (controlling another player), Illusionary Mask (done in round 458) (the face-up replacement against prevention and damage already
    determined, no ruling), Shaman's Trance (whether it permits casting by itself or only through other graveyard
-   permissions: its rulings mention flashback only), Camouflage (piles of blockers), Snowblind ("toughness minus 1" read
+   permissions: its rulings mention flashback only), Camouflage (piles of blockers), Snowblind (done in round B307) ("toughness minus 1" read
    inside its own effect), Ghostly Flame (done in round 455), North Star (done in round 455) (Lane B's skip lists). Judgment calls: "change the target to ~"
    (Spellskite, Muck Drubb) and copies aimed by their effect (CR 707.10d-e) aren't a player choosing targets; a copy's
    controller who keeps every target chose none. Known gaps: bots weigh nothing about Psychic Battle before casting, and
@@ -5024,7 +5024,7 @@ line blocks.
    Pulmonic Sliver, Psychic Battle (done in round 453), Panglacial Wurm and Shaman's Trance (done in round B305), the cards
    from outside the game (done in round B304), The Celestial Toymaker (done in round B306), Word of Command (control of a
    player only while a spell resolves, with limits on their mana abilities: no such limited control yet), Swirl the Mists, Volrath's Shapeshifter,
-   Spy Kit, Illusionary Mask, Camouflage, Snowblind, Ghostly Flame and North Star (done in round 455). Known gaps: bots never activate the
+   Spy Kit, Illusionary Mask (done in round 458), Camouflage, Snowblind (done in round B307), Ghostly Flame and North Star (done in round 455). Known gaps: bots never activate the
    Bracelet's ability (as with Mindslaver's); a bot controlling a player's combat phase declares no attacks for them, as
    it does for a whole turn.
    Round 455 took the two hard cards left that no open round had, both from the bottom of `npm run popular` (Lane B's
@@ -5055,7 +5055,7 @@ line blocks.
    (control only while a spell resolves, mana-ability limits), Chef's Kiss (done in round 456), Pulmonic Sliver, Swirl the Mists (a text change
    on every spell and permanent: the definition key, cardIdOf, is read without the game state), Volrath's Shapeshifter (the
    same, with the top card of the graveyard), Spy Kit (every nonlegendary creature card's name: the 258 places a
-   permanent's one name is read), Illusionary Mask, Camouflage, Snowblind ("toughness minus 1" read inside its own layer 7c
+   permanent's one name is read), Illusionary Mask (done in round 458), Camouflage, Snowblind (done in round B307) ("toughness minus 1" read inside its own layer 7c
    effect, no ruling). Known gaps: bots don't activate North Star (its worth
    for a spell in hand isn't weighed) and use one only for a spell they can't cast without it; when a cost reduction takes
    off a colored symbol both the mana cost and an additional cost have, it's taken off the additional cost's (the cost is
@@ -5078,12 +5078,12 @@ line blocks.
    aren't casting (rulings), and a random reselection isn't a player choosing targets (Psychic Battle doesn't trigger). With
    Twinning Staff, its additional copy may have new targets chosen and isn't "the copy" (rulings on Twinning Staff: "the
    original copy"), so only the first copy is reselected. +1, 31,899 of 31,936 on round 455's branch (PR #765, main 957ba2c
-   in), 31,912 with round 455's head f28e5299 (round 454, main 4be39a6) merged in; the compiled text of every other card and
+   in), 31,912 with round 455's head f28e5299 (round 454, main 4be39a6) merged in, 31,913 with main a050f56 (B307); the compiled text of every other card and
    face is unchanged.
    Out after round 456 (looked at, not done): the lists after round 455 (still out, for their reasons): Pulmonic Sliver (an
    optional "put it on top of its owner's library instead" asked in the middle of any move of a Sliver to a graveyard, and
    several Slivers of one owner dying at once put on top in the order the owner chooses, rulings: the zone change can't
-   pause for it), Word of Command, Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask and Camouflage. Known
+   pause for it), Word of Command, Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask (done in round 458) and Camouflage. Known
    gaps: bots cast Chef's Kiss as they cast Commandeer (at an opponent's spell), without weighing where the random targets
    may land.
    Round 457 took Pulmonic Sliver (out since the lists after round 453: "the zone change can't pause for it"). All Slivers
@@ -5110,9 +5110,9 @@ line blocks.
    event batches back when an action is undone partway through. Mana abilities that sacrifice such a permanent are
    activated by hand, never by the autopay (the question would stop the rest of a plan). Browser tests: Lightning Bolt a
    Muscle Sliver and put it on top; Wrath of God two Slivers, keep both and arrange them. +1, 31,913 of 31,936 on round
-   456's head dfb03503; the compiled text of every other card is unchanged.
+   456's head dfb03503, 31,914 with its head feb1e23 (main a050f56, B307); the compiled text of every other card is unchanged.
    Out after round 457 (looked at, not done): the lists after round 456 (still out, for their reasons): Word of Command,
-   Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask, Camouflage (Snowblind: Lane B's round B307), and the Wishes (left out by
+   Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask (done in round 458), Camouflage (Snowblind: Lane B's round B307), and the Wishes (left out by
    choice: nothing outside the game here). Known gaps: while the question is asked, the board shows the game as it was
    before the action (the action hasn't happened yet); a shortcut (CR 732) that went through the question stops there
    (repeated in place, nothing asks); the human answers a Sliver's question again if a damage shield question comes later
@@ -5136,10 +5136,10 @@ line blocks.
    down; Fog's combat damage too); otherwise it's turned face up either way. Aquamorph Entity's form and Vesuvan
    Shapeshifter's copy are asked as it's turned up the same way. Turned face up by the Mask isn't "you turned a permanent
    face up" (no player did). Browser test: X = 4 from four Mountains, choose Hill Giant, cast it face down, Shock turns it
-   face up as a 3/3. +1, 31,914 of 31,936 on round 457's head df7224b; the compiled text of every other card is unchanged.
+   face up as a 3/3. +1, 31,915 of 31,936 on round 457's head 25ca66a; the compiled text of every other card is unchanged.
    Out after round 458 (looked at, not done): Word of Command (playing a card while controlling another player mid-
    resolution), Swirl the Mists and Volrath's Shapeshifter (text changes before the layers), Spy Kit (every name of every
-   card), Camouflage (piles of blockers: menace and "can block only" piles have no ruling), Snowblind (Lane B's round B307),
+   card), Camouflage (piles of blockers: menace and "can block only" piles have no ruling), Snowblind (done in round B307),
    and the Wishes (left out by choice: nothing outside the game here). Known gaps: bots never activate Illusionary Mask
    (they answer its prompts: the highest mana value card, cast; prevention first); whether all damage would be prevented
    is judged as bots would choose the shields.
@@ -6429,10 +6429,10 @@ line blocks.
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
    Orders (done in round B256), Balduvian Warlord (done in round B256), General Jarkeld (done in round B258) (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (done in round B285) (noted
-   mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
+   mana); Illusionary Mask (done in round 458); Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (done in round B305) (other players' graveyards as yours);
-   Pygmy Hippo (done in round B286); Snowblind (Y counts the toughness the effect changes); Glyph of Delusion (done in round B291) and Glyph of Reincarnation
+   Pygmy Hippo (done in round B286); Snowblind (done in round B307) (Y counts the toughness the effect changes); Glyph of Delusion (done in round B291) and Glyph of Reincarnation
    (creatures a Wall blocked this turn); Infernal Denizen (done in round B238); Drought and Brutal Suppression (done in round B260) (sacrifices added to costs);
    Delif's Cube (done in round B207) and Acidic Dagger (done in round B225) (triggers set up on a target for the turn); Worms of the Earth (done in round B258) (lands can't enter the
    battlefield); The Prismatic Piper (done in round B249) (a color chosen before the game); False Dawn (done in round B294); Tidal Flats (done in round B214) (a payment for each attacking
@@ -12337,6 +12337,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the attacker (one that also kills it first), or none. Browser tests for the color choice, Turf War's targets and land
   pick, and Aetherplasm's question and hand pick. +3, 31,720 of 31,936 with main through round 415 and B255-B260. The
   compiled text of every other card is unchanged.
+- Round B307 (least played first, one card off the skip lists, not in Lane A's rounds 453-455): Snowblind (out since
+  round B176: Y read from the toughness the effect itself changes). "Enchanted creature gets -X/-Y. If that creature is
+  attacking, X is the number of snow lands defending player controls. Otherwise, X is the number of snow lands its
+  controller controls. Y is equal to X or to enchanted creature's toughness minus 1, whichever is smaller." (oracle/
+  laneb307.ts): one layer 7c effect (CR 613.4c). X counts the snow lands of the enchanted creature's defending player
+  while it attacks (the player it attacks, or the controller of the planeswalker it attacks, CR 506.2), otherwise its
+  controller's, as layers 1-6 leave them (Count affectedDefenderOrControllerPermanents). There's no ruling on Y; the
+  reading: the toughness is the one the effect is applied to, and every other P/T change in layer 7c and every counter
+  changes what it does, so it depends on them and applies after them, whatever their timestamps (CR 613.8a-b; layers.ts
+  applies it after the counters, Modification leaveToughness). Nothing else in 7c depends on it, since everything else
+  there only adds. Two Snowblinds on one creature depend on each other: a loop, applied in timestamp order (613.8b). With
+  a toughness of 1 or less Y would be below 0, and 0 is used instead (CR 107.1b): it gets -X/-0. So Giant Growth on a
+  Snowblinded 2/2 with five snow lands around gives 0/1, not 4/4. Known gap: an effect in layer 7c that reads power or
+  toughness (none supported reads the enchanted creature's) would apply before it. Bots put it on an opponent's creature.
+  No new prompt, so no browser test. +1, 31,907 of 31,936 on B306's head 7c8fda63 (main d305cbf), 31,908 with B306's
+  head 705a12e7 (main 957ba2c, round 453) merged in, 31,912 with main 0147fbe (rounds 454-455, B304-B306). The compiled text of every other card is unchanged.
+- Out after round B307 (looked at, not done): the lists after round B306 stay out. About 24 unsupported cards remain: the
+  Wishes (left out by choice), control of another player (Word of Command), text changes (Swirl the Mists; Spy Kit, whose "all names of
+  nonlegendary creature cards" would have to reach every one of the engine's name comparisons), Volrath's Shapeshifter,
+  Pulmonic Sliver, Illusionary Mask (done in round 458) and Camouflage for the reasons after round B306, and Chef's Kiss (left to Lane A).
 - Round B306 (least played first, one card off the skip lists, not in Lane A's rounds 453-454): The Celestial Toymaker
   (out after rounds 292 and 421: counting what made players group cards into piles). "Whenever ~ attacks, look at the top three
   cards of your library. Exile any number of them in a face-down pile and the rest in a face-up pile. Defending player
@@ -12368,7 +12388,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard depends on its controller, from layer 2: game.ts reads the definition before the layers, so it needs a
   definition worked out between layers 2 and 3); Pulmonic Sliver (its granted "you may put it on top of its owner's library
   instead" is the only optional replacement of a move to a graveyard: game.ts moveObject can't stop for a question, and
-  several Slivers dying at once go on top in an order their owner chooses, rulings); Illusionary Mask (when the face-down
+  several Slivers dying at once go on top in an order their owner chooses, rulings); Illusionary Mask (done in round 458) (when the face-down
   creature "would deal damage" outside combat, whether the amount is worked out again once it's face up has no ruling);
   Camouflage (piles of blockers: what a pile does with a menace attacker, or a creature that can block only one of the
   piles it's in, has no ruling); Chef's Kiss (done in round 456) (left to Lane A, the most played remaining card). Known gap: bots don't weigh
@@ -12480,7 +12500,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Codie copy them with the usual new-target choice. Browser test: cast Adventurous Eater (no trigger), then Have a Bite's
   copy from exile at the Eater; Codie's copy targets Grizzly Bears instead. +1, 31,886 of 31,936 on B300's head 65c7e36
   (main 2c9aae1), 31,890 with main 5035246 (rounds 447-449). The compiled text of every other card is unchanged.
-- Out after round B301 (looked at, not done): the lists after round B300 stay out; Snowblind ("toughness minus 1" read
+- Out after round B301 (looked at, not done): the lists after round B300 stay out; Snowblind (done in round B307) ("toughness minus 1" read
   inside its own layer 7c effect), North Star (done in round 455), Equinox (done in round B302), Spy Kit and Pulmonic Sliver were looked at again. About 47
   unsupported cards remain, all of them hard. Known gap: bots don't weigh Codie's copy when picking which prepared copy to
   cast.
@@ -12631,7 +12651,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Elemental's blue), and autopay counts on its sources' mana being white. Browser tests: Bloomsage prepared by its trigger,
   Channel's copy cast from exile, three life payments casting Commander's Sphere; Divination cast with Mountains under False
   Dawn. +2, 31,867 of 31,936 on B293's branch (main 24bb9f8), 31,871 with main cf06b92 (through round 443) and B293's head a9dbd248 merged in. The compiled text of every other card is unchanged.
-- Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind ("toughness minus 1" read inside
+- Out after round B294 (looked at, not done): the lists after round B293 stay out. Snowblind (done in round B307) ("toughness minus 1" read inside
   its own layer 7c effect, no ruling), Codie, Ravenous Codex ("a prepared spell" still isn't defined, CR 722), Cosima, God of
   the Voyage, Share the Spoils, Finale of Promise, Equinox (done in round B302), Saruman of Many Colors, Baron Helmut Zemo (done in round B299) and Snowfall (done in round B298) were looked
   at again and stay out for the reasons in the earlier lists; about 69 unsupported cards remain, all of them hard. Judgment
@@ -12889,7 +12909,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   out: its "they draw a card and reveal it" is a draw other replacements can still replace (CR 614.5, 616.1), and no
   ruling says what "it" is when that draw becomes two (an Archive) or none (dredge). North Star (done in round 455) ("for one spell this turn":
   which spell, and when it's used up, has no ruling), False Dawn (done in round B294) (every colored mana your spells and abilities add becomes
-  white: a replacement on all mana production, not only lands tapped for mana), Snowblind ("toughness minus 1" read inside
+  white: a replacement on all mana production, not only lands tapped for mana), Snowblind (done in round B307) ("toughness minus 1" read inside
   its own layer 7c effect, no ruling) and Ghostly Flame (done in round 455) (damage from a "colorless source" that's still red, wherever color
   of damage is looked at) were looked at again and stay out. Judgment calls and known gaps: Chorus's counters need it still
   on the battlefield as the creature enters (no ruling either way; CR 113.6); a copy of the creature spell doesn't get them
@@ -13178,7 +13198,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Wurm, mana value 6, not offered) and its return at the end step, and casting Dimensional Breach and choosing Grizzly
   Bears over Sol Ring at your next upkeep. +2, 31,787 of 31,936 on B273's branch, 31,790 with main through round 426 merged in. The
   compiled text of every other card is unchanged.
-- Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star (done in round 455), Ghostly Flame (done in round 455), Snowblind,
+- Out after round B274 (looked at, not done): the lists after round B273 stay out. North Star (done in round 455), Ghostly Flame (done in round 455), Snowblind (done in round B307),
   Land Equilibrium, Noxious Vapors, Chorus of the Conclave (done in round B284), Breathstealer's Crypt, Glyph of Delusion (done in round B291) and Guardian Beast (done in round B292)
   were looked at again and stay out for the reasons in the earlier lists; the Wishes and other "outside the game" cards
   stay out (nothing outside the game here). Judgment calls and known gaps: Dimensional Breach's upkeep trigger goes on
@@ -13435,7 +13455,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B266 (looked at, not done): the lists after round B265 stay out. Judgment calls and known gaps:
   Defensive Formation's division is made for its controller the way banding's is (the engine has no damage assignment
   prompt for blocked attackers), so a human controller isn't asked how to divide it; bots don't attack around Defensive
-  Formation. North Star (done in round 455), Emblazoned Golem, Noxious Vapors, Snowblind, Land Equilibrium, Chorus of the Conclave (done in round B284) and
+  Formation. North Star (done in round 455), Emblazoned Golem, Noxious Vapors, Snowblind (done in round B307), Land Equilibrium, Chorus of the Conclave (done in round B284) and
   Yixlid Jailer were looked at again and stay out for the reasons in the earlier lists.
 - Round B265 (least played first, from the Lane B skip lists, none of them in Lane A's rounds 418-420): Reversal of
   Fortune ("Target opponent reveals their hand. You may copy an instant or sorcery card in it. If you do, you may cast the
@@ -13544,7 +13564,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Nefarious Lich and Immortal Coil each take a different source's damage in one damage event, the Lich's cards are
   chosen first (for one source's damage only the one applied first applies: the damage is gone after it); bots' other ways of exiling their own graveyard (delve,
   escape, Nefarious Lich) don't look at Immortal Coil; Winter's Chill's three-way choice is asked as two questions, {2}
-  first, then {1}; Snowblind, Noxious Vapors, Land Equilibrium, Glyph of Delusion (done in round B291) and Lich's Mirror (done in round B280) were looked at again
+  first, then {1}; Snowblind (done in round B307), Noxious Vapors, Land Equilibrium, Glyph of Delusion (done in round B291) and Lich's Mirror (done in round B280) were looked at again
   and stay out for the reasons in the earlier lists.
 - Out after round B261 (looked at, not done): the lists after round B260 stay out. Judgment calls and known gaps: Turf
   War's has no rulings of its own, so with a player who controls no land its enters ability follows Vaevictis Asmadi's
@@ -13604,7 +13624,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and don't aim damage away from Dralnu or a Nefarious Lich player. No ruling settles whether Sigarda, Host of Herons
   stops Dralnu's sacrifice when an opponent's spell deals the damage: the engine treats it as that spell causing the
   sacrifice, so a protected player sacrifices nothing and the damage is still replaced.
-- Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (Y counted from the
+- Out after round B252 (looked at, not done): the lists after round B251 stay out, and Snowblind (done in round B307) (Y counted from the
   toughness so far in layer 7c: other 7c effects apply first, as it depends on them, CR 613.8, but counters apply in
   timestamp order, CR 613.7c, and only keyword counters have timestamps here), Battlefield Thaumaturge (done in round 447) (as before: one
   creature in two target slots), Mangara's Equity (done in round B261) (as before), Ghostly Flame (done in round 455) (its rulings make only the damage colorless,
@@ -13678,7 +13698,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "it" is isn't settled). Known gaps: Chains of Mephistopheles' discard doesn't ask Library of Leng; bots pay Zur's Weirding's 2
   life for an opponent's nonland card while at 12 life or more, the first in turn order who can.
 - Out after round B236 (looked at, not done): the lists after round B235 stay out, and Turf War (done in round B261) (still out: a player with no
-  land to target), Emblazoned Golem (one mana of each color on its kicker X, not tracked by the kicker's payment), Snowblind and
+  land to target), Emblazoned Golem (one mana of each color on its kicker X, not tracked by the kicker's payment), Snowblind (done in round B307) and
   Titania's Song (as before). Known gaps: another player can use Mana Cache only through automatic payment (not by clicking it),
   and bots don't count another player's Cache as mana they have when planning; Enduring
   Renewal counts the Renewals that already applied in a chain of draws, not which ones, as Blood Scrivener does.
@@ -13869,7 +13889,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the earlier lists.
 - Out after round B177 (looked at, not done): Divine Intervention (done in round B259) (only its controller removing the last counter triggers it,
   rulings: who removes counters isn't tracked), Rain of Gore (whether lifelink damage from a spell is that spell causing its
-  controller to gain life isn't settled by its rulings), Lich's Mirror (done in round B280), Blood Scrivener, Snowblind and Garruk, Curse Breaker (done in round B219)
+  controller to gain life isn't settled by its rulings), Lich's Mirror (done in round B280), Blood Scrivener, Snowblind (done in round B307) and Garruk, Curse Breaker (done in round B219)
   stay out for the reasons in the earlier lists.
 - Out after round B176 (looked at, not done): Battlefield Thaumaturge (done in round 447) ("{1} less for each creature it targets": whether a
   creature targeted twice counts twice isn't settled by its rulings' wording), Kodama of the Center Tree (done in round B213) (soulshift X counted
@@ -14036,7 +14056,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B127 (looked at, not done): Sutured Ghoul (done in round B171) (an enters replacement exiling any number of creature cards
   and a characteristic-defining P/T linked to them, CR 607.2a), Goblin Test Pilot (done in round B136) (a target chosen at random as it's
   activated), Valleymaker (done in round B139) (a mana ability with a sacrifice cost whose mana goes to another player), Escaped Shapeshifter
-  (a layer 6 ability-adding effect that depends on what opponents' creatures have, CR 613.8), Snowblind (Y counted from
+  (a layer 6 ability-adding effect that depends on what opponents' creatures have, CR 613.8), Snowblind (done in round B307) (Y counted from
   the toughness the effect itself changes), Sirocco (a punisher per revealed card, done in round B132), Nivmagus Elemental (exiling a spell
   you control from the stack as a cost), Burning of Xinye (done in round B139) ("destroys four lands they control", chosen by each player,
   isn't parsed).

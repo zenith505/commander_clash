@@ -190,6 +190,13 @@ export type Count =
   | { kind: "affectedDefenderPermanents"; filter: TargetSpec }
   /** "For each card in its controller's hand" (Righteous Authority): the hand of the affected permanent's controller. */
   | { kind: "affectedControllerHand" }
+  /**
+   * Snowblind (round B307): "If that creature is attacking, X is the number of snow lands defending player controls.
+   * Otherwise, X is the number of snow lands its controller controls.": the permanents matching `filter` that the affected
+   * creature's defending player controls while it's attacking (CR 506.2, 802.2a), otherwise its controller's, as the
+   * layers have them so far.
+   */
+  | { kind: "affectedDefenderOrControllerPermanents"; filter: TargetSpec }
   | { kind: "cardsInLibrary"; who: PlayerRef; /** "Cards with the chosen name" in that library (Mindblaze): only cards like this. */ filter?: TargetSpec }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   /** Erestor of the Council: "the number of opponents who voted for a choice you didn't vote for" in the vote that triggered it (an opponent may count both ways, rulings). */
@@ -2180,7 +2187,18 @@ export type Modification =
   | { kind: "setPower"; power: Amount } // layer 7b
   /** A characteristic-defining ability (CR 604.3): "~'s power and toughness are each equal to ...", layer 7a. */
   | { kind: "definePT"; power?: Amount; toughness?: Amount }
-  | { kind: "modifyPT"; power: Amount; toughness: Amount } // layer 7c
+  | {
+      kind: "modifyPT";
+      power: Amount;
+      toughness: Amount;
+      /**
+       * Snowblind (round B307): "gets -X/-Y ... Y is equal to X or to enchanted creature's toughness minus 1, whichever is
+       * smaller": the toughness change (a negative amount, -X) takes away at most the creature's toughness minus this,
+       * never less than 0 (CR 107.1b). That toughness is what layer 7c has given it once every other effect there and its
+       * counters have applied: they change what this does, so it depends on them (CR 613.8a-b).
+       */
+      leaveToughness?: number;
+    } // layer 7c
   | { kind: "switchPT" } // layer 7d
   /**
    * Duplicant: "As long as a card exiled with ~ is a creature card, ~ has the power, toughness, and creature types of the

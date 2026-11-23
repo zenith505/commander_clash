@@ -1,6 +1,6 @@
 # Roadmap
 
-31,907 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,908 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,976 of
 9,979 (99%).
 
@@ -4965,6 +4965,37 @@ line blocks.
    actions are checked during the new game's mulligans as at any game's start, so a player who'd draw from an empty library
    then would lose then, not in the first upkeep (CR 727.3; no deck here has fewer than seven cards left after a restart);
    bots weigh the restart by the worth of permanents and life only, not the cards in hand or library.
+   Round 453 went on down `npm run popular`, most played first, past Chef's Kiss, Secret of Bloodbending, Pulmonic Sliver,
+   The Dominion Bracelet and Panglacial Wurm (still out, for their reasons), Mastermind's Acquisition, Spawnsire of Ulamog
+   and Vivien, Arkbow Ranger (Lane B's round B304: nothing outside the game in Commander) and Turtles Forever (Lane B's
+   round B303) to Psychic Battle (rank 16,972), out since round B282 for having "not one hook yet": "Whenever a player
+   chooses one or more targets, each player reveals the top card of their library. The player who reveals the card with
+   the greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or
+   targets remain unchanged. Changing targets this way doesn't trigger abilities of permanents named ~." (a whole line in
+   oracle/round453.ts; TriggerEvent "targetsChosen", Effect "psychicBattle", effects/run-round453.ts). A player chooses
+   targets as a spell is cast, an ability activated or a triggered ability put on the stack (CR 601.2c, 602.2b, 603.3d),
+   and when they pick new targets for a copy (707.10c: "if the player chooses to change some or all of the targets") or
+   as an effect lets them (Redirect, Deflection, Boltbender, CR 115.7); the "targeted" event says so (`chose`). Not: a
+   copy's copied targets (707.10) or ones the effect specifies (707.10d-e: Radiate, Zevlor, "change the target to ~"),
+   Grip of Chaos's random reselection, nor Psychic Battle's own change (`psychicBattle`, skipping permanents named
+   Psychic Battle). Its trigger has no target. As it resolves, every player still in the game reveals their top card (none
+   from an empty library, and only the cards revealed count, rulings; a split card's mana value is its halves' together,
+   rulings); one greatest may change all, some or none of the targets of that spell or ability if it's still on the stack,
+   each to another legal one, never their number, nor making anything targeted more than once (rulings; the "newTargets"
+   prompt with `changeAny` and the new `noRepeat`); a tie, or no card revealed, leaves them unchanged. Browser tests: your
+   Lightning Bolt at Ana's Hill Giant, you reveal Serra Angel and keep the target; Ana's Bolt at your Grizzly Bears, you
+   reveal Serra Angel and click her Hill Giant. +1, 31,894 of 31,936 on round 452's branch, 31,896 with main d305cbf (B302, B303, rounds 451-452); the
+   compiled text of every other card and face is unchanged.
+   Out after round 453 (looked at, not done): the lists after round 452 (still out, for their reasons), and The
+   Celestial Toymaker (every spell or ability that made players guess or group cards or permanents into piles this turn:
+   no list of those in the rules), Swirl the Mists, Volrath's Shapeshifter and Spy Kit (text and names), Word of Command
+   (controlling another player), Illusionary Mask (the face-up replacement against prevention and damage already
+   determined, no ruling), Shaman's Trance (whether it permits casting by itself or only through other graveyard
+   permissions: its rulings mention flashback only), Camouflage (piles of blockers), Snowblind (done in round B307) ("toughness minus 1" read
+   inside its own effect), Ghostly Flame, North Star (Lane B's skip lists). Judgment calls: "change the target to ~"
+   (Spellskite, Muck Drubb) and copies aimed by their effect (CR 707.10d-e) aren't a player choosing targets; a copy's
+   controller who keeps every target chose none. Known gaps: bots weigh nothing about Psychic Battle before casting, and
+   as winners use the usual new-target choice (harmful ones away from themselves, helpful ones to their own).
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -12173,11 +12204,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a toughness of 1 or less Y would be below 0, and 0 is used instead (CR 107.1b): it gets -X/-0. So Giant Growth on a
   Snowblinded 2/2 with five snow lands around gives 0/1, not 4/4. Known gap: an effect in layer 7c that reads power or
   toughness (none supported reads the enchanted creature's) would apply before it. Bots put it on an opponent's creature.
-  No new prompt, so no browser test. +1, 31,907 of 31,936 on B306's head 7c8fda63 (main d305cbf). The compiled text of
-  every other card is unchanged.
-- Out after round B307 (looked at, not done): the lists after round B306 stay out. About 29 unsupported cards remain: the
+  No new prompt, so no browser test. +1, 31,907 of 31,936 on B306's head 7c8fda63 (main d305cbf), 31,908 with B306's
+  head 705a12e7 (main 957ba2c, round 453) merged in. The compiled text of every other card is unchanged.
+- Out after round B307 (looked at, not done): the lists after round B306 stay out. About 28 unsupported cards remain: the
   Wishes (left out by choice), control of another player (Word of Command; Lane A's round 454 has Secret of Bloodbending
-  and The Dominion Bracelet, round 453 Psychic Battle), text changes (Swirl the Mists; Spy Kit, whose "all names of
+  and The Dominion Bracelet), text changes (Swirl the Mists; Spy Kit, whose "all names of
   nonlegendary creature cards" would have to reach every one of the engine's name comparisons), Volrath's Shapeshifter,
   Pulmonic Sliver, Illusionary Mask and Camouflage for the reasons after round B306, and Lane A's Chef's Kiss, North Star
   and Ghostly Flame (round 455).
@@ -12203,7 +12234,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   nothing. Bots split the cards into piles as evenly as they can and, as the defending player, choose the pile worth less
   (the face-down one by its size). Browser tests: you split the top three when your Toymaker attacks Ana, and Ana's Toymaker
   attacking you has you choose her pile, the face-down one shown as card backs. +1, 31,906 of 31,936 on B305's head
-  f54dad76 (main d305cbf). The compiled text of every other card is unchanged.
+  f54dad76 (main d305cbf), 31,907 with main 957ba2c (round 453). The compiled text of every other card is unchanged.
 - Out after round B306 (looked at, not done): the lists after round B305 stay out. About 30 unsupported cards remain: the
   Wishes (left out by choice), control of another player (Word of Command; Lane A's round 454 has Secret of Bloodbending
   and The Dominion Bracelet, round 453 Psychic Battle), text changes (Swirl the Mists, Spy Kit), and the others in the

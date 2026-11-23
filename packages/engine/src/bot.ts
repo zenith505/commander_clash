@@ -4576,7 +4576,8 @@ function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecisio
     const t = next[j]!;
     if (t.kind === "none" || (harm[j] ? !isMine(s, pid, t) : isMine(s, pid, t))) continue;
     // Not one a kept "another target" names (CR 115.7d).
-    const clash = (x: ChosenTarget) => pend.specs.some((sp, k) => k !== j && sp.distinctFrom?.includes(j) && sameTarget(next[k], x));
+    // Psychic Battle (round 453): nor one it already targets elsewhere (pend.noRepeat).
+    const clash = (x: ChosenTarget) => pend.specs.some((sp, k) => k !== j && (sp.distinctFrom?.includes(j) || !!pend.noRepeat) && sameTarget(next[k], x));
     const options = changeTargetOptions(s, item, pend.specs[j]!, t).filter(
       (x): x is ChosenTarget => x.kind !== "none" && (harm[j] ? !isMine(s, pid, x) : isMine(s, pid, x)) && !(x.kind === "stack" && x.id === item.id) && !clash(x) && canChooseTarget(s, pend.specs, next, j, x, pend.controller, q, item.sourceId),
     );

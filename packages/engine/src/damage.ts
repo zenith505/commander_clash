@@ -23,6 +23,7 @@ import type { AbilityBody, DamageMod, TargetSpec } from "./abilities";
 import { defMv, hasName } from "./faces";
 import { shuffleLibrary } from "./rng";
 import { makeReplacementPicks, replacementPicks, type ReplacementPicks } from "./damage-picks";
+import { maskBeforeDamage } from "./effects/run-round458";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -1987,7 +1988,9 @@ export function shieldChoicesPossible(s: GameState): boolean {
  * The plan for damage dealt at the same time: inside a resolution that can stop to ask (withShieldAnswers), the
  * players' own choices among the shields (CR 616.1), else the way a bot would choose.
  */
-export function planDamage(s: GameState, events: DamageEvent[]): ShieldPlan {
+export function planDamage(s: GameState, events0: DamageEvent[]): ShieldPlan {
+  // Illusionary Mask (round 458): a face-down creature that would deal or be dealt some of it is turned face up first.
+  const events = maskBeforeDamage(s, events0);
   const ask = shieldAnswers;
   if (!ask) return planShields(s, events, [], true);
   const plan = planShields(s, events, ask.answers.slice(ask.used));

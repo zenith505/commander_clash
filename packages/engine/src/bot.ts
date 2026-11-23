@@ -259,6 +259,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const targets = newTargetsFor(s, pid, pend);
       return [{ type: "newTargets", player: pid, ...(targets ? { targets } : {}) }];
     }
+    // Illusionary Mask (round 458): the most costly card it can cast face down, cast that way (nothing to pay but increases).
+    if (pend.kind === "chooseOption" && pend.what === "maskCard") {
+      const best = pend.options.filter((o) => o !== "none").sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
+    if (pend.kind === "castFree" && pend.how === "mask") {
+      const plan = planCast(s, pid, pend.objectId, undefined, undefined, "auto", undefined, { faceDown: true });
+      return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
+    }
     if (pend.kind === "castFree" && pend.how === "transformed") {
       // A defeated Siege: its back face, for free (CR 310.12b).
       const plan = asFace(s, obj(s, pend.objectId), 1, () => castPlan(s, pid, pend.objectId, true));

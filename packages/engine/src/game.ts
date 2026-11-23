@@ -21,6 +21,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { cardSource, dealDamage, dealPlanned, hitsBy, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { maskApplies, maskBeforeDamage, maskFirst, maskTurnsUp } from "./effects/run-round458";
 import { isSuspended } from "./effects/run-zones";
 import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
@@ -714,6 +715,11 @@ export function castPayFor(s: GameState, pay: CastPay, id: ObjectId): CastPay {
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
 export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
+}
+
+/** Illusionary Mask (round 458): the card `pid` may cast face down right now as its ability resolves (castFree `how` "mask"). */
+export function maskCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
+  return s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.how === "mask" ? s.pending.objectId : undefined;
 }
 
 /**
@@ -1494,6 +1500,7 @@ export function moveObject(
   }
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
   if (!(fromZone === "stack" && to === "battlefield")) {
+    o.maskFaceUp = undefined; // Illusionary Mask's replacement: the spell's and the permanent's it becomes, nothing else (round 458)
     o.kicked = undefined;
     o.kickedByControl = undefined;
     o.castType = undefined;
@@ -3126,6 +3133,8 @@ export function tapPermanent(
   /** Tapped to pay a teamwork cost (Agent Maria Hill). */ teamwork?: true,
 ) {
   if (o.tapped) return;
+  // Illusionary Mask (round 458): "would ... become tapped, instead it's turned face up and ... becomes tapped".
+  if (maskApplies(o)) maskTurnsUp(s, o);
   o.tapped = true;
   const zc = o.zoneChanges ?? 0;
   const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
@@ -8051,9 +8060,13 @@ export function castProblem(
     }
     return short ?? castProblem(s, pid, id, targets, modes, convoke, improvise, 0, choices);
   }
+  // Illusionary Mask (round 458): only face down, as a plain 2/2 creature spell (FaceDownKind "morph": turned face up again
+  // only by the morph or disguise ability the card would have face up, rulings, CR 702.37e).
+  const masked = maskCastOf(s, pid) === id;
+  if (masked && !choices?.faceDown) return `${defOf(s, o).name} is cast face down this way`;
   if (choices?.faceDown && !o.faceDown) {
     // Cast face down (CR 702.37c, 708.4): it's turned face down first, so the checks see a 2/2 creature spell.
-    const fd = compileCard(defOf(s, o)).faceDownCast;
+    const fd = masked ? { kind: "morph" as const } : compileCard(defOf(s, o)).faceDownCast;
     if (!fd) return `${defOf(s, o).name} can't be cast face down`;
     if (o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be cast face down";
     o.faceDown = fd.kind;
@@ -8144,7 +8157,8 @@ export function castProblem(
   // Cast plotted, without paying its mana cost: an alternative cost (CR 702.170d, 118.9a).
   const plotted = !free && plottedCast(s, pid, o);
   // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
-  if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
+  // Illusionary Mask's "cast that card face down as a 2/2 creature spell without paying its mana cost" is the one way both go together.
+  if (choices?.faceDown && ((free && maskCastOf(s, pid) !== id) || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   // An aftermath half can't be cast from any zone other than a graveyard (CR 702.127a).
   if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
   // Shaman's Trance (round B305): "Other players can't ... cast spells from their graveyards this turn", whatever lets them.
@@ -9669,7 +9683,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (choices.faceDown && !o.faceDown) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
-    o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
+    o.faceDown = maskCastOf(s, p.id) === id ? "morph" : compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
   }
   if ((choices.alt === "prototype" || choices.prototyped) && !o.prototyped) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
@@ -9981,6 +9995,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
+  // Illusionary Mask (round 458): the spell and the creature it becomes are turned face up as they'd deal or be dealt
+  // damage or become tapped, until they've been turned face up (rulings).
+  if (paidHow === "mask") o.maskFaceUp = true;
   // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
   const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
   if (replicated.length) item.replicated = replicated;
@@ -13093,6 +13110,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(ab.crew !== undefined && !ab.saddle && !ab.tapPower && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
     ...(cycledTypes ? { cycled: { card: id, types: cycledTypes } } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
+    // Illusionary Mask (round 458): the snow mana among it, for a creature card's {S}.
+    ...(body.effects.some((e) => e.type === "illusionaryMask") && Object.values(paid.snow).some((n) => n > 0) ? { manaSpentSnow: Object.fromEntries(Object.entries(paid.snow).filter(([, n]) => n > 0)) } : {}),
   };
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
@@ -14315,6 +14334,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // Lynde, Cheerful Tormentor (round 394): which Curse attached to you goes to which opponent, or none.
     if (r.scratch?.curseMove === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the options offered");
     r.scratch.curseMove = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "maskCard") {
+    // Illusionary Mask (round 458): the creature card in your hand chosen, or none; not revealed (only its controller sees it).
+    if (r.scratch?.mask?.card !== "" || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    r.scratch.mask.card = choice;
+    log(s, choice === "none" ? `${player(s, pend.player).name} chooses no card (${pend.source}).` : `${player(s, pend.player).name} chooses a creature card in their hand (${pend.source}).`);
     continueResolution(s);
     return;
   }
@@ -17548,8 +17575,32 @@ function unblockedByTurnChoice(s: GameState, at: GameObject): boolean {
   return !!s.turnLog?.unblockedDamage?.includes(controllerOf(s, at));
 }
 
+/**
+ * Illusionary Mask (round 458): each face-down creature its replacement applies to that would assign combat damage in this
+ * step is turned face up first, then assigns its damage as it is face up (rulings). It assigns damage if it deals combat
+ * damage in this step with power (or what it assigns by) above 0 (CR 510.1a, 510.4): blocking a creature still in combat,
+ * attacking unblocked a player or a permanent still in combat, or blocked with a blocker left or with trample or a way to
+ * assign it as though unblocked (CR 510.1c, 702.19d). Fog's prevention comes after the damage is assigned (CR 510.1), so it
+ * doesn't stop this.
+ */
+function maskAssigns(s: GameState) {
+  const fs = s.step === "firstStrikeDamage";
+  for (const o of attackersAndBlockers(s)) {
+    if (!maskApplies(o) || !dealsDamageThisStep(s, o, fs) || assignsNoCombatDamage(s, o) || combatDamageOf(s, o) <= 0) continue;
+    if (o.blocking) {
+      if (!o.blocking.some((a) => s.objects[a]?.zone === "battlefield")) continue;
+    } else if (o.attacking !== undefined) {
+      const trample = objHasKeyword(s, o, "Trample") || objHasKeyword(s, o, "Trample over planeswalkers");
+      if (o.blockedBy && !o.blockedBy.length && !trample && !characteristics(s, o).unblockedDamage && !unblockedByTurnChoice(s, o)) continue;
+      if (!o.blockedBy && !attackedRecipient(s, o) && !(objHasKeyword(s, o, "Trample over planeswalkers") && o.attackingPermanent)) continue;
+    } else continue;
+    maskTurnsUp(s, o);
+  }
+}
+
 /** Ask the next player who decides whether blocked creatures assign combat damage as though unblocked; true if asked. */
 function askUnblocked(s: GameState): boolean {
+  maskAssigns(s);
   let c = s.unblockedChoice;
   if (!c || c.turn !== s.turn || c.step !== s.step) c = s.unblockedChoice = { turn: s.turn, step: s.step, asked: [], ids: [] };
   const cands = unblockedCandidates(s);
@@ -17748,6 +17799,9 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   if (s.preventCombatDamage && hits.length && canPreventDamage(s)) {
     // Whippoorwill (round B235): damage to a creature whose damage can't be prevented this turn.
     const kept = hits.filter((h) => unpreventable(objectSource(s, h.source), true) || (h.toObject !== undefined && damageUnalterableTo(s, { object: h.toObject })));
+    // Illusionary Mask (round 458): a face-down creature that would be dealt some of the prevented damage: Fog's prevention
+    // and the Mask's replacement apply to the same event, its controller's choice of order (CR 616.1).
+    for (const h of hits) if (!kept.includes(h) && maskApplies(h.toObject) && maskFirst(s, h.toObject, controllerOf(s, h.toObject), h.source.faceDown ? "a face-down creature" : nameOf(s, h.source.id))) maskTurnsUp(s, h.toObject);
     log(s, kept.length ? "Combat damage is prevented, except damage that can't be." : "All combat damage is prevented.");
     // "Whenever damage that would be dealt to you is prevented" (Selfless Squire).
     const toPlayers = new Map<PlayerId, number>();
@@ -17769,6 +17823,8 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
  */
 function finishCombatDamage(s: GameState): boolean {
   const batch = s.damageBatch!;
+  // Illusionary Mask (round 458): a face-down creature that would be dealt some of it is turned face up first.
+  batch.events = maskBeforeDamage(s, batch.events);
   const plan = planShields(s, batch.events, batch.answers);
   if (plan.ask) {
     const q = plan.ask;
@@ -19397,6 +19453,7 @@ export function faceUpFormsOf(s: GameState, o: GameObject): CompiledCard["enters
 function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number, attach?: ObjectId | "none", copy?: ObjectId | "none") {
   const forms = faceUpFormsOf(s, o);
   o.faceDown = undefined;
+  o.maskFaceUp = undefined; // turned face up: Illusionary Mask's replacement is done with it (round 458)
   o.turnedFaceUpTurn = s.turn;
   // "You turned a permanent face up this turn" (Oblivious Bookworm): the player who did (CR 116.2b, 708.8).
   if (by !== undefined && !(s.turnLog ??= {}).turnedFaceUp?.includes(by)) (s.turnLog.turnedFaceUp ??= []).push(by);

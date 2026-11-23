@@ -5117,6 +5117,32 @@ line blocks.
    before the action (the action hasn't happened yet); a shortcut (CR 732) that went through the question stops there
    (repeated in place, nothing asks); the human answers a Sliver's question again if a damage shield question comes later
    in the same instruction; bots always put a nontoken Sliver on top.
+   Round 458 took Illusionary Mask (out since the lists after round 453). "{X}: You may choose a creature card in your hand
+   whose mana cost could be paid by some amount of, or all of, the mana you spent on {X}. If you do, you may cast that card
+   face down as a 2/2 creature spell without paying its mana cost. ..." (oracle/round458.ts, effects/run-round458.ts). The
+   mana spent on X is kept on the ability (StackItem.manaSpentTypes, manaSpentSnow for {S}); a card fits if some of that
+   mana could pay its cost, amount and types both (rulings: {U}{U} pays {U}{U}, {1}{U} or {2}, not {2}{U} or {G}): colored
+   and Phyrexian symbols need mana of their color (life isn't mana spent), hybrid either half, {2/U} one blue or two of any
+   type, {S} snow mana, generic any; {X} in the card's cost is 0, and no mana cost can't be paid (CR 118.6, 202.1b). With a
+   cost increase only X of the mana counts. The choice is secret (chooseOption "maskCard"), then the cast is offered
+   (castFree how "mask", CR 608.2g, timing ignored): face down as a plain 2/2 (FaceDownKind "morph"), turned face up later
+   only by its own morph or disguise (rulings). The creature it becomes has GameObject.maskFaceUp, which outlives the Mask
+   (rulings). Its replacement (rulings: a replacement effect, CR 614.1a) turns it face up instead of becoming tapped
+   (tapPermanent), assigning combat damage (before assignment, so it assigns with its face-up power, CR 510.1), dealing or
+   being dealt damage (damage.ts planDamage and finishCombatDamage, before shields are planned). Noncombat damage it deals
+   keeps the amount already set (CR 608.2h: the amount is worked out once as the effect applies; the replacement changes
+   only the creature). When a prevention or redirection would take all of that damage, both apply to the same event and the
+   affected player orders them (CR 616.1): asked mid-damage with round 457's move questions (prevented first, it stays face
+   down; Fog's combat damage too); otherwise it's turned face up either way. Aquamorph Entity's form and Vesuvan
+   Shapeshifter's copy are asked as it's turned up the same way. Turned face up by the Mask isn't "you turned a permanent
+   face up" (no player did). Browser test: X = 4 from four Mountains, choose Hill Giant, cast it face down, Shock turns it
+   face up as a 3/3. +1, 31,914 of 31,936 on round 457's head df7224b; the compiled text of every other card is unchanged.
+   Out after round 458 (looked at, not done): Word of Command (playing a card while controlling another player mid-
+   resolution), Swirl the Mists and Volrath's Shapeshifter (text changes before the layers), Spy Kit (every name of every
+   card), Camouflage (piles of blockers: menace and "can block only" piles have no ruling), Snowblind (Lane B's round B307),
+   and the Wishes (left out by choice: nothing outside the game here). Known gaps: bots never activate Illusionary Mask
+   (they answer its prompts: the highest mana value card, cast; prevention first); whether all damage would be prevented
+   is judged as bots would choose the shields.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

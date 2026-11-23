@@ -12161,20 +12161,20 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   compiled text of every other card is unchanged.
 - Round B304 (least played first, eight cards off the skip lists, not in Lane A's rounds 450-452): the cards whose only gap
   was a card from outside the game. "Parts of abilities which bring other traditional card(s) you own from outside the game
-  into the game (such as Living Wish; Spawnsire of Ulamog (done in round B304); Karn, the Great Creator; Wish) do not function in Commander"
+  into the game (such as Living Wish; Spawnsire of Ulamog; Karn, the Great Creator; Wish) do not function in Commander"
   (Commander format rule 10, mtgcommander.net), and players here have no sideboard (CR 100.4, 400.11a), as already read for
   learn, Invasion of Arcavios, Karn, the Great Creator and Turtles Forever. Such an instruction, when it's a whole ability
   or mode, compiles to an `outsideGame` effect (oracle/laneb304.ts) that does nothing but say so in the log; no "you may" is
-  asked. Mastermind's Acquisition (done in round B304) (its second mode), North Wind Avatar (done in round B304) and Legion Angel (done in round B304) (their enter triggers), Vivien,
-  Arkbow Ranger's −5 (the loyalty is still paid), Spawnsire of Ulamog (done in round B304)'s {20} (still paid), Fae of Wishes // Granted (Granted
-  still sends the card on an adventure, CR 715.3d), Research, and The Raven's Warning (done in round B304)'s chapter III. New with them: The
+  asked. Mastermind's Acquisition (its second mode), North Wind Avatar and Legion Angel (their enter triggers), Vivien,
+  Arkbow Ranger's −5 (the loyalty is still paid), Spawnsire of Ulamog's {20} (still paid), Fae of Wishes // Granted (Granted
+  still sends the card on an adventure, CR 715.3d), Research, and The Raven's Warning's chapter III. New with them: The
   Raven's Warning's chapter II, "Whenever one or more creatures you control with flying deal combat damage to a player this
   turn, look at that player's hand and draw a card" (a delayed trigger for the turn, CR 603.7b, counting only the fliers,
   once for each player dealt damage), and Development's "Create a 3/1 red Elemental creature token unless any opponent has
   you draw a card. Repeat this process two more times.": three times, each opponent in turn order may have you draw; once
   one does, no one else is asked that time, and if none does, you get the token (rulings: three tokens, two and a card, one
   and two cards, or three cards). Bots never cast or activate an ability that only reaches outside the game, choose
-  Mastermind's Acquisition (done in round B304)'s search, and always let the caster draw rather than get a 3/1. The Wishes that would only exile
+  Mastermind's Acquisition's search, and always let the caster draw rather than get a 3/1. The Wishes that would only exile
   themselves (Burning, Cunning, Death, Glittering, Golden, Living Wish, Wish, Extrapolate the Impossible, Ring of Ma'rûf)
   stay out by choice: as cards they'd do nothing here. Browser tests: you cast Development from the split card's menu; Ana
   casts it and you have her draw a card. +8, 31,900 of 31,936 on B303's head f23e044 (main 60ad21bc), 31,901 with B303's head 95247b0 (main fa73a14, round 450), 31,903 with main d305cbf (round 452). The compiled text

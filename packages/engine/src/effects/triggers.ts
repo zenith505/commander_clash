@@ -347,7 +347,13 @@ export type TriggerSourceEvent =
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** With `copy`: the stack id of the spell copied (Parnesse, the Subtle Brush's "that spell", round B289). */ copyOf?: string; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana; /** The permanents whose kept-apart mana was spent on it ("id#zoneChanges", ManaLot.source). */ manaSources?: string[] }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   /** `only`: its targets were changed (CR 115.7), and these are the new ones; that isn't a crime (CR 700.13). */
-  | { type: "targeted"; stackId: string; only?: ObjectId[] }
+  /**
+   * `chose`: whether a player chose targets for it (Psychic Battle, round 453): as it's cast, activated or put on the stack
+   * (CR 601.2c, 602.2b, 603.3d), or new ones a player picked for a copy (707.10c) or as an effect let them (115.7); not a
+   * copy's copied or specified targets (707.10, 707.10d-e) or a random reselection. Left out: true unless `only` or a copy.
+   * `psychicBattle`: changed by Psychic Battle's own trigger, which doesn't trigger permanents named Psychic Battle.
+   */
+  | { type: "targeted"; stackId: string; only?: ObjectId[]; chose?: boolean; psychicBattle?: true }
   /** A player searched their own library (CR 701.23). */
   | { type: "searchedLibrary"; player: PlayerId }
   /** A player's library was shuffled (CR 701.24), by its owner. */
@@ -2909,6 +2915,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         add(w, controllerOf(s, w), (e) => e === "stackItemSingleTarget", undefined, ev.stackId);
+      }
+    // Psychic Battle (round 453): "Whenever a player chooses one or more targets": a player chose at least one (see `chose`);
+    // "Changing targets this way doesn't trigger abilities of permanents named Psychic Battle."
+    if (item && (item.targets ?? []).some((t) => t.kind !== "none") && (ev.chose ?? (!ev.only && !item.copy)))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (ev.psychicBattle && characteristics(s, w).name === "Psychic Battle") continue;
+        add(w, controllerOf(s, w), (e) => e === "targetsChosen", undefined, ev.stackId);
       }
     const seen = new Set<ObjectId>();
     for (const t of item?.targets ?? []) {

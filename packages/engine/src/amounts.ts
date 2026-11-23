@@ -158,6 +158,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return o?.chosen?.number ?? 0;
     }
+    case "pileOrGuessSources":
+      // The Celestial Toymaker (round B306): each spell or ability once (effects/run-laneb306.ts notePileOrGuess).
+      return s.turnLog?.pileOrGuess?.length ?? 0;
     case "selfNotedExiledMv": {
       // Bell Borca: only what it noted this turn as the object it is; none noted, or off the battlefield, is 0 (rulings).
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -1505,6 +1508,8 @@ function describeCount(c: Count): string {
       return "the last chosen number";
     case "selfNotedExiledMv":
       return "the greatest number noted for it this turn";
+    case "pileOrGuessSources":
+      return "the spells and abilities that made players guess or group things into piles this turn";
     case "permanents":
       return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.counterKinds ? "kinds of counters among " : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":

@@ -235,6 +235,7 @@ import { round450Line } from "./round450";
 import { round451Line } from "./round451";
 import { linkRestartExiles, round452Line } from "./round452";
 import { round453Line } from "./round453";
+import { round454Line } from "./round454";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1147,6 +1148,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 454: oracle/round454.ts.
+    if (round454Line(line, raw, out, isSpell)) continue;
     // Round 453: oracle/round453.ts.
     if (round453Line(line, raw, out, isSpell)) continue;
     // Round 452: oracle/round452.ts.
@@ -1518,6 +1521,12 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "You may cast ~ from your graveyard, but not from anywhere else.") {
       (out.fromGraveyard ??= []).push({ kind: "permission", costs: [], exile: false });
       out.castOnlyFromGraveyard = true;
+      continue;
+    }
+    // Panglacial Wurm (round B305): an ability of the card that works while it's in its owner's library (CR 113.6b), a
+    // permission to cast it from there while they search it (effects/run-laneb305.ts).
+    if (line === "While you're searching your library, you may cast ~ from your library.") {
+      out.castWhileSearching = true;
       continue;
     }
     // Haakon: "As long as ~ is on the battlefield, you may cast Knight spells from your graveyard": a static ability works

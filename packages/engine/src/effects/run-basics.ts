@@ -146,9 +146,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const controller = players(s, e.controller, ctx)[0];
       if (controller === undefined) return;
       for (const pid of players(s, e.who, ctx)) {
-        (s.playerControls ??= []).push({ controlled: pid, controller, ...(e.extraTurnAfter ? { extraTurnAfter: true as const } : {}) });
+        // Secret of Bloodbending (round 454): `combat`, their next combat phase instead (beginCombatControl). Each one's
+        // timestamp says which works when several apply (CR 723.1a).
+        (s.playerControls ??= []).push({ controlled: pid, controller, ...(e.extraTurnAfter ? { extraTurnAfter: true as const } : {}), ...(e.combat ? { combat: true as const } : {}), created: s.nextTimestamp++ });
         const who = player(s, pid).name;
-        log(s, `${player(s, controller).name} will control ${who} during ${who}'s next turn${e.extraTurnAfter ? `; after it, ${who} takes an extra turn` : ""}.`);
+        log(s, `${player(s, controller).name} will control ${who} during ${who}'s next ${e.combat ? "combat phase" : "turn"}${e.extraTurnAfter ? `; after it, ${who} takes an extra turn` : ""}.`);
       }
       return;
     }

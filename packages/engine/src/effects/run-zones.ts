@@ -1312,10 +1312,31 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const d = o && defOf(s, o);
         if (e.setsDid && o?.zone === "stack") s.resolving!.did = true;
         if (o?.zone === "stack" && e.exileAfter && (e.exileAfter === true || isType(d!, "Instant") || isType(d!, "Sorcery"))) o.exileIfToGraveyard = true;
+        // Finale of Promise (round 450): the spell it became, for "copy each of those spells".
+        const item = e.notesCast && o?.zone === "stack" ? s.stack.find((x) => x.kind === "spell" && x.objectId === o.id) : undefined;
+        if (item) (s.resolving!.castThisWay ??= []).push(item.id);
         done.push(sc.castingTarget);
         sc.castingTarget = undefined;
       }
-      for (const o of objects(s, e.what, ctx)) {
+      let cands = objects(s, e.what, ctx);
+      // Finale of Promise (round 450): "you cast the target instant card and/or the target sorcery card in either order"
+      // (rulings): with two different cards that could be cast, its controller chooses the one cast first. One split card
+      // targeted twice is one card, cast once at most (rulings).
+      if (e.chooseOrder && !done.length) {
+        const castable = (o: GameObject) => {
+          s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
+          const ok = freeCastable(s, ctx.controller, o.id);
+          s.pending = null;
+          return ok;
+        };
+        const both = [...new Set(cands.filter((o) => o.zone === "graveyard").map((o) => o.id))].filter((id) => castable(obj(s, id)));
+        if (both.length > 1 && (sc.castFirst === undefined || !both.includes(sc.castFirst))) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "castFirst", options: both, labels: both.map((id) => defOf(s, obj(s, id)).name), prompt: "choose the card to cast first (the one cast later resolves first)" };
+          return "paused";
+        }
+        if (sc.castFirst !== undefined) cands = [...cands.filter((o) => o.id === sc.castFirst), ...cands.filter((o) => o.id !== sc.castFirst)];
+      }
+      for (const o of cands) {
         // Hidetsugu and Kairi: "exile the top card of your library ... you may cast it": the card just exiled, still there.
         if ((o.zone !== "graveyard" && !(o.zone === "exile" && e.what.ref === "exiledTop")) || done.includes(o.id)) continue;
         sc.castingTarget = o.id;
@@ -1335,6 +1356,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${defOf(s, o).name} can't be cast.`);
       }
       sc.castTargetsDone = undefined;
+      sc.castFirst = undefined;
       return;
     }
     case "castFromExileFree": {

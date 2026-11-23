@@ -19402,6 +19402,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d6fafb50-9531-4fbf-bb1e-ebb4dd39281c",
+  "name": "Finale of Promise",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast up to one target instant card and/or up to one target sorcery card from your graveyard each with mana value X or less without paying their mana costs. If a spell cast this way would be put into your graveyard, exile it instead. If X is 10 or more, copy each of those spells twice. You may choose new targets for the copies.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "war",
+  "releasedAt": "2019-05-03",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ae92942b-919c-4ea9-b693-85fcef765d5a",
   "name": "Fire // Ice",
   "manaCost": "{1}{R} // {1}{U}",

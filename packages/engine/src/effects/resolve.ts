@@ -57,6 +57,7 @@ import { runBecomeCopyOfLinkedXEffect, runEachOpponentTakesEffect } from "./run-
 import { runChooseLinkedCardEffect } from "./run-round399";
 import { runGainActivatedOfEffect, runWhenCastGainsActivatedEffect } from "./run-round400";
 import { runExileFromHandOrYardEffect } from "./run-round401";
+import { runRestartGameEffect } from "./run-round452";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
 import { runNoteCreatureTypeEffect } from "./run-round380";
@@ -1997,6 +1998,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runThievesAuctionEffect(s, ctx, src);
     case "warpWorld":
       return runWarpWorldEffect(s, ctx, src);
+    case "restartGame":
+      return runRestartGameEffect(s, ctx, src);
     case "glimpseOfTomorrow":
       return runGlimpseOfTomorrowEffect(s, ctx, src);
     case "faceDownPile":

@@ -561,20 +561,27 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // spell this resolution cast (ResolvingState.castThisWay) still on the stack, `n` copies of it (Twinning Staff's
       // more, CR 614.1a), put on the stack in any order (rulings): while two spells have copies to make, their controller
       // chooses which one the next copy is of (copies put on the stack later resolve first). A copy isn't cast (CR 707.10).
-      if (e.spell === "castThisWay") {
+      // Ulalek, Fused Atrocity (round 451): "copy all spells you control, then copy all other activated and triggered
+      // abilities you control": the spells its controller controls on the stack as the first instruction begins (copies too:
+      // they're spells, CR 707.10), each copied once (Twinning Staff's more, CR 614.1a); then the abilities they control as the
+      // second begins, other than this one resolving (CR 608.2c, "then"), mana abilities never being there (CR 605.3b). The
+      // copies of each instruction are put on the stack in the order their controller chooses (CR 405.3), the spells' below
+      // the abilities'; each may have new targets (CR 707.10c), keeps the original's modes, X and costs paid (rulings).
+      if (e.spell === "castThisWay" || e.spell === "allYours") {
         if (!sc.wayLeft) {
           const n = typeof e.n === "string" ? 0 : amountNow(s, e.n, ctx);
           sc.wayLeft = {};
-          for (const id of r.castThisWay ?? []) {
+          const ids = e.spell === "castThisWay" ? (r.castThisWay ?? []) : s.stack.filter((x) => x.id !== r.item.id && x.controller === ctx.controller && x.kind === (sc.wayAbilities ? "ability" : "spell")).map((x) => x.id);
+          for (const id of ids) {
             const item = s.stack.find((x) => x.id === id);
-            if (n <= 0 || item?.kind !== "spell") continue;
+            if (n <= 0 || item?.kind !== (sc.wayAbilities ? "ability" : "spell")) continue;
             // "~ can't be copied" (See Double): no copy of it is made.
             const card = item.objectId ? s.objects[item.objectId] : undefined;
             if (item.body?.uncopyable || (card && compileCard(s.cards[cardIdOf(card)]!).spell?.uncopyable)) {
               log(s, `${item.description} can't be copied.`);
               continue;
             }
-            sc.wayLeft[id] = n + extraSpellCopies(s, ctx.controller);
+            sc.wayLeft[id] = n + (item.kind === "spell" ? extraSpellCopies(s, ctx.controller) : 0);
           }
         }
         for (;;) {
@@ -582,8 +589,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             const left = Object.keys(sc.wayLeft).filter((id) => sc.wayLeft![id]! > 0 && s.stack.some((x) => x.id === id));
             if (!left.length) break;
             if (left.length > 1 && (sc.wayPick === undefined || !left.includes(sc.wayPick))) {
-              const label = (id: string) => `${s.stack.find((x) => x.id === id)!.description} (${sc.wayLeft![id]} ${sc.wayLeft![id] === 1 ? "copy" : "copies"} left)`;
-              s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "copyNextOf", options: left, labels: left.map(label), prompt: "choose the spell the next copy is of (copies put on the stack later resolve first)" };
+              // Two with the same description (two triggers of one permanent) are told apart.
+              const descs = left.map((id) => s.stack.find((x) => x.id === id)!.description);
+              const label = (id: string, i: number) => `${descs[i]}${descs.filter((d) => d === descs[i]).length > 1 ? ` #${descs.slice(0, i + 1).filter((d) => d === descs[i]).length}` : ""} (${sc.wayLeft![id]} ${sc.wayLeft![id] === 1 ? "copy" : "copies"} left)`;
+              s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "copyNextOf", options: left, labels: left.map(label), prompt: `choose the ${sc.wayAbilities ? "ability" : "spell"} the next copy is of (copies put on the stack later resolve first)` };
               return "paused";
             }
             sc.wayCur = left.length > 1 ? sc.wayPick! : left[0]!;
@@ -596,6 +605,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           sc.copies = undefined;
         }
         sc.wayLeft = undefined;
+        if (e.spell === "allYours" && !sc.wayAbilities) {
+          sc.wayAbilities = true;
+          return runSpellsEffect(s, e, ctx, src);
+        }
+        sc.wayAbilities = undefined;
         return;
       }
       if (!sc.copies) {

@@ -231,6 +231,8 @@ import { round447Line } from "./round447";
 import { round448Line } from "./round448";
 import { round449Line } from "./round449";
 import { round450Line } from "./round450";
+import { round451Line } from "./round451";
+import { linkRestartExiles, round452Line } from "./round452";
 import { round381Chapter, round381Line } from "./round381";
 import { round382Chapter, round382Line } from "./round382";
 import { round383Line } from "./round383";
@@ -1143,6 +1145,10 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 452: oracle/round452.ts.
+    if (round452Line(line, raw, out, isSpell)) continue;
+    // Round 451: oracle/round451.ts.
+    if (round451Line(line, raw, out, isSpell)) continue;
     // Round 450: oracle/round450.ts.
     if (round450Line(line, raw, out, isSpell)) continue;
     // Round 449: oracle/round449.ts.
@@ -8502,6 +8508,8 @@ function linkExile(out: CompiledCard) {
     else if (exiles[0]) exiles[0].linked = true;
     else searches[0]!.dest = { ...searches[0]!.dest, linked: true };
   }
+  // Round 452, Karn Liberated: its restart's "cards exiled with ~" (oracle/round452.ts).
+  linkRestartExiles(out);
   // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

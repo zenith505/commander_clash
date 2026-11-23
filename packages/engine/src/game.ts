@@ -1,6 +1,7 @@
 import { isRealKicker, kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, ManaSpend, Count, AdditionalCost, CastPay, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { finishRestart } from "./restart";
 import { addedAbilityCosts, addedSpellCosts, anyAddedSacrifice } from "./added-costs";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
@@ -113,7 +114,20 @@ export interface PlayerSetup {
 
 /** `mulligans`: start with the mulligan process (CR 103.5) instead of keeping every opening hand. */
 export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: { mulligans?: boolean } = {}): GameState {
-  const s: GameState = {
+  const s = blankGame(seed);
+  s.turnOrder = setup.map((_, i) => i);
+  setup.forEach((p, pid) => seatPlayer(s, p, pid));
+  // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
+  for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
+  // CR 103.1: randomly determine the starting player.
+  const first = Math.floor(nextRandom(s) * setup.length);
+  openGame(s, first, !!opts.mulligans);
+  return s;
+}
+
+/** A game with no players yet, before any card is in it (createGame; restart.ts starts a new game from it, CR 727.1). */
+export function blankGame(seed: number): GameState {
+  return {
     seed,
     rngState: seed,
     turn: 1,
@@ -121,7 +135,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     priority: 0,
     step: "untap",
     passedInSuccession: [],
-    turnOrder: setup.map((_, i) => i),
+    turnOrder: [],
     players: [],
     objects: {},
     cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST, [FACE_DOWN_CYBERMAN.oracleId]: FACE_DOWN_CYBERMAN, [FACE_DOWN_HORROR.oracleId]: FACE_DOWN_HORROR, [FACE_DOWN_ARTIFACT_55.oracleId]: FACE_DOWN_ARTIFACT_55 },
@@ -137,68 +151,73 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     winner: null,
     over: false,
   };
-  setup.forEach((p, pid) => {
-    const player: Player = {
-      id: pid,
-      name: p.name,
-      life: STARTING_LIFE,
-      library: [],
-      hand: [],
-      graveyard: [],
-      exile: [],
-      command: [],
-      manaPool: emptyPool(),
-      landsPlayedThisTurn: 0,
-      commanderCasts: {},
-      commanderDamage: {},
-      lost: false,
-      drewFromEmptyLibrary: false,
-      isBot: !!p.isBot,
-    };
-    s.players.push(player);
-    // Both commanders start in the command zone, and each is tracked on its own: tax, damage (CR 702.124b, d).
-    for (const [i, c] of (p.secondCommander ? [p.commander, p.secondCommander] : [p.commander]).entries()) {
-      const cmd = newObject(s, c, pid, "command");
-      cmd.isCommander = true;
-      // The Prismatic Piper (round B249): its color, chosen as the deck was built, revealed as it's put into the command
-      // zone (CR 903.4b, 103.2c).
-      const color = i === 0 ? p.commanderColor : p.secondCommanderColor;
-      if (compileCard(c).pregameColorIsColor) {
-        if (!color || !COLORS.includes(color)) throw new RulesError(`${c.name} is a commander: choose its color before the game begins (CR 903.4b)`);
-        cmd.pregameColor = color;
-      } else if (color) throw new RulesError(`${c.name} doesn't have you choose a color before the game begins`);
-      player.command.push(cmd.id);
-      player.commanderCasts[cmd.id] = 0;
-    }
-    for (const card of p.deck) {
-      // Cryptic Spires (round 443): its two colors are circled as the deck is built, before any game (CR 207.5).
-      const circled = circledProblem(card);
-      if (circled) throw new RulesError(`${card.name} ${circled}`);
-      player.library.push(newObject(s, card, pid, "library").id);
-    }
-    shuffleLibrary(s, player);
-  });
-  // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
-  for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
-  // CR 103.1: randomly determine the starting player.
-  const first = Math.floor(nextRandom(s) * setup.length);
+}
+
+/** Seat player `pid` with their deck (CR 103.2c, 903.6): commanders in the command zone, the rest shuffled as the library. */
+export function seatPlayer(s: GameState, p: PlayerSetup, pid: PlayerId): Player {
+  const player: Player = {
+    id: pid,
+    name: p.name,
+    life: STARTING_LIFE,
+    library: [],
+    hand: [],
+    graveyard: [],
+    exile: [],
+    command: [],
+    manaPool: emptyPool(),
+    landsPlayedThisTurn: 0,
+    commanderCasts: {},
+    commanderDamage: {},
+    lost: false,
+    drewFromEmptyLibrary: false,
+    isBot: !!p.isBot,
+  };
+  s.players.push(player);
+  // Both commanders start in the command zone, and each is tracked on its own: tax, damage (CR 702.124b, d).
+  for (const [i, c] of (p.secondCommander ? [p.commander, p.secondCommander] : [p.commander]).entries()) {
+    const cmd = newObject(s, c, pid, "command");
+    cmd.isCommander = true;
+    // The Prismatic Piper (round B249): its color, chosen as the deck was built, revealed as it's put into the command
+    // zone (CR 903.4b, 103.2c).
+    const color = i === 0 ? p.commanderColor : p.secondCommanderColor;
+    if (compileCard(c).pregameColorIsColor) {
+      if (!color || !COLORS.includes(color)) throw new RulesError(`${c.name} is a commander: choose its color before the game begins (CR 903.4b)`);
+      cmd.pregameColor = color;
+    } else if (color) throw new RulesError(`${c.name} doesn't have you choose a color before the game begins`);
+    player.command.push(cmd.id);
+    player.commanderCasts[cmd.id] = 0;
+  }
+  for (const card of p.deck) {
+    // Cryptic Spires (round 443): its two colors are circled as the deck is built, before any game (CR 207.5).
+    const circled = circledProblem(card);
+    if (circled) throw new RulesError(`${card.name} ${circled}`);
+    player.library.push(newObject(s, card, pid, "library").id);
+  }
+  shuffleLibrary(s, player);
+  return player;
+}
+
+/**
+ * The game begins with `first` as the starting player (CR 103.1): opening hands are drawn (103.5), then the mulligans
+ * (`mulligans`) and the actions opening hands allow (103.6), then the first turn.
+ */
+export function openGame(s: GameState, first: PlayerId, mulligans: boolean) {
   s.activePlayer = first;
   s.priority = first;
   // The starting player's first turn (set after choosing them).
   s.players[first]!.turnBegan = s.turn;
   s.players[first]!.turnsTaken = 1;
   s.lifeAsTurnBegan = s.players.map((p) => p.life);
-  for (const p of s.players) draw(s, p.id, 7);
+  for (const p of s.players) if (!p.lost) draw(s, p.id, 7);
   s.handAsTurnBegan = s.players.map((p) => p.hand.length);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
   // Nor is the first time each would draw a card this turn (Scion of Halaster, Reed Richards: round B237).
   for (const p of s.players) delete p.draws, delete p.firstWouldDraw, delete p.firstOtherWouldDraw;
   log(s, `Game start. ${s.players[first]!.name} goes first.`);
-  if (opts.mulligans) {
+  if (mulligans) {
     s.mulligans = { taken: {}, kept: [], toDeclare: turnOrderFrom(s, first), going: [] };
     nextMulliganDecision(s);
   } else startOpeningActions(s);
-  return s;
 }
 
 /**
@@ -239,6 +258,13 @@ function nextOpeningAction(s: GameState) {
     s.openingActions.shift();
   }
   s.openingActions = undefined;
+  // Round 452: a restart's cards left in exile are put onto the battlefield now (CR 727.4); an "as it enters" choice
+  // they ask is made before the first turn begins (runStateBasedActions).
+  if (s.restartEnters) {
+    finishRestart(s);
+    if (askEntersChoice(s)) return;
+    s.restartEnters = undefined;
+  }
   beginStep(s, "untap");
 }
 
@@ -17696,6 +17722,13 @@ export function runStateBasedActions(s: GameState, holdTriggers = false, onePass
   // Grimoire Thief: its controller now may look at the cards exiled with it too (rulings).
   if (s.exileLookWatch) watchExileLookers(s);
   if (!s.pending && askEntersChoice(s)) return;
+  // Round 452: the "as it enters" choices of the cards a restart put onto the battlefield are made; the first turn begins
+  // (CR 727.4).
+  if (!s.pending && s.restartEnters?.entered) {
+    s.restartEnters = undefined;
+    beginStep(s, "untap");
+    return runStateBasedActions(s, holdTriggers, onePass);
+  }
   // Round B253: draws a Lich made of a life gain outside a resolution and outside damage (a cost, a choice's answer, a loss
   // replaced), made before anything else happens; a draw replacement may stop them to ask.
   if (!s.pending && !s.damageBatch && s.damageDraws?.length && damageDrawsMade(s)) return;

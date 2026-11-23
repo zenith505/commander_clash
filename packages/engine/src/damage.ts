@@ -23,6 +23,7 @@ import type { AbilityBody, DamageMod, TargetSpec } from "./abilities";
 import { defMv, hasName } from "./faces";
 import { shuffleLibrary } from "./rng";
 import { makeReplacementPicks, replacementPicks, type ReplacementPicks } from "./damage-picks";
+import { maskBeforeDamage } from "./effects/run-round458";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -1987,7 +1988,9 @@ export function shieldChoicesPossible(s: GameState): boolean {
  * The plan for damage dealt at the same time: inside a resolution that can stop to ask (withShieldAnswers), the
  * players' own choices among the shields (CR 616.1), else the way a bot would choose.
  */
-export function planDamage(s: GameState, events: DamageEvent[]): ShieldPlan {
+export function planDamage(s: GameState, events0: DamageEvent[]): ShieldPlan {
+  // Illusionary Mask (round 458): a face-down creature that would deal or be dealt some of it is turned face up first.
+  const events = maskBeforeDamage(s, events0);
   const ask = shieldAnswers;
   if (!ask) return planShields(s, events, [], true);
   const plan = planShields(s, events, ask.answers.slice(ask.used));
@@ -2008,7 +2011,20 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 }
 
 /** Commit a finished plan and deal its damage. `lifelink`: add the life up for the caller instead of gaining it per event. */
-export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }); /** The combat damage step's (game.ts dealCombatDamage), which makes GameState.damageDraws itself. */ combatStep?: true } = {}): (DamageEvent & { dealt: number })[] {
+export function dealPlanned(s: GameState, plan: ShieldPlan, opts: DealOpts = {}): (DamageEvent & { dealt: number })[] {
+  // A question a move asks partway through (round 457, move-questions.ts) undoes the whole action: the batches go back too.
+  const outer = [playerBatch, infectAtZero, creatureBatch, sourceBatch] as const;
+  try {
+    return dealPlannedNow(s, plan, opts);
+  } catch (e) {
+    [playerBatch, infectAtZero, creatureBatch, sourceBatch] = outer;
+    throw e;
+  }
+}
+
+type DealOpts = { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }); /** The combat damage step's (game.ts dealCombatDamage), which makes GameState.damageDraws itself. */ combatStep?: true };
+
+function dealPlannedNow(s: GameState, plan: ShieldPlan, opts: DealOpts): (DamageEvent & { dealt: number })[] {
   const back = commitShields(s, plan);
   const witherCounters = new Map<string, number>();
   // What would be lethal for each permanent just before (CR 120.10): from a source with deathtouch, any 1 damage is

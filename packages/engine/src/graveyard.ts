@@ -44,6 +44,7 @@ export function noteToGraveyard(s: GameState, o: GameObject) {
 
 /** The current event is over: the cards it put into one graveyard together wait to be arranged (CR 404.3). */
 export function closeGraveyardBatch(s: GameState) {
+  closeLibraryTopBatch(s);
   const batch = s.graveyardBatch;
   s.graveyardBatch = undefined;
   if (!batch || batch.length < 2) return;
@@ -59,6 +60,27 @@ export function closeGraveyardBatch(s: GameState) {
   const order = (pid: PlayerId) => (s.turnOrder.indexOf(pid) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
   groups.sort(([a], [b]) => order(a) - order(b));
   for (const [owner, cards] of groups) (s.graveyardOrders ??= []).push({ owner, cards });
+}
+
+/**
+ * Pulmonic Sliver (round 457): the cards the current event put on top of their owner's library instead of into a graveyard
+ * (GameState.libraryTopBatch). Two or more of one owner's, still there, wait to be arranged by that owner, as a merged
+ * permanent's cards do: "that player chooses any of those Slivers and puts them on top of their library in any order. They
+ * don't reveal this order." (rulings, CR 401.4). Owners choose in turn order (CR 101.4).
+ */
+function closeLibraryTopBatch(s: GameState) {
+  const batch = s.libraryTopBatch;
+  s.libraryTopBatch = undefined;
+  if (!batch || batch.length < 2) return;
+  const byOwner = new Map<PlayerId, { id: ObjectId; zc: number }[]>();
+  for (const c of batch) {
+    const o = s.objects[c.id];
+    if (!o || o.zone !== "library" || (o.zoneChanges ?? 0) !== c.zc) continue;
+    byOwner.set(o.owner, [...(byOwner.get(o.owner) ?? []), c]);
+  }
+  const order = (pid: PlayerId) => (s.turnOrder.indexOf(pid) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  const groups = [...byOwner].filter(([, cards]) => cards.length > 1).sort(([a], [b]) => order(a) - order(b));
+  for (const [owner, cards] of groups) (s.graveyardOrders ??= []).push({ owner, cards, library: { bottom: false, shuffles: player(s, owner).shuffles ?? 0, source: "Pulmonic Sliver" } });
 }
 
 /**

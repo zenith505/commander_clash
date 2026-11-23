@@ -4989,7 +4989,7 @@ line blocks.
    Out after round 453 (looked at, not done): the lists after round 452 (still out, for their reasons), and The
    Celestial Toymaker (every spell or ability that made players guess or group cards or permanents into piles this turn:
    no list of those in the rules), Swirl the Mists, Volrath's Shapeshifter and Spy Kit (text and names), Word of Command
-   (controlling another player), Illusionary Mask (the face-up replacement against prevention and damage already
+   (controlling another player), Illusionary Mask (done in round 458) (the face-up replacement against prevention and damage already
    determined, no ruling), Shaman's Trance (whether it permits casting by itself or only through other graveyard
    permissions: its rulings mention flashback only), Camouflage (piles of blockers), Snowblind (done in round B307) ("toughness minus 1" read
    inside its own effect), Ghostly Flame (done in round 455), North Star (done in round 455) (Lane B's skip lists). Judgment calls: "change the target to ~"
@@ -5024,7 +5024,7 @@ line blocks.
    Pulmonic Sliver, Psychic Battle (done in round 453), Panglacial Wurm and Shaman's Trance (done in round B305), the cards
    from outside the game (done in round B304), The Celestial Toymaker (done in round B306), Word of Command (control of a
    player only while a spell resolves, with limits on their mana abilities: no such limited control yet), Swirl the Mists, Volrath's Shapeshifter,
-   Spy Kit, Illusionary Mask, Camouflage, Snowblind (done in round B307), Ghostly Flame and North Star (done in round 455). Known gaps: bots never activate the
+   Spy Kit, Illusionary Mask (done in round 458), Camouflage, Snowblind (done in round B307), Ghostly Flame and North Star (done in round 455). Known gaps: bots never activate the
    Bracelet's ability (as with Mindslaver's); a bot controlling a player's combat phase declares no attacks for them, as
    it does for a whole turn.
    Round 455 took the two hard cards left that no open round had, both from the bottom of `npm run popular` (Lane B's
@@ -5055,7 +5055,7 @@ line blocks.
    (control only while a spell resolves, mana-ability limits), Chef's Kiss (done in round 456), Pulmonic Sliver, Swirl the Mists (a text change
    on every spell and permanent: the definition key, cardIdOf, is read without the game state), Volrath's Shapeshifter (the
    same, with the top card of the graveyard), Spy Kit (every nonlegendary creature card's name: the 258 places a
-   permanent's one name is read), Illusionary Mask, Camouflage, Snowblind (done in round B307) ("toughness minus 1" read inside its own layer 7c
+   permanent's one name is read), Illusionary Mask (done in round 458), Camouflage, Snowblind (done in round B307) ("toughness minus 1" read inside its own layer 7c
    effect, no ruling). Known gaps: bots don't activate North Star (its worth
    for a spell in hand isn't weighed) and use one only for a spell they can't cast without it; when a cost reduction takes
    off a colored symbol both the mana cost and an additional cost have, it's taken off the additional cost's (the cost is
@@ -5083,9 +5083,66 @@ line blocks.
    Out after round 456 (looked at, not done): the lists after round 455 (still out, for their reasons): Pulmonic Sliver (an
    optional "put it on top of its owner's library instead" asked in the middle of any move of a Sliver to a graveyard, and
    several Slivers of one owner dying at once put on top in the order the owner chooses, rulings: the zone change can't
-   pause for it), Word of Command, Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask and Camouflage. Known
+   pause for it), Word of Command, Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask (done in round 458) and Camouflage. Known
    gaps: bots cast Chef's Kiss as they cast Commandeer (at an opponent's spell), without weighing where the random targets
    may land.
+   Round 457 took Pulmonic Sliver (out since the lists after round 453: "the zone change can't pause for it"). All Slivers
+   have "If this permanent would be put into a graveyard, you may put it on top of its owner's library instead." (a whole
+   granted line in oracle/round457.ts, CompiledCard.mayTopInsteadOfGraveyard, a granted static kind in grants.ts): a
+   replacement effect (CR 614.1a) of a Sliver permanent (CR 109.2), optional, chosen by its controller ("you", CR 109.5) as
+   it would be put into a graveyard from the battlefield; with other replacements of that move the controller chooses which
+   applies first (CR 616.1e-f, its example): taking this one, it goes on top and the ones that would put a card going to a
+   graveyard elsewhere (Rest in Peace, a finality counter) no longer apply; declining, they apply as before. A replacement
+   that exiles it from leaving at all (unearth) applies to the move to the library too, so nothing is asked then. Slivers
+   dying with Pulmonic Sliver have the ability too (rulings): replacements look at the event before it happens, so the
+   permanents with it just before the first of those leaving at once are kept (GameState.leftTogether `mayTop`). Several of
+   one owner's put on top at once are arranged by that owner, without revealing the order (rulings, CR 401.4:
+   GameState.libraryTopBatch, asked with the orderLibrary prompt a merged permanent's cards use, graveyard.ts). A Sliver
+   token goes there and ceases to exist (CR 111.7).
+   The move can happen anywhere (a state-based action, a cost, any instruction of a resolution) and none of those can
+   stop halfway, so the question stops the whole action instead (move-questions.ts): applyAction undoes it, asks (a
+   chooseOption "moveInstead" that carries the action and the decision pending before it), and once it's answered
+   applies the same action again from the same state, which reaches the same move and takes the answer
+   (GameState.moveAnswers, kept until the action is done; a second Sliver asks the same way). The state is plain JSON
+   with its randomness seeded in it, so the action goes the same way again. Only the state applyAction is working on
+   asks: a bot's look ahead on a copy, a shortcut repeating a loop in place (applyInPlace), and the engine's own look
+   aheads make the choice as a bot would (a card on top, a token to the graveyard), as bots answer. dealPlanned puts its
+   event batches back when an action is undone partway through. Mana abilities that sacrifice such a permanent are
+   activated by hand, never by the autopay (the question would stop the rest of a plan). Browser tests: Lightning Bolt a
+   Muscle Sliver and put it on top; Wrath of God two Slivers, keep both and arrange them. +1, 31,913 of 31,936 on round
+   456's head dfb03503, 31,914 with its head feb1e23 (main a050f56, B307); the compiled text of every other card is unchanged.
+   Out after round 457 (looked at, not done): the lists after round 456 (still out, for their reasons): Word of Command,
+   Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask (done in round 458), Camouflage (Snowblind: Lane B's round B307), and the Wishes (left out by
+   choice: nothing outside the game here). Known gaps: while the question is asked, the board shows the game as it was
+   before the action (the action hasn't happened yet); a shortcut (CR 732) that went through the question stops there
+   (repeated in place, nothing asks); the human answers a Sliver's question again if a damage shield question comes later
+   in the same instruction; bots always put a nontoken Sliver on top.
+   Round 458 took Illusionary Mask (out since the lists after round 453). "{X}: You may choose a creature card in your hand
+   whose mana cost could be paid by some amount of, or all of, the mana you spent on {X}. If you do, you may cast that card
+   face down as a 2/2 creature spell without paying its mana cost. ..." (oracle/round458.ts, effects/run-round458.ts). The
+   mana spent on X is kept on the ability (StackItem.manaSpentTypes, manaSpentSnow for {S}); a card fits if some of that
+   mana could pay its cost, amount and types both (rulings: {U}{U} pays {U}{U}, {1}{U} or {2}, not {2}{U} or {G}): colored
+   and Phyrexian symbols need mana of their color (life isn't mana spent), hybrid either half, {2/U} one blue or two of any
+   type, {S} snow mana, generic any; {X} in the card's cost is 0, and no mana cost can't be paid (CR 118.6, 202.1b). With a
+   cost increase only X of the mana counts. The choice is secret (chooseOption "maskCard"), then the cast is offered
+   (castFree how "mask", CR 608.2g, timing ignored): face down as a plain 2/2 (FaceDownKind "morph"), turned face up later
+   only by its own morph or disguise (rulings). The creature it becomes has GameObject.maskFaceUp, which outlives the Mask
+   (rulings). Its replacement (rulings: a replacement effect, CR 614.1a) turns it face up instead of becoming tapped
+   (tapPermanent), assigning combat damage (before assignment, so it assigns with its face-up power, CR 510.1), dealing or
+   being dealt damage (damage.ts planDamage and finishCombatDamage, before shields are planned). Noncombat damage it deals
+   keeps the amount already set (CR 608.2h: the amount is worked out once as the effect applies; the replacement changes
+   only the creature). When a prevention or redirection would take all of that damage, both apply to the same event and the
+   affected player orders them (CR 616.1): asked mid-damage with round 457's move questions (prevented first, it stays face
+   down; Fog's combat damage too); otherwise it's turned face up either way. Aquamorph Entity's form and Vesuvan
+   Shapeshifter's copy are asked as it's turned up the same way. Turned face up by the Mask isn't "you turned a permanent
+   face up" (no player did). Browser test: X = 4 from four Mountains, choose Hill Giant, cast it face down, Shock turns it
+   face up as a 3/3. +1, 31,915 of 31,936 on round 457's head 25ca66a; the compiled text of every other card is unchanged.
+   Out after round 458 (looked at, not done): Word of Command (playing a card while controlling another player mid-
+   resolution), Swirl the Mists and Volrath's Shapeshifter (text changes before the layers), Spy Kit (every name of every
+   card), Camouflage (piles of blockers: menace and "can block only" piles have no ruling), Snowblind (done in round B307),
+   and the Wishes (left out by choice: nothing outside the game here). Known gaps: bots never activate Illusionary Mask
+   (they answer its prompts: the highest mana value card, cast; prevention first); whether all damage would be prevented
+   is judged as bots would choose the shields.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -6372,7 +6429,7 @@ line blocks.
    Quay, Shelkin Brownie (done in round B161) ("bands with other"); Oracle en-Vec (done in round B233) (chosen creatures attack next turn, the others can't); False
    Orders (done in round B256), Balduvian Warlord (done in round B256), General Jarkeld (done in round B258) (a blocker removed, then blocking another attacker); Takklemaggot; Jötun Grunt (done in round B209)
    (cumulative upkeep paid with cards from a single graveyard each time); Soul Echo; Goblin Artisans (done in round B223); Ice Cauldron (done in round B285) (noted
-   mana); Illusionary Mask; Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
+   mana); Illusionary Mask (done in round 458); Stand or Fall (done in round B234) and Camouflage (piles of blockers); Volrath's Curse (done in round 313) and Lost in Thought (done in round 313) (a cost
    paid to ignore the effect, any time you have priority); Protective Sphere (a source sharing a color with the mana
    spent); Yixlid Jailer (cards in graveyards lose all abilities); Shaman's Trance (done in round B305) (other players' graveyards as yours);
    Pygmy Hippo (done in round B286); Snowblind (done in round B307) (Y counts the toughness the effect changes); Glyph of Delusion (done in round B291) and Glyph of Reincarnation
@@ -12299,7 +12356,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B307 (looked at, not done): the lists after round B306 stay out. About 24 unsupported cards remain: the
   Wishes (left out by choice), control of another player (Word of Command), text changes (Swirl the Mists; Spy Kit, whose "all names of
   nonlegendary creature cards" would have to reach every one of the engine's name comparisons), Volrath's Shapeshifter,
-  Pulmonic Sliver, Illusionary Mask and Camouflage for the reasons after round B306, and Chef's Kiss (left to Lane A).
+  Pulmonic Sliver, Illusionary Mask (done in round 458) and Camouflage for the reasons after round B306, and Chef's Kiss (left to Lane A).
 - Round B306 (least played first, one card off the skip lists, not in Lane A's rounds 453-454): The Celestial Toymaker
   (out after rounds 292 and 421: counting what made players group cards into piles). "Whenever ~ attacks, look at the top three
   cards of your library. Exile any number of them in a face-down pile and the rest in a face-up pile. Defending player
@@ -12331,7 +12388,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard depends on its controller, from layer 2: game.ts reads the definition before the layers, so it needs a
   definition worked out between layers 2 and 3); Pulmonic Sliver (its granted "you may put it on top of its owner's library
   instead" is the only optional replacement of a move to a graveyard: game.ts moveObject can't stop for a question, and
-  several Slivers dying at once go on top in an order their owner chooses, rulings); Illusionary Mask (when the face-down
+  several Slivers dying at once go on top in an order their owner chooses, rulings); Illusionary Mask (done in round 458) (when the face-down
   creature "would deal damage" outside combat, whether the amount is worked out again once it's face up has no ruling);
   Camouflage (piles of blockers: what a pile does with a menace attacker, or a creature that can block only one of the
   piles it's in, has no ruling); Chef's Kiss (done in round 456) (left to Lane A, the most played remaining card). Known gap: bots don't weigh

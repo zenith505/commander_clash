@@ -3201,6 +3201,12 @@ export type Effect =
    * you or a permanent you control." after a controlSpell of target `index` (effects/run-round456.ts).
    */
   | { type: "chefsKiss"; index: number }
+  /**
+   * Round 458, Illusionary Mask: "You may choose a creature card in your hand whose mana cost could be paid by some amount of,
+   * or all of, the mana you spent on {X}. If you do, you may cast that card face down as a 2/2 creature spell without paying
+   * its mana cost." and the replacement that card gets (GameObject.maskFaceUp) (effects/run-round458.ts).
+   */
+  | { type: "illusionaryMask" }
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true; /** Hofri Ghostforge's Spirit token: "the exiled card" is the one the ability that created this token linked to it (round354.ts), not one an exile ability of its own took. */ createdLink?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
@@ -9322,6 +9328,11 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If this land would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a), as an ability it has (Realmbreaker's gift). */
   exileIfLeavesSelf?: true;
+  /**
+   * Pulmonic Sliver's granted "If this permanent would be put into a graveyard, you may put it on top of its owner's
+   * library instead." (round 457, CR 614.1a): asked of its controller as it would be put there (move-questions.ts).
+   */
+  mayTopInsteadOfGraveyard?: true;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   /** Ugin's Nexus: "If ~ would be put into a graveyard from the battlefield, instead exile it and take an extra turn after this one." (game.ts moveObject). */
   exileForExtraTurn?: true;

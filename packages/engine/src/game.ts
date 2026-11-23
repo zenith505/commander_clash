@@ -21,6 +21,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { cardSource, dealDamage, dealPlanned, hitsBy, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, damageUnalterableTo, whileSourceHolds, withShieldAnswers, type DamageEvent, type DamageSource } from "./damage";
 import { blightOptions, countersBanned, countersRemoved, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch, withPutter } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { maskApplies, maskBeforeDamage, maskFirst, maskTurnsUp } from "./effects/run-round458";
 import { isSuspended } from "./effects/run-zones";
 import { payShield, payShieldProblem, payableShields } from "./pay-shields";
 import { attachTo, attachToPlayer, canAttachTo, canTransform, transformPermanent, turnFaceDown } from "./effects/run-permanents";
@@ -45,6 +46,7 @@ import { channelMana } from "./channel";
 import { nextRandom, randomWatch, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
+import { answerMoveQuestion, answersMoveQuestion, asking, moveAnswer, MoveQuestionPause, questionPending } from "./move-questions";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
 import { circledProblem } from "./deck";
 import { spendPlan } from "./value";
@@ -414,7 +416,15 @@ export function waitingOn(s: GameState): PlayerId | null {
 export function applyAction(state: GameState, action: Action): GameState {
   if (state.over) throw new RulesError("game is over");
   const s = cloneState(state);
-  applyInPlace(s, action);
+  try {
+    asking(s, () => applyInPlace(s, action));
+  } catch (e) {
+    // Round 457: a move stopped to ask (move-questions.ts): the action is undone, and redone once it's answered.
+    if (!(e instanceof MoveQuestionPause)) throw e;
+    const back = cloneState(state);
+    back.pending = questionPending(e.q, action, state.pending);
+    return back;
+  }
   return s;
 }
 
@@ -425,6 +435,8 @@ export function applyAction(state: GameState, action: Action): GameState {
 export function applyInPlace(s: GameState, action: Action): void {
   if (s.over) throw new RulesError("game is over");
   invalidateCharacteristics(s); // a fresh copy would start with nothing cached
+  // Round 457: the answer to a question a move asked redoes the action it stopped (move-questions.ts).
+  if (answersMoveQuestion(s, action)) return answerMoveQuestion(s, action);
   const p = player(s, action.player);
   if (action.type === "concede") {
     playerLoses(s, p.id, "conceded", true);
@@ -703,6 +715,11 @@ export function castPayFor(s: GameState, pay: CastPay, id: ObjectId): CastPay {
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
 export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
+}
+
+/** Illusionary Mask (round 458): the card `pid` may cast face down right now as its ability resolves (castFree `how` "mask"). */
+export function maskCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
+  return s.pending?.kind === "castFree" && s.pending.player === pid && s.pending.how === "mask" ? s.pending.objectId : undefined;
 }
 
 /**
@@ -1069,6 +1086,9 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // Pulmonic Sliver (round 457): which permanents have its granted replacement just before the first of the permanents
+  // leaving at the same time leaves (s.leftTogether `mayTop`).
+  const mayTopBefore = fromZone === "battlefield" && !s.leftTogether?.length ? mayTopKeys(s) : undefined;
   // Syrix, Carrier of the Flame: "if a creature card left your graveyard this turn": a creature card as it was there.
   const creatureCardLeavesYard = fromZone === "graveyard" && to !== "graveyard" && !o.isToken && objIsType(s, o, "Creature");
   // "Can't be sacrificed": an instruction to sacrifice it does nothing (rulings on Alexios, CR 701.21).
@@ -1217,6 +1237,20 @@ export function moveObject(
   // aren't on the battlefield yet either). One sacrifice for each Land Equilibrium that applies (CR 614.5), made right after
   // the instruction or action that put it there (equilibriumSacrifices).
   if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "phasedOut" && fromZone !== "merged") equilibriumOwed(s, o, opts, fromZone);
+  // Pulmonic Sliver (round 457): "If this permanent would be put into a graveyard, you may put it on top of its owner's
+  // library instead" (CR 614.1a): the permanent's ability as it would leave, or as it was just before the first of the
+  // permanents leaving with it left (rulings: it applies to Pulmonic Sliver and the Slivers dying with it). Its controller
+  // ("you") chooses, and with other replacements of this move chooses which applies first (CR 616.1, 616.1e): taking this
+  // one first, it goes to the library and the ones that put a card going to a graveyard elsewhere no longer apply
+  // (616.1f); declining, they apply as they would. One that exiles it from leaving at all (unearth, Realmbreaker's) still
+  // applies to the move to the library, so nothing is asked then. The question stops the action (move-questions.ts).
+  let toppedInstead = false;
+  if (fromZone === "battlefield" && to === "graveyard" && o.exileIfLeaves !== "battlefield" && !abilitiesOf(s, o).exileIfLeavesSelf && hasMayTop(s, o, mayTopBefore) && topInstead(s, o) === "top") {
+    to = "library";
+    opts = { ...opts, top: true };
+    toppedInstead = true;
+    log(s, `${characteristics(s, o).name} is put on top of its owner's library instead of into a graveyard.`);
+  }
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -1430,7 +1464,7 @@ export function moveObject(
     // powers then, for "the greatest power among creatures that player controls" as it looks back (CR 603.10a), while
     // something has such an ability.
     const before = !s.leftTogether?.length && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).triggers.some((t) => t.dies?.greatestPowerOfController)) ? s.battlefield.flatMap((b) => (objIsType(s, obj(s, b), "Creature") ? [{ id: b, controller: controllerOf(s, obj(s, b)), power: power(s, obj(s, b)) }] : [])) : undefined;
-    (s.leftTogether ??= []).push({ ...(before ? { before } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
+    (s.leftTogether ??= []).push({ ...(before ? { before } : {}), ...(mayTopBefore?.length ? { mayTop: mayTopBefore } : {}), id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}), ...(borrowed ? { borrowed } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     // Spellweaver Volute (round B273): the card in a graveyard it enchanted, if that card is still there as that object.
     const enchanted = o.enchantsCard && host && host.id === o.enchantsCard.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === o.enchantsCard.zc ? { enchantsCard: { ...o.enchantsCard } } : {};
@@ -1466,6 +1500,7 @@ export function moveObject(
   }
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
   if (!(fromZone === "stack" && to === "battlefield")) {
+    o.maskFaceUp = undefined; // Illusionary Mask's replacement: the spell's and the permanent's it becomes, nothing else (round 458)
     o.kicked = undefined;
     o.kickedByControl = undefined;
     o.castType = undefined;
@@ -1688,6 +1723,8 @@ export function moveObject(
   // Temporal Aperture's card no longer remains on top once another card is put there (CR 611.2b).
   if (to === "library" && opts.top && s.topFreePlays?.some((g) => g.player === o.owner && g.card !== id)) endTopFreePlays(s, o.owner);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
+  // Pulmonic Sliver (round 457): cards put on top of a library together are arranged by their owner (CR 401.4, rulings).
+  if (toppedInstead && to === "library" && !o.isToken) (s.libraryTopBatch ??= []).push({ id, zc: o.zoneChanges ?? 0 });
   // "If a card left your graveyard this turn" (Gau, Feral Youth): a card, not a token (CR 111.1).
   if (fromZone === "graveyard" && to !== "graveyard" && !o.isToken) {
     const left = ((s.turnLog ??= {}).leftGraveyard ??= []);
@@ -3006,6 +3043,46 @@ function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; cont
 }
 
 /** Necromancer's Magemark: the name of a permanent whose "return it to its owner's hand instead" applies to `o` dying. */
+/** Pulmonic Sliver (round 457): the permanents with its granted replacement now (CompiledCard.mayTopInsteadOfGraveyard), as `${id}@${zoneChanges}`. */
+function mayTopKeys(s: GameState): string[] | undefined {
+  let out: string[] | undefined;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (abilitiesOf(s, o).mayTopInsteadOfGraveyard) (out ??= []).push(`${id}@${o.zoneChanges ?? 0}`);
+  }
+  return out;
+}
+
+/** Does `o`, about to leave the battlefield, have Pulmonic Sliver's granted replacement, now or just before the first permanent leaving with it left? */
+function hasMayTop(s: GameState, o: GameObject, before: string[] | undefined): boolean {
+  if (abilitiesOf(s, o).mayTopInsteadOfGraveyard) return true;
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return !!(before ?? s.leftTogether?.find((l) => l.mayTop)?.mayTop)?.includes(key);
+}
+
+/**
+ * Pulmonic Sliver (round 457): "top" or "graveyard", chosen by the permanent's controller (move-questions.ts). A bot puts a
+ * card on top; a token would only cease to exist in the library (CR 111.7), so it lets that go to the graveyard and "die".
+ */
+function topInstead(s: GameState, o: GameObject): string {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return moveAnswer(s, key, () => {
+    const you = controllerOf(s, o);
+    const name = characteristics(s, o).name;
+    const theirs = o.owner === you ? "your" : `${player(s, o.owner).name}'s`;
+    return {
+      player: you,
+      key,
+      about: o.id,
+      source: name,
+      prompt: `put it on top of ${theirs} library instead of into ${theirs} graveyard?`,
+      options: ["top", "graveyard"],
+      labels: [`Put it on top of ${theirs} library`, `Put it into ${theirs} graveyard`],
+      botChoice: o.isToken ? "graveyard" : "top",
+    };
+  });
+}
+
 function handInsteadOfDying(s: GameState, o: GameObject): string | undefined {
   for (const id of s.battlefield) {
     const f = abilitiesOf(s, obj(s, id)).handInsteadOfDying;
@@ -3056,6 +3133,8 @@ export function tapPermanent(
   /** Tapped to pay a teamwork cost (Agent Maria Hill). */ teamwork?: true,
 ) {
   if (o.tapped) return;
+  // Illusionary Mask (round 458): "would ... become tapped, instead it's turned face up and ... becomes tapped".
+  if (maskApplies(o)) maskTurnsUp(s, o);
   o.tapped = true;
   const zc = o.zoneChanges ?? 0;
   const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
@@ -7981,9 +8060,13 @@ export function castProblem(
     }
     return short ?? castProblem(s, pid, id, targets, modes, convoke, improvise, 0, choices);
   }
+  // Illusionary Mask (round 458): only face down, as a plain 2/2 creature spell (FaceDownKind "morph": turned face up again
+  // only by the morph or disguise ability the card would have face up, rulings, CR 702.37e).
+  const masked = maskCastOf(s, pid) === id;
+  if (masked && !choices?.faceDown) return `${defOf(s, o).name} is cast face down this way`;
   if (choices?.faceDown && !o.faceDown) {
     // Cast face down (CR 702.37c, 708.4): it's turned face down first, so the checks see a 2/2 creature spell.
-    const fd = compileCard(defOf(s, o)).faceDownCast;
+    const fd = masked ? { kind: "morph" as const } : compileCard(defOf(s, o)).faceDownCast;
     if (!fd) return `${defOf(s, o).name} can't be cast face down`;
     if (o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be cast face down";
     o.faceDown = fd.kind;
@@ -8074,7 +8157,8 @@ export function castProblem(
   // Cast plotted, without paying its mana cost: an alternative cost (CR 702.170d, 118.9a).
   const plotted = !free && plottedCast(s, pid, o);
   // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
-  if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
+  // Illusionary Mask's "cast that card face down as a 2/2 creature spell without paying its mana cost" is the one way both go together.
+  if (choices?.faceDown && ((free && maskCastOf(s, pid) !== id) || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   // An aftermath half can't be cast from any zone other than a graveyard (CR 702.127a).
   if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
   // Shaman's Trance (round B305): "Other players can't ... cast spells from their graveyards this turn", whatever lets them.
@@ -9599,7 +9683,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (choices.faceDown && !o.faceDown) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
-    o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
+    o.faceDown = maskCastOf(s, p.id) === id ? "morph" : compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
   }
   if ((choices.alt === "prototype" || choices.prototyped) && !o.prototyped) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
@@ -9911,6 +9995,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
+  // Illusionary Mask (round 458): the spell and the creature it becomes are turned face up as they'd deal or be dealt
+  // damage or become tapped, until they've been turned face up (rulings).
+  if (paidHow === "mask") o.maskFaceUp = true;
   // Round B248: each instance of replicate a permanent gave it that was paid, for that instance's copy trigger (CR 702.56b).
   const replicated = replicateNow.flatMap((g, i) => ((choices.replicate![i] ?? 0) > 0 ? [{ source: g.source, zc: s.objects[g.source]?.zoneChanges ?? 0, times: choices.replicate![i]! }] : []));
   if (replicated.length) item.replicated = replicated;
@@ -13023,6 +13110,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(ab.crew !== undefined && !ab.saddle && !ab.tapPower && tapCreatures?.length ? { crewers: tapCreatures.length } : {}),
     ...(cycledTypes ? { cycled: { card: id, types: cycledTypes } } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
+    // Illusionary Mask (round 458): the snow mana among it, for a creature card's {S}.
+    ...(body.effects.some((e) => e.type === "illusionaryMask") && Object.values(paid.snow).some((n) => n > 0) ? { manaSpentSnow: Object.fromEntries(Object.entries(paid.snow).filter(([, n]) => n > 0)) } : {}),
   };
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
@@ -14248,6 +14337,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "maskCard") {
+    // Illusionary Mask (round 458): the creature card in your hand chosen, or none; not revealed (only its controller sees it).
+    if (r.scratch?.mask?.card !== "" || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
+    r.scratch.mask.card = choice;
+    log(s, choice === "none" ? `${player(s, pend.player).name} chooses no card (${pend.source}).` : `${player(s, pend.player).name} chooses a creature card in their hand (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "kohCard") {
     // Koh, the Face Stealer (round 399): which creature card exiled with it is chosen.
     if (r.scratch?.kohCard === undefined || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered");
@@ -14734,6 +14831,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "transformCopy") throw new RulesError("nothing to choose");
   // Dinosaur Headdress's card (round 448) is chosen as it becomes attached, with an objectId (askEntersChoice).
   if (pend.what === "attachCopy") throw new RulesError("nothing to choose");
+  // Pulmonic Sliver's question (round 457) is answered before anything else (applyInPlace, move-questions.ts).
+  if (pend.what === "moveInstead") throw new RulesError("nothing to choose");
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice], typesBy: { ...r.chosen.typesBy, [p.id]: choice } };
   else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
@@ -17476,8 +17575,32 @@ function unblockedByTurnChoice(s: GameState, at: GameObject): boolean {
   return !!s.turnLog?.unblockedDamage?.includes(controllerOf(s, at));
 }
 
+/**
+ * Illusionary Mask (round 458): each face-down creature its replacement applies to that would assign combat damage in this
+ * step is turned face up first, then assigns its damage as it is face up (rulings). It assigns damage if it deals combat
+ * damage in this step with power (or what it assigns by) above 0 (CR 510.1a, 510.4): blocking a creature still in combat,
+ * attacking unblocked a player or a permanent still in combat, or blocked with a blocker left or with trample or a way to
+ * assign it as though unblocked (CR 510.1c, 702.19d). Fog's prevention comes after the damage is assigned (CR 510.1), so it
+ * doesn't stop this.
+ */
+function maskAssigns(s: GameState) {
+  const fs = s.step === "firstStrikeDamage";
+  for (const o of attackersAndBlockers(s)) {
+    if (!maskApplies(o) || !dealsDamageThisStep(s, o, fs) || assignsNoCombatDamage(s, o) || combatDamageOf(s, o) <= 0) continue;
+    if (o.blocking) {
+      if (!o.blocking.some((a) => s.objects[a]?.zone === "battlefield")) continue;
+    } else if (o.attacking !== undefined) {
+      const trample = objHasKeyword(s, o, "Trample") || objHasKeyword(s, o, "Trample over planeswalkers");
+      if (o.blockedBy && !o.blockedBy.length && !trample && !characteristics(s, o).unblockedDamage && !unblockedByTurnChoice(s, o)) continue;
+      if (!o.blockedBy && !attackedRecipient(s, o) && !(objHasKeyword(s, o, "Trample over planeswalkers") && o.attackingPermanent)) continue;
+    } else continue;
+    maskTurnsUp(s, o);
+  }
+}
+
 /** Ask the next player who decides whether blocked creatures assign combat damage as though unblocked; true if asked. */
 function askUnblocked(s: GameState): boolean {
+  maskAssigns(s);
   let c = s.unblockedChoice;
   if (!c || c.turn !== s.turn || c.step !== s.step) c = s.unblockedChoice = { turn: s.turn, step: s.step, asked: [], ids: [] };
   const cands = unblockedCandidates(s);
@@ -17676,6 +17799,9 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   if (s.preventCombatDamage && hits.length && canPreventDamage(s)) {
     // Whippoorwill (round B235): damage to a creature whose damage can't be prevented this turn.
     const kept = hits.filter((h) => unpreventable(objectSource(s, h.source), true) || (h.toObject !== undefined && damageUnalterableTo(s, { object: h.toObject })));
+    // Illusionary Mask (round 458): a face-down creature that would be dealt some of the prevented damage: Fog's prevention
+    // and the Mask's replacement apply to the same event, its controller's choice of order (CR 616.1).
+    for (const h of hits) if (!kept.includes(h) && maskApplies(h.toObject) && maskFirst(s, h.toObject, controllerOf(s, h.toObject), h.source.faceDown ? "a face-down creature" : nameOf(s, h.source.id))) maskTurnsUp(s, h.toObject);
     log(s, kept.length ? "Combat damage is prevented, except damage that can't be." : "All combat damage is prevented.");
     // "Whenever damage that would be dealt to you is prevented" (Selfless Squire).
     const toPlayers = new Map<PlayerId, number>();
@@ -17697,6 +17823,8 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
  */
 function finishCombatDamage(s: GameState): boolean {
   const batch = s.damageBatch!;
+  // Illusionary Mask (round 458): a face-down creature that would be dealt some of it is turned face up first.
+  batch.events = maskBeforeDamage(s, batch.events);
   const plan = planShields(s, batch.events, batch.answers);
   if (plan.ask) {
     const q = plan.ask;
@@ -19325,6 +19453,7 @@ export function faceUpFormsOf(s: GameState, o: GameObject): CompiledCard["enters
 function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId, form?: number, attach?: ObjectId | "none", copy?: ObjectId | "none") {
   const forms = faceUpFormsOf(s, o);
   o.faceDown = undefined;
+  o.maskFaceUp = undefined; // turned face up: Illusionary Mask's replacement is done with it (round 458)
   o.turnedFaceUpTurn = s.turn;
   // "You turned a permanent face up this turn" (Oblivious Bookworm): the player who did (CR 116.2b, 708.8).
   if (by !== undefined && !(s.turnLog ??= {}).turnedFaceUp?.includes(by)) (s.turnLog.turnedFaceUp ??= []).push(by);

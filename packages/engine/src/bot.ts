@@ -259,6 +259,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const targets = newTargetsFor(s, pid, pend);
       return [{ type: "newTargets", player: pid, ...(targets ? { targets } : {}) }];
     }
+    // Illusionary Mask (round 458): the most costly card it can cast face down, cast that way (nothing to pay but increases).
+    if (pend.kind === "chooseOption" && pend.what === "maskCard") {
+      const best = pend.options.filter((o) => o !== "none").sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
+    if (pend.kind === "castFree" && pend.how === "mask") {
+      const plan = planCast(s, pid, pend.objectId, undefined, undefined, "auto", undefined, { faceDown: true });
+      return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
+    }
     if (pend.kind === "castFree" && pend.how === "transformed") {
       // A defeated Siege: its back face, for free (CR 310.12b).
       const plan = asFace(s, obj(s, pend.objectId), 1, () => castPlan(s, pid, pend.objectId, true));
@@ -2284,6 +2293,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Jinnie Fay, Esix: what the engine judged worth more, the tokens as they are or one replacement (counters.ts tokenWorth).
+    // Pulmonic Sliver (round 457, move-questions.ts): the choice game.ts topInstead offers bots.
+    if (pend.kind === "chooseOption" && pend.what === "moveInstead") return [{ type: "chooseOption", player: pid, choice: pend.botChoice && pend.options.includes(pend.botChoice) ? pend.botChoice : pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "tokenInstead") return [{ type: "chooseOption", player: pid, choice: pend.botChoice && pend.options.includes(pend.botChoice) ? pend.botChoice : "none" }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     // Friend or foe (Pir's Whim): a friend is the bot itself, every other player a foe.

@@ -60,6 +60,7 @@ import { runExileFromHandOrYardEffect } from "./run-round401";
 import { runRestartGameEffect } from "./run-round452";
 import { runPsychicBattleEffect } from "./run-round453";
 import { runRound456Effect } from "./run-round456";
+import { runIllusionaryMaskEffect } from "./run-round458";
 import { runAnyTypeOneSpellEffect } from "./run-round455";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
@@ -2012,6 +2013,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runAnyTypeOneSpellEffect(s, ctx, src);
     case "chefsKiss":
       return runRound456Effect(s, e, ctx, src);
+    case "illusionaryMask":
+      return runIllusionaryMaskEffect(s, ctx, src);
     case "glimpseOfTomorrow":
       return runGlimpseOfTomorrowEffect(s, ctx, src);
     case "faceDownPile":

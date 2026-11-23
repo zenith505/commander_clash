@@ -142,7 +142,7 @@ function namesGrantSource(c: CompiledCard): boolean {
  * keywords (or remove them) join layer 6 once granted (computeLayers in layers.ts); ones that change types, colors or other abilities
  * would have to come out of earlier layers than the one that grants them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop", "combatToPlayerDrawsHalf", "damagedCantRegenerate"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain", "exileIfLeavesSelf", "exileInsteadOfDying", "noMaxHandSize", "targetTax", "combatLimit", "untapRemovesOwnCounter", "lookTop", "combatToPlayerDrawsHalf", "damagedCantRegenerate", "mayTopInsteadOfGraveyard"]);
 // Earthbind's granted "Enchanted creature loses flying" (removeKeywords) joins layer 6 the same way.
 // Roar of the Fifth People (round 427): a granted "Creatures you control have '{T}: Add ...'" (addAbility) joins layer 6 the
 // same way, once the effect granting it has applied (CR 613.8a), when what it adds is a triggered, activated or mana ability

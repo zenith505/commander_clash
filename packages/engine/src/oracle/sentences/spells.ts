@@ -1044,6 +1044,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // targeted; the discard cost's card decides (compile checks there is one).
   if (/^Counter target spell if it has the same mana value as the discarded card$/i.test(s) && ctx.activated) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvDiscarded: true }];
   if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
+  // Equinox (round B302): "Counter target spell if it would destroy a land you control": any spell can be targeted, and
+  // whether it would destroy one is decided as this resolves (rulings).
+  if (/^Counter target spell if it would destroy a land you control$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifDestroysLand: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).
   if (/^Counter target spell if it has the same name as that card$/i.test(s) && ctx.activated && ctx.costLinked) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifCostCardName: true }];

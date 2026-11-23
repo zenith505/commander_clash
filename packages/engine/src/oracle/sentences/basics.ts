@@ -205,12 +205,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // An opponent choosing among the cards found or revealed (Gifts Ungiven, Murmurs from Beyond), as parseBody rewrites them.
   // Threats Undetected: "into your library" is shuffled into it (SearchDest shuffleIn).
   const zoneOf = (to: string) => (to === "into your hand" ? { zone: "hand" as const } : to === "into your graveyard" ? { zone: "graveyard" as const } : to === "into your library" ? { zone: "libraryTop" as const, shuffleIn: true as const } : { zone: "battlefield" as const, ...(to.endsWith("tapped") ? { tapped: true } : {}) });
-  const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard|into your library) and the rest (into your hand|into your graveyard|onto the battlefield tapped)$/.exec(s);
-  if (opp) {
-    const fx = parseSearch(`Search your library for ${opp[1]!}, reveal them, put them ${opp[5]!}, then shuffle`);
+  // Turtles Forever (round B303): "shuffle the rest into your library": the cards not chosen are put back into it and it's
+  // shuffled (searched as "into your hand", then sent there instead).
+  const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard|into your library) and the rest (into your hand|into your graveyard|onto the battlefield tapped|into your library)$/.exec(s);
+  if (opp && !(opp[4] === "into your library" && opp[5] === "into your library")) {
+    const restLib = opp[5] === "into your library";
+    const fx = parseSearch(`Search your library for ${opp[1]!}, reveal them, put them ${restLib ? "into your hand" : opp[5]!}, then shuffle`);
     const chooser = opp[2] === "target opponent" ? parsePlayer("target opponent", ctx) : undefined;
     if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.others || chooser === null) return null;
-    return [{ ...fx[0]!, split: { ...(chooser ? { chooser } : {}), n: opp[3] === "one" ? 1 : 2, to: zoneOf(opp[4]!) } }];
+    return [{ ...fx[0]!, ...(restLib ? { dest: zoneOf("into your library") } : {}), split: { ...(chooser ? { chooser } : {}), n: opp[3] === "one" ? 1 : 2, to: zoneOf(opp[4]!) } }];
   }
   // Karn, Scion of Urza: "... and exile the other with a silver counter on it" (the one card not chosen, CR 122.1).
   const revealPick = /^Reveal the top (two|three|four|five) cards of your library; (target opponent|an opponent) chooses (one|an? ([a-z]+) card from among them); put it (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard)| and exile the other with an? ([a-z]+) counter on it)?$/.exec(s);

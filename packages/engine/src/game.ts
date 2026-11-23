@@ -41,7 +41,7 @@ import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, red
 import { evalAmount, halve, manaSymbolsOf } from "./amounts";
 import { abilityUse, addMana, boundSpend, canPayFromPool, falseDawnMana, manaOriginsOf, mayPayUse, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { channelMana } from "./channel";
-import { nextRandom, shuffle, shuffleLibrary } from "./rng";
+import { nextRandom, randomWatch, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
@@ -3319,6 +3319,9 @@ export function damagedNoRegen(s: GameState): Set<ObjectId> {
  */
 export function destroyPermanent(s: GameState, o: GameObject, message: string, noRegen = false, /** The controller of the spell or ability destroying it (Cobra Trap). */ by?: PlayerId): boolean {
   if (objHasKeyword(s, o, "Indestructible")) return false;
+  // Equinox's look-ahead: a land of that player's the spell would destroy, before any replacement of the destruction
+  // (regeneration, a shield counter: "would be destroyed", CR 614.1a, 701.19a), not by chance.
+  if (destroyProbe && !randomWatch.picks && o.zone === "battlefield" && objIsType(s, o, "Land") && controllerOf(s, o) === destroyProbe.player) destroyProbe.hit = true;
   // Pyramids: "The next time target land would be destroyed this turn, remove all damage marked on it instead" (CR 614.1a,
   // 614.8: not regeneration, so "can't be regenerated" doesn't stop it, and it isn't tapped). Its controller would use
   // this one-turn shield before a shield counter or a regeneration shield (CR 616.1).
@@ -3404,6 +3407,41 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   // or umbra armor replace the destruction itself, and they returned above.
   if (by !== undefined && noncreature) ((s.turnLog ??= {}).destroyed ??= []).push({ controller, by });
   return true;
+}
+
+/** Set while spellWouldDestroyLand resolves a spell in a copy of the game. */
+let destroyProbe: { player: PlayerId; hit: boolean } | null = null;
+
+/**
+ * Equinox (round B302): "Counter target spell if it would destroy a land you control": "determine whether the targeted
+ * spell would destroy a land if it resolved right then" (rulings). The spell is resolved in a copy of the game, as if it
+ * were on top of the stack now, and only its own instructions count: a land destroyed by a game rule after damage (CR
+ * 704.5g, state-based actions don't run here), a sacrifice, or a destruction that waits for a choice (the copy stops at
+ * the first one) or comes by chance (a random pick before it) doesn't (rulings). An indestructible land isn't destroyed
+ * (CR 702.12b). `pid` is "you", the ability's controller.
+ */
+export function spellWouldDestroyLand(s: GameState, stackId: string, pid: PlayerId): boolean {
+  const i = s.stack.findIndex((x) => x.id === stackId);
+  if (i < 0 || s.stack[i]!.kind !== "spell" || destroyProbe) return false;
+  const c = structuredClone(s);
+  const [item] = c.stack.splice(i, 1);
+  c.stack.push(item!);
+  c.pending = null;
+  c.resolving = null;
+  const probe = { player: pid, hit: false };
+  destroyProbe = probe;
+  randomWatch.on = true;
+  randomWatch.picks = 0;
+  try {
+    resolveTop(c);
+  } catch {
+    // A resolution that can't run in the copy destroys nothing there.
+  } finally {
+    destroyProbe = null;
+    randomWatch.on = false;
+    randomWatch.picks = 0;
+  }
+  return probe.hit;
 }
 
 /** Could `pid` pair these two now (CR 702.95a, 702.95c): two different creatures on the battlefield under their control, both unpaired. */

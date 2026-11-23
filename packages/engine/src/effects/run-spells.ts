@@ -5,7 +5,7 @@ import { abilitiesOf, cardIdOf, defOf, isType, objIsType, opponentForbidsDiscard
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { blightOptions, putCounters } from "../counters";
-import { castProblem, collectEvidence, destroyPermanent, enterTogether, evidenceProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player, whileTappedHolds } from "../game";
+import { castProblem, collectEvidence, destroyPermanent, spellWouldDestroyLand, enterTogether, evidenceProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player, whileTappedHolds } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import { PERMANENT_TYPES } from "../oracle/targets";
 import type { CardDef, Chosen, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -1508,6 +1508,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${src} doesn't counter ${item?.description ?? "it"}: it wasn't kicked.`);
           return;
         }
+      }
+      // Equinox (round B302): only a spell that would destroy a land this ability's controller controls if it resolved
+      // right then (rulings).
+      if (e.ifDestroysLand && !spellWouldDestroyLand(s, t.id, ctx.controller)) {
+        log(s, `${src} doesn't counter ${s.stack.find((x) => x.id === t.id)?.description ?? "it"}: it wouldn't destroy a land ${player(s, ctx.controller).name} controls.`);
+        return;
       }
       // Jester's Scepter: only a spell with the name of the card put into a graveyard for the cost; a split card's either
       // half (rulings).

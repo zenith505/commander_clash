@@ -4850,6 +4850,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "70d2f5f7-f727-48e1-9532-8d365b1c1ae5",
+  "name": "Battlefield Thaumaturge",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Each instant and sorcery spell you cast costs {1} less to cast for each creature it targets.\nHeroic — Whenever you cast a spell that targets this creature, this creature gains hexproof until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Heroic"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "650bf82e-7f83-470c-bf4a-34281bfe9341",
   "name": "Battlegrowth",
   "manaCost": "{G}",
@@ -16864,6 +16897,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0fa2cb01-476e-4e82-94e6-9639e53a7743",
+  "name": "Equinox",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant land\nEnchanted land has \"{T}: Counter target spell if it would destroy a land you control.\"",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "aab905ef-b945-4523-b26f-fb5e6932bb56",
   "name": "Equipoise",
   "manaCost": "{2}{W}",
@@ -20335,6 +20398,32 @@
   "set": "j25",
   "releasedAt": "2024-11-15",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "382097b3-f753-493c-bde4-101c0538feb4",
+  "name": "Frost Breath",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tap up to two target creatures. Those creatures don't untap during their controller's next untap step.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m12",
+  "releasedAt": "2011-07-15",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -35144,6 +35233,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "60433b48-d27f-413c-905c-43839b1943f1",
+  "name": "Mother of Runes",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "{T}: Target creature you control gains protection from the color of your choice until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-04-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "995c8dac-fd27-468a-abd4-02372cf0c850",
   "name": "Mount Doom",
   "manaCost": "",
@@ -41556,6 +41676,42 @@
   "set": "sld",
   "releasedAt": "2026-04-27",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "37108cd4-bbab-4ce3-9ed6-f60e8422e703",
+  "name": "Ragavan, Nimble Pilferer",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Legendary Creature — Monkey Pirate",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Monkey",
+   "Pirate"
+  ],
+  "oracleText": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure",
+   "Dash"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -52184,6 +52340,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9b7f1d05-707c-4ed3-9f0e-8ced1232c2ee",
+  "name": "Thalia, Guardian of Thraben",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "First strike\nNoncreature spells cost {1} more to cast.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "46abaabe-7015-4d82-a5aa-2706b1f51bed",
   "name": "Thallid",
   "manaCost": "{G}",
@@ -55724,6 +55915,32 @@
   "set": "usg",
   "releasedAt": "1998-10-12",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cff5aca2-72c5-4053-a32c-c0bd3174c52d",
+  "name": "Turtles Forever",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library and/or outside the game for exactly four legendary creature cards you own with different names, then reveal those cards. An opponent chooses two of them. Put the chosen cards into your hand and shuffle the rest into your library.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmt",
+  "releasedAt": "2026-03-06",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -8,6 +8,7 @@ import {
   dredgeAmount,
   castableFaces,
   isType,
+  objIsType,
   landFaces,
   registerFace,
   abilityProblem,
@@ -2753,9 +2754,41 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?
     const ev = autoEvidence(s, HUMAN, c.evidence, id);
     if (evidenceValue(s, ev) >= c.evidence && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { evidence: ev }) !== null) return true;
   }
+  // Cheaper for what it targets (Battlefield Thaumaturge, Hinata, Killian): with targets it could be given.
+  if (!convoke && cheaperWithTargets(s, id)) return true;
   // With delve's help: as many cards from your graveyard as it can use (CR 702.66a).
   const room = convoke ? 0 : delveRoom(s, HUMAN, id);
   return room > 0 && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { delve: s.players[HUMAN]!.graveyard.filter((c) => c !== id).slice(0, room) }) !== null;
+}
+
+/**
+ * A spell that costs less for what it targets ("{1} less for each creature it targets", Battlefield Thaumaturge; "for each
+ * target", Hinata; "that target a creature", Killian) is worked out after its targets are chosen (CR 601.2c, 601.2f), so
+ * before then try it with a different legal target for each one it has, creatures first. The engine checks the real
+ * targets as the spell is cast; this only lets the cast begin.
+ */
+function cheaperWithTargets(s: GameState, id: string): boolean {
+  const reducer = s.battlefield.some((x) => {
+    const ab = abilitiesOf(s, s.objects[x]!);
+    return controllerOf(s, s.objects[x]!) === HUMAN && (!!ab.perTargetCost?.some((c) => c.n < 0 && !c.opponents) || !!ab.castTargetLess);
+  });
+  if (!reducer) return false;
+  const specs = spellTargets(s, id);
+  if (!specs.length) return false;
+  const used = new Set<string>();
+  const targets: TargetChoice[] = [];
+  for (const spec of specs) {
+    const legal = legalTargets(s, spec, HUMAN, undefined, undefined, id).filter((t) => !used.has(`${t.kind}:${t.id}`));
+    const best = legal.find((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objIsType(s, s.objects[t.id]!, "Creature")) ?? legal[0];
+    if (!best) {
+      if (!spec.optional) return false;
+      targets.push({ kind: "none" });
+      continue;
+    }
+    used.add(`${best.kind}:${best.id}`);
+    targets.push(best);
+  }
+  return planCast(s, HUMAN, id, targets) !== null;
 }
 
 /** Could you begin casting this card now if mana were no object? With assist, another player may pay some of it. */

@@ -23,6 +23,7 @@ import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { dealDamage, objectSource } from "../damage";
 import { couldEnchantAsLastExisted } from "./run-laneb208";
 import { refineExiled } from "./run-laneb283";
+import { castWhileSearching } from "./run-laneb305";
 
 /** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
 function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec {
@@ -1579,6 +1580,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           sc.searchZones = barred(p.id) ? "graveyard" : "both";
         }
         const yardOnly = sc.searchZones === "graveyard";
+        // Panglacial Wurm (round B305): cast from their own library before they find anything. Not while an opponent's
+        // Opposition Agent controls them (CR 723.5), a gap: that player would make the choice for them.
+        if (!yardOnly && libOf(p.id) === p && searchAgent(s, p.id)?.controller === undefined && castWhileSearching(s, p.id, src, sc, searchTop(s, p.id)) === "paused") return "paused";
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
         if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);

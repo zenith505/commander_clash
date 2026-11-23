@@ -1517,6 +1517,12 @@ export function compile(d: CardDef): CompiledCard {
       out.castOnlyFromGraveyard = true;
       continue;
     }
+    // Panglacial Wurm (round B305): an ability of the card that works while it's in its owner's library (CR 113.6b), a
+    // permission to cast it from there while they search it (effects/run-laneb305.ts).
+    if (line === "While you're searching your library, you may cast ~ from your library.") {
+      out.castWhileSearching = true;
+      continue;
+    }
     // Haakon: "As long as ~ is on the battlefield, you may cast Knight spells from your graveyard": a static ability works
     // only on the battlefield anyway (CR 113.6), so the same as the line without it.
     if (/^As long as ~ is on the battlefield, you may cast [A-Z][a-z]+ spells from your graveyard\.$/.test(line)) line = line.replace(/^As long as ~ is on the battlefield, you/, "You");

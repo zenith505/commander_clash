@@ -6,6 +6,7 @@ import { characteristics, controllerOf } from "../layers";
 import { shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { apnap, type ResolveCtx } from "./resolve";
+import { notePileOrGuess } from "./run-laneb306";
 
 type B265Effect = Extract<Effect, { type: "portalPiles" | "ragingRiver" }>;
 
@@ -29,6 +30,7 @@ export function runLaneB265Effect(s: GameState, e: B265Effect, ctx: ResolveCtx, 
           return;
         }
         sc.looked = p.library.slice(0, e.n);
+        notePileOrGuess(s); // The Celestial Toymaker (round B306): they'll be separated into piles (CR 700.3).
         log(s, `${player(s, opp).name} looks at the top ${count(sc.looked.length)} of ${p.name}'s library.`);
       }
       const inLibrary = (ids: ObjectId[]) => ids.filter((id) => s.objects[id]?.zone === "library" && p.library.includes(id));

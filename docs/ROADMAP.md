@@ -5112,7 +5112,7 @@ line blocks.
    Muscle Sliver and put it on top; Wrath of God two Slivers, keep both and arrange them. +1, 31,913 of 31,936 on round
    456's head dfb03503; the compiled text of every other card is unchanged.
    Out after round 457 (looked at, not done): the lists after round 456 (still out, for their reasons): Word of Command,
-   Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask, Camouflage, Snowblind, and the Wishes (left out by
+   Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask, Camouflage (Snowblind: Lane B's round B307), and the Wishes (left out by
    choice: nothing outside the game here). Known gaps: while the question is asked, the board shows the game as it was
    before the action (the action hasn't happened yet); a shortcut (CR 732) that went through the question stops there
    (repeated in place, nothing asks); the human answers a Sliver's question again if a damage shield question comes later

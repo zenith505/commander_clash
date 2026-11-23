@@ -10635,6 +10635,12 @@ export interface CompiledCard {
    * "enchanted": the creature it's attached to (none while it isn't attached to a creature). See game.ts entersAsCopyKeys.
    */
   creaturesEnterAsCopy?: { of: "self" | "enchanted"; nontoken?: true; text: string }[];
+  /**
+   * Volrath's Shapeshifter (round 459): "As long as the top card of your graveyard is a creature card, ~ has the full text of
+   * that card and has the text "{2}: Discard a card."": `grant` is the quoted text, which it has as well (GameObject.shapeOf,
+   * shapeshift.ts).
+   */
+  shapeshifter?: { grant: string; text: string };
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];

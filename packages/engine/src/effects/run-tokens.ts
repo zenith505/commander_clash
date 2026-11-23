@@ -129,7 +129,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         sc.chosen = {};
       }
       const me = objects(s, { ref: "self" }, ctx)[0];
-      const base = me ? defOf(s, me) : ctx.sourceDef; // as it last existed if it's gone (CR 707.2, 608.2h)
+      const base = me ? copiableDef(s, me) : ctx.sourceDef; // as it last existed if it's gone (CR 707.2, 608.2h)
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
         if (sc.may === undefined && e.must) sc.may = true;

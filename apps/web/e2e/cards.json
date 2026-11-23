@@ -40982,6 +40982,32 @@
   ]
  },
  {
+  "oracleId": "79f0d763-5a71-470a-867f-86fc72e9db6d",
+  "name": "Psychic Battle",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a player chooses one or more targets, each player reveals the top card of their library. The player who reveals the card with the greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or targets remain unchanged. Changing targets this way doesn't trigger abilities of permanents named Psychic Battle.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inv",
+  "releasedAt": "2000-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "110b601c-bf38-4985-8de6-fcb477f543a8",
   "name": "Psychic Paper",
   "manaCost": "{2}",

@@ -3165,6 +3165,12 @@ export type Effect =
    * those cards onto the battlefield under your control." (CR 727, restart.ts): the cards linked to the source (CR 607.2a).
    */
   | { type: "restartGame" }
+  /**
+   * Round 453, Psychic Battle: "each player reveals the top card of their library. The player who reveals the card with the
+   * greatest mana value may change the target or targets. If two or more cards are tied for greatest, the target or targets
+   * remain unchanged." The spell or ability is the trigger's cause.
+   */
+  | { type: "psychicBattle" }
   | { type: "returnLinked"; dest: "battlefield" | "hand" | /** Gravegouger: "return the exiled cards to their owner's graveyard". */ "graveyard"; /** "Under your control" (Prowling Geistcatcher): the ability's controller's, not their owners'. */ yours?: true; /** The Princess Takes Flight's chapter III: its source is still the object whose chapter I exiled them (not one that left). */ here?: true; /** Pyxis of Pandemonium: "Each player turns face up all cards they own exiled with ~, then puts all permanent cards among them onto the battlefield": every linked card is turned face up (CR 406.3) and only the permanent cards return, from an activated ability whose source may have just been sacrificed for its cost. */ permanentCards?: true; /** Realm Razer: "to the battlefield tapped". */ tapped?: true; /** Hofri Ghostforge's Spirit token: "the exiled card" is the one the ability that created this token linked to it (round354.ts), not one an exile ability of its own took. */ createdLink?: true }
   /**
    * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
@@ -7128,6 +7134,8 @@ export type TriggerEvent =
   | "selfManaAbilityResolves"
   /** Grip of Chaos (round B267): "Whenever a spell or ability is put onto the stack, if it has a single target": any spell or ability, cast, activated, triggered or copied (CR 707.10), with exactly one target chosen; the event's cause is it. */
   | "stackItemSingleTarget"
+  /** Psychic Battle (round 453): "Whenever a player chooses one or more targets": for a spell or ability on the stack (the event's cause), as it's cast, activated or put on the stack, or new ones a player picks for it or its copy (TriggerEvent "targeted" `chose`). */
+  | "targetsChosen"
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
   /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */

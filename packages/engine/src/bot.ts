@@ -2269,6 +2269,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "copyOrder" && s.resolving?.scratch?.copies?.pickOne && pend.options.every((o) => !/^p\d+$/.test(o) && s.objects[o]?.zone === "battlefield" && controllerOf(s, obj(s, o)) !== pid))
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => permanentWorth(s, pid, b) - permanentWorth(s, pid, a))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "copyOrder") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Finale of Promise (round 450): which card is cast first and which spell the next copy is of; the order hardly
+    // matters to a bot, so the first.
+    if (pend.kind === "chooseOption" && (pend.what === "castFirst" || pend.what === "copyNextOf")) return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Sword-Point Diplomacy: the cheapest revealed card first (its opponents pay life for the costly ones later).
     // Chaotic Transformation: the order of its own exiled permanents doesn't matter much; the first.
     if (pend.kind === "chooseOption" && pend.what === "nextExiled") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];

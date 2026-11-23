@@ -10292,6 +10292,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a17e414c-8de0-47fd-bcbc-540c7fec7642",
+  "name": "Codie, Ravenous Codex",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact Creature — Book Construct",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Book",
+   "Construct"
+  ],
+  "oracleText": "Whenever you cast a prepared spell, copy it. You may choose new targets for the copy.\n{W}{U}{B}{R}{G}, {T}: Each creature you control becomes prepared. (Only creatures with prepare spells can become prepared.)",
+  "power": "1",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Prepared"
+  ],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "67a9357c-4713-4e01-a60d-532bf0dd80b6",
   "name": "Codie, Vociferous Codex",
   "manaCost": "{3}",
@@ -45846,6 +45884,32 @@
   "set": "sld",
   "releasedAt": "2026-09-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d39af66c-4997-48b8-a704-f21d93247d7d",
+  "name": "Share the Spoils",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters and whenever an opponent loses the game, exile the top card of each player's library.\nDuring each player's turn, that player may play a land or cast a spell from among cards exiled with this enchantment, and they may spend mana as though it were mana of any color to cast that spell. When they do, exile the top card of their library.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

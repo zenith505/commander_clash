@@ -407,6 +407,8 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     landPlayedNotFromHand: t.landPlayedNotFromHand,
     playedFromExile: t.playedFromExile,
     linkedSpellOnce: t.linkedSpellOnce ? [...t.linkedSpellOnce].sort() : undefined,
+    // Share the Spoils (round B300): which sources' plays are used up this turn (one each).
+    eachTurnLinked: t.eachTurnLinked ? t.eachTurnLinked.map((e) => e.src).sort() : undefined,
     // Jace's Machinations (round 433): who may activate which planeswalkers' loyalty abilities at instant speed this turn.
     loyaltyAtInstantSpeed: t.loyaltyAtInstantSpeed ? [...new Set(t.loyaltyAtInstantSpeed.map((g) => `${g.player}:${g.subtype}`))].sort() : undefined,
     lorePut: t.lorePut ? [...t.lorePut].sort() : undefined,

@@ -1496,6 +1496,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
         (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types)) &&
         (!t.cast.fromLinked || (ev.from === "exile" && playedFromLinked(s, o, land, false))) &&
+        // Share the Spoils (round B300): "When they do": played with its permission.
+        (!t.cast.viaEachTurnLinked || (ev.from === "exile" && playedViaEachTurn(s, o, land, false))) &&
         // Search the City (round B256): a land with the name of a card exiled with it.
         (!t.cast.nameExiledWithSelf || (!land.faceDown && exiledWithNamed(s, o, characteristics(s, land).name)));
       add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
@@ -2839,6 +2841,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.sharesColorOrMvWithLinked && !sharesColorOrMvWithLinked(s, o, spell ? characteristics(s, spell).colors : ev.card.colors, item ? spellManaValue(s, item) : defMv(ev.card))) return false;
         // Voltaic Visionary: the spell's card was one its linked ability exiled, cast from there.
         if (t.cast.fromLinked && !(spell && !ev.copy && spell.castFrom === "exile" && playedFromLinked(s, o, spell, true))) return false;
+        // Share the Spoils (round B300): "When they do": the spell cast with its permission (TurnLog.eachTurnLinked).
+        if (t.cast.viaEachTurnLinked && !(spell && !ev.copy && spell.castFrom === "exile" && playedViaEachTurn(s, o, spell, true))) return false;
         // Spinerock Tyrant: "an instant or sorcery spell with a single target": exactly one target as it was cast (CR 115.1,
         // 601.2c), as "target spell with a single target" reads it (TargetSpec.singleTarget).
         if (t.cast.singleTarget && (item?.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
@@ -2853,6 +2857,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.kicked && !(item?.kicked?.length && (!spell || isRealKicker(compileCard(defOf(s, spell)).kicker)))) return false;
         // "A spell using teamwork" (Virtual Assistant): its teamwork cost was paid as it was cast (CR 702.194b).
         if (t.cast.teamwork && !spell?.teamwork) return false;
+        // Codie, Ravenous Codex (round B301): "a prepared spell": cast as a prepare spell, from the copy a prepared permanent's
+        // controller has in exile (CR 722.3c-d; prepare.ts); a card cast another way has only its normal characteristics (722.4).
+        if (t.cast.prepared && !(spell && !ev.copy && spell.preparedFrom)) return false;
         // "A creature spell that has an Adventure" (Garenbrig Squire): the card is an adventurer card (CR 715.2).
         if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
@@ -3996,6 +4003,15 @@ export function closeZoneBatch(s: GameState) {
  */
 function playedFromLinked(s: GameState, o: GameObject, card: GameObject, spell: boolean): boolean {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).some((l) => l.id === card.id && l.zc + (spell ? 0 : 1) === (card.zoneChanges ?? 0));
+}
+
+/**
+ * Share the Spoils (round B300): `card` was played with `o`'s CompiledCard.playLinkedEachTurn permission this turn
+ * (TurnLog.eachTurnLinked): a spell (the stack object keeps the card's zone-change count) or a land (one zone change later).
+ */
+function playedViaEachTurn(s: GameState, o: GameObject, card: GameObject, spell: boolean): boolean {
+  const key = `${o.id}@${o.zoneChanges ?? 0}`;
+  return (s.turnLog?.eachTurnLinked ?? []).some((e) => e.src === key && e.id === card.id && e.zc + (spell ? 0 : 1) === (card.zoneChanges ?? 0));
 }
 
 function castFromMatches(from: NonNullable<NonNullable<TriggeredAbility["cast"]>["from"]>, spell: GameObject | undefined, caster: PlayerId): boolean {

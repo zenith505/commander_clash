@@ -1,6 +1,6 @@
 # Roadmap
 
-31,898 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,899 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,975 of
 9,979 (99%).
 
@@ -122,7 +122,7 @@ line blocks.
    an opponent controls causes you to discard ~": who caused a discard isn't kept), Share the Spoils (each player plays
    from its exiled cards on their own turn, with mana of any type, and "whenever an opponent loses the game"), Sanctum
    of All (Shrine triggers that trigger an additional time), Master Warcraft (you declare everyone's attackers and
-   blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
+   blockers), Chef's Kiss (done in round 456) (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
    separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (done in round 413) (exchanging control of a
    permanent and a spell), Karn, Living Legacy (done in round 330) ("pay any amount of mana" as an effect), Benevolent Blessing (done in round 277) (protection
    that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (done in round 410) (spells that gain evoke as
@@ -3978,7 +3978,7 @@ line blocks.
    commander). Browser tests click through the Chimera's Yes and Murder's new target, and Sudden Substitution's two
    targets (Ana's Murder on the stack, your Grizzly Bears) and Murder's new target. +2, 31,690 of 31,936 on this stacked
    branch (31,697 with main's B255 and B256 merged in). The compiled text of every other card is unchanged.
-   Out after round 413 (looked at, not done): Chef's Kiss ("reselect the targets at random": no rule or ruling says
+   Out after round 413 (looked at, not done): Chef's Kiss (done in round 456) ("reselect the targets at random": no rule or ruling says
    whether the spell's current target is among those it can be reselected to, as Grip of Chaos's rulings say for its own
    reselection; still out); the lists after round 412 stay out. Known gap: a spell owned by a player who leaves the game
    while another player controls it stays on the stack (CR 800.4a says it leaves the game), as before.
@@ -4683,7 +4683,7 @@ line blocks.
    controlled by another player can still be chosen (the ability names no controller). Known gaps: bots always exile a
    spell the Foundry's mana paid for, and tap the Foundry for mana like any other source, without keeping it for its
    second ability.
-   Round 441 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   Round 441 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss (done in round 456), Finale
    of Promise, Psychic Paper and the others still out, to two cards whose pieces are there now. Wayta, Trainer Prodigy's
    "If a creature you control being dealt damage causes a triggered ability of a permanent you control to trigger, that
    ability triggers an additional time." (CR 603.2d: every damage event says what it was dealt to, so a trigger on damage
@@ -4702,7 +4702,7 @@ line blocks.
    Out after round 441 (looked at, not done): the lists after round 440 (still out, for their reasons). Known gaps: bots
    pick their least useful permanent for the Pools' copy, none for a legendary spell (the legend rule), and never hold
    its {U} for a permanent spell.
-   Round 442 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   Round 442 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss (done in round 456), Finale
    of Promise, Psychic Paper and the others still out, to two cards whose pieces are there now. Auspicious Starrix's
    "Whenever this creature mutates, exile cards from the top of your library until you exile X permanent cards, where X is
    the number of times this creature has mutated. Put those permanent cards onto the battlefield." (CR 702.140d; X of the
@@ -4724,7 +4724,7 @@ line blocks.
    enchantment creature card (being an Aura is the bestow ability's effect, CR 702.103b, not a copiable value, CR 707.2),
    so its token enters unattached (CR 303.4h); Arna's rulings don't cover it. Known gaps: bots don't weigh Arna's copies
    when choosing attackers, nor Starrix's mutation count when choosing what to mutate onto.
-   Round 443 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   Round 443 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss (done in round 456), Finale
    of Promise, Psychic Paper and the others still out, to two cards whose pieces are there now. Etrata, Deadly Fugitive's
    'Face-down creatures you control have "{2}{U}{B}: Turn this creature face up. If you can't, exile it, then you may cast
    the exiled card without paying its mana cost."' (turned face up by the effect, no cost paid, CR 708.8; it can't be when
@@ -4749,7 +4749,7 @@ line blocks.
    Cryptic Spires' colors (they're one color each, so it can't be in them: two different colors in the commander's
    identity, CR 207.5, 903.4); bots use Etrata's ability only in their second main phase, for an instant or sorcery card
    or a creature card of mana value 3 or more, and don't weigh it in combat.
-   Round 444 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss, Finale
+   Round 444 went on down `npm run popular`, most played first, past Ulalek, Cosima, Share the Spoils, Chef's Kiss (done in round 456), Finale
    of Promise, Psychic Paper, Karn Liberated (done in round 452), Vesuvan Shapeshifter and the others still out, to two cards with memory
    counters on cards in exile. Altaïr Ibn-La'Ahad's "Whenever Altaïr attacks, exile up to one target Assassin creature card
    from your graveyard with a memory counter on it. Then for each creature card you own in exile with a memory counter on
@@ -4769,7 +4769,7 @@ line blocks.
    gaps: bots exile an Assassin card with Altaïr whenever they can, and use The Animus in their main phase only when the
    exiled card is worth more than their legendary creature (by power and toughness), never on a legendary card whose name
    they already have on the battlefield.
-   Round 445 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Round 445 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss (done in round 456), Finale of
    Promise, Psychic Paper, Karn Liberated (done in round 452), Vesuvan Shapeshifter and the others still out, to two cards with cards in exile
    that matter. Flamewar, Brash Veteran // Flamewar, Streetwise Operative's "Sacrifice another artifact: Put a +1/+1 counter
    on Flamewar and convert it. Activate only as a sorcery." ("it" is Flamewar; converting is transforming, CR 701.28a, the
@@ -4797,7 +4797,7 @@ line blocks.
    their commander Cosima; bots exile any other Cosima at their upkeep, add voyage counters until three (fewer with few cards
    left in the library), use Flamewar's "Discard your hand" in their second main phase once it brings back two more cards
    than their hand, and sacrifice only a noncreature artifact token (Treasure, Clue, Food) to convert it.
-   Round 446 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss and Finale of
+   Round 446 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss (done in round 456) and Finale of
    Promise to Psychic Paper, back off the lists (its name's layer is settled by CR 123.6c: a name change is a text-changing
    effect, as Witness Protection's), and Vesuvan Shapeshifter, whose pieces are there now. Psychic Paper's "As this
    Equipment becomes attached to a creature, choose a creature card name and a creature type." (asked each time it becomes
@@ -4823,7 +4823,7 @@ line blocks.
    creature's own name and pick their most common creature type; bots never turn Vesuvan face down at their upkeep, and turn
    it face up (or answer an effect turning it face up) as a copy of the creature with the most power, toughness and
    abilities, not a legend whose name they have, never as a 0/0.
-   Round 447 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Round 447 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss (done in round 456), Finale of
    Promise, Karn Liberated (done in round 452) and Secret of Bloodbending (still out, for their reasons) to two cards back off the lists, each
    settled by reading closer. Captain America, First Avenger's "Throw ... — {3}, Unattach an Equipment from Captain America:
    He deals damage equal to that Equipment's mana value divided as you choose among one, two, or three targets." ("Throw
@@ -4847,7 +4847,7 @@ line blocks.
    Battlefield Thaumaturge's reading above (a creature targeted twice counts twice). Known gaps: bots throw an Equipment only
    in their second main phase, the one with the greatest mana value; the targeting prompt offers "up to 2 more" targets
    even when the thrown Equipment's mana value leaves room for fewer (the division then refuses them).
-   Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss, Finale of
+   Round 448 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils, Chef's Kiss (done in round 456), Finale of
    Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Saruman of Many Colors and Baron Helmut Zemo (Lane B's
    round B299) to Paleontologist's Pick-Axe, out since round 334, whose pieces are there now. Its back face, Dinosaur
    Headdress: "As this Equipment becomes attached to a creature, choose an exiled creature card used to craft this
@@ -4872,7 +4872,7 @@ line blocks.
    card is chosen, so an ability the copy has that would trigger on the Headdress becoming attached doesn't; bots choose the
    card with the most power, toughness and abilities.
    Round 449 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300), Chef's
-   Kiss, Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
+   Kiss (done in round 456), Finale of Promise, Karn Liberated (done in round 452), Secret of Bloodbending, Pulmonic Sliver, Mastermind's Acquisition, The Dominion
    Bracelet and Spawnsire of Ulamog (still out, for their reasons) to Saruman of Many Colors, out since round 425, whose pieces
    are there now. Its "Ward—Discard an enchantment, instant, or sorcery card." (CR 702.21a: counter the spell or ability
    unless its controller discards a card of those types, CR 701.9a; one they can't pay without such a card in hand, CR
@@ -4894,7 +4894,7 @@ line blocks.
    discard their least useful one; bots target the card the usual target choice values most, and cast its copy when they
    can.
    Round 450 went on down `npm run popular`, most played first, past Ulalek, Share the Spoils (Lane B's round B300) and Chef's
-   Kiss (still out, for their reasons) to Finale of Promise (rank 5,610), out since round 342, whose pieces are there now: "You may cast up to one target instant card and/or up to one target sorcery card
+   Kiss (done in round 456) (still out, for their reasons) to Finale of Promise (rank 5,610), out since round 342, whose pieces are there now: "You may cast up to one target instant card and/or up to one target sorcery card
    from your graveyard each with mana value X or less without paying their mana costs. If a spell cast this way would be put
    into your graveyard, exile it instead. If X is 10 or more, copy each of those spells twice. You may choose new targets for
    the copies." (two "up to one" targets, CR 115.6, with mana value no more than its X, chosen before targets, CR 601.2b-c,
@@ -4909,7 +4909,7 @@ line blocks.
    Ana takes 9 and discards two, both cards exiled) and X = 3 with Fact or Fiction (mana value 4) offered no slot and Night's
    Whisper cast alone. +1, 31,889 of 31,936 on this stacked branch (round 449 #751, with round 448's head and main 2c9aae1 in), 31,891 with main 60ad21b (B300, B301); the compiled text of every other card and face is unchanged.
    Out after round 450 (looked at, not done): the lists after round 449 (still out, for their reasons). Every other
-   unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss, Karn Liberated (done in round 452) (restarting the game), Secret of
+   unsupported card above rank 12,000 is in those lists: Ulalek, Chef's Kiss (done in round 456), Karn Liberated (done in round 452) (restarting the game), Secret of
    Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: bots cast the cards in
    the order targeted and make the copies in the order cast.
@@ -4931,14 +4931,14 @@ line blocks.
    31,892 with round 450's head ba16779 (main 60ad21b, B300-B301) merged in; the compiled text of every other card and face
    is unchanged. The top 5,000 are all supported now.
    Out after round 451 (looked at, not done): the lists after round 450 (still out, for their reasons; Share the Spoils
-   was done in round B300): Chef's Kiss ("reselect the targets at random": whether the current target is among them, no rule
+   was done in round B300): Chef's Kiss (done in round 456) ("reselect the targets at random": whether the current target is among them, no rule
    or ruling), Karn Liberated (done in round 452) (restarting the game), Secret of Bloodbending and The Dominion Bracelet (controlling another
    player), Pulmonic Sliver (an optional replacement in the middle of any move to a graveyard), Mastermind's Acquisition and
    Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: the human's own
    simultaneous triggers are ordered automatically (no prompt), so Ulalek's may go below another trigger of yours from the
    same spell; the automatic payment for the Eldrazi spell may tap the colorless sources Ulalek's {C}{C} would need, and a
    trigger whose payment can't be made isn't asked about; bots always pay, and copy in the order the stack holds.
-   Round 452 went on down `npm run popular`, most played first, past Chef's Kiss (still out, for its reason) to Karn
+   Round 452 went on down `npm run popular`, most played first, past Chef's Kiss (done in round 456) (still out, for its reason) to Karn
    Liberated (rank 7,138), out since the first rounds for "restarting the game", which CR 727 and the card's rulings
    settle: "−14: Restart the game, leaving in exile all non-Aura permanent cards exiled with Karn. Then put those cards onto
    the battlefield under your control." (a whole line in oracle/round452.ts; Effect "restartGame", restart.ts). The game
@@ -4959,13 +4959,13 @@ line blocks.
    (turn 1, everyone at 40, an empty battlefield), Keep, then Mulldrifter enters under your control and draws you two in
    your first upkeep. +1, 31,893 of 31,936 on this stacked branch (round 451 #756), 31,895 with main 7917d27 (B302,
    B303) merged in; the compiled text of every other card and face is unchanged.
-   Out after round 452 (looked at, not done): the lists after round 451 (still out, for their reasons): Chef's Kiss,
+   Out after round 452 (looked at, not done): the lists after round 451 (still out, for their reasons): Chef's Kiss (done in round 456),
    Secret of Bloodbending and The Dominion Bracelet (controlling another player), Pulmonic Sliver, Mastermind's Acquisition
    and Spawnsire of Ulamog (cards from outside the game), Panglacial Wurm (cast while searching). Known gaps: state-based
    actions are checked during the new game's mulligans as at any game's start, so a player who'd draw from an empty library
    then would lose then, not in the first upkeep (CR 727.3; no deck here has fewer than seven cards left after a restart);
    bots weigh the restart by the worth of permanents and life only, not the cards in hand or library.
-   Round 453 went on down `npm run popular`, most played first, past Chef's Kiss, Secret of Bloodbending, Pulmonic Sliver,
+   Round 453 went on down `npm run popular`, most played first, past Chef's Kiss (done in round 456), Secret of Bloodbending, Pulmonic Sliver,
    The Dominion Bracelet and Panglacial Wurm (still out, for their reasons), Mastermind's Acquisition, Spawnsire of Ulamog
    and Vivien, Arkbow Ranger (Lane B's round B304: nothing outside the game in Commander) and Turtles Forever (Lane B's
    round B303) to Psychic Battle (rank 16,972), out since round B282 for having "not one hook yet": "Whenever a player
@@ -5021,7 +5021,7 @@ line blocks.
    of 31,936 on main d305cbf, 31,898 with main 957ba2c (round 453) merged in; the compiled text of every other card and face is
    unchanged.
    Out after round 455 (looked at, not done): the lists after round 453 and round 454's (PR #762) (still out, for their reasons): Word of Command
-   (control only while a spell resolves, mana-ability limits), Chef's Kiss, Pulmonic Sliver, Swirl the Mists (a text change
+   (control only while a spell resolves, mana-ability limits), Chef's Kiss (done in round 456), Pulmonic Sliver, Swirl the Mists (a text change
    on every spell and permanent: the definition key, cardIdOf, is read without the game state), Volrath's Shapeshifter (the
    same, with the top card of the graveyard), Spy Kit (every nonlegendary creature card's name: the 258 places a
    permanent's one name is read), Illusionary Mask, Camouflage, Snowblind ("toughness minus 1" read inside its own layer 7c
@@ -5029,6 +5029,31 @@ line blocks.
    for a spell in hand isn't weighed) and use one only for a spell they can't cast without it; when a cost reduction takes
    off a colored symbol both the mana cost and an additional cost have, it's taken off the additional cost's (the cost is
    one total, CR 601.2f, no ruling says which).
+   Round 456 went back to the top of `npm run popular` for Chef's Kiss (rank 5,504), out since round 168 because no rule or
+   ruling seemed to say whether a spell's current target is among those it can be reselected to at random. Its rulings do
+   settle it: "If there are any legal targets that are not you or permanents you control, you must reselect the targets at
+   random" counts the one it has (with that as the only one, there would be nothing else to reselect to), and "if there are
+   no legal targets that could be selected, the targets remain unchanged" speaks of the legal targets, not "other" ones, as
+   Grip of Chaos's random reselection does ("it may still choose the original one"); "reselect" is to select again. "Gain
+   control of target spell that targets only a single permanent or player. Copy it, then reselect the targets at random for
+   the spell and the copy. The new targets can't be you or a permanent you control." (a whole line in oracle/round456.ts):
+   its target is a spell every target of which names one permanent or player (TargetSpec.targetsOnlyPermanentOrPlayer, as
+   Radiate's; yours too, and several instances of "target" naming it, rulings). As it resolves you gain control of it
+   (controlSpell, as Commandeer), copy it (CR 707.10: the copy is yours, same targets, modes and X), then the spell, if it's
+   still on the stack, and the copy each have every target reselected at random (Effect "chefsKiss", effects/run-round456.ts),
+   one for each instance of "target" (rulings), among the targets that instance could have now for you (CR 115.3, 115.7),
+   other than you and permanents you control, the current one among them; with none, that target is unchanged, illegal or not
+   (rulings: Lava Spike still deals 3 to you). A divided amount stays with its target (CR 115.7f). Copying and reselecting
+   aren't casting (rulings), and a random reselection isn't a player choosing targets (Psychic Battle doesn't trigger). With
+   Twinning Staff, its additional copy may have new targets chosen and isn't "the copy" (rulings on Twinning Staff: "the
+   original copy"), so only the first copy is reselected. +1, 31,899 of 31,936 on round 455's branch (PR #765, main 957ba2c
+   in); the compiled text of every other card and face is unchanged.
+   Out after round 456 (looked at, not done): the lists after round 455 (still out, for their reasons): Pulmonic Sliver (an
+   optional "put it on top of its owner's library instead" asked in the middle of any move of a Sliver to a graveyard, and
+   several Slivers of one owner dying at once put on top in the order the owner chooses, rulings: the zone change can't
+   pause for it), Word of Command, Swirl the Mists, Volrath's Shapeshifter, Spy Kit, Illusionary Mask and Camouflage. Known
+   gaps: bots cast Chef's Kiss as they cast Commandeer (at an opponent's spell), without weighing where the random targets
+   may land.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the
@@ -12336,7 +12361,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   with main a10d465 (through round 445 and B296). The compiled text of every other card is unchanged.
 - Out after round B298 (looked at, not done): the lists after round B297 stay out; Ghostly Flame (done in round 455) (its rulings make damage
   colorless only "whenever something looks at the damage", but not for triggers that look at the source; where each damage
-  check falls is still unclear), Chef's Kiss (whether the current target is among those it can be reselected to at random,
+  check falls is still unclear), Chef's Kiss (done in round 456) (whether the current target is among those it can be reselected to at random,
   no ruling), Captain America, First Avenger (the division is announced before the cost picks the Equipment, CR 601.2d,
   601.2h) and Pulmonic Sliver were looked at again. About 50 unsupported cards remain, all of them hard. Known gaps: the
   mana pool can't be filled by hand while a payment is asked (the Pay button autopays, using Snowfall's mana for cumulative

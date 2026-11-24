@@ -328,6 +328,16 @@ export interface GameObject {
    */
   textFrom?: string;
   /**
+   * Volrath's Shapeshifter (round 459): "As long as the top card of your graveyard is a creature card, ~ has the full text
+   * of that card and has the text "{2}: Discard a card."" A text-changing effect (rulings; layer 3, CR 613.1c): `key` is
+   * the definition in GameState.cards it has now (that card's name, mana cost, color, types, abilities, power and
+   * toughness, and the granted text), on top of its copiable values `base` (layer 1, CR 613.2), so a copy of it copies
+   * the Shapeshifter (CR 707.2; rulings: "A copy of a Volrath's Shapeshifter will have the shapeshifting ability"). Set as
+   * it enters and kept up to date by shapeshift.ts syncShapes; it applies only on the battlefield, while `base` is still its
+   * copiable values.
+   */
+  shapeOf?: { base: string; key: string };
+  /**
    * Text-changing effects on it (CR 612.1, layer 3, 613.1c), in timestamp order (613.7): each replaces every instance of
    * one color word, basic land type or creature type, used as one (612.2), in its rules text and type line (Sleight of
    * Mind). They apply to what its copiable values are (layer 1 first), so they're not copiable values themselves (707.2).

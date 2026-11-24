@@ -5143,6 +5143,33 @@ line blocks.
    and the Wishes (left out by choice: nothing outside the game here). Known gaps: bots never activate Illusionary Mask
    (they answer its prompts: the highest mana value card, cast; prevention first); whether all damage would be prevented
    is judged as bots would choose the shields.
+   Round 459 took Volrath's Shapeshifter (out since the lists after round 453). "As long as the top card of your graveyard
+   is a creature card, this creature has the full text of that card and has the text "{2}: Discard a card." (This
+   creature has that card's name, mana cost, color, types, abilities, power, and toughness.)" (oracle/round459.ts,
+   shapeshift.ts). Its rulings call it a text-changing effect, so it applies in layer 3 (CR 613.1c) on top of its copiable
+   values (layer 1): the definition it has now is kept on it (GameObject.shapeOf, its key read by cardIdOf as a text
+   change's is) and every later layer applies to what it has become. A copy of it copies the Shapeshifter, shapeshifting
+   ability and all (CR 707.2, rulings), so Clone and the other "enter as a copy" paths now copy copiable values
+   (copiableDef), not text changes or an exchanged text box. "Your graveyard" is its controller's; the top card is the
+   last card put there (CR 404.1), a token not being a card. It has the card's front face (CR 712.8a) or normal
+   characteristics (715.4), plus the quoted ability; a characteristic the card doesn't have isn't taken (rulings: Dryad
+   Arbor leaves it its own mana cost). Changing forms isn't entering (rulings: no "enters" triggers), but it enters as what
+   the top card makes it (CR 614.12: that card's replacements and triggers as it enters). Its form is worked out as it
+   enters and again as each event ends (between the instructions of a resolution, with each pass of state-based actions),
+   as cards put into a graveyard at the same time are arranged then (CR 404.3), so in one event it keeps the form it had as
+   the event began: dying with other creatures, its "dies" ability is the card's it was (Wrath of God and Doomed
+   Dissenter). With it in the game the order of a graveyard matters, so cards put there together are arranged by their
+   owner (the existing orderGraveyard prompt). No new prompt, so no browser test. +1, 31,916 of 31,936 on round 458's head
+   efd2650; the compiled text of every other card is unchanged.
+   Out after round 459 (looked at, not done): Swirl the Mists (its changed color words apply to a spell from the moment
+   it's put on the stack as it's cast, CR 601.2a, so its targets, modes and costs are chosen with the changed text; the
+   engine works those out from the card where it's cast from, in castSpell, castProblem, planCast and the bots' and UI's
+   target lists, so every cast path would need to read the spell as it will be on the stack), Word of Command (playing a
+   card while controlling another player mid-resolution), Spy Kit (every name of every card), Camouflage (piles of
+   blockers: menace and "can block only" piles have no ruling), and the Wishes (left out by choice: nothing outside the
+   game here). Known gaps: after an exchange of text boxes with a Shapeshifter (Deadpool), neither creature shapeshifts; a copy made from it as
+   it last existed (a token copy of a sacrificed or destroyed one) copies the form it had (the same for any text change);
+   the log names its triggered abilities after the card it is now; bots don't plan around its form when they discard.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

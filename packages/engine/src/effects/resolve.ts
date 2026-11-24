@@ -10,6 +10,7 @@ import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, w
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
+import { syncShapes } from "../shapeshift";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sharingACreatureType, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource, itemQuality } from "./targeting";
@@ -338,6 +339,7 @@ export function continueResolution(s: GameState): Resolution {
     if (!r.scratch && !item.manaAbility) {
       closeZoneBatch(s); // its "one or more" triggers (CR 603.2c)
       closeGraveyardBatch(s);
+      syncShapes(s); // Volrath's Shapeshifter (round 459): the top cards of graveyards after the last instruction
       // Auras coming back because the last instruction made an "until ~ leaves" source leave (CR 303.4f, 610.3).
       if (askAuraReturns(s) === "asked") return "paused";
       if (askGraveyardOrder(s)) return "paused";

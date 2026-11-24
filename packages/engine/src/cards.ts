@@ -112,7 +112,18 @@ export const identityOf = (s: GameState, o: GameObject, d: CardDef | undefined =
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
 /** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */
 const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? faceDownDef(o).oracleId : wordsKey(o, textKey(o) ?? copiedId(o)));
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? faceDownDef(o).oracleId : wordsKey(o, textKey(o) ?? shapeKeyOf(o) ?? copiedId(o)));
+
+/** Its copiable values' key (CR 707.2): what a copy of it copies, and what Volrath's Shapeshifter's text change applies to. */
+export const copiableKeyOf = (o: GameObject): string => copiedId(o);
+
+/**
+ * Volrath's Shapeshifter (round 459, GameObject.shapeOf): the key of the definition with the full text of the top card of
+ * its controller's graveyard, on the battlefield, while its copiable values are still the ones it was worked out on (a
+ * later copy effect applies first, layer 1, and may take the ability away until shapeshift.ts syncShapes looks again). An
+ * exchange of text boxes (textFrom) isn't combined with it.
+ */
+const shapeKeyOf = (o: GameObject): string | undefined => (o.shapeOf && o.zone === "battlefield" && !o.faceDown && !o.textFrom && o.shapeOf.base === copiedId(o) ? o.shapeOf.key : undefined);
 
 /**
  * Whether it's a copy of something (CR 707): a "becomes a copy" effect on it (707.4) or what it entered as a copy of
@@ -142,7 +153,10 @@ const textKey = (o: GameObject): string | undefined => (o.textFrom && (o.zone ==
 
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
-  const out = ownDefOf(s, o);
+  const shaped = shapeKeyOf(o);
+  // Volrath's Shapeshifter's text change (layer 3, CR 613.1c) comes before later ones in timestamp order (613.7): its own
+  // timestamp is the permanent's (613.7a).
+  const out = (shaped && s.cards[shaped]) || ownDefOf(s, o);
   // Text changes apply after an exchange of text boxes (both layer 3, CR 613.1c; an exchange is as the permanent enters).
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return withWords(s, o, o.textFrom && !o.faceDown ? withTextOf(s, out, o.textFrom, textKey(o)!) : out);
   if (o.zone === "stack") return offFieldDefinedPT(s, o, offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(withWords(s, o, out)))));

@@ -45,6 +45,7 @@ import { abilityUse, addMana, boundSpend, canPayFromPool, falseDawnMana, manaOri
 import { channelMana } from "./channel";
 import { nextRandom, randomWatch, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
+import { enterShape, syncShapes } from "./shapeshift";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
 import { answerMoveQuestion, answersMoveQuestion, asking, moveAnswer, MoveQuestionPause, questionPending } from "./move-questions";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
@@ -1554,6 +1555,7 @@ export function moveObject(
   if (rebirth) (s.cantPlayUntilTurn ??= []).push({ id, zc: o.zoneChanges, player: o.owner, card: defOf(s, o).name });
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
   o.textFrom = undefined; // so do text-changing effects
+  o.shapeOf = undefined; // Volrath's Shapeshifter's too (round 459)
   o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
   o.copyEffects = undefined;
   o.chosenTypeAside = undefined; // a new object (CR 400.7)
@@ -1712,6 +1714,8 @@ export function moveObject(
     for (const k of compileCard(defOf(s, o)).entersKicked ?? [])
       if (k.which !== undefined && o.kicked.includes(k.which)) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: k.mods });
   invalidateCharacteristics(s);
+  // Volrath's Shapeshifter enters as what the top card of its controller's graveyard makes it (round 459, CR 614.12).
+  if (to === "battlefield") enterShape(s, o);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
@@ -2189,7 +2193,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     // Vizier of Many Faces: more exceptions for an embalmed token (CR 702.128b).
     const except = own.ifEmbalmed && o.embalmed ? { ...own.except, ...own.ifEmbalmed } : own.except;
     const { keywordsIfCreature, ...exceptNow } = exceptFor(s, o, except, realDefOf(s, o).name) ?? {};
-    let key = copyKey(s, defOf(s, target), exceptNow);
+    let key = copyKey(s, copiableDef(s, target), exceptNow); // its copiable values (CR 707.2): not text changes (round 459)
     if (own.tapped) opts = { ...opts, tapped: true };
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
     // Vesuvan Shapeshifter (round 446): "until this creature is turned face down" (run-permanents.ts turnFaceDown).
@@ -2198,7 +2202,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     // Moritte of the Frost: "if it's a creature, it ... has changeling": a creature as it enters, as this copy (rulings).
     if (keywordsIfCreature?.length && !own.untilEndOfTurn && !own.untilFaceDown) {
       invalidateCharacteristics(s);
-      if (objIsType(s, o, "Creature")) o.copyOf = key = copyKey(s, defOf(s, target), { ...exceptNow, keywords: [...(exceptNow.keywords ?? []), ...keywordsIfCreature] });
+      if (objIsType(s, o, "Creature")) o.copyOf = key = copyKey(s, copiableDef(s, target), { ...exceptNow, keywords: [...(exceptNow.keywords ?? []), ...keywordsIfCreature] });
     }
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
@@ -2279,6 +2283,8 @@ function controlThenEnter(s: GameState, o: GameObject, opts: EnterOpts) {
 
 /** Finish entering as what it now is, after "as it enters" copy or text choices (CR 614.12). */
 function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
+  // A Clone entering as a copy of Volrath's Shapeshifter has its ability as it enters (round 459, CR 614.12, 707.5).
+  enterShape(s, o);
   const printed = compileCard(defOf(s, o));
   // A Clone entering as a copy of Xantcha enters under an opponent's control too (CR 614.12, 707.5).
   if (printed.entersUnderOpponent && !opts.controlChosen && opponents(s, o.controller).length) {
@@ -17991,6 +17997,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false, onePass
     invalidateCharacteristics(s);
     endWhileTapped(s);
     syncControl(s);
+    syncShapes(s); // Volrath's Shapeshifter (round 459): the top cards of graveyards after the last event
     checkPairs(s);
     checkAscend(s);
     checkDayNight(s); // not a state-based action, but done at once (CR 702.145c-g)
@@ -19413,7 +19420,7 @@ function faceUpCopy(s: GameState, o: GameObject, targetId: ObjectId) {
   }
   const { keywordsIfCreature: _, ...exceptNow } = exceptFor(s, o, own.except, realDefOf(s, o).name) ?? {};
   const name = defOf(s, target).name;
-  addCopyEffect(s, o, copyKey(s, defOf(s, target), exceptNow), own.untilFaceDown ? "faceDown" : undefined);
+  addCopyEffect(s, o, copyKey(s, copiableDef(s, target), exceptNow), own.untilFaceDown ? "faceDown" : undefined);
   log(s, `${realDefOf(s, o).name} becomes a copy of ${name}${own.untilFaceDown ? " until it's turned face down" : ""}.`);
 }
 

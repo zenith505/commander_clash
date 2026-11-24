@@ -234,6 +234,7 @@ import { round455Line } from "./round455";
 import { round456Line } from "./round456";
 import { round457Line } from "./round457";
 import { round458Line } from "./round458";
+import { round459Line } from "./round459";
 import { round450Line } from "./round450";
 import { round451Line } from "./round451";
 import { linkRestartExiles, round452Line } from "./round452";
@@ -1151,6 +1152,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 459: oracle/round459.ts.
+    if (round459Line(line, raw, out, isSpell)) continue;
     // Round 454: oracle/round454.ts.
     if (round454Line(line, raw, out, isSpell)) continue;
     // Round 453: oracle/round453.ts.

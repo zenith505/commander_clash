@@ -9,6 +9,7 @@ import { characteristics } from "../layers";
 import { defMv, sameName } from "../faces";
 import { bindChosen, printedMatches } from "./targeting";
 import { discardCards, discardToTop } from "./run-library";
+import { charView, viewsShareName } from "../all-names";
 
 type B160Effect = Extract<Effect, { type: "revealRandomDiscardNamed" | "counterCauseIfNamed" | "eachChoosesFromHand" }>;
 
@@ -51,7 +52,8 @@ export function runLaneB160Effect(s: GameState, e: B160Effect, ctx: ResolveCtx, 
       const inYard = s.players.some((p) => p.graveyard.some((id) => sameName(defOf(s, obj(s, id)).name, name)));
       const onField = s.battlefield.some((id) => {
         const x = obj(s, id);
-        return !x.isToken && !x.faceDown && sameName(characteristics(s, x).name, name);
+        // Spy Kit's names count (CR 612.7).
+        return !x.isToken && !x.faceDown && viewsShareName(s, charView(characteristics(s, x)), { name });
       });
       if (!inYard && !onField) return;
       return runEffect(s, { type: "counterCause" }, ctx);

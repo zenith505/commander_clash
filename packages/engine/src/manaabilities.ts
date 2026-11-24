@@ -12,9 +12,9 @@ import { evalAmount } from "./amounts";
 import { canPayFromPool, falseDawnMana, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { nameActivationBan } from "./names";
-import { sameName } from "./faces";
 import { countersStay, removableCounters } from "./counters";
 import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId } from "./types";
+import { charView, viewsShareName } from "./all-names";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
 export const MANA_ABILITY_OFFSET = 1000;
@@ -596,7 +596,7 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     if (t.attached && src?.attachedTo !== o.id) continue;
     if (t.filter && !objectMatches(s, t.filter, o, ctl, false)) continue;
     // Extraplanar Lens: no card exiled, nothing has its name (CR 607.2a); a face-down land has no name (CR 708.2).
-    if (t.sameNameAsLinked && (!src || o.faceDown || !linkedExileCards(s, src).some((id) => sameName(defOf(s, obj(s, id)).name, characteristics(s, o).name)))) continue;
+    if (t.sameNameAsLinked && (!src || o.faceDown || !linkedExileCards(s, src).some((id) => viewsShareName(s, { name: defOf(s, obj(s, id)).name }, charView(characteristics(s, o)))))) continue;
     if ((t.ofChosen || t.adds.kind === "chosenColor") && !chosen) continue; // no color chosen: it never triggers (rulings on Gauntlet of Power)
     if (t.ofChosen && !made.includes(chosen!)) continue;
     let picks: { extra: ManaType[]; adds: ManaType[] }[];
@@ -617,7 +617,7 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
         // Sasaya's Essence: one for each other land its controller controls with this land's name (CR 201.2), a face-down
         // one having none (CR 708.2); each of any type it made, in any mix (rulings on Mossfire Valley).
         const name = o.faceDown ? undefined : characteristics(s, o).name;
-        const n = !name ? 0 : s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === ctl && objIsType(s, obj(s, id), "Land") && !obj(s, id).faceDown && sameName(characteristics(s, obj(s, id)).name, name)).length;
+        const n = !name ? 0 : s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === ctl && objIsType(s, obj(s, id), "Land") && !obj(s, id).faceDown && viewsShareName(s, charView(characteristics(s, obj(s, id))), charView(characteristics(s, o)))).length;
         let combos: ManaType[][] = [[]];
         for (let i = 0; i < n; i++) combos = combos.flatMap((c) => types.filter((x) => !c.length || types.indexOf(x) >= types.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
         picks = types.length <= 1 ? [{ extra: [], adds: Array<ManaType>(n).fill(types[0]!) }] : combos.map((c) => ({ extra: c, adds: c }));

@@ -15,9 +15,10 @@ import { discardCards, discardToTopEach } from "./run-library";
 import { canTransform, lockedDoors } from "./run-permanents";
 import { COLOR_NAMES, describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
-import { cardNameOptions } from "../names";
+import { cardNameOptions, nameView, objsShareName } from "../names";
 import { voteAmongMost, voteWins } from "./run-votes";
 import { defMv, sameName } from "../faces";
+import { viewsShareName } from "../all-names";
 import { putCounters, removableCounters } from "../counters";
 import { CREATURE_TYPES, LAND_TYPES } from "../keywords";
 import { nextRandom } from "../rng";
@@ -1075,7 +1076,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((name) => {
                 const mine = Object.values(s.objects).filter((o) => o.owner === ctx.controller && !o.isToken && !o.faceDown && !(o.zone === "exile" && (o.foretold || o.hiddenExile)));
                 const card = (zone: string) => mine.some((o) => o.zone === zone && sameName(defOf(s, o).name, name));
-                return card("exile") && card("hand") && card("graveyard") && mine.some((o) => o.zone === "battlefield" && sameName(characteristics(s, o).name, name));
+                return card("exile") && card("hand") && card("graveyard") && mine.some((o) => o.zone === "battlefield" && viewsShareName(s, nameView(s, o), { name }));
               })(ctx.sourceDef.name)
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && (!(e.cond as { snow?: true }).snow || !!k.snow) && ((sub) => !sub || !!k.subtypes?.includes(sub) || (!!k.allCreatureTypes && CREATURE_TYPES.has(sub)))((e.cond as { subtype?: string }).subtype))
@@ -1192,7 +1193,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
               })(ctx.targets[e.cond.index], chosenPlayerOf(s, ctx))
             : e.cond.kind === "targetSharesName"
             ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
-              ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
+              ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && objsShareName(s, obj(s, id), o)))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "targetSharesTypeWithCostExiled"
             ? ((o) => !!o && ((types) => objects(s, { ref: "costExiled" }, ctx).some((x) => defOf(s, x).types.some((t) => types.includes(t))))(defOf(s, o).types))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "targetsSameColors"

@@ -4,7 +4,8 @@ import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText
 import { parseCostKeyword, parseGraveyardKeyword } from "./oracle/keyword-abilities";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
-import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
+import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey } from "./faces";
+import { charView, viewsShareName } from "./all-names";
 import { bindChosen, objectMatches, printedMatches } from "./effects/targeting";
 import { isRingBearer } from "./effects/run-ring";
 import { textChangesKey, withTextChanges } from "./text-changes";
@@ -731,7 +732,8 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
         const x = s.objects[id]!;
         if (b.other && x.id === o.id) continue;
         if (!objectMatches(s, b.filter, x, c.controller, false)) continue;
-        if (b.notSameName && sameName(characteristics(s, x).name, c.name)) continue;
+        // Spy Kit's names count (CR 612.7, all-names.ts).
+        if (b.notSameName && !x.faceDown && !o.faceDown && viewsShareName(s, charView(characteristics(s, x)), charView(c))) continue;
         out.objects.push(x);
       }
   } finally {

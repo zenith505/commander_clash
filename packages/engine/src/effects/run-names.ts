@@ -1,7 +1,8 @@
 import type { Effect, SameNameRef } from "../abilities";
 import { defOf, isType, objIsType } from "../cards";
 import { attackingPermanentOf, creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
-import { currentName } from "../names";
+import { currentName, nameView } from "../names";
+import { joinedName, nameLabel, viewNames } from "../all-names";
 import { defMv, restingDef } from "../faces";
 import { addCopyEffect, copyKey } from "../copies";
 import { CREATURE_TYPES } from "../keywords";
@@ -28,11 +29,12 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Pick the Brain: "the same name as the exiled card", the one its instruction before exiled.
       const names = e.sameName ? namesFrom(s, e.sameName, ctx) : undefined;
       const name = names ? names[0] : e.sameAs !== undefined ? targetName(s, ctx, e.sameAs) : ctx.chosen?.name;
-      const filter = { ...bindChosen(e.filter, ctx.chosen), ...(names ? { namedAny: names } : name !== undefined ? { named: name } : {}) };
+      // A name with Spy Kit's joined on (all-names.ts) is matched as a list of names (CR 612.7).
+      const filter = { ...bindChosen(e.filter, ctx.chosen), ...(names ? { namedAny: names } : name !== undefined ? { namedAny: [name] } : {}) };
       // No name (none was chosen, or the card was face down): the zones are searched, but nothing can be found (CR 701.23c).
       const match = (id: ObjectId) => name !== undefined && printedMatches(filter, defOf(s, obj(s, id)));
       // Reap Intellect (round B245): several names, any of them.
-      const named = names && names.length > 1 ? names.join(" or ") : name;
+      const named = names && names.length > 1 ? names.map(nameLabel).join(" or ") : name !== undefined ? nameLabel(name) : undefined;
       if (e.handOnly) {
         // Hour of Glory: the hand is revealed, so all of them, no choice (and no library to shuffle).
         // Legion's End: and from their graveyard, a public zone (CR 404.2), every one of them too.
@@ -75,7 +77,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const who = e.who && players(s, e.who, ctx);
       (s.namedBansUntil ??= []).push({ name, ...(who ? { players: who } : {}), ...(e.lands ? { lands: true as const } : {}), controller: ctx.controller, source: src });
       const until = `until ${player(s, ctx.controller).name}'s next turn`;
-      log(s, who ? `${who.map((p) => player(s, p).name).join(", ")} can't cast spells named ${name} ${until}.` : `Spells named ${name} can't be cast${e.lands ? " and lands named it can't be played" : ""} ${until}.`);
+      log(s, who ? `${who.map((p) => player(s, p).name).join(", ")} can't cast spells named ${nameLabel(name)} ${until}.` : `Spells named ${nameLabel(name)} can't be cast${e.lands ? " and lands named it can't be played" : ""} ${until}.`);
       return;
     }
     case "revealUntilPerExiled": {
@@ -356,10 +358,12 @@ export function namesFrom(s: GameState, ref: SameNameRef, ctx: ResolveCtx): stri
     const sub = ctx.subject;
     const o = sub ? s.objects[sub.id] : undefined;
     if (!sub || !o) return [];
-    if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return one(currentName(s, o));
+    // Spy Kit's names (CR 612.7) are joined on (all-names.ts joinedName).
+    if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return viewNames(nameView(s, o));
     const lk = s.lastKnown?.[o.id];
     if (!lk || (lk.zc !== sub.zc && lk.zc !== sub.zc - 1)) return [];
-    return one(lk.source?.name ?? (lk.copyKey ? s.cards[lk.copyKey]?.name : undefined));
+    if (lk.source) return viewNames({ name: lk.source.name, ...(lk.source.allNames ? { all: true } : {}) });
+    return one(lk.copyKey ? s.cards[lk.copyKey]?.name : undefined);
   }
   if ("spell" in ref) return one(ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castName : undefined);
   if ("permanents" in ref) {
@@ -369,11 +373,11 @@ export function namesFrom(s: GameState, ref: SameNameRef, ctx: ResolveCtx): stri
     return s.battlefield
       .map((id) => s.objects[id]!)
       .filter((o) => !o.faceDown && controllerOf(s, o) === whose && !(ref.other && o.id === ctx.sourceId) && objectMatches(s, ref.permanents, o, ctx.controller, false))
-      .map((o) => characteristics(s, o).name);
+      .flatMap((o) => viewNames(nameView(s, o)));
   }
   if ("chosenThisWay" in ref)
     // Clarion Ultimatum: the chosen permanents still on the battlefield, by their names now (a copy's copied name, rulings).
-    return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is NonNullable<typeof o> => !!o && o.zone === "battlefield" && !o.faceDown).map((o) => characteristics(s, o).name);
+    return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is NonNullable<typeof o> => !!o && o.zone === "battlefield" && !o.faceDown).flatMap((o) => viewNames(nameView(s, o)));
   // Deadly Cover-Up (round B245): the card exiled from an opponent's graveyard just before, still that card in exile.
   if ("yardChosen" in ref) {
     const c = s.resolving?.chosenFromYard;
@@ -415,6 +419,11 @@ function targetName(s: GameState, ctx: ResolveCtx, index: number): string | unde
   const o = s.objects[t.id];
   if (!o) return undefined;
   const lk = s.lastKnown?.[o.id];
-  if (o.zone !== "battlefield" && lk && lk.zc === (o.zoneChanges ?? 0) - 1) return lk.copyKey ? s.cards[lk.copyKey]?.name : defOf(s, o).name;
-  return currentName(s, o);
+  // Spy Kit's names (CR 612.7), now or as it last existed, are joined on (all-names.ts joinedName).
+  if (o.zone !== "battlefield" && lk && lk.zc === (o.zoneChanges ?? 0) - 1) {
+    const n = lk.copyKey ? s.cards[lk.copyKey]?.name : defOf(s, o).name;
+    return n !== undefined && lk.source?.allNames ? joinedName({ name: n, all: true }) : n;
+  }
+  const v = nameView(s, o);
+  return v.name === undefined ? undefined : joinedName({ ...v, name: v.name });
 }

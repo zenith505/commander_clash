@@ -7,8 +7,9 @@ import type { TargetSpec } from "./abilities";
 import { abilitiesOf, defOf } from "./cards";
 import { characteristics, controllerOf } from "./layers";
 import { printedMatches } from "./effects/targeting";
-import { faceDef, hasName, sameName } from "./faces";
+import { faceDef, hasName } from "./faces";
 import { nameFirstPrintedIn, OLD_SET_NAME } from "./first-printings";
+import { defNamedAny, viewHasName, viewsShareName, type NameView } from "./all-names";
 
 /**
  * An object's name now: a permanent's from its characteristics (a copy has the name it copies, CR 707.2), a card
@@ -18,6 +19,23 @@ export function currentName(s: GameState, o: GameObject): string | undefined {
   if (o.faceDown) return undefined;
   return o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name;
 }
+
+/**
+ * An object's names now, as rules compare them (all-names.ts): a permanent's from its characteristics, Spy Kit's "all
+ * names of nonlegendary creature cards" too (CR 612.7); a card elsewhere its own; face down, none (CR 708.2a).
+ */
+export function nameView(s: GameState, o: GameObject): NameView {
+  if (o.faceDown) return { name: undefined };
+  if (o.zone !== "battlefield") return { name: defOf(s, o).name };
+  const c = characteristics(s, o);
+  return c.allNames ? { name: c.name, all: true } : { name: c.name };
+}
+
+/** Does it have this name now (CR 201.2a)? See nameView. */
+export const objHasName = (s: GameState, o: GameObject, name: string): boolean => viewHasName(s, nameView(s, o), name);
+
+/** Do they have the same name now: a name in common (CR 201.2a)? See nameView. */
+export const objsShareName = (s: GameState, a: GameObject, b: GameObject): boolean => viewsShareName(s, nameView(s, a), nameView(s, b));
 
 /**
  * The card names a player can choose (CR 201.4): those of the cards in this game, the ones matching `filter` by their
@@ -38,13 +56,15 @@ export function cardNameOptions(s: GameState, filter?: TargetSpec): string[] {
 }
 
 /** The permanents whose chosen name is `name`, with what that name does to it (see CompiledCard.nameBans). */
-function bansOn(s: GameState, name: string | undefined) {
+function bansOn(s: GameState, name: string | undefined, view?: NameView) {
   if (name === undefined) return [];
+  // A permanent with Spy Kit's names (view) has each nonlegendary creature card's name too (CR 612.7).
+  const has = (n: string) => (view ? viewHasName(s, view, n) : hasName(name, n));
   const out: { o: GameObject; ban: NonNullable<ReturnType<typeof abilitiesOf>["nameBans"]>[number] }[] = [];
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     // Null Chamber: either of its two names (Chosen.opponentName, the opponent's).
-    if (![o.chosen?.name, o.chosen?.opponentName].some((n) => n !== undefined && hasName(name, n))) continue;
+    if (![o.chosen?.name, o.chosen?.opponentName].some((n) => n !== undefined && has(n))) continue;
     for (const ban of abilitiesOf(s, o).nameBans ?? []) out.push({ o, ban });
   }
   return out;
@@ -54,12 +74,13 @@ function bansOn(s: GameState, name: string | undefined) {
  * A card exiled with `o` (its linked exile abilities, CR 607.2a, and its "until ~ leaves" ones), still exiled and face up (a face-down card has no name,
  * CR 708.2a), with `name` (a name in common is the same name, CR 201.2a): Circle of Confinement.
  */
-export function exiledWithNamed(s: GameState, o: GameObject, name: string): boolean {
+export function exiledWithNamed(s: GameState, o: GameObject, name: string | NameView): boolean {
+  const view = typeof name === "string" ? { name } : name;
   const key = `${o.id}@${o.zoneChanges ?? 0}`;
   // "Until ~ leaves the battlefield" exiles are kept on the permanent (GameObject.exiledUntilLeaves).
   return [...(s.linkedExile?.[key] ?? []), ...(o.exiledUntilLeaves ?? [])].some((l) => {
     const c = s.objects[l.id];
-    return !!c && c.zone === "exile" && !c.faceDown && !c.hiddenExile && (c.zoneChanges ?? 0) === l.zc && defOf(s, c).name.split(" // ").some((n) => hasName(name, n));
+    return !!c && c.zone === "exile" && !c.faceDown && !c.hiddenExile && (c.zoneChanges ?? 0) === l.zc && defOf(s, c).name.split(" // ").some((n) => viewHasName(s, view, n));
   });
 }
 
@@ -72,7 +93,7 @@ export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef, faceDown?: 
   if (market) return market;
   const city = faceDown ? null : firstPrintedBan(s, d, "spells");
   if (city) return city;
-  for (const b of s.namedBansUntil ?? []) if (hasName(d.name, b.name) && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
+  for (const b of s.namedBansUntil ?? []) if (defNamedAny(d, [b.name]) && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
   // Circu, Dimir Lobotomist: the names of the cards exiled with it, still exiled and face up (a face-down card has none,
   // CR 708.2a); a name in common is the same name (CR 201.2a).
   for (const id of s.battlefield) {
@@ -96,7 +117,7 @@ export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef, faceDown?: 
  * Revoker, Pithing Needle): in every zone (rulings), so cycling from a hand too. Why it can't be activated, or null.
  */
 export function nameActivationBan(s: GameState, o: GameObject, mana: boolean): string | null {
-  for (const { o: src, ban } of bansOn(s, currentName(s, o))) {
+  for (const { o: src, ban } of bansOn(s, currentName(s, o), nameView(s, o))) {
     if (ban.kind !== "activate" || (mana && ban.exceptMana)) continue;
     return `${characteristics(s, src).name}: activated abilities of sources named ${currentName(s, o)} can't be activated${ban.exceptMana ? " unless they're mana abilities" : ""}`;
   }
@@ -111,7 +132,7 @@ function permanentNameBan(s: GameState, d: CardDef, what: "cast" | "lands"): str
   if (what === "lands" && d.supertypes.includes("Basic")) return null;
   const market = s.battlefield.map((id) => s.objects[id]!).find((o) => !!abilitiesOf(s, o).permanentNameBan?.[what]);
   if (!market) return null;
-  const twin = s.battlefield.map((id) => s.objects[id]!).find((o) => !o.isToken && !o.faceDown && sameName(characteristics(s, o).name, d.name));
+  const twin = s.battlefield.map((id) => s.objects[id]!).find((o) => !o.isToken && !o.faceDown && viewsShareName(s, nameView(s, o), { name: d.name }));
   return twin ? `${characteristics(s, market).name}: ${what === "cast" ? "spells" : "nonbasic lands"} with the same name as a nontoken permanent (${characteristics(s, twin).name}) can't be ${what === "cast" ? "cast" : "played"}` : null;
 }
 
@@ -134,7 +155,7 @@ export function nameLandBan(s: GameState, pid: PlayerId, d: CardDef): string | n
   if (market) return market;
   const city = firstPrintedBan(s, d, "lands");
   if (city) return city;
-  const b = (s.namedBansUntil ?? []).find((x) => x.lands && hasName(d.name, x.name) && (!x.players || x.players.includes(pid)));
+  const b = (s.namedBansUntil ?? []).find((x) => x.lands && defNamedAny(d, [x.name]) && (!x.players || x.players.includes(pid)));
   if (b) return `${b.source}: lands named ${d.name} can't be played until ${s.players[b.controller]!.name}'s next turn`;
   // Null Chamber: "lands with the chosen names can't be played", anyone's (CR 305.1).
   const chamber = bansOn(s, d.name).find(({ ban }) => ban.kind === "play");

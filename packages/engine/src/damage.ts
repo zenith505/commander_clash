@@ -20,7 +20,8 @@ import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
 import type { AbilityBody, DamageMod, TargetSpec } from "./abilities";
-import { defMv, hasName } from "./faces";
+import { defMv } from "./faces";
+import { viewHasName } from "./all-names";
 import { shuffleLibrary } from "./rng";
 import { makeReplacementPicks, replacementPicks, type ReplacementPicks } from "./damage-picks";
 import { maskBeforeDamage } from "./effects/run-round458";
@@ -28,6 +29,8 @@ import { maskBeforeDamage } from "./effects/run-round458";
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
   name: string;
+  /** Spy Kit (CR 612.7): it also has the name of each nonlegendary creature card (all-names.ts). */
+  allNames?: true;
   controller: PlayerId;
   colors: Color[];
   /** Card types and subtypes, for protection from artifacts, creatures, Goblins (CR 702.16a). */
@@ -72,7 +75,7 @@ export interface DamageSource {
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, supertypes: c.supertypes, allCreatureTypes: c.allCreatureTypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.zone === "battlefield" && (o.counters.corruption ?? 0) > 0 ? { corrupted: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
+  return { name: c.name, ...(c.allNames ? { allNames: true as const } : {}), controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, supertypes: c.supertypes, allCreatureTypes: c.allCreatureTypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.zone === "battlefield" && (o.counters.corruption ?? 0) > 0 ? { corrupted: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
@@ -403,7 +406,7 @@ export function dealDamage(
     const srcWas = src.ref && !src.spell ? `${src.ref.object}@${src.ref.zc}` : undefined;
     // Aegar: what dealt damage to it this turn, as the source was then; Brine Hag, Giant Albatross: which permanent it
     // was (`src`); Blazing Effigy: its name.
-    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n, name: src.name, ...(srcKey && !src.spell ? { src: srcKey } : {}), ...(srcWas && srcWas !== srcKey ? { srcWas } : {}) });
+    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n, name: src.name, ...(src.allNames ? { allNames: true as const } : {}), ...(srcKey && !src.spell ? { src: srcKey } : {}), ...(srcWas && srcWas !== srcKey ? { srcWas } : {}) });
     if (srcKey && src.id !== o.id && c.types.includes("Creature") && !s.turnLog.damagedCreature?.includes(srcKey)) (s.turnLog.damagedCreature ??= []).push(srcKey);
     // Thirsting Axe: "if equipped creature didn't deal combat damage to a creature this turn".
     if (srcKey && opts.combat && c.types.includes("Creature") && !s.turnLog.combatDamagedCreature?.includes(srcKey)) (s.turnLog.combatDamagedCreature ??= []).push(srcKey);
@@ -788,7 +791,7 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
   // A spell's mana value counts its X (CR 202.3e); a gone permanent's is its card's.
   if (spec.manaValue && (src.manaValue === undefined || !inRange(src.manaValue, spec.manaValue))) return false;
   if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.supertypes || spec.notSupertypes || spec.anyOf || spec.chosen) return false;
-  if (spec.named !== undefined && !hasName(src.name, spec.named)) return false;
+  if (spec.named !== undefined && !viewHasName(s, { name: src.name, ...(src.allNames ? { all: true } : {}) }, spec.named)) return false;
   const kw = (k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.types?.length && !spec.types.some((t) => src.types.includes(t)) && !spec.orSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.allTypes?.some((t) => !src.types.includes(t)) || spec.notTypes?.some((t) => src.types.includes(t))) return false;

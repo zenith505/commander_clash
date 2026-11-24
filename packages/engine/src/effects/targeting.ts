@@ -15,6 +15,8 @@ import type { BlockQualities, CardDef, Chosen, Color, GameObject, GameState, Obj
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
+import { defNamedAny, viewHasName, viewNamedAny, viewNames, viewsShareName, type NameView } from "../all-names";
+import { nameView, objsShareName } from "../names";
 import { isSuspended } from "./run-zones";
 import { landCouldProduce } from "../manaabilities";
 
@@ -39,11 +41,10 @@ const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) =>
  */
 export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sameName"]>, controller: PlayerId): GameObject[] {
   if (t.zone !== "battlefield" || t.faceDown) return [];
-  const name = characteristics(s, t).name;
   const whose = controllerOf(s, t);
   return s.battlefield
     .map((id) => obj(s, id))
-    .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
+    .filter((o) => o.id !== t.id && !o.faceDown && objsShareName(s, o, t) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
 /**
@@ -51,10 +52,11 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
  * with `name`, every permanent with that name but `except`. Face-down permanents have no name (CR 708.2a); two objects
  * with one name in common have the same name (CR 201.2b).
  */
-export function sharingName(s: GameState, name?: string, except?: ObjectId): GameObject[] {
+export function sharingName(s: GameState, name?: string | NameView, except?: ObjectId): GameObject[] {
   const named = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown);
-  if (name !== undefined) return named.filter((o) => o.id !== except && sameName(characteristics(s, o).name, name));
-  return named.filter((o) => !(characteristics(s, o).supertypes.includes("Basic") && characteristics(s, o).types.includes("Land")) && named.some((x) => x.id !== o.id && sameName(characteristics(s, x).name, characteristics(s, o).name)));
+  // Spy Kit's names count (CR 612.7, all-names.ts).
+  if (name !== undefined) return named.filter((o) => o.id !== except && viewsShareName(s, nameView(s, o), typeof name === "string" ? { name } : name));
+  return named.filter((o) => !(characteristics(s, o).supertypes.includes("Basic") && characteristics(s, o).types.includes("Land")) && named.some((x) => x.id !== o.id && objsShareName(s, x, o)));
 }
 
 /** Moratorium Stone: the other cards in every graveyard and the permanents with the name of `t`, a card in a graveyard, now. */
@@ -62,7 +64,7 @@ export function sameNamedAnywhere(s: GameState, t: GameObject): GameObject[] {
   if (t.zone !== "graveyard") return [];
   const name = characteristics(s, t).name;
   const yards = s.players.flatMap((p) => p.graveyard.map((id) => obj(s, id))).filter((o) => o.id !== t.id && sameName(characteristics(s, o).name, name));
-  const perms = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && sameName(characteristics(s, o).name, name));
+  const perms = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && viewHasName(s, nameView(s, o), name));
   return [...yards, ...perms];
 }
 
@@ -206,11 +208,14 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   if (spec.counterMin && (o.counters[spec.counter!] ?? 0) < spec.counterMin) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
-  if (spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsSource || (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named)))) return false;
-  if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
+  // Spy Kit's "all names of nonlegendary creature cards" count as its names (CR 612.7, all-names.ts).
+  const nv: NameView = o.faceDown ? { name: undefined } : { name: c.name, ...(c.allNames ? { all: true } : {}) };
+  if (spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsSource || (spec.named !== undefined && !viewHasName(s, nv, spec.named))) return false;
+  if (spec.notNamed !== undefined && viewHasName(s, nv, spec.notNamed)) return false;
+  if (spec.namedLike && !viewNamedAny(s, nv, spec.namedLike)) return false;
   // Golgothian Sylex, City in a Bottle, Apocalypse Chime: its name now, first printed in that set; a face-down one has none (CR 708.2).
-  if (spec.firstPrintedIn && (o.faceDown || !nameFirstPrintedIn(c.name, spec.firstPrintedIn))) return false;
-  if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
+  if (spec.firstPrintedIn && (o.faceDown || !nameFirstPrintedIn(c.name, spec.firstPrintedIn, c.allNames))) return false;
+  if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && (spec.uniqueNameAmongYours !== "tokens" || !!s.objects[id]!.isToken) && controllerOf(s, s.objects[id]!) === controller && viewsShareName(s, ((x) => ({ name: x.name, ...(x.allNames ? { all: true } : {}) }))(view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)), nv))) return false;
   // A keyword ability an effect gave it as text ('gains "Cumulative upkeep {1}"', Balduvian Shaman, round B292) counts too.
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase()) || c.grantedAbilities.some((g) => g.toLowerCase() === k.toLowerCase() || (g.toLowerCase().startsWith(k.toLowerCase()) && /^(?: |—|\.$)/.test(g.slice(k.length))));
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
@@ -609,7 +614,8 @@ function targetOfAbilityFrom(s: GameState, stackId: string, from: NonNullable<Ta
     const q = abilitySourceNow(s, x);
     const o = s.objects[x.sourceId];
     const faceDown = !!o && o.zone === "battlefield" && (x.sourceZc === undefined || (o.zoneChanges ?? 0) === x.sourceZc) && !!o.faceDown;
-    return !!q && !faceDown && q.name === from.name && from.types.every((t) => q.types.includes(t));
+    // Spy Kit's names count (CR 612.7): such a creature is named Goblin Artisans too.
+    return !!q && !faceDown && viewHasName(s, { name: q.name, ...("allNames" in q && q.allNames ? { all: true } : {}) }, from.name) && from.types.every((t) => q.types.includes(t));
   });
 }
 
@@ -661,8 +667,10 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.noXInCost && parseManaCost(d.manaCost).hasX) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
-  if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
-  if (spec.namedAny && !spec.namedAny.some((n) => sameName(d.name, n))) return false;
+  // ALL_NONLEGENDARY_CREATURE_NAMES among them: Spy Kit's names, a permanent's (CR 612.7, all-names.ts).
+  if (spec.notNamedAny && defNamedAny(d, spec.notNamedAny)) return false;
+  if (spec.namedAny && !defNamedAny(d, spec.namedAny)) return false;
+  if (spec.namedLike && !defNamedAny(d, spec.namedLike)) return false;
   if (spec.firstPrintedIn && !nameFirstPrintedIn(d.name, spec.firstPrintedIn)) return false;
   if (spec.notNamedAsYours || spec.namedAsSource || spec.sameNameAsCause || spec.otherTypeThanCause || spec.sameNameAsPermanent || spec.namedAsYourLegendary) return false; // not worked out yet (sameNameAsPermanent: bindBound; namedAsYourLegendary: bindLegendaryNames)
   if (spec.sharesTypeWithAttached || spec.sharesTypeWithSubjectCreature || spec.sharesTypeWithSelf || spec.notKinOfYourCreatures) return false; // bound where it's used (dig)
@@ -792,7 +800,8 @@ export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId 
   const holder = { controller: pid };
   if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
   // "You have protection from the chosen card name" (Runed Halo): anything with that name, its own sources too.
-  if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && hasName(src.name, s.objects[id]!.chosen?.name ?? "\u0000") && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
+  // Spy Kit's names count (CR 612.7).
+  if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && s.objects[id]!.chosen?.name !== undefined && viewHasName(s, { name: src.name, ...(src.allNames ? { all: true } : {}) }, s.objects[id]!.chosen!.name!) && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
   // Serra's Emissary: from sources of the chosen card type, its controller's own too.
   if (src?.types && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youProtectedFromChosenType && src.types!.includes(s.objects[id]!.chosen?.cardType ?? "\u0000"))) return true;
   // Gor Muldrak: "You ... have protection from Salamanders", from such sources, its controller's own too.
@@ -1022,7 +1031,7 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
   // anyone's (rulings); a face-down one has none (CR 708.2). With none, nothing matches.
   // Goblin Artisans: "another creature named Goblin Artisans": not this ability's own source.
   if (spec5.notTargetOfAbilityFrom && ctx.sourceId && spec5.notTargetOfAbilityFrom.except === undefined) return bindBound(s, { ...spec5, notTargetOfAbilityFrom: { ...spec5.notTargetOfAbilityFrom, except: ctx.sourceId } }, ctx);
-  const spec: TargetSpec = spec5.sameNameAsPermanent ? (({ sameNameAsPermanent: _, ...r }) => ({ ...r, namedAny: [...new Set(s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown).map((o) => characteristics(s, o).name))].filter((n) => !r.namedAny || r.namedAny.some((m) => sameName(m, n))) }))(spec5) : spec5;
+  const spec: TargetSpec = spec5.sameNameAsPermanent ? (({ sameNameAsPermanent: _, ...r }) => ({ ...r, namedAny: [...new Set(s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown).flatMap((o) => viewNames(nameView(s, o))))].filter((n) => !r.namedAny || r.namedAny.some((m) => sameName(m, n))) }))(spec5) : spec5;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.

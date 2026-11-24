@@ -4,6 +4,7 @@
 // part of it like a merged permanent's components (GameObject.merged, CR 730): as it leaves the battlefield, both cards
 // go where it goes (712.21).
 
+import { charView, viewHasName } from "./all-names";
 import { defOf, realDefOf } from "./cards";
 import { attackingPermanentOf, log, moveObject, obj, player } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
@@ -20,7 +21,9 @@ function ownedNamed(s: GameState, pid: PlayerId, name: string, type: string, exc
     .filter((o) => o.id !== except && o.owner === pid && controllerOf(s, o) === pid)
     .filter((o) => {
       const c = characteristics(s, o);
-      return c.name === name && c.types.includes(type);
+      // Spy Kit's names count (CR 612.7): such a creature is "named Midnight Scavengers" too; melding it then does nothing
+      // (only a meld pair's two cards meld, CR 701.42c, meld.ts).
+      return viewHasName(s, charView(c, !!o.faceDown), name) && c.types.includes(type);
     });
 }
 

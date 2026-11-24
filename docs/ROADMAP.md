@@ -1,6 +1,6 @@
 # Roadmap
 
-31,917 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,918 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,979 of
 9,979 (100%).
 
@@ -5196,6 +5196,36 @@ line blocks.
    while they play the card (its "unless any player pays {1}" would ask mid-cast); triggered mana (Mana Flare) isn't
    restricted; bots choose the castable card with the greatest mana value, else a card they can't play, and bots
    controlling a player make that player's choices as that player would; "if able" is worked out by the cast planner.
+   Round 461 took Spy Kit (out since the lists after round 453). "Equipped creature gets +1/+1 and has all names of
+   nonlegendary creature cards in addition to its name." (oracle/round461.ts, all-names.ts). The names are a text-changing
+   effect in layer 3 (CR 612.7, 613.1c: Modification "allCardNames", Characteristics.allNames), added to its own name; an
+   effect that sets its name later takes them away (CR 612.8, timestamp order). The names are those of every nonlegendary
+   creature card, back faces too and no tokens' (rulings); the engine knows the cards in the game (GameState.cards, any zone,
+   any added later) and, for a name that reaches a game only through rules text ("a token named ..."), the generated list
+   in spy-kit-names.ts (tools/spy-kit-names.ts, 629 names; a test checks it against the card data). Every name comparison
+   in the engine reads names as a NameView (all-names.ts): targets and filters ("named", "with the same name as", "sharing
+   a name", "named like" lists, Echoing Truth, Maelstrom Pulse), chosen names (Pithing Needle, Runed Halo, cost and cast
+   bans), counts ("for each other creature named ~", Relentless Rats; "differently named" is the largest group with
+   different names, CR 201.2b; "N with the same name" the most with one name in common, 201.2a), damage records by source
+   name, exile links by name, and the legend rule: a player's legends are grouped by each name they have, one more group for
+   the names only Spy Kit legends have, each group chosen for on its own and all at once (CR 704.5j, 704.3), so a legend
+   stays only if it's the one kept in each of its groups (GameState.legendKeepGroups). A face-down creature has no name
+   (CR 708.2a) and shares none. "Named ~" for the card's own name stays the printed name (CR 201.5). The hidden agenda and
+   draft rulings don't apply (no such cards here). With a browser test (two Spy Kit legends and the legend rule's buttons).
+   +1, 31,918 of 31,936 on main 5497097 (round 460 merged); the compiled text of every other card is unchanged. Known gaps: a card outside the
+   battlefield that's a creature only through an effect is judged by its own types for "named like" Spy Kit's names; the
+   largest differently named group is exact for one-named objects, and greedy when split cards' two names overlap with
+   Spy Kit's.
+   Out after round 461 (looked at, not done; THE CARD LIST IS OTHERWISE COMPLETE): Swirl the Mists ("All instances of color
+   words in the text of spells and permanents are changed to the chosen color word.": a text change from the moment a
+   spell is put on the stack, CR 601.2a, so its modes, targets and costs are chosen with the changed text, while the
+   engine reads a spell from the card where it's cast from in castProblem, castSpell, planCast, the cost and the target
+   lists; and a probe of the 3,680 supported cards with a color word found 63 whose text, with every color word made one
+   word, the compiler can't read ("both white and white", "white or white spells", Council Guardian's vote, Sunglasses of
+   Urza), which would leave such a permanent's text unknown rather than changed); Camouflage (piles of blockers assigned
+   to attackers at random: there's no ruling on how menace, "can block only creatures with flying" and other block
+   requirements and restrictions apply to a pile, and guessing is out); the Wishes (left out by choice: nothing outside
+   the game here); and the 7 meld results, which aren't cards of their own. That is all 18 unsupported.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

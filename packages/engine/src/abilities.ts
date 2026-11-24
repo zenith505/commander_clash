@@ -1310,6 +1310,12 @@ export interface TargetSpec {
   notNamedAny?: string[];
   /** A search's `sameName` worked out as it resolves: one of these names (CR 201.2; none at all: nothing fits). */
   namedAny?: string[];
+  /**
+   * "With the same name as that creature", worked out from a permanent as it resolves: a name in common with these (CR
+   * 201.2a), checked on permanents too (objectMatches) and on cards (printedMatches). ALL_NONLEGENDARY_CREATURE_NAMES among
+   * them stands for Spy Kit's names (CR 612.7, all-names.ts viewNames). None at all: nothing fits.
+   */
+  namedLike?: string[];
   /** "Nontoken permanents with a name originally printed in the Antiquities expansion" (Golgothian Sylex, round B290): its name (a permanent's now, a copy's the one it copies, CR 707.2; a face-down one has none, CR 708.2) is one first printed in that set (first-printings.ts). */
   firstPrintedIn?: OldSet;
   /** None of these subtypes. */
@@ -2182,6 +2188,8 @@ export type Modification =
   | { kind: "setPT"; power: Amount; toughness: Amount } // layer 7b
   /** "Is ... named Legitimate Businessperson" (Witness Protection): its name, a text-changing effect (layer 3, CR 613.1c). */
   | { kind: "setName"; name: string; /** Psychic Paper (round 446): "its name is the last chosen name", the name chosen as its source last became attached (Chosen.name); none chosen, no change. */ chosen?: true }
+  /** Spy Kit (round 461): "has all names of nonlegendary creature cards in addition to its name": a text-changing effect on its name (CR 612.7, layer 3); see all-names.ts. */
+  | { kind: "allCardNames" }
   /** "Have base toughness 1" (Maha, Its Feathers Night): toughness only, power unchanged. */
   | { kind: "setToughness"; toughness: Amount } // layer 7b
   | { kind: "setPower"; power: Amount } // layer 7b

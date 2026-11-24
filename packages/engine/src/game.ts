@@ -8,7 +8,7 @@ import { joinMeld } from "./meld";
 import { createEmblem, liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
 import { askYardExile, yardExileChosen } from "./enters-yard";
-import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, sameName, setFace, transformedFace } from "./faces";
+import { asFace, castableFaces, defMv, faceDef, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, sameName, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
@@ -53,7 +53,8 @@ import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
 import { circledProblem } from "./deck";
 import { spendPlan } from "./value";
 import { gatherInstance, gatherSteps } from "./gather";
-import { cardNameOptions, currentName, nameActivationBan, nameCastBan, nameLandBan } from "./names";
+import { cardNameOptions, nameActivationBan, nameCastBan, nameLandBan, nameView, objHasName } from "./names";
+import { differentlyNamedCount, viewHasName, viewNames, viewsAllDifferent } from "./all-names";
 import {
   COLORS,
   RulesError,
@@ -1478,7 +1479,7 @@ export function moveObject(
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     // Spellweaver Volute (round B273): the card in a graveyard it enchanted, if that card is still there as that object.
     const enchanted = o.enchantsCard && host && host.id === o.enchantsCard.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === o.enchantsCard.zc ? { enchantsCard: { ...o.enchantsCard } } : {};
-    (s.lastKnown ??= {})[id] = { ...enchanted, zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.name !== undefined ? { chosenName: o.chosen.name } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { ...enchanted, zc: o.zoneChanges ?? 0, ...(o.fromOwnLibrary ? { fromOwnLibrary: true as const } : {}), ...(o.castFromHand && o.castBy !== undefined ? { castFromHandBy: o.castBy } : {}), ...(o.tapped ? { tapped: true as const } : {}), ...(o.saddled ? { saddled: true as const } : {}), ...(o.castAlt === "sneak" ? { sneak: true as const } : {}), ...(o.convoked?.length ? { convoked: o.convoked.length } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.chosen?.color ? { chosenColor: o.chosen.color } : {}), ...(o.chosen?.type ? { chosenType: o.chosen.type } : {}), ...(o.chosen?.name !== undefined ? { chosenName: o.chosen.name } : {}), ...(o.chosen?.object ? { chosenObject: { ...o.chosen.object } } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), ...(aloneIn ? { aloneIn } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, ...(last.allNames ? { allNames: true as const } : {}), colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Titania's Song (round B293): an effect that goes on to the end of the turn once its source leaves the battlefield.
   if (fromZone === "battlefield" && hadAbilities) lingerOnLeaving(s, o, last);
@@ -11208,7 +11209,7 @@ function ownActivatedCosts(ab: ActivatedAbility, x: number | undefined, src?: Ga
  */
 export function bindLegendaryNames(s: GameState, pid: PlayerId, c: AdditionalCost): AdditionalCost {
   if (c.kind !== "discard" || !c.filter?.namedAsYourLegendary) return c;
-  const names = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && controllerOf(s, o) === pid && characteristics(s, o).supertypes.includes("Legendary")).map((o) => characteristics(s, o).name);
+  const names = s.battlefield.map((id) => obj(s, id)).filter((o) => !o.faceDown && controllerOf(s, o) === pid && characteristics(s, o).supertypes.includes("Legendary")).flatMap((o) => viewNames(nameView(s, o)));
   const { namedAsYourLegendary: _, ...filter } = c.filter;
   return { ...c, filter: { ...filter, namedAny: [...new Set(names)] } };
 }
@@ -11527,7 +11528,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       if (alike && !pool.some((id) => pool.filter((x) => sameName(nameOf(x), nameOf(id))).length >= c.n)) return `you need to ${verb} ${full} to ${doing}`;
       if (share && !shareablePick(s, share, pool)) return `you need to ${verb} ${full} to ${doing}`;
-      if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full}${c.kind === "discard" ? " with different names" : ""} to ${doing}`;
+      if ((c.kind === "sacrifice" || c.kind === "discard") && c.differentNames && mostDifferentlyNamed(s, pool) < c.n) return `you need to ${verb} ${full}${c.kind === "discard" ? " with different names" : ""} to ${doing}`;
       continue;
     }
     // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
@@ -11631,8 +11632,9 @@ export function shareablePick(s: GameState, c: AdditionalCost, pool: ObjectId[])
 
 /** "With different names" (Transmutation Font): no two share a name; a face-down permanent has none (CR 708.2). */
 export function namesDiffer(s: GameState, ids: ObjectId[]): boolean {
-  const names = ids.map((id) => characteristics(s, obj(s, id)).name).filter((n) => n);
-  return new Set(names).size === names.length;
+  // Spy Kit's names count (CR 612.7, 201.2b; all-names.ts).
+  const views = ids.map((id) => nameView(s, obj(s, id))).filter((v) => v.name);
+  return viewsAllDifferent(s, views);
 }
 
 /** As many of `ids` as can be taken with different names, in their order (see namesDiffer). */
@@ -11640,6 +11642,12 @@ export function differentlyNamed(s: GameState, ids: ObjectId[]): ObjectId[] {
   const out: ObjectId[] = [];
   for (const id of ids) if (namesDiffer(s, [...out, id])) out.push(id);
   return out;
+}
+
+/** The most of `ids` that can be taken with different names (see namesDiffer): with Spy Kit's names, not always the first ones. */
+function mostDifferentlyNamed(s: GameState, ids: ObjectId[]): number {
+  const views = ids.map((id) => nameView(s, obj(s, id)));
+  return views.filter((v) => !v.name).length + differentlyNamedCount(s, views);
 }
 
 const FOOD: TargetSpec = { kind: "object", types: ["Artifact"], subtypes: ["Food"], text: "Food" };
@@ -12805,7 +12813,7 @@ function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: Pick<Acti
       if (tax.loyalty && ((ab?.loyalty === undefined && !ab?.loyaltyX) || !objIsType(s, o, "Planeswalker"))) continue;
       // Oppressive Rays: "activated abilities of enchanted creature": the permanent it's attached to.
       if (tax.host && (src.attachedTo !== o.id || o.zone !== "battlefield")) continue;
-      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter && (o.zone !== "battlefield" || !objectMatches(s, tax.filter, o, owner, false))) continue;
+      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !objHasName(s, o, src.chosen.name) : !!tax.filter && (o.zone !== "battlefield" || !objectMatches(s, tax.filter, o, owner, false))) continue;
       n += tax.n;
     }
   }
@@ -13916,6 +13924,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "legend") {
     // The legend rule (CR 704.5j): kept as the state-based actions are performed, after any other group is asked about.
     (s.legendKeep ??= []).push(choice);
+    (s.legendKeepGroups ??= []).push(pend.options.join(","));
     log(s, `${p.name} keeps ${characteristics(s, obj(s, choice)).name}${obj(s, choice).isToken ? " (a token)" : ""} (legend rule).`);
     return;
   }
@@ -16946,7 +16955,7 @@ function bandsWithOther(s: GameState, o: GameObject): string[] {
 function hasBandQuality(s: GameState, o: GameObject, quality: string): boolean {
   if (quality === "legendary creatures") return characteristics(s, o).supertypes.includes("Legendary");
   const named = /^creatures named (.+)$/.exec(quality);
-  return !!named && hasName(currentName(s, o), named[1]!);
+  return !!named && objHasName(s, o, named[1]!);
 }
 /**
  * Whether these creatures together band for combat damage (CR 702.22j-k): one has banding, or one with "bands with
@@ -17960,19 +17969,29 @@ function legendGroups(s: GameState): ObjectId[][] {
   const exempt = s.battlefield.flatMap((id) => (abilitiesOf(s, obj(s, id)).noLegendRule ?? []).map((filter) => ({ filter, you: controllerOf(s, obj(s, id)) })));
   // Brothers Yamazaki: the names exactly two permanents on the battlefield have, when one of them says so.
   const nameOf = (id: ObjectId) => characteristics(s, obj(s, id)).name;
-  const twoNames = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).noLegendRuleIfTwo).map(nameOf).filter((n) => s.battlefield.filter((id) => nameOf(id) === n).length === 2));
-  const groups = new Map<string, ObjectId[]>();
+  const twoNames = new Set(s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).noLegendRuleIfTwo).map(nameOf).filter((n) => s.battlefield.filter((id) => objHasName(s, obj(s, id), n)).length === 2));
+  const mine = new Map<PlayerId, ObjectId[]>();
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const c = characteristics(s, o);
-    if (!c.supertypes.includes("Legendary") || twoNames.has(c.name) || exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
+    if (o.faceDown || !c.supertypes.includes("Legendary") || twoNames.has(c.name) || exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
     // Hall of Echoes: "The "legend rule" doesn't apply to permanents you control this turn."
     if (player(s, c.controller).noLegendRuleTurn === s.turn) continue;
-    const key = `${c.controller}:${c.name}`;
-    groups.set(key, [...(groups.get(key) ?? []), id]);
+    mine.set(c.controller, [...(mine.get(c.controller) ?? []), id]);
   }
+  // A group for each name: those of a player's legends that have it (CR 201.2a). Spy Kit's names (CR 612.7) put a
+  // legend with them in the group of each nonlegendary creature card's name another legend has, and those with them
+  // together in one more group (the names only they have).
   const byAge = (a: ObjectId, b: ObjectId) => obj(s, a).timestamp - obj(s, b).timestamp;
-  return [...groups.values()].filter((g) => g.length > 1).map((g) => g.sort(byAge)).sort((a, b) => byAge(a[0]!, b[0]!));
+  const groups = new Map<string, ObjectId[]>();
+  for (const ids of mine.values()) {
+    const views = ids.map((id) => nameView(s, obj(s, id)));
+    const names = new Set(views.flatMap((v) => (v.name ? v.name.split(" // ") : [])));
+    const add = (g: ObjectId[]) => g.length > 1 && groups.set([...g].sort(byAge).join(","), [...g].sort(byAge));
+    for (const n of names) add(ids.filter((_, i) => viewHasName(s, views[i]!, n)));
+    add(ids.filter((_, i) => views[i]!.all));
+  }
+  return [...groups.values()].sort((a, b) => byAge(a[0]!, b[0]!) || a.length - b.length);
 }
 
 /** Which legend a bot keeps: the one with Auras and Equipment on it, then more counters, then not a token, then the oldest. */
@@ -17989,7 +18008,8 @@ export function legendBotKeep(s: GameState, group: ObjectId[]): ObjectId {
 /** Ask a player which of a group of their legends to keep (CR 704.5j), for each group not yet answered. */
 function askLegendRule(s: GameState): boolean {
   for (const group of legendGroups(s)) {
-    if (group.some((id) => s.legendKeep?.includes(id))) continue;
+    // A group already chosen for; without the groups recorded, any group with a kept permanent (see legendKeepGroups).
+    if (s.legendKeepGroups ? s.legendKeepGroups.includes(group.join(",")) : group.some((id) => s.legendKeep?.includes(id))) continue;
     const you = controllerOf(s, obj(s, group[0]!));
     const label = (id: ObjectId, i: number) => {
       const o = obj(s, id);
@@ -18119,17 +18139,24 @@ export function runStateBasedActions(s: GameState, holdTriggers = false, onePass
     // Legend rule (704.5j): the rest of each group go to the graveyard, all but the one its controller chose (asked at the
     // start of this pass, askLegendRule). Not while another choice waits: they're checked again once it's made.
     const keep = s.legendKeep ?? [];
+    const keptFor = s.legendKeepGroups;
     s.legendKeep = undefined;
-    if (!s.pending)
+    s.legendKeepGroups = undefined;
+    if (!s.pending) {
+      // Each group on its own, all at once (CR 704.5j, 704.3): a permanent in two groups (Spy Kit's names) stays only if
+      // it's the one chosen in both.
+      const gone = new Set<ObjectId>();
       for (const group of legendGroups(s)) {
-        const kept = group.find((id) => keep.includes(id)) ?? legendBotKeep(s, group);
-        for (const id of group) {
-          if (id === kept) continue;
-          log(s, `${characteristics(s, obj(s, id)).name} is put into the graveyard (legend rule).`);
-          moveObject(s, id, "graveyard");
-          changed = true;
-        }
+        const at = keptFor?.indexOf(group.join(",")) ?? -1;
+        const kept = at >= 0 ? keep[at] : (group.find((id) => keep.includes(id)) ?? legendBotKeep(s, group));
+        for (const id of group) if (id !== kept) gone.add(id);
       }
+      for (const id of s.battlefield.filter((x) => gone.has(x))) {
+        log(s, `${characteristics(s, obj(s, id)).name} is put into the graveyard (legend rule).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    }
     // World rule (704.5k): of two or more world permanents, all but the one that has been one for the shortest time go to
     // the graveyard; on a tie, all of them. That time is read from when each entered (its timestamp).
     const worlds = s.battlefield.filter((id) => characteristics(s, obj(s, id)).supertypes.includes("World"));

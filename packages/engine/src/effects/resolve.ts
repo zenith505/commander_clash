@@ -1,3 +1,5 @@
+import { viewNames } from "../all-names";
+import { nameView } from "../names";
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { tokenChoicesPossible, TokenQuestionPause, withPutter, withTokenAnswers, batchCountersPut } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
@@ -612,7 +614,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const here = o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
     if (here && o.faceDown) return [];
     const lk = s.lastKnown?.[o.id];
-    const name = here ? characteristics(s, o).name : (lk?.source?.name ?? (lk?.copyKey ? s.cards[lk.copyKey]?.name : undefined) ?? defOf(s, o).name);
+    // Spy Kit's names count (CR 612.7): as it is now, or as it last existed.
+    const name = here ? nameView(s, o) : lk?.source ? { name: lk.source.name, ...(lk.source.allNames ? { all: true } : {}) } : { name: (lk?.copyKey ? s.cards[lk.copyKey]?.name : undefined) ?? defOf(s, o).name };
     return sharingName(s, name, here ? o.id : undefined);
   }
   if (ref.ref === "countersPutThisWay")
@@ -928,7 +931,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       // Gone from the battlefield, the subject is the card in its new zone, one zone change on from what last existed.
       const name = here ? (subj!.faceDown ? "" : characteristics(s, subj!).name) : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) ? (lk.source?.name ?? "") : "";
       if (!name) return [];
-      filter1 = { ...filter1a, named: name };
+      // Spy Kit's names count (CR 612.7): its names now, or as it last existed.
+      const all = here ? !!characteristics(s, subj!).allNames : !!lk?.source?.allNames;
+      filter1 = { ...filter1a, namedLike: viewNames({ name, ...(all ? { all: true } : {}) }) };
     }
     // Sanguine Praetor, Endemic Plague: the sacrificed creature as it last existed; none matches without one.
     const sacked = ref.sacrificedKin ? (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1)) : undefined;

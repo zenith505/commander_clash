@@ -16,6 +16,8 @@ import { namesFrom } from "./run-names";
 import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
 import { defMv, restingDef, sameName } from "../faces";
+import { nameLabel, viewNames } from "../all-names";
+import { nameView } from "../names";
 import { addCopyEffect, copyKey } from "../copies";
 import { characteristics } from "../layers";
 import type { TargetSpec } from "../abilities";
@@ -1492,13 +1494,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // existed (CR 608.2h); colorless, nothing fits (rulings).
       const filter2 = filter2a?.sharesColorWithSource ? sourceColors(s, filter2a, ctx) : filter2a;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
-      let filter3a = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
+      let filter3a = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).flatMap((o) => viewNames(nameView(s, o))) }))(filter2) : filter2;
       // Curse of Misfortunes: "that doesn't have the same name as a Curse attached to enchanted player": the names of those
       // attached to that player as it resolves (rulings).
       if (filter3a?.notNamedAsAttachedTo) {
         const { notNamedAsAttachedTo: on, ...rest } = filter3a;
         const pids = players(s, on.player, ctx);
-        const taken = s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && o.attachedToPlayer !== undefined && pids.includes(o.attachedToPlayer) && objectMatches(s, on.filter, o, ctx.controller, false)).map((o) => characteristics(s, o).name);
+        const taken = s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && o.attachedToPlayer !== undefined && pids.includes(o.attachedToPlayer) && objectMatches(s, on.filter, o, ctx.controller, false)).flatMap((o) => viewNames(nameView(s, o)));
         filter3a = { ...rest, notNamedAny: [...(rest.notNamedAny ?? []), ...taken] };
       }
       // Hiveheart Shaman: "a basic land card that doesn't share a land type with a land you control": none of the land types
@@ -1510,9 +1512,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const names = e.sameName && namesFrom(s, e.sameName, ctx);
       // Doubling Chant: one card for each of those permanents, with its name (the found cards matched to them one to one).
       const single = (filter4?.text.replace(/ with the same name as .+$/, "") ?? "card").replace(/\bcards\b/, "card");
-      const perName = e.sameName && "each" in e.sameName && e.sameName.each ? (names || []).map((n) => ({ ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: [n], text: `${single} named ${n}` })) : undefined;
+      const perName = e.sameName && "each" in e.sameName && e.sameName.each ? (names || []).map((n) => ({ ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: [n], text: `${single} named ${nameLabel(n)}` })) : undefined;
       const oneOfEach = perName ?? e.oneOfEach;
-      const filter = names ? { ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: names, ...(names.length === 1 && filter4 ? { text: filter4.text.replace(/ with the same name as .+$/, ` named ${names[0]}`) } : {}) } : filter4;
+      const filter = names ? { ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: names, ...(names.length === 1 && filter4 ? { text: filter4.text.replace(/ with the same name as .+$/, ` named ${nameLabel(names[0]!)}`) } : {}) } : filter4;
       // Pir's Whim: "each friend", every player chosen so.
       // From the Ashes: each player who controlled a land destroyed this way, up to one card for each (CR 608.2h).
       // Wave of Vitriol: those it sacrificed, by their card types as they last existed.
@@ -1607,7 +1609,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (agent?.exileFor !== undefined) sc.searchExileFor = agent.exileFor;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
         const underName = (d: SearchDest) => ((pid) => (pid === undefined || pid === p.id ? undefined : player(s, pid).name))(d.under ? players(s, d.under, ctx)[0] : undefined);
-        const what = perName ? `up to one ${single} for each of these names: ${perName.map((f) => f.namedAny[0]).join(", ")}` : e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
+        const what = perName ? `up to one ${single} for each of these names: ${perName.map((f) => nameLabel(f.namedAny[0]!)).join(", ")}` : e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
           player: agent?.controller ?? p.id,

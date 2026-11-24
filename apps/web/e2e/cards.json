@@ -4657,6 +4657,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4a221518-c850-4e8a-a697-765c0a0e76e7",
+  "name": "Barktooth Warbeard",
+  "manaCost": "{4}{B}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Human Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-03-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0fe6c042-1182-4392-8938-fee36149d74f",
   "name": "Baron Helmut Zemo",
   "manaCost": "{B}{B}{B}",
@@ -49736,6 +49771,32 @@
   "set": "ecl",
   "releasedAt": "2026-01-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4d94f5bd-42c6-4d15-a693-8be189ec3746",
+  "name": "Spy Kit",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +1/+1 and has all names of nonlegendary creature cards in addition to its name.\nEquip {2}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

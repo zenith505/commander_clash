@@ -111,6 +111,8 @@ export interface SourceQuality {
   activated?: true;
   /** Its name, for protection from a card name (Runed Halo, CR 702.16a). */
   name?: string;
+  /** Spy Kit (CR 612.7): it also has the name of each nonlegendary creature card (all-names.ts). */
+  allNames?: true;
   /** A permanent that was cast this turn (it resolved as a spell this turn), for Emrakul, the World Anew's protection. */
   castThisTurn?: true;
   /** A Ring-bearer (CR 701.54a), for protection from Ring-bearers (Lord of the Nazgûl). */

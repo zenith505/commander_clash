@@ -298,9 +298,14 @@ const NAMES: Record<OldSet, ReadonlySet<string>> = {
   ]),
 };
 
-/** Was a card with this name (one of a split card's names, CR 201.2) originally printed in `set`? No name, no. */
-export function nameFirstPrintedIn(name: string | undefined, set: OldSet): boolean {
+/**
+ * Was a card with this name (one of a split card's names, CR 201.2) originally printed in `set`? No name, no. With `all`
+ * (Spy Kit's "all names of nonlegendary creature cards", CR 612.7), yes: each of these sets first printed nonlegendary
+ * creature cards (Atog, Erg Raiders, Aysen Crusader), whose names it has.
+ */
+export function nameFirstPrintedIn(name: string | undefined, set: OldSet, all?: boolean): boolean {
   if (name === undefined) return false;
+  if (all) return true;
   for (const n of NAMES[set]) if (hasName(name, n)) return true;
   return false;
 }

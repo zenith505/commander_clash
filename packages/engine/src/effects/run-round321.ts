@@ -8,6 +8,7 @@ import type { GameState, ObjectId, PlayerId } from "../types";
 import type { ResolveCtx } from "./resolve";
 import { printedMatches } from "./targeting";
 import { castWhileSearching } from "./run-laneb305";
+import { charView, viewHasName } from "../all-names";
 
 
 /**
@@ -59,7 +60,7 @@ export function runChooseHostOrNamedEffect(s: GameState, e: Extract<Effect, { ty
   if (!sc.impulseChoice) {
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const host = me?.zone === "battlefield" && me.attachedTo ? s.objects[me.attachedTo] : undefined;
-    const ids = [...(host?.zone === "battlefield" && objIsType(s, host, "Creature") ? [host.id] : []), ...s.battlefield.map((id) => obj(s, id)).filter((o) => objIsType(s, o, "Creature") && controllerOf(s, o) === ctx.controller && characteristics(s, o).name === e.named && o.id !== host?.id).map((o) => o.id)];
+    const ids = [...(host?.zone === "battlefield" && objIsType(s, host, "Creature") ? [host.id] : []), ...s.battlefield.map((id) => obj(s, id)).filter((o) => objIsType(s, o, "Creature") && controllerOf(s, o) === ctx.controller && viewHasName(s, charView(characteristics(s, o), !!o.faceDown), e.named) && o.id !== host?.id).map((o) => o.id)];
     sc.impulseChoice = { ids };
     if (ids.length > 1) {
       s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => characteristics(s, obj(s, id)).name), prompt: HOST_OR_NAMED_PROMPT };

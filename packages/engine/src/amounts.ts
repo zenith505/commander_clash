@@ -13,6 +13,7 @@ import { characteristics, controllerOf, staticConditionNow, type Characteristics
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
 import { defMv, sameName } from "./faces";
+import { charView, differentlyNamedCount, viewHasName, viewsShareName, type NameView } from "./all-names";
 import { creatureTypesOf, opponents, shareCreatureType } from "./game";
 import { CREATURE_TYPES, toxicValue } from "./keywords";
 
@@ -274,6 +275,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "permanents": {
       let n = 0;
       const names = new Set<string>();
+      const differentlyNamed: NameView[] = [];
       // "Named ~" (Hare Apparent): the source's name as it is now (a copy's is what it copies, CR 707.2); in a static
       // ability (Timberpack Wolf), as the layers have it so far.
       const me = c.filter.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -297,7 +299,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (byAffected && !affected) return 0;
       const affectedTypes = affected && c.sharesTypeWithAffected && typesIn(view(affected));
       // Mirror Box: the name of the permanent it's applied to (copy effects are applied by now, layer 1); a face-down one has none (CR 708.2).
-      const affectedName = affected && c.sameNameAsAffected ? (affected.faceDown ? undefined : view(affected)?.name) : undefined;
+      // Spy Kit's names count on either side (CR 612.7, 201.2a; all-names.ts).
+      const affectedName = affected && c.sameNameAsAffected ? (affected.faceDown || !view(affected) ? undefined : charView(view(affected)!)) : undefined;
       if (c.sameNameAsAffected && !affectedName) return 0;
       // Strata Scythe: the names of the cards its linked exile took that are still there, face up (CR 607.2a, 400.7).
       const linkSrc = c.sameNameAsLinked && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -311,8 +314,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (subject && ((id === subject.id && !c.includeSubject) || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
         if (srcTypes && (id === ctx.sourceId || !shareCreatureType(srcTypes, creatureTypesOf(s, o)))) continue;
         if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
-        if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
-        if (linkedNames && (o.faceDown || !linkedNames.some((nm) => sameName(view(o)?.name, nm)))) continue;
+        if (affectedName && (o.faceDown || !view(o) || !viewsShareName(s, charView(view(o)!), affectedName))) continue;
+        if (linkedNames && (o.faceDown || !view(o) || !linkedNames.some((nm) => viewsShareName(s, charView(view(o)!), { name: nm })))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         // Blim, Comedic Genius (round 416): "permanents they control but don't own" (CR 108.3, 108.4).
@@ -322,9 +325,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         else if (c.differentManaValues) names.add(String(o.faceDown ? 0 : defMv(defOf(s, o))));
         else if (c.differentPowers) names.add(String(ch.power));
         else if (!c.differentNames) n++;
-        else if (ch.name && !o.faceDown) names.add(ch.name);
+        else if (ch.name && !o.faceDown) differentlyNamed.push(charView(ch));
       }
-      return c.differentNames || c.differentManaValues || c.differentPowers || c.counterKinds ? names.size : n;
+      // "Differently named": the most of them with different names (CR 201.2b), Spy Kit's names counting (all-names.ts).
+      if (c.differentNames) return differentlyNamedCount(s, differentlyNamed);
+      return c.differentManaValues || c.differentPowers || c.counterKinds ? names.size : n;
     }
     case "mostSharingCreatureType": {
       // White Lotus Tile: for each creature type, how many creatures you control have it; a changeling has every one
@@ -1126,7 +1131,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const eachOne = c.byEachOne ? ctx.players?.({ ref: "eachOne" })[0] : undefined;
       const named = c.byOtherNamed ? (lk?.source?.name ?? (o ? characteristics(s, o).name : self ? defOf(s, self).name : undefined)) : undefined;
       if (c.byOtherNamed && !named) return 0;
-      return key ? (s.turnLog?.damageDealtTo?.[key] ?? []).filter((d) => (!c.byOtherNamed || (d.name === named && d.src !== key)) && (!c.byEachOne || d.controller === eachOne)).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
+      // "Other sources named ~" (the card's own name, literally): a source with Spy Kit's names as it dealt the damage is
+      // named so if that's a nonlegendary creature card's name (CR 612.7).
+      return key ? (s.turnLog?.damageDealtTo?.[key] ?? []).filter((d) => (!c.byOtherNamed || (d.name !== undefined && viewHasName(s, { name: d.name, ...(d.allNames ? { all: true } : {}) }, named!) && d.src !== key)) && (!c.byEachOne || d.controller === eachOne)).reduce((n, d) => n + (d.amount ?? 0), 0) : 0;
     }
     case "toxicValue": {
       const o = refObjects(s, c.of, ctx)[0];

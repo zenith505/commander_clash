@@ -1,5 +1,5 @@
 import { pruneMeddled } from "./run-laneb282";
-import { exiledWithNamed } from "../names";
+import { exiledWithNamed, nameView } from "../names";
 import { defMv, hasName, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import { isRealKicker, type AbilityBody, type BatchTrigger, type BendKind, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
@@ -460,7 +460,7 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
   if (en.ifCast && !entering.wasCast) return false;
   if (en.notFromHand && entering.castFromHand) return false;
   // Invader Parasite: named as a card exiled with the watcher is (a face-down permanent has no name, CR 708.2).
-  if (en.nameExiledWithSelf && (entering.faceDown || !exiledWithNamed(s, o, characteristics(s, entering).name))) return false;
+  if (en.nameExiledWithSelf && (entering.faceDown || !exiledWithNamed(s, o, nameView(s, entering)))) return false;
   if (o.id === entering.id) {
     if (en.orSelf) return true;
     if (en.other) return false;
@@ -1505,7 +1505,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Share the Spoils (round B300): "When they do": played with its permission.
         (!t.cast.viaEachTurnLinked || (ev.from === "exile" && playedViaEachTurn(s, o, land, false))) &&
         // Search the City (round B256): a land with the name of a card exiled with it.
-        (!t.cast.nameExiledWithSelf || (!land.faceDown && exiledWithNamed(s, o, characteristics(s, land).name)));
+        (!t.cast.nameExiledWithSelf || (!land.faceDown && exiledWithNamed(s, o, nameView(s, land))));
       add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "finalChapterResolved") {

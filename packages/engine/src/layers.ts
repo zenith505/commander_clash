@@ -24,6 +24,7 @@ import { basePower, baseToughness, castCardAs, defOf, identityOf, pairedWith } f
 import { activatedAbilityCount } from "./manaabilities";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
+import { charView, defNamedAny, differentlyNamedCount, mostWithSameName, viewHasName, viewNames, viewsShareName, type NameView } from "./all-names";
 import { liveEmblems } from "./emblems";
 import { bindChosenKeywords, CHOSEN_LAND_TYPE, COLOR_WORD, CREATURE_TYPES, IDENTITY_PROTECTION, isLandwalk, YOURS_BASIC_LANDWALK, LINKED_TYPES_PROTECTION, LINKED_CARD_KEYWORD, LINKED_CREATURE_CARD_KEYWORD, YARD_CREATURE_CARD_KEYWORD, EXILED_BLOOD_CREATURE_KEYWORD, OPPONENT_CREATURE_KEYWORD, YOURS_COLORS_PROTECTION, YOURS_ARTIFACT_MV_PROTECTION, protectionFromCardTypes, isEveryCreatureTypeText, stripReminder, subtypeSet } from "./keywords";
 import { bindGrantSource, compileCard, compileGranted, QUOTED_SOURCE_NAME } from "./oracle";
@@ -37,6 +38,7 @@ export function layerOf(m: Modification): Layer {
     case "control":
       return "2";
     case "setName":
+    case "allCardNames":
       return "3";
     case "addTypes":
     case "setTypes":
@@ -113,6 +115,11 @@ export function sparedFrom(s: GameState, hc: Characteristics, key: string, o: Ga
 
 export interface Characteristics {
   name: string;
+  /**
+   * Spy Kit (round 461, CR 612.7): it also has the name of each nonlegendary creature card. Compare names with
+   * all-names.ts (nameView in names.ts), never `name` alone.
+   */
+  allNames?: true;
   supertypes: string[];
   types: string[];
   subtypes: string[];
@@ -1144,7 +1151,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const me = chars.get(sourceId);
       const partner = me && meldPartnerName(defOf(s, src));
       if (!me || !partner || src.owner !== you || me.controller !== you) return false;
-      for (const [id, c] of chars) if (id !== sourceId && s.objects[id]!.owner === you && c.controller === you && c.name === partner && c.types.includes(cond.type)) return true;
+      // Spy Kit's names count (CR 612.7): such a creature is "named Midnight Scavengers" too.
+      for (const [id, c] of chars) if (id !== sourceId && s.objects[id]!.owner === you && c.controller === you && viewHasName(s, charView(c, s.objects[id]!.faceDown !== undefined), partner) && c.types.includes(cond.type)) return true;
       return false;
     }
     case "moreThanActive": {
@@ -1312,8 +1320,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (here && sub.faceDown) return true;
       const name = here ? chars.get(sub.id)?.name : defOf(s, sub).name;
       if (!name) return true;
-      for (const [id, c] of chars) if (c.controller === you && c.types.includes("Creature") && !(here && id === sub.id) && !s.objects[id]!.faceDown && sameName(c.name, name)) return false;
-      return !yard().some((d) => d.types.includes("Creature") && sameName(d.name, name));
+      // Spy Kit's names count on either side (CR 612.7, 201.2a).
+      const mine: NameView = here ? charView(chars.get(sub.id)!) : { name };
+      for (const [id, c] of chars) if (c.controller === you && c.types.includes("Creature") && !(here && id === sub.id) && !s.objects[id]!.faceDown && viewsShareName(s, charView(c), mine)) return false;
+      return !yard().some((d) => d.types.includes("Creature") && defNamedAny(d, viewNames(mine)));
     }
     case "subjectDamagedBy":
       return (s.turnLog?.damageDealtTo?.[`${subjectId}@${subjectZc}`] ?? []).some((d) => d.controller === you && ((cond.spell && !!d.spell) || d.subtypes.some((st) => cond.subtypes.includes(st))));
@@ -1380,10 +1390,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "sameNamed": {
       // An object with no name (face down) shares a name with nothing (CR 201.2a).
-      const byName = new Map<string, number>();
+      // Spy Kit's names count (CR 612.7): the most of them with one name in common.
+      const views: NameView[] = [];
       for (const [id, c] of chars)
-        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && !cond.notTypes?.some((t) => c.types.includes(t)) && !(cond.nontoken && s.objects[id]!.isToken) && c.name && !s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
-      return [...byName.values()].some((n) => n >= cond.n);
+        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && !cond.notTypes?.some((t) => c.types.includes(t)) && !(cond.nontoken && s.objects[id]!.isToken) && c.name && !s.objects[id]!.faceDown) views.push(charView(c));
+      return mostWithSameName(s, views) >= cond.n;
     }
     case "allShareColor": {
       // The colors the earlier layers left them (CR 613.1e), every player's.
@@ -1617,8 +1628,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.
-        const names = new Set<string>();
-        const byName = new Map<string, number>();
+        // Spy Kit's names count (CR 612.7, 201.2a-b): see all-names.ts.
+        const names: NameView[] = [];
+        const byName: NameView[] = [];
         const byType = new Map<string, number>();
         let everyType = 0;
         for (const [id, c] of chars) {
@@ -1630,12 +1642,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
             if (c.allCreatureTypes) everyType++;
             else for (const st of new Set(c.subtypes.filter((x) => CREATURE_TYPES.has(x)))) byType.set(st, (byType.get(st) ?? 0) + 1);
           } else if (cond.sameName) {
-            if (!s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
+            if (!s.objects[id]!.faceDown) byName.push(charView(c));
           } else if (!cond.differentNames) n++;
-          else if (!s.objects[id]!.faceDown) names.add(c.name);
+          else if (!s.objects[id]!.faceDown) names.push(charView(c));
         }
-        if (cond.differentNames) n = names.size;
-        if (cond.sameName) n = Math.max(0, ...byName.values());
+        if (cond.differentNames) n = differentlyNamedCount(s, names);
+        if (cond.sameName) n = mostWithSameName(s, byName);
         if (cond.sameCreatureType) n = everyType + Math.max(0, ...byType.values());
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (!cond.prime || isPrime(n));
       });
@@ -1828,7 +1840,8 @@ function opponentCreatureKeyword(s: GameState, e: Inst, chars: CharMap, keyword:
   const you = controllerOfInst(e, chars);
   const name = e.sourceId ? chars.get(e.sourceId)?.name : undefined;
   const opps = new Set(s.turnOrder.filter((p) => p !== you && !s.players[p]?.lost));
-  const theirs = [...chars.entries()].filter(([id, c]) => id !== e.sourceId && opps.has(c.controller) && c.types.includes("Creature") && c.name !== name).map(([, c]) => c);
+  // Spy Kit's names count (CR 612.7): such a creature is named Escaped Shapeshifter too.
+  const theirs = [...chars.entries()].filter(([id, c]) => id !== e.sourceId && opps.has(c.controller) && c.types.includes("Creature") && (name === undefined || !viewHasName(s, charView(c, !!s.objects[id]!.faceDown), name))).map(([, c]) => c);
   if (keyword === "Protection") {
     const colors = new Set<Color>();
     for (const c of theirs)
@@ -1952,10 +1965,19 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // name too is changed by a text-changing effect (CR 123.6c, 613.1c), so in layer 3.
       if (m.chosen) {
         const name = e.sourceId ? s.objects[e.sourceId]?.chosen?.name : undefined;
-        if (name !== undefined) c.name = name;
+        if (name !== undefined) {
+          c.name = name;
+          c.allNames = undefined; // CR 612.8
+        }
         return;
       }
       c.name = m.name;
+      // An effect that sets its name takes the names it had away (CR 612.8), Spy Kit's among them (timestamp order, 613.7).
+      c.allNames = undefined;
+      return;
+    case "allCardNames":
+      // Spy Kit: "has all names of nonlegendary creature cards in addition to its name" (CR 612.7).
+      c.allNames = true;
       return;
     case "setColors":
       // "~ is the chosen color" (Alloy Golem), "Enchanted land is the chosen color" (Shimmerwilds Growth): a static ability's,

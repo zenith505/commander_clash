@@ -24,3 +24,4 @@ export { blightOptions } from "./counters";
 export { keywordLabel, CREATURE_TYPES } from "./keywords";
 export { mayPayUse } from "./spend";
 export { channelProblem, channelling } from "./channel";
+export { commandCastable, resolveControlOf } from "./effects/run-round460";

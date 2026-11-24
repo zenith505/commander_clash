@@ -193,6 +193,7 @@ import { damageEstimate, objectSource, protectionHolder } from "./damage";
 import { blightOptions, removableCounters } from "./counters";
 import { pileCards } from "./effects/run-round386";
 import { eachOtherTargets } from "./effects/run-spells";
+import { commandCardFor, commandWay } from "./effects/run-round460";
 import { onlyPermanentOrPlayer, relatedOk } from "./effects/targeting";
 
 /**
@@ -264,6 +265,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = pend.options.filter((o) => o !== "none").sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
+    // Word of Command (round 460): the card we make the opponent play (commandCardFor), and how a controlled player plays it.
+    if (pend.kind === "chooseOption" && pend.what === "commandCard") {
+      const opp = s.resolving?.scratch?.command?.opp;
+      return [{ type: "chooseOption", player: pid, choice: opp !== undefined ? commandCardFor(s, opp, pend.options) : pend.options[0]! }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "commandPlay") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    if (pend.kind === "castFree" && pend.how === "commanded") return commandedCast(s, pid, pend.objectId) ?? [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "castFree" && pend.how === "mask") {
       const plan = planCast(s, pid, pend.objectId, undefined, undefined, "auto", undefined, { faceDown: true });
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
@@ -5458,6 +5466,29 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
  * A card we must cast "if able" (PendingDecision "castFree" `must`: Omen Machine, Wild Evocation) that no plan of ours
  * wants to cast: any modes and targets that are legal (CR 601.2b-c), paid for as usual (an additional cost included).
  */
+/**
+ * Word of Command (round 460): the card a controlled player must cast if able, as they'd cast it (the way commandWay
+ * found, targets and modes as they'd choose them), paid with their pool and their lands' mana.
+ */
+function commandedCast(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const way = commandWay(s, pid, id);
+  if (!way) return null;
+  // As we'd cast it ourselves (additional costs picked), else with the modes and targets we'd choose.
+  const own = way.alt ? castPlan(s, pid, id, false, undefined, way.alt) : way.face === undefined ? castPlan(s, pid, id, false) : null;
+  if (own) return own;
+  const o = obj(s, id);
+  const viaFace = (f: () => Action[] | null) => (way.face !== undefined ? asFace(s, o, way.face, f) : f());
+  return viaFace(() => {
+    const printed = castingBody(castDef(s, id, way.alt));
+    const modes = printed?.modal ? chooseModes(s, pid, printed, true, id)?.modes : undefined;
+    if (printed?.modal && !modes) return null;
+    const body = printed && withModes(printed, modes);
+    const targets = body?.targets.length ? (chooseTargets(s, pid, body, true, id) ?? undefined) : [];
+    const plan = targets ? planCast(s, pid, id, targets, modes, "auto", undefined, way) : null;
+    return plan ? plan.map((a) => (a.type === "castSpell" && a.objectId === id && way.face !== undefined ? { ...a, face: way.face } : a)) : null;
+  });
+}
+
 function forcedFreeCast(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
   const printed = castingBody(defOf(s, obj(s, id)));
   const modes = printed?.modal ? chooseModes(s, pid, printed, true, id)?.modes : undefined;

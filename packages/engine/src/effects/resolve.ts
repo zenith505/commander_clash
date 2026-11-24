@@ -62,6 +62,7 @@ import { runRestartGameEffect } from "./run-round452";
 import { runPsychicBattleEffect } from "./run-round453";
 import { runRound456Effect } from "./run-round456";
 import { runIllusionaryMaskEffect } from "./run-round458";
+import { endResolveControls, runWordOfCommandEffect } from "./run-round460";
 import { runAnyTypeOneSpellEffect } from "./run-round455";
 import { runGlimpseOfTomorrowEffect } from "./run-round390";
 import { runOpponentShufflesExiledInEffect, runThievesAuctionEffect, runWarpWorldEffect } from "./run-round376";
@@ -363,6 +364,8 @@ export function continueResolution(s: GameState): Resolution {
   }
   s.leftTogether = undefined;
   s.resolving = null;
+  // Word of Command (round 460): control "until ~ finishes resolving" or "while that spell is resolving" ends (CR 723.2).
+  if (s.resolveControls) endResolveControls(s, item.id);
   if (r.endTurn) return endTheTurn(s, item), "done";
   if (r.endCombat) return endTheCombatPhase(s, item), "done";
   // Narci, Fable Singer: it has finished resolving and left the stack (rulings).
@@ -2017,6 +2020,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runRound456Effect(s, e, ctx, src);
     case "illusionaryMask":
       return runIllusionaryMaskEffect(s, ctx, src);
+    case "wordOfCommand":
+      return runWordOfCommandEffect(s, e, ctx, src);
     case "glimpseOfTomorrow":
       return runGlimpseOfTomorrowEffect(s, ctx, src);
     case "faceDownPile":

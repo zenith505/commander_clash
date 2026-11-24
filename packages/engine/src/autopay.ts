@@ -933,7 +933,7 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   // Doubling Cube doubles the pool, so its cost is paid from the pool as it is (ManaProduce "doublePool").
   if (ab.produces.kind === "doublePool") return manaAbilityProblem(s, pid, o, ability) || !manaCombos(s, o, ab)?.[combo ?? -1] ? null : [{ type: "activateMana", player: pid, objectId, mana, ability, combo: combo! }];
   const payCost = manaAbilityCostOf(s, pid, o, ab);
-  const taps = payCost ? planMana(s, pid, payCost, 0, objectId, [...(tapped ?? []), ...(sacrifice ?? [])], { ability: o }) : [];
+  const taps = payCost ? planMana(s, pid, payCost, 0, objectId, [...(tapped ?? []), ...(sacrifice ?? [])], { ability: o, manaAbility: true }) : [];
   return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(sacrifice?.length ? { sacrifice } : {}), ...(extra?.length ? { extra } : {}), ...(instead ? { instead } : {}) }] : null;
 }
 

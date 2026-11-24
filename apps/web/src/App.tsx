@@ -7,6 +7,7 @@ import {
   crewLoyaltyChoices,
   dredgeAmount,
   castableFaces,
+  commandCastable,
   isType,
   objIsType,
   landFaces,
@@ -5716,6 +5717,44 @@ function Controls({
       </div>
     );
   }
+  if (pending?.kind === "castFree" && pending.how === "commanded") {
+    // Word of Command (round 460): the controlled player casts the chosen card if able, every choice yours, paying with
+    // the mana in their pool and their lands' mana abilities only (CR 723.5, 723.7); any way they could cast it.
+    const d = cardOf(s, pending.objectId);
+    const o = s.objects[pending.objectId]!;
+    const faces = castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"));
+    const ok = (choices: CostChoices) => {
+      const p = castProblem(s, HUMAN, pending.objectId, undefined, undefined, undefined, undefined, undefined, choices);
+      return !p || (/not enough mana/.test(p) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto", undefined, choices) !== null);
+    };
+    return (
+      <div className="controls" data-testid="command-cast">
+        <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
+          <strong>{pending.source}:</strong> {s.players[HUMAN]!.name} casts <strong>{d.name}</strong> if able. You make the choices; only the mana in their pool and their lands&apos; mana abilities can pay for it.
+        </span>
+        {s.cards[o.cardId]?.layout !== "split" && (
+          <button disabled={!ok({})} title={castProblem(s, HUMAN, pending.objectId) ?? ""} onClick={() => onCastFree(pending.objectId)}>
+            Cast it
+          </button>
+        )}
+        {faces.map((face) => (
+          <button key={face} className="face-cast" disabled={!ok({ face })} onClick={() => onCastFree(pending.objectId, face)}>
+            Cast {s.cards[registerFace(s, o, face)]!.name}
+          </button>
+        ))}
+        {altCostsFor(s, HUMAN, o).map((a) => (
+          <button key={a.kind} data-alt={a.kind} disabled={!ok({ alt: a.kind })} title={ALT_NOTES[a.kind]} onClick={() => onCastFree(pending.objectId, undefined, a.kind)}>
+            {a.text && !a.mana ? <>Cast it: {a.text}</> : <>{ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" /></>}
+          </button>
+        ))}
+        {!commandCastable(s, HUMAN, pending.objectId) && (
+          <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
+            Don&apos;t (can&apos;t cast it)
+          </button>
+        )}
+      </div>
+    );
+  }
   if (pending?.kind === "castFree") {
     const d = cardOf(s, pending.objectId);
     const o = s.objects[pending.objectId]!;
@@ -6140,7 +6179,8 @@ function Controls({
   // the legend rule's "keep which one?" (CR 704.5j); Gilgamesh's "attach one of them": hovering shows each card.
   // Dinosaur Headdress (round 448): the exiled creature cards used to craft it.
   // Finale of Promise (round 450): the card cast first, then the spell each next copy is of.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFirst" || pending.what === "copyNextOf" || pending.what === "attachCopy" || pending.what === "reblockAttacker" || pending.what === "cityCard" || pending.what === "faceUpAttach" || pending.what === "faceUpCopy" || pending.what === "castFromHand" || pending.what === "lookedCard" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "auraForToken" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
+  // Word of Command (round 460): the card chosen from the opponent's hand (hovering shows each), then how it's played.
+  if (pending?.kind === "chooseOption" && (pending.what === "castFirst" || pending.what === "commandCard" || pending.what === "commandPlay" || pending.what === "copyNextOf" || pending.what === "attachCopy" || pending.what === "reblockAttacker" || pending.what === "cityCard" || pending.what === "faceUpAttach" || pending.what === "faceUpCopy" || pending.what === "castFromHand" || pending.what === "lookedCard" || pending.what === "castFromAmong" || pending.what === "impulseChoice" || pending.what === "takeExiled" || pending.what === "pileCard" || pending.what === "legend" || pending.what === "revealHandOrTop" || pending.what === "exileHandOrPermanent" || pending.what === "copyOrder" || pending.what === "nextRevealed" || pending.what === "nextExiled" || pending.what === "attachWhich" || pending.what === "auraForToken" || pending.what === "predicamentCard" || pending.what === "alternatePick" || pending.what === "struggleExile") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

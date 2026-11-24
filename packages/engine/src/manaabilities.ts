@@ -251,7 +251,7 @@ export function doublePoolPayments(s: GameState, o: GameObject, ab: ManaAbility)
   let ways: ManaType[][] = [[]];
   for (let i = 0; i < n; i++)
     ways = ways.flatMap((w) => types.filter((m) => types.indexOf(m) >= types.indexOf(w[w.length - 1] ?? "W") && w.filter((x) => x === m).length < pool[m]).map((m) => [...w, m]));
-  return ways.filter((w) => canPayFromPool(s, pid, parseManaCost(w.map((m) => `{${m}}`).join("")), { ability: o }));
+  return ways.filter((w) => canPayFromPool(s, pid, parseManaCost(w.map((m) => `{${m}}`).join("")), { ability: o, manaAbility: true }));
 }
 
 /**
@@ -705,6 +705,18 @@ export function abolisherBan(s: GameState, pid: PlayerId, o: GameObject): string
   return src ? `${characteristics(s, obj(s, src)).name}: opponents can't activate abilities of artifacts, creatures or enchantments during ${player(s, s.activePlayer).name}'s turn` : null;
 }
 
+/**
+ * Word of Command (round 460): "While doing so, the player can activate mana abilities only if they're from lands that
+ * player controls" (CR 723.7): why `pid` can't activate a mana ability of `o` now, while they're made to cast a card
+ * (castFree `how` "commanded"); null otherwise.
+ */
+export function commandedProblem(s: GameState, pid: PlayerId, o: GameObject): string | null {
+  const pend = s.pending;
+  if (pend?.kind !== "castFree" || pend.how !== "commanded" || pend.player !== pid) return null;
+  if (o.zone === "battlefield" && objIsType(s, o, "Land") && controllerOf(s, o) === pid) return null;
+  return `only mana abilities of lands you control can be activated while you play ${defOf(s, obj(s, pend.objectId)).name} (Word of Command)`;
+}
+
 export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false, tap?: ObjectId[], /** Round B260: what's sacrificed for the sacrifices Brutal Suppression and Drought add (activateMana `sacrifice`); without it, whether they could be. */ sacrifice?: ObjectId[]): string | null {
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
@@ -716,6 +728,11 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (banned) return banned;
   // Sen Triplets (round 412): "that player can't ... activate abilities" this turn, mana abilities too (rulings).
   if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "noAbilities")) return "you can't activate abilities this turn";
+  // Word of Command (round 460): while made to play a card, only mana abilities of lands they control (CR 723.7). Rhystic
+  // Cave's question to the other players can't be asked in the middle of that cast here.
+  const commanded = commandedProblem(s, pid, o);
+  if (commanded) return commanded;
+  if (ab.unlessAnyPays && s.pending?.kind === "castFree" && s.pending.how === "commanded") return `${name}'s ability can't be activated while a card is played for Word of Command`;
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   // {Q} (CR 107.6): it must be tapped, a stun counter that stays keeps it so (rulings on Fear of Sleep Paralysis), and a
@@ -742,7 +759,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
     if (why) return why;
   }
   const payCost = manaAbilityCostOf(s, pid, o, ab);
-  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o, ...(ab.blueAsAny ? { blueAny: true as const } : {}) })) return "not enough mana";
+  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o, manaAbility: true, ...(ab.blueAsAny ? { blueAny: true as const } : {}) })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);

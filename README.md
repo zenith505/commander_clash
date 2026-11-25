@@ -8,7 +8,7 @@ apps/web          React + Vite game client that drives the engine.
 tools/            Card-data build script and a bot-vs-bot simulator.
 data/raw/         Scryfall bulk files and the Comprehensive Rules PDF (not in git).
 data/generated/   cards.json, rulings.json, sample-decks.json (built, not in git).
-docs/             ARCHITECTURE.md, ROADMAP.md (next work), HISTORY.md (done).
+docs/             ARCHITECTURE.md, DEVELOPING.md (setup, tests, rules), ROADMAP.md (next work), HISTORY.md (done).
 ```
 
 ## Run it
@@ -44,3 +44,5 @@ npm run simulate     # bots play full games, prints speed and winners
 npm run coverage     # how many Commander-legal cards are fully supported
 npm run blockers     # which rules-text lines block the most cards
 ```
+
+For setup in a cloud session, the test commands and how to add a card, see `docs/DEVELOPING.md`.

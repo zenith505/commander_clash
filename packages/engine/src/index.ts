@@ -26,3 +26,4 @@ export { mayPayUse } from "./spend";
 export { channelProblem, channelling } from "./channel";
 export { commandCastable, resolveControlOf } from "./effects/run-round460";
 export { spyKitTextNames, isNonlegendaryCreatureCardName } from "./all-names";
+export * from "./deckbuilding";

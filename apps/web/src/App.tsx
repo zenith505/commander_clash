@@ -256,7 +256,8 @@ import {
   seatOrder,
   unlessDiscardable,
 } from "@cc/engine";
-import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
+import { BuilderRoute, MainMenu, useHashRoute } from "./decks/Menu";
+import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
 import { ManaCost, ManaPoolView, RulesText } from "./Mana";
 
@@ -318,24 +319,10 @@ function DeckLoader() {
 
 function Lobby({ bundle }: { bundle: DeckBundle }) {
   const [game, setGame] = useState<GameState | null>(null);
+  const route = useHashRoute();
   if (game) return <Table key={game.seed} initial={game} onQuit={() => setGame(null)} />;
-  return (
-    <div className="lobby">
-      <h1>Commander Clash</h1>
-      <p>Pick your deck. The other three are played by bots.</p>
-      <div className="deck-list">
-        {bundle.decks.map((d, i) => {
-          const cmd = bundle.cards.find((c) => c.name === d.commander);
-          return (
-            <button key={d.name} className="deck-choice" onClick={() => setGame(newGame(bundle, i))}>
-              {cmd?.imageUrl && <img src={cmd.imageUrl} alt={cmd.name} />}
-              <span>{d.name}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  if (route.startsWith("decks/")) return <BuilderRoute route={route} />;
+  return <MainMenu bundle={bundle} onPlay={setGame} />;
 }
 
 type Corner = "tl" | "tr" | "bl" | "br";

@@ -37,6 +37,7 @@ import {
   timedCondition,
   type Action,
   type CardDef,
+  type Color,
   type GameState,
   type PlayerId,
   type Step,
@@ -70,7 +71,7 @@ const STACK_DELAY_MS = QUICK ? 60 : 450;
 
 export interface DeckBundle {
   /** `secondCommander`: a partner or a Background (CR 702.124). */
-  decks: { name: string; commander: string; secondCommander?: string; cards: string[] }[];
+  decks: { name: string; commander: string; secondCommander?: string; /** CR 903.4b's color, for a commander that has one chosen. */ commanderColor?: Color; secondCommanderColor?: Color; cards: string[] }[];
   cards: CardDef[];
 }
 
@@ -87,7 +88,15 @@ export function newGame(bundle: DeckBundle, humanDeck: number, seed = Date.now()
   const s = createGame(
     order.map((di, seat) => {
       const d = bundle.decks[di]!;
-      return { name: seat === YOU ? "You" : d.commander.split(",")[0]!, commander: get(d.commander), ...(d.secondCommander ? { secondCommander: get(d.secondCommander) } : {}), deck: d.cards.map(get), isBot: seat !== YOU };
+      return {
+        name: seat === YOU ? "You" : d.commander.split(",")[0]!,
+        commander: get(d.commander),
+        ...(d.secondCommander ? { secondCommander: get(d.secondCommander) } : {}),
+        ...(d.commanderColor ? { commanderColor: d.commanderColor } : {}),
+        ...(d.secondCommanderColor ? { secondCommanderColor: d.secondCommanderColor } : {}),
+        deck: d.cards.map(get),
+        isBot: seat !== YOU,
+      };
     }),
     seed,
     { mulligans: true },

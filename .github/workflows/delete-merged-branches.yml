@@ -1,0 +1,54 @@
+# Deletes remote branches whose work is already in main. Run it by hand from the
+# Actions tab ("Run workflow"). It only deletes a branch when:
+#   - its tip commit is an ancestor of main (every commit on it is in main), and
+#   - no open pull request uses it as its head or its base.
+# main itself is never touched. With dry_run on (the default) it only lists them.
+# A deleted branch can be restored from its merged pull request ("Restore branch").
+name: Delete merged branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list the branches, delete nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete branches fully contained in main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          gh pr list --state open --limit 1000 --json headRefName,baseRefName \
+            --jq '.[] | .headRefName, .baseRefName' | sort -u > keep.txt
+          echo "Kept for open pull requests:"; cat keep.txt
+          git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin \
+            | { grep -vx -e main -e HEAD || true; } | sort > all.txt
+          : > delete.txt
+          while read -r b; do
+            grep -qxF "$b" keep.txt && continue
+            if git merge-base --is-ancestor "refs/remotes/origin/$b" refs/remotes/origin/main; then
+              echo "$b" >> delete.txt
+            fi
+          done < all.txt
+          echo "$(wc -l < delete.txt) of $(wc -l < all.txt) branches are fully contained in main:"
+          cat delete.txt
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: nothing deleted."
+          else
+            xargs -r -n 50 git push origin --delete < delete.txt
+            echo "Deleted $(wc -l < delete.txt) branches."
+          fi

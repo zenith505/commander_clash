@@ -81,3 +81,17 @@ for play. When we add search-based AI we'll switch to structural sharing.
 
 `useGame.ts` holds the game state, runs the bots and records a loop for a shortcut ("Start a loop", then "Repeat"); `App.tsx` draws the table, hand, stack, log and every choice
 bar. Play-test URL params: `?hand=A|B`, `&board=`, `&yard=` (the cards must be in your deck).
+
+### Main menu and deck builder (`apps/web/src/decks/`)
+
+- `Menu.tsx`: the main menu (saved decks, starter decks) and the deck builder's addresses (`#decks/new`,
+  `#decks/import`, `#decks/<id>`), so a phone's back button works.
+- `DeckBuilder.tsx`, `DeckStats.tsx`: search, commander slots, the deck as images or a list, import/export dialogs and
+  the statistics. The logic is in the engine (`packages/engine/src/deckbuilding/`): `search.ts` (Scryfall's search
+  syntax over CardDefs), `decklist.ts` (reading Moxfield/Archidekt/MTG Arena lists), `stats.ts` (curve, colors,
+  hypergeometric land odds), `saved.ts` (the saved deck format and what stops it being played).
+- `pool.ts`: the card pool, `public/data/card-pool.json.gz`: every Commander-legal card the engine fully supports, written
+  by `npm run build:pool` (about 3 minutes, needs the unpacked card data) and unzipped in the browser. Regenerate it
+  whenever a round changes which cards are supported.
+- `store.ts`: `DeckStore`, the one interface saved decks go through; `deviceStore` keeps them in the browser.
+- `play.ts`: a saved deck plus three random starter decks for the bots, as a game bundle.

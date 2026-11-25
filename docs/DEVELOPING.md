@@ -1,8 +1,8 @@
-# Commander Clash
+# Developing Commander Clash
 
-4-player Commander (MTG): Ken against 3 bots. `packages/engine` is a pure TypeScript rules engine; `apps/web` is the
-React + Vite client. Work comes from `docs/ROADMAP.md`; finished rounds go in `docs/HISTORY.md`; the design is in
-`docs/ARCHITECTURE.md`.
+How to set up, test and extend the engine and client. `README.md` covers running the game;
+`docs/ROADMAP.md` lists the next work, `docs/HISTORY.md` the finished rounds, and
+`docs/ARCHITECTURE.md` the design.
 
 ## Rules correctness
 

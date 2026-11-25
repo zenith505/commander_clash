@@ -6,3 +6,6 @@ data/generated/
 *.log
 test-results/
 playwright-report/
+
+# Local Claude Code notes; the shared setup and rules guide is docs/DEVELOPING.md
+CLAUDE.md

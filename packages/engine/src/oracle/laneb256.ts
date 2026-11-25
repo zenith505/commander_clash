@@ -1,6 +1,7 @@
 // Lane B round B256's sentences, read at the end of round B240's chain (roundB240Sentence in oracle/laneb240.ts): False
 // Orders and Balduvian Warlord ("remove target ... from combat ..., then it blocks an attacking creature of your choice")
 // and Raiding Party. Search the City's trigger is read in oracle/laneb256-lines.ts.
+import { COLOR_OF_WORD } from "./color-template";
 import type { Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseObject } from "./targets";
@@ -35,7 +36,8 @@ export function roundB256Sentence(s: string, sentences: string[], si: number, ct
   // player in turn order from the active player (CR 101.4) chooses the creatures to tap and taps them, then up to two Plains
   // for each one tapped, anyone's, not targeted; then every Plains no player chose is destroyed at once (Effect
   // raidingParty). The color is white, not chosen anew (rulings).
-  if (plain(s) === "Each player may tap any number of untapped white creatures they control" && plain(sentences[si + 1]) === "For each creature tapped this way, that player chooses up to two Plains" && plain(sentences[si + 2]) === "Then destroy all Plains that weren't chosen this way by any player")
-    return ctx.activated ? { effect: { type: "raidingParty" }, next: si + 3 } : "fail";
+  const raid = /^Each player may tap any number of untapped (white|blue|black|red|green) creatures they control$/.exec(plain(s));
+  if (raid && plain(sentences[si + 1]) === "For each creature tapped this way, that player chooses up to two Plains" && plain(sentences[si + 2]) === "Then destroy all Plains that weren't chosen this way by any player")
+    return ctx.activated ? { effect: { type: "raidingParty", ...(raid[1] !== "white" ? { color: COLOR_OF_WORD[raid[1]!]! } : {}) }, next: si + 3 } : "fail";
   return roundB257Sentence(s, sentences, si, ctx);
 }

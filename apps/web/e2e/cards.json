@@ -8404,6 +8404,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9cf44db4-627a-4197-9588-6da72e41f03d",
+  "name": "Camouflage",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Cast this spell only during your declare attackers step.\nThis turn, instead of declaring blockers, each defending player chooses any number of creatures they control and divides them into a number of piles equal to the number of attacking creatures for whom that player is the defending player. Creatures those players control that can block additional creatures may likewise be put into additional piles. Assign each pile to a different one of those attacking creatures at random. Each creature in a pile that can block the creature that pile is assigned to does so. (Piles can be empty.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d00fb28-ea6c-49a9-b4af-ffb38860a9a7",
   "name": "Cancel",
   "manaCost": "{1}{U}{U}",
@@ -18592,32 +18618,6 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "mythic",
-  "layout": "normal",
-  "gameChanger": false
- },
- {
-  "oracleId": "efd9cc25-f445-4de0-9a69-adab9f8878f4",
-  "name": "False Dawn",
-  "manaCost": "{1}{W}",
-  "cmc": 2,
-  "typeLine": "Sorcery",
-  "supertypes": [],
-  "types": [
-   "Sorcery"
-  ],
-  "subtypes": [],
-  "oracleText": "Until end of turn, spells and abilities you control that would add colored mana instead add that much white mana. Until end of turn, you may spend white mana as though it were mana of any color.\nDraw a card.",
-  "colors": [
-   "W"
-  ],
-  "colorIdentity": [
-   "W"
-  ],
-  "keywords": [],
-  "commanderLegal": "legal",
-  "set": "apc",
-  "releasedAt": "2001-06-04",
-  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -47272,6 +47272,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1cdf30de-d88c-421a-80df-4917bbd2f09e",
+  "name": "Silent Arbiter",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "No more than one creature can attack each combat.\nNo more than one creature can block each combat.",
+  "power": "1",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5a074b0a-3a4d-4c6f-b161-5d1281f6136d",
   "name": "Silhouette",
   "manaCost": "{1}{U}",
@@ -51327,6 +51354,32 @@
   "commanderLegal": "legal",
   "set": "ncc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "eed742c3-006f-475c-aa62-41f971d328cb",
+  "name": "Swirl the Mists",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose a color word.\nAll instances of color words in the text of spells and permanents are changed to the chosen color word.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

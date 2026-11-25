@@ -44,8 +44,9 @@ export function runGainActivatedOfEffect(s: GameState, e: Extract<Effect, { type
   }
   // Grell Philosopher: "You may spend blue mana as though it were mana of any color to activate those abilities.": those only.
   if (e.blueAsAny) {
-    activated = activated.map((a) => ({ ...a, blueAsAny: true as const }));
-    mana = mana.map((m) => ({ ...m, blueAsAny: true as const }));
+    const blue = e.blueAsAny;
+    activated = activated.map((a) => ({ ...a, blueAsAny: blue }));
+    mana = mana.map((m) => ({ ...m, blueAsAny: blue }));
   }
   return runEffectInner(s, { type: "continuous", what: e.what, mods: [{ kind: "addAbility", text: gainedAbilityText(name, activated, mana) }], duration: "endOfTurn" }, ctx);
 }

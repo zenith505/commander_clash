@@ -47,6 +47,13 @@ export function changeWords(text: string, c: TextChange, names: string[]): strin
   let t = text;
   for (const n of [...new Set(names.filter(Boolean))].sort((a, b) => b.length - a.length)) t = t.replace(new RegExp(`(?<![\\p{L}\\p{N}])${esc(n)}(?![\\p{L}\\p{N}])`, "gu"), hide);
   t = t.replace(/(\bnamed )([A-Z][\w'-]*(?:,? (?:of|the|and|[A-Z][\w'-]*))*)/g, (_, a: string, n: string) => `${a}${hide(n)}`);
+  // Reminder text isn't rules text (CR 207.2): Mjölnir's "(A creature is worthy if it's ... red and/or white.)" stays, as the
+  // rules define worthy (CR 700.16).
+  t = t.replace(/\([^()]*\)/g, hide);
+  // A color word written with a capital letter inside a sentence is part of a name, not a color word (CR 612.2): "Create a
+  // Black Lotus token" (Arzakon), "and Black Lotus" (Garth One-Eye's list of card names), "Partner with Blue, Loyal Raptor",
+  // "transforms into Black Chocobo", "Deal with the Black Guardian" (a flavor word).
+  if (c.kind === "color") t = t.replace(/(?<=[\p{Ll}\p{N},] )(?:White|Blue|Black|Red|Green)(?![\p{L}])/gu, hide);
   // Each new word is marked while articles before it are fixed ("a Island" is "an Island", "an Elf" becomes "a Goblin").
   const mark = (w: string) => `\u0006${w}\u0006`;
   if (c.kind === "color") {

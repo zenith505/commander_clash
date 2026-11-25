@@ -4,7 +4,8 @@
 import type { CompiledCard } from "../abilities";
 import { parseActivated } from "./activated";
 
-const ZEMO = /^(Boast — Exile any number of black cards from your graveyard with fifteen or more black mana symbols among their mana costs): (Copy those exiled cards\. You may cast up to three of the copies without paying their mana costs\.)$/;
+// Its colors as a text change of color words leaves them (CR 612.2: "black mana symbols" is a color word used as one).
+const ZEMO = /^(Boast — Exile any number of (?:white|blue|black|red|green) cards from your graveyard with fifteen or more (white|blue|black|red|green) mana symbols among their mana costs): (Copy those exiled cards\. You may cast up to three of the copies without paying their mana costs\.)$/;
 
 /** One line of a card's text, compiled into `out`; false when it isn't one of these. */
 export function roundB299Line(line: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -20,7 +21,7 @@ export function roundB299Line(line: string, out: CompiledCard, isSpell: boolean)
   // isn't one (CR 702.114a).
   const a = parseActivated(`${m[1]}: Draw a card.`);
   const cost = a && a !== "fail" && a.costs?.length === 1 ? a.costs[0] : undefined;
-  if (!a || a === "fail" || cost?.kind !== "collectEvidence" || cost.symbols !== "B" || !cost.costCards || cost.n !== 15 || a.manaCost || a.tap || !a.oncePerTurn || a.activateIf?.kind !== "self") return fail();
+  if (!a || a === "fail" || cost?.kind !== "collectEvidence" || cost.symbols !== ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[m[2] as "black"] || !cost.costCards || cost.n !== 15 || a.manaCost || a.tap || !a.oncePerTurn || a.activateIf?.kind !== "self") return fail();
   // "Copy those exiled cards. You may cast up to three of the copies without paying their mana costs.": the cards the cost
   // exiled, still in exile as those objects (CR 400.7), copied in exile and the copies cast one at a time as this resolves,
   // in the order its controller chooses, timing ignored (CR 707.12, 608.2g), without paying their mana costs, so X is 0 and
@@ -29,7 +30,7 @@ export function roundB299Line(line: string, out: CompiledCard, isSpell: boolean)
   out.activated.push({
     ...a,
     text: line,
-    body: { targets: [], effects: [{ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromCost: true, max: 3 }], text: m[2]! },
+    body: { targets: [], effects: [{ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromCost: true, max: 3 }], text: m[3]! },
   });
   return true;
 }

@@ -9,6 +9,7 @@ import type { Ctx } from "./body";
 import { parseSentence } from "./sentence";
 import { parseTrigger } from "./triggers";
 import { round361Sentence } from "./round361";
+import { colorTemplate, withColors } from "./color-template";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -76,8 +77,10 @@ export function round360Line(line: string, raw: string, out: CompiledCard, isSpe
   // (CR 603.4), checked as you attack and as it resolves: you have the initiative, or a player (not a planeswalker or
   // battle) your creatures attack in this combat does (CR 506.3, 726.1). The tokens attack a player or planeswalker you
   // choose (CR 508.4).
-  if (line === SWEEP) {
-    const t = isSpell ? null : parseTrigger("Whenever you attack, if you have the initiative, you create two 1/1 white Soldier creature tokens that are tapped and attacking.");
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const sweep = colorTemplate(SWEEP, line);
+  if (sweep) {
+    const t = isSpell ? null : parseTrigger(withColors("Whenever you attack, if you have the initiative, you create two 1/1 white Soldier creature tokens that are tapped and attacking.", sweep));
     if (!t || t === "fail" || t.event !== "creaturesYouControlAttack" || t.ifCond?.kind !== "initiative") {
       out.unsupported.push(raw);
       return true;

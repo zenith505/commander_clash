@@ -61,12 +61,14 @@ export function round358Sentence(s: string, sentences: string[], si: number, ctx
   if (
     !ctx.spell &&
     /^[Yy]ou may choose any number of target lands you control and put an awakening counter on each of them$/.test(line) &&
-    plain(sentences[si + 1]) === "Each of those lands is an 8/8 green Elemental creature for as long as it has an awakening counter on it" &&
+    // Another color after a text change of color words (round 462).
+    /^Each of those lands is an 8\/8 (?:white|blue|black|red|green) Elemental creature for as long as it has an awakening counter on it$/.test(plain(sentences[si + 1]) ?? "") &&
     plain(sentences[si + 2]) === "They're still lands"
   ) {
     const before = ctx.targets.length;
     const put = parseSentence("Put an awakening counter on each of any number of target lands you control", ctx);
-    const become = put ? parseSentence("They become 8/8 green Elemental creatures that are still lands until end of turn", ctx) : null;
+    const liegeColor = /an 8\/8 ([a-z]+) Elemental/.exec(plain(sentences[si + 1]) ?? "")![1]!;
+    const become = put ? parseSentence(`They become 8/8 ${liegeColor} Elemental creatures that are still lands until end of turn`, ctx) : null;
     const counters = put?.length === 1 && put[0]!.type === "counters" ? put[0]! : undefined;
     const animate = become?.length === 1 && become[0]!.type === "continuous" && become[0]!.duration === "endOfTurn" && become[0]!.mods.some((m) => m.kind === "addTypes" && m.types.includes("Creature")) && !become[0]!.mods.some((m) => m.kind === "setTypes") ? become[0]! : undefined;
     if (!counters || !animate || ctx.targets.length !== before + 1 || JSON.stringify(animate.what) !== JSON.stringify(counters.what)) return "fail";

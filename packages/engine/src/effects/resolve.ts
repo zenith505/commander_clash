@@ -13,6 +13,7 @@ import { RulesError, type CardDef, type Chosen, type Color, type GameObject, typ
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import { syncShapes } from "../shapeshift";
+import { syncSwirls } from "../swirl";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindAttachedToSource, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sameNamedAnywhere, sharingName, sharingAColor, sharingACreatureType, sameManaValued, checkTotals, relatedOk, printedMatches, spellMatches, saddledSource, itemQuality } from "./targeting";
@@ -343,6 +344,7 @@ export function continueResolution(s: GameState): Resolution {
       closeZoneBatch(s); // its "one or more" triggers (CR 603.2c)
       closeGraveyardBatch(s);
       syncShapes(s); // Volrath's Shapeshifter (round 459): the top cards of graveyards after the last instruction
+      syncSwirls(s); // Swirl the Mists (round 462): what's on the battlefield and the stack after the last instruction
       // Auras coming back because the last instruction made an "until ~ leaves" source leave (CR 303.4f, 610.3).
       if (askAuraReturns(s) === "asked") return "paused";
       if (askGraveyardOrder(s)) return "paused";
@@ -2261,6 +2263,11 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runLaneB254Effect(s, e, ctx, src);
     case "whimsPiles":
       return runLaneB255Effect(s, e, ctx, src);
+    case "camouflage":
+      // Camouflage (round 462): this turn's declare blockers steps make piles instead (camouflage.ts).
+      s.camouflageTurn = s.turn;
+      log(s, "This turn, each defending player divides their creatures into piles instead of declaring blockers (Camouflage).");
+      return;
     case "reblock":
     case "raidingParty":
     case "searchTheCity":

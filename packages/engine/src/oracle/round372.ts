@@ -2,6 +2,7 @@
 // (Reap) and a land put in from among the cards cascade exiled (Averna, the Chaos Bloom).
 import type { AbilityBody, CompiledCard, TargetSpec } from "../abilities";
 import { parseBody } from "./body";
+import { colorTemplate, withColors } from "./color-template";
 
 const fail = (out: CompiledCard, raw: string) => {
   out.unsupported.push(raw);
@@ -26,16 +27,18 @@ export function round372Line(line: string, raw: string, out: CompiledCard, isSpe
   // targets there are, and not again later). The opponent comes first among its targets, so its place is the same
   // whatever is chosen for "up to X" (see manyX). As it resolves, the cards still legal return (CR 608.2b), whatever
   // became of the opponent.
-  if (line === REAP) {
+  const reap = colorTemplate(REAP, line);
+  if (reap) {
+    const word = withColors("black", reap);
     if (!isSpell || out.spell) return fail(out, raw);
-    const b = parseBody("Return up to X target cards from your graveyard to your hand, where X is the number of black permanents you control.", { spell: true });
+    const b = parseBody(`Return up to X target cards from your graveyard to your hand, where X is the number of ${word} permanents you control.`, { spell: true });
     const cards = b?.targets.length === 1 ? b.targets[0] : undefined;
     const count = cards?.manyCount?.count;
     const bounce = b?.effects.length === 1 ? b.effects[0] : undefined;
     if (!b || !cards || cards.many !== "x" || count?.kind !== "permanents" || count.filter.controller !== "you" || bounce?.type !== "bounce" || bounce.what.ref !== "target" || bounce.what.index !== 0) return fail(out, raw);
     const { controller: _you, ...black } = count.filter;
     const opponent: TargetSpec = { kind: "player", opponent: true, text: "target opponent" };
-    const many: TargetSpec = { ...cards, manyCount: { ...cards.manyCount!, count: { ...count, filter: { ...black, text: "black permanents target opponent controls" }, whose: { ref: "target", index: 0 } } } };
+    const many: TargetSpec = { ...cards, manyCount: { ...cards.manyCount!, count: { ...count, filter: { ...black, text: `${word} permanents target opponent controls` }, whose: { ref: "target", index: 0 } } } };
     const body: AbilityBody = { targets: [opponent, many], effects: [{ ...bounce, what: { ...bounce.what, index: 1 } }], text: line };
     out.spell = body;
     return true;

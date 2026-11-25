@@ -4,6 +4,7 @@
 import type { AdditionalCost, CompiledCard, Effect, TargetSpec } from "../abilities";
 import { parseActivated } from "./activated";
 import { parseTrigger } from "./triggers";
+import { colorTemplate, withColors } from "./color-template";
 
 const fail = (out: CompiledCard, raw: string) => {
   out.unsupported.push(raw);
@@ -34,8 +35,10 @@ export function round398Line(line: string, raw: string, out: CompiledCard, isSpe
   // ...": the costs are ~ itself and one artifact you control with each of those names (CR 201.2; a copy named so too,
   // rulings), all exiled as the cost is paid (CR 602.2b, 601.2h). The token has the triggered abilities of the cards
   // exiled (TokenSpec.triggersOfExiled, effects/run-tokens.ts): as they are in exile, part of its copiable values (rulings).
-  if (line === BOOK) {
-    const a = isSpell ? null : parseActivated("{T}, Exile ~: Create Vecna, a legendary 8/8 black Zombie God creature token with indestructible.");
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const book = colorTemplate(BOOK, line);
+  if (book) {
+    const a = isSpell ? null : parseActivated(withColors("{T}, Exile ~: Create Vecna, a legendary 8/8 black Zombie God creature token with indestructible.", book));
     const create = a && a !== "fail" ? a.body.effects[0] : undefined;
     if (!a || a === "fail" || !a.tap || !a.exileSelf || a.costs?.length || a.body.effects.length !== 1 || create?.type !== "createToken" || !create.token.named || !create.token.legendary) return fail(out, raw);
     const named = (name: string): TargetSpec => ({ kind: "object", types: ["Artifact"], notTypes: [], notColors: [], named: name, text: `artifact named ${name}` });

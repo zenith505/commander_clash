@@ -5,6 +5,7 @@
 import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseSearchFilter } from "./search";
 import { parseTrigger } from "./triggers";
+import { colorTemplate, withColors } from "./color-template";
 
 const CHANDRA_PLUS = "Discard your hand, then exile the top three cards of your library. Until end of turn, you may play cards exiled this way.";
 const CHANDRA_ULT = "Search your graveyard and library for any number of red instant and/or sorcery cards, exile them, then shuffle. You may cast them this turn. Add six {R}.";
@@ -19,8 +20,10 @@ export function round370WholeText(text: string, parse: (t: string) => AbilityBod
   // any number of cards that fit, none too (CR 701.23b); they're exiled face up and may be cast this turn, paying their
   // costs, with their normal timing (rulings); then the library is shuffled. A loyalty ability, so the mana is added as it
   // resolves, not as a mana ability (CR 605.1a, rulings).
-  if (t === CHANDRA_ULT) {
-    const filter = parseSearchFilter("red instant or sorcery cards");
+  // Its color as a text change of color words leaves it (color-template.ts, round 462).
+  const ult = colorTemplate(CHANDRA_ULT, t);
+  if (ult) {
+    const filter = parseSearchFilter(withColors("red instant or sorcery cards", ult));
     const mana = parse("Add six {R}.");
     const add = mana?.effects.length === 1 && mana.targets.length === 0 ? mana.effects[0] : undefined;
     if (!filter || add?.type !== "addMana") return null;

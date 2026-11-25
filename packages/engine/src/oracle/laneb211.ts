@@ -4,6 +4,7 @@ import { parseActivated } from "./activated";
 import { parseBody } from "./body";
 import { parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
+import { colorTemplate, withColors } from "./color-template";
 
 /** Call to Arms: "the chosen color is the most common color among nontoken permanents the chosen player controls but isn't tied for most common". */
 const MOST_COMMON = "the chosen color is the most common color among nontoken permanents the chosen player controls but isn't tied for most common";
@@ -38,9 +39,11 @@ export function roundB211Line(line: string, raw: string, out: CompiledCard, isSp
   // Call to Arms: "White creatures get +1/+1 as long as ...": every white creature, anyone's (rulings), while the color
   // chosen as it entered has more nontoken permanents of that color controlled by the opponent chosen then than any other
   // color does (multicolored ones counted for each color, colorless ones not, rulings), whoever controls it now (rulings).
-  if (line === `White creatures get +1/+1 as long as ${MOST_COMMON}.`) {
+  // Its color as a text change of color words leaves it (color-template.ts).
+  const arms = colorTemplate(`White creatures get +1/+1 as long as ${MOST_COMMON}.`, line);
+  if (arms) {
     if (!out.entersChoose?.some((c) => c.what === "color") || out.entersChoosePlayer !== "opponent") return fail();
-    const st = parseStatic("White creatures get +1/+1.");
+    const st = parseStatic(withColors("White creatures get +1/+1.", arms));
     if (!st || st.affects.kind !== "filter" || st.condition) return fail();
     out.statics.push({ ...st, condition: { kind: "chosenColorMostCommonOfChosen" }, text: line });
     return true;

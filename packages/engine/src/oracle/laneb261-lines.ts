@@ -3,6 +3,8 @@
 import type { CompiledCard, TargetSpec } from "../abilities";
 import { parseBody, replaceX } from "./body";
 import { parseTrigger } from "./triggers";
+import { colorTemplate } from "./color-template";
+import { COLOR_NAMES } from "../effects/describe";
 
 const MANGARA = "Whenever a creature of the chosen color deals damage to you or a white creature you control, ~ deals that much damage to that creature.";
 const TURF_ENTERS = "When ~ enters, for each player, put a contested counter on target land that player controls.";
@@ -20,21 +22,24 @@ export function roundB261Line(line: string, out: CompiledCard, isSpell: boolean)
     return true;
   };
   // Mangara's Equity: "As ~ enters, choose black or red." (CR 614.12): one of these two colors, kept as Chosen.color.
-  if (line === "As ~ enters, choose black or red.") {
+  // Its colors as a text change of color words leaves them (color-template.ts): one, "choose white", once both are white.
+  const equity = colorTemplate("As ~ enters, choose black or red.", line);
+  if (equity) {
     if (out.entersChoose?.some((c) => c.what === "color")) return fail();
-    (out.entersChoose ??= []).push({ what: "color", options: ["Black", "Red"] });
+    (out.entersChoose ??= []).push({ what: "color", options: equity[0]!.map((c) => COLOR_NAMES[c]) });
     return true;
   }
   // Mangara's Equity: a creature permanent (CR 109.2) of the chosen color, as it deals the damage, dealing it to you or to a
   // white creature you control: once for each creature and each of them dealt damage, "that much" what that one was dealt
   // (the rulings on Flameblade Angel and Elesh Norn: "you or a permanent you control" triggers for each recipient). "That
   // creature" is the creature that dealt the damage; gone from the battlefield, it isn't dealt any (CR 120.4, 400.7).
-  if (line === MANGARA) {
+  const mangara = colorTemplate(MANGARA, line);
+  if (mangara) {
     if (!out.entersChoose?.some((c) => c.what === "color")) return fail();
     const body = parseBody("~ deals X damage to it.", { subjectIt: true });
     const fx = body?.effects[0];
     if (!body || body.targets.length || body.effects.length !== 1 || fx?.type !== "damage") return fail();
-    out.triggers.push({ event: "creatureDamagesYouOrYours", creatureDamagesYours: { creatureColor: "W" }, body: { ...replaceX(body, { count: { kind: "eventAmount" } }), text: "~ deals that much damage to that creature." } });
+    out.triggers.push({ event: "creatureDamagesYouOrYours", creatureDamagesYours: { creatureColor: mangara[0]![0]! }, body: { ...replaceX(body, { count: { kind: "eventAmount" } }), text: "~ deals that much damage to that creature." } });
     return true;
   }
   // Turf War: one target land for each player, its controller first (CR 601.2c, 603.3d), each player's own. The number of

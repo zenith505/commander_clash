@@ -5,6 +5,7 @@
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { round351Sentence } from "./round351";
+import { colorTemplate } from "./color-template";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -72,7 +73,9 @@ export function round350Line(line: string, raw: string, out: CompiledCard, isSpe
   // Desert Warfare: "At the beginning of combat on your turn, if you control five or more Deserts, create that many 1/1 red,
   // green, and white Sand Warrior creature tokens. They gain haste.": an intervening "if" (CR 603.4), "that many" the
   // Deserts you control as it resolves; the haste lasts with no duration stated (CR 611.2a).
-  if (line === "At the beginning of combat on your turn, if you control five or more Deserts, create that many 1/1 red, green, and white Sand Warrior creature tokens. They gain haste.") {
+  // Its colors as a text change of color words leaves them (color-template.ts).
+  const warfare = colorTemplate("At the beginning of combat on your turn, if you control five or more Deserts, create that many 1/1 red, green, and white Sand Warrior creature tokens. They gain haste.", line);
+  if (warfare) {
     if (isSpell) {
       out.unsupported.push(raw);
       return true;
@@ -84,10 +87,10 @@ export function round350Line(line: string, raw: string, out: CompiledCard, isSpe
       body: {
         targets: [],
         effects: [
-          { type: "createToken", who: { ref: "you" }, n: { count: { kind: "permanents", filter: { ...deserts, controller: "you" } } }, token: { name: "Sand Warrior", power: 1, toughness: 1, colors: ["R", "G", "W"], types: ["Creature"], subtypes: ["Sand", "Warrior"], keywords: [] } },
+          { type: "createToken", who: { ref: "you" }, n: { count: { kind: "permanents", filter: { ...deserts, controller: "you" } } }, token: { name: "Sand Warrior", power: 1, toughness: 1, colors: warfare[0]!, types: ["Creature"], subtypes: ["Sand", "Warrior"], keywords: [] } },
           { type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: ["Haste"] }], duration: "game" },
         ],
-        text: "if you control five or more Deserts, create that many 1/1 red, green, and white Sand Warrior creature tokens. They gain haste.",
+        text: line.slice(line.indexOf(", ") + 2),
       },
     });
     return true;

@@ -4,6 +4,7 @@
 import type { CompiledCard, Effect } from "../abilities";
 import type { Ctx } from "./body";
 import { parseCardTarget, parseObject } from "./targets";
+import { COLOR_OF_WORD } from "./color-template";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -24,8 +25,10 @@ export function round400Sentence(s: string, sentences: string[], si: number, ctx
     const from = parseObject(gain[2]!, ctx);
     const t = ctx.targets[before];
     if (from?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "object" || !t.types?.length || t.optional) return "fail";
-    const blue = plain(sentences[si + 1]) === "You may spend blue mana as though it were mana of any color to activate those abilities";
-    return { effect: { type: "gainActivatedOf", what, from, ...(blue ? { blueAsAny: true as const } : {}) }, next: si + (blue ? 2 : 1) };
+    // Blue as printed; any color word after a text change of color words (round 462).
+    const spend = /^You may spend (white|blue|black|red|green) mana as though it were mana of any color to activate those abilities$/.exec(plain(sentences[si + 1]) ?? "");
+    const blue = spend ? COLOR_OF_WORD[spend[1]!]! : undefined;
+    return { effect: { type: "gainActivatedOf", what, from, ...(blue ? { blueAsAny: blue } : {}) }, next: si + (blue ? 2 : 1) };
   }
   // Havengul Lich: "You may cast target creature card in a graveyard this turn. When you cast it this turn, ~ gains all
   // activated abilities of that card until end of turn.": a permission for that card (any player's graveyard), paying its
@@ -47,9 +50,11 @@ export function round400Line(line: string, raw: string, out: CompiledCard, isSpe
   // Quicksilver Elemental: "You may spend blue mana as though it were mana of any color to pay the activation costs of ~'s
   // abilities." (CR 609.4b): the costs of every activated ability it has, mana and gained ones among them (CR 602.1,
   // 605.1a); not costs that aren't an activation's (cumulative upkeep, turning it face up), as Manascape Refractor's.
-  if (line === "You may spend blue mana as though it were mana of any color to pay the activation costs of ~'s abilities.") {
-    if (isSpell) out.unsupported.push(raw);
-    else out.spendBlueAnyColorOwnAbilities = true;
+  // Blue as printed; any color word after a text change of color words (round 462).
+  const own = /^You may spend (white|blue|black|red|green) mana as though it were mana of any color to pay the activation costs of ~'s abilities\.$/.exec(line);
+  if (own) {
+    if (isSpell || out.spendBlueAnyColorOwnAbilities) out.unsupported.push(raw);
+    else out.spendBlueAnyColorOwnAbilities = COLOR_OF_WORD[own[1]!]!;
     return true;
   }
   return false;

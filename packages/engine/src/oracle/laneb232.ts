@@ -2,6 +2,7 @@
 // whole spells (after round B231's).
 import type { AbilityBody, CompiledCard, TargetSpec } from "../abilities";
 import { parseActivated } from "./activated";
+import { colorTemplate, withColors } from "./color-template";
 import { roundB233Spell } from "./laneb233";
 import { parseTrigger } from "./triggers";
 
@@ -34,16 +35,17 @@ export function roundB232Line(line: string, raw: string, out: CompiledCard, isSp
   // Heroism: the attacking red creatures as it resolves, each controller asked in turn order (CR 101.4) whether to pay
   // {2}{R} for each of theirs, then (rulings) paid or not; one not paid for has all the combat damage it would deal this
   // turn prevented, as the creature it is (CR 615.1, 611.2c). Paying stops only this activation's prevention (rulings).
-  if (line === HEROISM) {
-    const a = parseActivated("Sacrifice a white creature: Tap all attacking red creatures.");
+  const heroism = colorTemplate(HEROISM, line);
+  if (heroism) {
+    const a = parseActivated(withColors("Sacrifice a white creature: Tap all attacking red creatures.", heroism));
     const tap = a && a !== "fail" ? a.body.effects[0] : undefined;
     const cost = a && a !== "fail" && a.costs?.length === 1 ? a.costs[0] : undefined;
     if (!a || a === "fail" || a.tap || a.manaCost || cost?.kind !== "sacrifice" || cost.n !== 1 || a.body.effects.length !== 1 || tap?.type !== "tap" || tap.what.ref !== "each") {
       out.unsupported.push(raw);
       return true;
     }
-    const filter: TargetSpec = { ...tap.what.filter, text: "attacking red creature" };
-    const text = "For each attacking red creature, prevent all combat damage that would be dealt by that creature this turn unless its controller pays {2}{R}.";
+    const filter: TargetSpec = { ...tap.what.filter, text: withColors("attacking red creature", [heroism[1]!]) };
+    const text = line.slice(line.indexOf(": ") + 2);
     out.activated.push({ ...a, text: raw, body: { targets: [], effects: [{ type: "attackersPayOrPrevent", filter, cost: "{2}{R}" }], text } });
     return true;
   }

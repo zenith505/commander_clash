@@ -4,6 +4,7 @@ import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseBody } from "./body";
 import { roundB230Spell } from "./laneb230";
 import { parseTrigger } from "./triggers";
+import { colorTemplate } from "./color-template";
 
 const DESPOILER = "As ~ enters, you may put two cards your opponents own from exile into their owners' graveyards. If you do, ~ enters with four +1/+1 counters on it.";
 const WAR_MACHINE = "When ~ dies, destroy all Merfolk tapped this turn to pay for its abilities.";
@@ -49,11 +50,13 @@ export function roundB229Spell(text: string): AbilityBody | null | undefined {
   // you this turn. Draw a card at the beginning of the next turn's upkeep.": a red instant or a red sorcery (rulings), red as
   // it dealt the damage, the latest one; its controller as it dealt it (TurnLog.spellDamage). No target. Then the delayed
   // draw (CR 603.7).
-  if (text === SUFFOCATION) {
+  // Its color as a text change of color words leaves it (color-template.ts, round 462).
+  const suffocation = colorTemplate(SUFFOCATION, text);
+  if (suffocation) {
     const b = parseBody("~ deals 4 damage to each opponent. Draw a card at the beginning of the next turn's upkeep.", { spell: true });
     const [dmg, draw] = b?.effects ?? [];
     if (!b || b.targets.length || b.effects.length !== 2 || dmg?.type !== "damage" || dmg.to.ref !== "eachOpponent" || dmg.amount !== 4 || draw?.type !== "delayed") return null;
-    return { targets: [], effects: [{ ...dmg, to: { ref: "lastSpellDamagedYou", color: "R", types: ["Instant", "Sorcery"] } }, draw], text };
+    return { targets: [], effects: [{ ...dmg, to: { ref: "lastSpellDamagedYou", color: suffocation[0]![0]!, types: ["Instant", "Sorcery"] } }, draw], text };
   }
   // Backdraft: see Effect halfSpellDamageBack.
   if (text === BACKDRAFT) return { targets: [], effects: [{ type: "halfSpellDamageBack" }], text };

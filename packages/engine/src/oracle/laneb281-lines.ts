@@ -1,6 +1,7 @@
 // Lane B round B281's lines, read by compileCard before the generic triggers and statics (after round B280's): Celestial
 // Dawn's three static abilities, Drain Power's spell.
 import type { CompiledCard } from "../abilities";
+import { colorTemplate } from "./color-template";
 
 const DAWN_LANDS = "Lands you control are Plains.";
 const DAWN_WHITE = "Nonland permanents you control are white. The same is true for spells you control and nonland cards you own that aren't on the battlefield.";
@@ -22,17 +23,20 @@ export function roundB281Line(line: string, out: CompiledCard, isSpell: boolean)
   // aren't on the battlefield.": white instead of their other colors (layer 5, CR 105.3, 613.1e), applied to those as they
   // are (a permanent entering under its control too), and back to their own colors once it's gone (rulings); in every zone
   // but the battlefield its controller's spells and the nonland cards they own (layers.ts offFieldColored).
-  if (line === DAWN_WHITE) {
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const white = colorTemplate(DAWN_WHITE, line);
+  if (white) {
     if (isSpell) return fail();
-    out.statics.push({ affects: { kind: "filter", types: [], controller: "you", spec: { kind: "object", notTypes: ["Land"], text: "nonland permanent" } }, mods: [{ kind: "setColors", colors: ["W"] }], text: line, offFieldColorsYours: true });
+    out.statics.push({ affects: { kind: "filter", types: [], controller: "you", spec: { kind: "object", notTypes: ["Land"], text: "nonland permanent" } }, mods: [{ kind: "setColors", colors: white[0]! }], text: line, offFieldColorsYours: true });
     return true;
   }
   // "You may spend white mana as though it were mana of any color. You may spend other mana only as though it were colorless
   // mana." (CR 609.4b): how its controller may pay each cost with mana (spend.ts dawnCost); mana already in their pool as it
   // arrives is spent that way too, and what mana was spent stays what it was (rulings).
-  if (line === DAWN_MANA) {
+  const mana = colorTemplate(DAWN_MANA, line);
+  if (mana) {
     if (isSpell || out.dawnMana) return fail();
-    out.dawnMana = true;
+    out.dawnMana = mana[0]![0]!;
     return true;
   }
   // Drain Power: the whole spell, a target player (any, its controller too; CR 106.13), effects/run-laneb281.ts drainPower.

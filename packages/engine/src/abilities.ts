@@ -4653,7 +4653,7 @@ export type Effect =
    * permanent (rulings). A layer 6 effect (CR 613.1f) whose text carries them (grants.ts gainedAbilityText). `blueAsAny`:
    * "You may spend blue mana as though it were mana of any color to activate those abilities" (CR 609.4b), those only.
    */
-  | { type: "gainActivatedOf"; what: ObjRef; from: ObjRef; blueAsAny?: true }
+  | { type: "gainActivatedOf"; what: ObjRef; from: ObjRef; /** The color whose mana pays any colored symbol of them: blue as printed, another after a text change (round 462). */ blueAsAny?: Color }
   /** Mairsil, the Pretender (round 401): "you may exile an artifact or creature card from your hand or graveyard and put a cage counter on it": one of its controller's cards matching `filter`, chosen as it resolves, or none, exiled with `counters` (effects/run-round401.ts). */
   | { type: "exileFromHandOrYard"; filter: TargetSpec; counters: Record<string, number> }
   /**
@@ -5452,7 +5452,8 @@ export type Effect =
    * Raiding Party (round B256): "Each player may tap any number of untapped white creatures they control. For each creature
    * tapped this way, that player chooses up to two Plains. Then destroy all Plains that weren't chosen this way by any player."
    */
-  | { type: "raidingParty" }
+  | /** Camouflage (round 462): this turn, piles at random instead of declaring blockers (GameState.camouflageTurn, camouflage.ts). */ { type: "camouflage" }
+  | { type: "raidingParty"; /** The color of the creatures tapped, when a text change made it other than white (CR 612.2). */ color?: Color }
   /**
    * Search the City (round B256): "you may put one of those cards with that name into its owner's hand. Then if there are no
    * cards exiled with ~, sacrifice it. If you do, take an extra turn after this one.": the cards its enters ability exiled
@@ -8299,7 +8300,7 @@ export interface ActivatedAbility {
   /** Mairsil, the Pretender (round 401): "You may activate each of those abilities only once each turn": this borrowed ability's own key (the lender card's object id, zone changes and ability index), recorded on the borrower as it's activated (GameObject.borrowedUsed), so each instance is once each turn (rulings: the same ability from two cards is two instances). */
   onceKey?: string;
   /** Grell Philosopher (round 400): an ability gained with "You may spend blue mana as though it were mana of any color to activate those abilities" (CR 609.4b). */
-  blueAsAny?: true;
+  blueAsAny?: Color;
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
   spendOnlyChosenColor?: true;
   /** "{X}: ... Spend only black mana on X." (Crypt Rats): with {X} its whole mana cost, only mana of these types pays it. */
@@ -8588,7 +8589,7 @@ export type ManaProduce =
 export interface ManaAbility {
   text: string;
   /** Grell Philosopher (round 400): a mana ability gained with "you may spend blue mana as though it were mana of any color to activate those abilities" (CR 609.4b). */
-  blueAsAny?: true;
+  blueAsAny?: Color;
   /** Mana Cache (round B236): "Any player may activate this ability" (CR 602.2): its activator controls it (CR 113.8) and gets the mana. */
   anyPlayer?: true;
   /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
@@ -8960,6 +8961,8 @@ export interface AddedCostRule {
   sacrifice: TargetSpec;
   source?: TargetSpec;
   perBlack?: true;
+  /** With `perBlack`: the color of the symbols counted, black as printed, another after a text change of color words (round 462). */
+  perColor?: Color;
 }
 
 export type AdditionalCost =
@@ -9467,7 +9470,7 @@ export interface CompiledCard {
   entersTappedIfXAtMost?: number;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; /** Callous Oppressor (round B221): "an opponent chooses a creature type": its controller chooses an opponent (Chosen.player), who makes this choice. */ byOpponent?: true; /** With "cardName": "each opponent reveals their hand. You choose the name of a nonland card revealed this way" (Alhammarret, High Arbiter): only the names of the cards matching `names` in its controller's opponents' hands, revealed as it enters; none chosen if there's none. */ opponentHands?: true; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** Apex Observatory (round 434): "a card type shared among two exiled cards used to craft it": only those of `options` (craftedSharedTypes), none chosen with none. */ craftedShared?: true; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
+  entersChoose?: { what: ChoiceKind; except?: string; /** Swirl the Mists (round 462): "choose a color word", a color as its word. */ word?: true; /** Callous Oppressor (round B221): "an opponent chooses a creature type": its controller chooses an opponent (Chosen.player), who makes this choice. */ byOpponent?: true; /** With "cardName": "each opponent reveals their hand. You choose the name of a nonland card revealed this way" (Alhammarret, High Arbiter): only the names of the cards matching `names` in its controller's opponents' hands, revealed as it enters; none chosen if there's none. */ opponentHands?: true; /** "Choose two abilities from among first strike, vigilance, and lifelink" (Greymond): one of several keywords chosen, each added to Chosen.keywords and not offered again. */ many?: true; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** Apex Observatory (round 434): "a card type shared among two exiled cards used to craft it": only those of `options` (craftedSharedTypes), none chosen with none. */ craftedShared?: true; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number }; /** "Choose 2, 3, or 4 at random" (Haktos): one of these, at random, with no one choosing. */ random?: number[] }[];
   /** "Noncreature spells with mana value equal to the chosen number can't be cast." (Sanctum Prelate): anyone's. */
   noncreatureChosenMvCantBeCast?: true;
   /** "You may cast ~ as though it had flash if it targets a commander." (Timely Ward) */
@@ -10507,12 +10510,14 @@ export interface CompiledCard {
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
   /** Sunglasses of Urza: "You may spend white mana as though it were red mana." (CR 609.4b): for its controller's costs, white mana pays {R}; it stays white. */
-  spendWhiteAsRed?: true;
+  /** [the color spent, the color it pays as]: white and red as printed, others after a text change of color words (round 462). */
+  spendWhiteAsRed?: [Color, Color];
   /**
    * Celestial Dawn (round B281): "You may spend white mana as though it were mana of any color. You may spend other mana
    * only as though it were colorless mana." (CR 609.4b), for every cost its controller pays with mana (spend.ts dawnCost).
    */
-  dawnMana?: true;
+  /** The color whose mana is spent as any color: white as printed, another after a text change of color words (round 462). */
+  dawnMana?: Color;
   /**
    * Chorus of the Conclave (round B284): "As an additional cost to cast creature spells, you may pay any amount of mana. If
    * you do, that creature enters with that many additional +1/+1 counters on it." (CR 601.2b, 601.2f, 614.1c): for its
@@ -10553,7 +10558,8 @@ export interface CompiledCard {
    * costs of ~'s abilities." (CR 609.4b): blue mana pays any colored symbol of every activated ability it has, mana and
    * gained ones among them (CR 602.1); it can't pay {C} (colorless isn't a color, CR 105.1).
    */
-  spendBlueAnyColorOwnAbilities?: true;
+  /** The color: blue as printed, another after a text change of color words (round 462). */
+  spendBlueAnyColorOwnAbilities?: Color;
   /**
    * River Song (round 382): "You draw cards from the bottom of your library rather than the top.": every card its
    * controller draws while it's on the battlefield, not only in the draw step (rulings); it's a draw like any other.
@@ -10661,6 +10667,12 @@ export interface CompiledCard {
    * shapeshift.ts).
    */
   shapeshifter?: { grant: string; text: string };
+  /**
+   * Swirl the Mists (round 462, swirl.ts): "All instances of color words in the text of spells and permanents are changed to
+   * the chosen color word." A text-changing effect (CR 612.1-612.2) of a static ability, in layer 3 (CR 613.1c), on every
+   * spell and permanent while this permanent is on the battlefield with a color chosen (rulings).
+   */
+  swirlMists?: true;
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; /** "The first historic spell you cast each turn" (Peri Brown): only while no other spell matching `filter` was cast by its controller this turn. */ firstEachTurn?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; /** "The first nonartifact spell you cast each turn" (The Fifteenth Doctor), as for convoke. */ firstEachTurn?: true; text: string }[];

@@ -480,7 +480,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (e.rules[0] === "whiteMana") {
-        log(s, `Until end of turn, spells and abilities ${player(s, ctx.controller).name} controls that would add colored mana add that much white mana instead${e.rules.includes("whiteAnyColor") ? `, and ${player(s, ctx.controller).name} may spend white mana as though it were mana of any color` : ""}.`);
+        const word = COLOR_NAMES[e.byColors?.[0] ?? "W"].toLowerCase();
+        log(s, `Until end of turn, spells and abilities ${player(s, ctx.controller).name} controls that would add colored mana add that much ${word} mana instead${e.rules.includes("whiteAnyColor") ? `, and ${player(s, ctx.controller).name} may spend ${word} mana as though it were mana of any color` : ""}.`);
         return;
       }
       log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "castFromHandFree" ? " may cast spells from their hand without paying their mana costs" : r === "spellsUncounterable" ? `'s spells can't be countered${e.byColors ? ` by ${e.byColors.map((c) => COLOR_NAMES[c].toLowerCase()).join(" or ")} spells` : ""}` : r === "creatureSpellsUncounterable" ? "'s creature spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);

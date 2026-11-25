@@ -42,10 +42,12 @@ export function round337Sentence(s: string, sentences: string[], si: number, ctx
   // of its colors, card types and creature types, its supertypes kept (CR 205.1a), base 1/1 (CR 613.4b), with no
   // abilities (CR 613.1f); the second is a copy of it as it is then (CR 707.2).
   const hunted = /^Choose up to (\w+) target creatures you don't control$/.exec(line);
-  if (hunted && plain(sentences[si + 1]) === "For each of them, that creature's controller faces a villainous choice — That creature becomes a 1/1 white Human creature and loses all abilities, or you create a token that's a copy of it") {
+  const huntedColor = hunted ? /^For each of them, that creature's controller faces a villainous choice — That creature becomes a 1\/1 (white|blue|black|red|green) Human creature and loses all abilities, or you create a token that's a copy of it$/.exec(plain(sentences[si + 1]) ?? "") : null;
+  if (hunted && huntedColor) {
+    const color = huntedColor[1]!;
     if (!ctx.spell || ctx.targets.length || effects.length) return "fail";
     const what = parseObject(`up to ${hunted[1]} target creatures you don't control`, ctx);
-    const mods = parseChanges("loses all abilities and becomes a white Human creature with base power and toughness 1/1");
+    const mods = parseChanges(`loses all abilities and becomes a ${color} Human creature with base power and toughness 1/1`);
     if (what?.ref !== "target" || !mods) return "fail";
     return {
       effect: {
@@ -53,7 +55,7 @@ export function round337Sentence(s: string, sentences: string[], si: number, ctx
         who: { ref: "you" },
         eachOf: what,
         options: [[{ type: "continuous", what: { ref: "subject" }, mods, duration: "game" }], [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "subject" } }]],
-        labels: ["That creature becomes a 1/1 white Human creature and loses all abilities", "You create a token that's a copy of it"],
+        labels: [`That creature becomes a 1/1 ${color} Human creature and loses all abilities`, "You create a token that's a copy of it"],
       },
       next: si + 2,
     };

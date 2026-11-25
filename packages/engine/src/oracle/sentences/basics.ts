@@ -1584,8 +1584,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // (rulings: spells may be countered while it's on the stack), so every spell you control.
   if (ctx.spell && /^Other spells you control can't be countered this turn$/.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn".
-  if ((m = /^Spells you control can't be countered by (white|blue|black|red|green) or (white|blue|black|red|green) spells this turn$/i.exec(s)) && m[1] !== m[2])
-    return [{ type: "turnRules", rules: ["spellsUncounterable"], byColors: [COLOR_WORDS[m[1]!.toLowerCase()]!, COLOR_WORDS[m[2]!.toLowerCase()]!] }];
+  // One color after a text change of color words ("white spells", "white or white spells": Swirl the Mists).
+  if ((m = /^Spells you control can't be countered by (white|blue|black|red|green)(?: or (white|blue|black|red|green))? spells this turn$/i.exec(s)))
+    return [{ type: "turnRules", rules: ["spellsUncounterable"], byColors: [...new Set([COLOR_WORDS[m[1]!.toLowerCase()]!, ...(m[2] ? [COLOR_WORDS[m[2].toLowerCase()]!] : [])])] }];
   // Domri, Anarch of Bolas: "Creature spells you cast this turn can't be countered" (rulings: every one, after it resolves).
   if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
   // Screaming Nemesis: each player the damage just before was dealt to (CR 119.7), for good.
@@ -1625,7 +1626,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[m[2] as "white"];
     const land = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" }[m[1]!.slice(7)];
-    return what?.ref === "target" && !what.n && land === color ? [{ type: "replaceLandMana", what, from: color, into: "C" }] : null;
+    // Another color word after a text change of color words (round 462): that color's mana, should the land make it.
+    return what?.ref === "target" && !what.n && land ? [{ type: "replaceLandMana", what, from: color, into: "C" }] : null;
   }
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller
   // can't ..." (Render Silent), "defending player can't ..." (Xantid Swarm), "Players can't cast noncreature spells this

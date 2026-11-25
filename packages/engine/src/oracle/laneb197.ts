@@ -7,6 +7,7 @@ import { parseStaticCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import type { Ctx } from "./body";
 import { roundB200Sentence, roundB200Spell } from "./laneb200";
+import { colorTemplate, withColors } from "./color-template";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -21,15 +22,17 @@ export function roundB197Line(line: string, raw: string, out: CompiledCard, isSp
   // dealing damage are different events, so it reads as one trigger for each kind of source; the planeswalker's color and
   // types as it dealt the damage (CR 113.7a), whichever ability of it that was (a red planeswalker that's a creature too,
   // in combat).
-  if (line === "Whenever an opponent is dealt damage by a red instant or sorcery spell you control or by a red planeswalker you control, return ~ from your graveyard to your hand.") {
-    const spell = parseTrigger("Whenever a red instant or sorcery spell you control deals damage to an opponent, return ~ from your graveyard to your hand.");
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const phoenix = colorTemplate("Whenever an opponent is dealt damage by a red instant or sorcery spell you control or by a red planeswalker you control, return ~ from your graveyard to your hand.", line);
+  if (phoenix) {
+    const spell = parseTrigger(withColors("Whenever a red instant or sorcery spell you control deals damage to an opponent, return ~ from your graveyard to your hand.", phoenix));
     if (!spell || spell === "fail" || spell.event !== "spellYouControlDealsDamage" || spell.zone !== "graveyard") {
       out.unsupported.push(raw);
       return true;
     }
     const text = "Return ~ from your graveyard to your hand.";
     out.triggers.push({ ...spell, body: { ...spell.body, text } });
-    out.triggers.push({ event: "sourceYouControlDamagesOpponent", zone: "graveyard", damageSourceIs: { colors: ["R"], types: ["Planeswalker"] }, body: { targets: [], effects: [{ type: "bounce", what: { ref: "selfCard" } }], text } });
+    out.triggers.push({ event: "sourceYouControlDamagesOpponent", zone: "graveyard", damageSourceIs: { colors: phoenix[1]!, types: ["Planeswalker"] }, body: { targets: [], effects: [{ type: "bounce", what: { ref: "selfCard" } }], text } });
     return true;
   }
   // Abby, Merciless Soldier: "When you cast ~, create a number of 1/1 black Fungus Zombie creature tokens named Cordyceps

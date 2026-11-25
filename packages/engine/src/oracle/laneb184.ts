@@ -5,6 +5,7 @@ import type { Ctx } from "./body";
 import { reflexiveBody } from "./body";
 import { roundB185Sentence } from "./laneb185";
 import { parseSentence } from "./sentence";
+import { COLOR_OF_WORD } from "./color-template";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -39,11 +40,12 @@ export function roundB184Line(line: string, raw: string, out: CompiledCard, isSp
   // Oppressive Rays: "Activated abilities of enchanted creature cost {3} more to activate." Gloom: "Activated abilities of
   // white enchantments cost {3} more to activate." Mana abilities too (CR 605.1a: they're activated abilities); generic
   // mana added to the total cost (CR 602.2b applies 601.2f, rulings).
-  const tax = /^Activated abilities of (enchanted creature|white enchantments) cost \{(\d+)\} more to activate\.$/.exec(line);
+  // Gloom's color as a text change of color words leaves it (round 462).
+  const tax = /^Activated abilities of (enchanted creature|(?:white|blue|black|red|green) enchantments) cost \{(\d+)\} more to activate\.$/.exec(line);
   if (tax) {
     const host = tax[1] === "enchanted creature";
     if (host && out.enchant?.kind !== "object") out.unsupported.push(raw);
-    else (out.activationTaxes ??= []).push({ ...(host ? { host: true as const } : { filter: { kind: "object", types: ["Enchantment"], notTypes: [], notColors: [], colors: ["W"], text: "white enchantment" } }), n: Number(tax[2]), manaToo: true, text: line });
+    else (out.activationTaxes ??= []).push({ ...(host ? { host: true as const } : { filter: { kind: "object", types: ["Enchantment"], notTypes: [], notColors: [], colors: [COLOR_OF_WORD[tax[1]!.split(" ")[0]!]!], text: tax[1]!.replace(/s$/, "") } }), n: Number(tax[2]), manaToo: true, text: line });
     return true;
   }
   return false;

@@ -7,15 +7,15 @@ import type { AdditionalCost, AddedCostRule, TargetSpec } from "./abilities";
 import { abilitiesOf, canSacrificeForCost } from "./cards";
 import { objectMatches } from "./effects/targeting";
 import { controllerOf } from "./layers";
-import type { GameObject, GameState, ObjectId, PlayerId } from "./types";
+import type { Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
 /**
  * How many black mana symbols a mana cost has (Drought): {B}, the hybrids with black ({B/G}, {2/B}) and Phyrexian black
  * ({B/P}), each one (rulings: "A hybrid symbol that is both black and another type is a black mana symbol, regardless of
  * what cost is paid for it"). {X} and generic mana aren't black (CR 107.4, 105.2).
  */
-export function blackSymbols(cost: string | undefined): number {
-  return [...(cost ?? "").matchAll(/\{([^}]+)\}/g)].filter((m) => /B/.test(m[1]!)).length;
+export function blackSymbols(cost: string | undefined, color: Color = "B"): number {
+  return [...(cost ?? "").matchAll(/\{([^}]+)\}/g)].filter((m) => m[1]!.includes(color)).length;
 }
 
 const plural = (t: string) => (t === "land" ? "lands" : /s$/.test(t) ? t : `${t}s`);
@@ -60,9 +60,9 @@ function merged(s: GameState, what: AddedCostRule["what"], count: (r: AddedCostR
  * `sacrificedSelf`: the ability also sacrifices its source, which then can't pay for these too.
  */
 export function addedAbilityCosts(s: GameState, pid: PlayerId, src: GameObject | undefined, manaCost: string | undefined, sacrificedSelf = false): AdditionalCost[] {
-  const black = blackSymbols(manaCost);
   const out = merged(s, "abilities", (r) => {
-    if (r.perBlack) return black;
+    // Another color than black after a text change of color words (AddedCostRule perColor, round 462).
+    if (r.perBlack) return blackSymbols(manaCost, r.perColor);
     if (!r.source) return 1;
     return src && src.zone === "battlefield" && objectMatches(s, r.source, src, pid, false) ? 1 : 0;
   });
@@ -75,8 +75,7 @@ export function addedAbilityCosts(s: GameState, pid: PlayerId, src: GameObject |
  * too (CR 118.9d: additional costs still apply).
  */
 export function addedSpellCosts(s: GameState, manaCost: string | undefined): AdditionalCost[] {
-  const black = blackSymbols(manaCost);
-  return black ? merged(s, "spells", (r) => (r.perBlack ? black : 1)) : merged(s, "spells", (r) => (r.perBlack ? 0 : 1));
+  return merged(s, "spells", (r) => (r.perBlack ? blackSymbols(manaCost, r.perColor) : 1));
 }
 
 /**

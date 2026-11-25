@@ -12,6 +12,7 @@ import { parseDamageMod } from "./damage-mods";
 import { QUOTED_SOURCE_NAME } from "./compile";
 import { parseBecomes } from "./sentence";
 import { snowblindStatic } from "./laneb307";
+import { COLOR_OF_WORD } from "./color-template";
 
 /** Every land type (CR 205.3i): the basic ones (Forest, Island, Mountain, Plains, Swamp) and the others. */
 const ALL_LAND_TYPES = ["Cave", "Desert", "Forest", "Gate", "Island", "Lair", "Locus", "Mine", "Mountain", "Plains", "Planet", "Power-Plant", "Sphere", "Swamp", "Tower", "Town", "Urza's"];
@@ -565,11 +566,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // The Defilers: "As an additional cost to cast green permanent spells, you may pay 2 life. Those spells cost {G} less to
   // cast if you paid life this way. This effect reduces only the amount of green mana you pay." An optional additional
   // cost of each spell it applies to, once per spell (rulings, CR 601.2b), and a colored reduction if it was paid (601.2f).
+  // After a text change of color words (Swirl the Mists, round 462) the two color words can be another color than the {G}:
+  // a reduction of {G} that reduces only white mana reduces nothing (CR 601.2f, 118.7), though the life may still be paid.
   if ((m = /^As an additional cost to cast (white|blue|black|red|green) permanent spells, you may pay (\d+) life\. Those spells cost \{([WUBRG])\} less to cast if you paid life this way\. This effect reduces only the amount of \1 mana you pay$/.exec(text))) {
     const base = parseCostChange(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} permanent spells you cast cost {1} less to cast`);
     const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[m[1] as "white"];
-    if (!base || base === "fail" || !("costMod" in base) || color !== m[3]) return "fail";
-    return { costMod: { ...base.costMod, n: 0, colored: [color], payLife: Number(m[2]), text: line } };
+    if (!base || base === "fail" || !("costMod" in base)) return "fail";
+    return { costMod: { ...base.costMod, n: 0, colored: color === m[3] ? [color] : [], payLife: Number(m[2]), text: line } };
   }
   // Defense Grid: "Each spell costs {3} more to cast except during its controller's turn": whoever casts it, unless it's
   // their turn (CR 601.2f).
@@ -873,7 +876,9 @@ export function parseActivateCondition(text: string): StaticCondition | null {
   // Sea Troll (round B230): "Activate only if ~ blocked or was blocked by a blue creature this turn": a creature that was
   // blue as the block was declared (TurnLog.blocks, which keeps the colors of a block with a blue creature in it), this
   // object in it (CR 400.7).
-  if (/^~ blocked or was blocked by a blue creature this turn$/.test(text)) return { kind: "blockedWithColorThisTurn", color: "U" };
+  // Another color after a text change of color words (round 462).
+  const troll = /^~ blocked or was blocked by an? (white|blue|black|red|green) creature this turn$/.exec(text);
+  if (troll) return { kind: "blockedWithColorThisTurn", color: COLOR_OF_WORD[troll[1]!]! };
   // Tazri, Stalwart Survivor's granted ability: "Activate only if this creature has another activated ability": any other
   // one, even one that can't be activated now or on the battlefield (cycling, rulings), mana abilities too (CR 605.1a).
   if (/^~ has another activated ability$/.test(text)) return { kind: "self", is: "hasAnotherActivatedAbility" };
@@ -1289,7 +1294,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
   // Suffocation (round B229): "if you were dealt damage this turn by a red instant or sorcery spell": a red instant or a red
   // sorcery (rulings), red as it dealt the damage (TurnLog.spellDamage).
-  if (text === "you were dealt damage this turn by a red instant or sorcery spell") return { kind: "spellDamagedYou", color: "R", types: ["Instant", "Sorcery"] };
+  // Another color after a text change of color words (round 462).
+  const suffocated = /^you were dealt damage this turn by an? (white|blue|black|red|green) instant or sorcery spell$/.exec(text);
+  if (suffocated) return { kind: "spellDamagedYou", color: COLOR_OF_WORD[suffocated[1]!]!, types: ["Instant", "Sorcery"] };
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
   // Sigardian Paladin: "as long as you've put one or more +1/+1 counters on a creature this turn", a creature as the
@@ -3179,8 +3186,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   // other types": both card types and both subtypes in layer 4 (each subtype stays with its own card type, rulings, CR
   // 205.3d), green in layer 5, base 1/1 in 7b, the same set of permanents in each layer (CR 613.6). A Forest has "{T}: Add
   // {G}" by its subtype (CR 305.6), so a Saproling taps for {G} once it's a Forest.
-  if (/^All Forests and all Saprolings are 1\/1 green Saproling creatures and Forest lands in addition to their other types$/.test(text))
-    return { affects: { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Forest", "Saproling"], text: "Forest or Saproling" } }, mods: [{ kind: "addTypes", types: ["Creature", "Land"], subtypes: ["Saproling", "Forest"] }, { kind: "setColors", colors: [COLOR_WORDS.green!] }, { kind: "setPT", power: 1, toughness: 1 }], text: line };
+  // Another color after a text change of color words (round 462).
+  const limb = /^All Forests and all Saprolings are 1\/1 (white|blue|black|red|green) Saproling creatures and Forest lands in addition to their other types$/.exec(text);
+  if (limb)
+    return { affects: { kind: "filter", types: [], spec: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Forest", "Saproling"], text: "Forest or Saproling" } }, mods: [{ kind: "addTypes", types: ["Creature", "Land"], subtypes: ["Saproling", "Forest"] }, { kind: "setColors", colors: [COLOR_WORDS[limb[1]!]!] }, { kind: "setPT", power: 1, toughness: 1 }], text: line };
   // Natural Emergence: "Lands you control are 2/2 creatures with first strike. They're still lands.": the same, with the
   // keyword in layer 6.
   const emergence = /^Lands you control are (\d+)\/(\d+) creatures with ([a-z ]+)\. They're still lands$/.exec(text);

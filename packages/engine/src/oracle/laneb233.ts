@@ -4,6 +4,7 @@ import type { AbilityBody, CompiledCard } from "../abilities";
 import { parseActivated } from "./activated";
 import { roundB234Spell } from "./laneb234";
 import { parseTrigger } from "./triggers";
+import { colorTemplate } from "./color-template";
 
 const VAMPIRE = "Whenever ~ deals combat damage to a player, any number of target players each mill that many cards. Then you may collect evidence 9. When you do, you may cast target nonland card from defending player's graveyard without paying its mana cost.";
 const ORACLE = "{T}: Target opponent chooses any number of creatures they control. During that player's next turn, the chosen creatures attack if able, and other creatures can't attack. At the beginning of that turn's end step, destroy each of the chosen creatures that didn't attack this turn. Activate only during your turn.";
@@ -57,14 +58,15 @@ export function roundB233Line(line: string, raw: string, out: CompiledCard, isSp
   }
   // A Killer Among Us: the three tokens together, then the type chosen as the trigger resolves, kept secret from the other
   // players (rulings: written down) on this object (GameObject.secretType); each copy has its own (rulings).
-  if (line === KILLER_ENTERS) {
-    const t = parseTrigger(KILLER_ENTERS.slice(0, KILLER_ENTERS.indexOf(" Then secretly")));
+  // The tokens' colors as a text change of color words leaves them (color-template.ts).
+  if (colorTemplate(KILLER_ENTERS, line)) {
+    const t = parseTrigger(line.slice(0, line.indexOf(" Then secretly")));
     const made = t && t !== "fail" && t.body.effects.length === 1 ? t.body.effects[0] : undefined;
     if (!t || t === "fail" || t.event !== "selfEnters" || made?.type !== "together" || made.effects.length !== 3 || made.effects.some((e) => e.type !== "createToken")) {
       out.unsupported.push(raw);
       return true;
     }
-    out.triggers.push({ ...t, body: { ...t.body, effects: [made, { type: "secretCreatureType", options: ["Human", "Merfolk", "Goblin"] }], text: KILLER_ENTERS.slice(KILLER_ENTERS.indexOf(", ") + 2) } });
+    out.triggers.push({ ...t, body: { ...t.body, effects: [made, { type: "secretCreatureType", options: ["Human", "Merfolk", "Goblin"] }], text: line.slice(line.indexOf(", ") + 2) } });
     return true;
   }
   // A Killer Among Us: revealing the type is part of the cost (CR 601.2h, 602.2b), which only the player who chose it can

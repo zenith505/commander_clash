@@ -3,6 +3,7 @@
 // Aura or Equipment attached to the token just created (Forum Filibuster).
 import type { CompiledCard, Effect } from "../abilities";
 import { parseTrigger } from "./triggers";
+import { colorTemplate, withColors } from "./color-template";
 
 const fail = (out: CompiledCard, raw: string) => {
   out.unsupported.push(raw);
@@ -40,8 +41,10 @@ export function round371Line(line: string, raw: string, out: CompiledCard, isSpe
   // with its own), its target chosen as it's put on the stack (rulings). The card returns attached to that token: an Aura
   // only if it could enchant it, else it stays in the graveyard (CR 303.4f-g); an Equipment enters unattached if the
   // token is gone or it can't equip it (CR 301.5b-c).
-  if (line === FILIBUSTER) {
-    const t = isSpell ? null : parseTrigger("At the beginning of your upkeep, create a 2/1 white and black Inkling creature token with flying. When you do, return up to one target creature card from your graveyard to the battlefield.");
+  // Its colors as a text change of color words leaves them (color-template.ts).
+  const filibuster = colorTemplate(FILIBUSTER, line);
+  if (filibuster) {
+    const t = isSpell ? null : parseTrigger(withColors("At the beginning of your upkeep, create a 2/1 white and black Inkling creature token with flying. When you do, return up to one target creature card from your graveyard to the battlefield.", filibuster));
     const r = t && t !== "fail" && t.body.effects.length === 2 ? t.body.effects[1] : undefined;
     const put = r?.type === "reflexive" ? r.body.effects[0] : undefined;
     if (!t || t === "fail" || t.event !== "yourUpkeep" || r?.type !== "reflexive" || !r.perToken || r.body.targets.length !== 1 || r.body.effects.length !== 1 || put?.type !== "putOntoBattlefield") return fail(out, raw);

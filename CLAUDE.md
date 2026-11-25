@@ -30,7 +30,9 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
 3. A new effect type runs in `src/effects/run-<area>.ts`; add its case to the dispatch in `effects/resolve.ts`.
 4. Test in `packages/engine/test/<mechanic>.test.ts` with the helpers in `test/helpers.ts`, using real oracle text
    and asserting `isFullySupported`. Infinite or long loops get CR 732 shortcuts, as in paper Magic.
-5. A new prompt, button or menu entry gets a browser test in `apps/web/e2e/` that clicks through it (see Commands).
+5. When the round changes which cards are supported, run `npm run build:pool` (the deck builder's card pool,
+   `apps/web/public/data/card-pool.json.gz`) and commit it.
+6. A new prompt, button or menu entry gets a browser test in `apps/web/e2e/` that clicks through it (see Commands).
 
 ## Commands
 

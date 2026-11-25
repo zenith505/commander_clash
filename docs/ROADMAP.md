@@ -22,6 +22,19 @@ line blocks.
 - A UI polish pass comes at the end. Don't reorder the game log (Ken rejected that).
 - Each round clicks through the prompts and buttons it adds with a browser test (`npm run e2e`, Ken, Oct 15 2026).
 
+## App: accounts and deck builder (Ken, Nov 25 2026)
+
+Done: the deck builder (main menu "Build a deck" / "Import a deck list"): Scryfall-syntax search over the card pool,
+commander and partner/Background slots, color identity filtering, card images, import/export of deck lists,
+Moxfield-style stats, saved decks playable against three starter decks. Decks are saved on the device for now.
+
+Still to do:
+- Accounts (sign up, sign in) and storing decks per account, behind `DeckStore` (`apps/web/src/decks/store.ts`), once
+  Ken picks where they live; hosting the app so it works from his phone.
+- Choosing the bots' decks (today: three random starter decks), and a starter deck as a template to edit.
+- Deck builder extras: sideboard/maybeboard, printing choice, prices, tag-based search (Scryfall's `otag:`), which
+  the card data doesn't have.
+
 ## Next rounds
 
 00. Most played first (`npm run popular`). Out after round 156, most played first: Karazikar, the Eye Tyrant (no

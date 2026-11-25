@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build:cards": "tsx tools/build-cards.ts",
+    "build:pool": "tsx tools/build-pool.ts",
     "test": "npm run test -w @cc/engine",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p packages/engine && node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p apps/web",
     "dev": "npm run dev -w @cc/web",

@@ -13,7 +13,7 @@ const trig = (text: string) => {
 };
 
 const SPLICER = "{2}, {T}, Choose flying, first strike, trample, or shadow: Until end of turn, target creature with the chosen ability loses it and another target creature gains it.";
-const EXPRESSIONIST = /^(?:Magecraft — )?Whenever you cast or copy an instant or sorcery spell, choose target creature you control\. Until end of turn, it gains "If ~ would leave the battlefield, exile it instead of putting it anywhere else" and "When ~ is put into exile, create a 4\/4 blue and red Elemental creature token\."$/;
+const EXPRESSIONIST = /^(?:Magecraft — )?Whenever you cast or copy an instant or sorcery spell, choose target creature you control\. Until end of turn, it gains "If ~ would leave the battlefield, exile it instead of putting it anywhere else" and "When ~ is put into exile, create a 4\/4 ((?:white|blue|black|red|green)(?: and (?:white|blue|black|red|green))?) Elemental creature token\."$/;
 const REAPER = /^(?:Consume Anomaly — )?Whenever ~ deals combat damage to a player, put target face-up card they own in exile on the bottom of their library\. If you do, you gain 3 life\.$/;
 const EQUIPOISE = "At the beginning of your upkeep, for each land target player controls in excess of the number you control, choose a land that player controls, then the chosen permanents phase out. Repeat this process for artifacts and creatures.";
 
@@ -48,13 +48,16 @@ export function roundB222Line(line: string, raw: string, out: CompiledCard, isSp
   // granted until end of turn (CR 611.2a); the trigger works only while it's on the battlefield, so it's going from the
   // battlefield to exile, for any reason (rulings: whoever exiles it), and a token exiled triggers it too before it ceases to
   // exist (rulings, CR 603.10a, 111.7). Granted twice, it triggers twice (rulings).
-  if (!isSpell && EXPRESSIONIST.test(line)) {
+  // Its colors as a text change of color words leaves them.
+  const expressionist = isSpell ? null : EXPRESSIONIST.exec(line);
+  if (expressionist) {
+    const colors = expressionist[1]!;
     const t = trig('Magecraft — Whenever you cast or copy an instant or sorcery spell, target creature you control gains "If ~ would leave the battlefield, exile it instead of putting it anywhere else" until end of turn.');
     const [gain] = t?.body.effects ?? [];
     if (!t || t.body.effects.length !== 1 || gain?.type !== "continuous" || gain.mods.length !== 1 || gain.mods[0]!.kind !== "addAbility" || t.body.targets.length !== 1) return fail();
-    const exiled = trig("When ~ is put into exile from the battlefield, create a 4/4 blue and red Elemental creature token.");
+    const exiled = trig(`When ~ is put into exile from the battlefield, create a 4/4 ${colors} Elemental creature token.`);
     if (exiled?.event !== "selfExiled") return fail();
-    const both: Effect = { ...gain, mods: [...gain.mods, { kind: "addAbility", text: "When ~ is put into exile from the battlefield, create a 4/4 blue and red Elemental creature token." }] };
+    const both: Effect = { ...gain, mods: [...gain.mods, { kind: "addAbility", text: `When ~ is put into exile from the battlefield, create a 4/4 ${colors} Elemental creature token.` }] };
     out.triggers.push({ ...t, body: { ...t.body, effects: [both], text: line.replace(/^Magecraft — Whenever you cast or copy an instant or sorcery spell, /, "") } });
     return true;
   }

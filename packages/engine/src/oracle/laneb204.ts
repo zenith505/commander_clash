@@ -5,6 +5,7 @@ import { parseActivated } from "./activated";
 import { parseTrigger } from "./triggers";
 import { parseSearchFilter } from "./search";
 import { roundB205Spell } from "./laneb205";
+import { colorTemplate, withColors } from "./color-template";
 
 /** One line of a card's text, compiled into `out` (an unsupported one reported as `raw`); false when it isn't one of these. */
 export function roundB204Line(line: string, raw: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -15,8 +16,10 @@ export function roundB204Line(line: string, raw: string, out: CompiledCard, isSp
   // with ~ onto the battlefield, then sacrifice it.": "those cards" are the four this trigger exiled, still in exile;
   // "exiled with ~" is every card any of its upkeep triggers exiled while it's this object (CR 607.2a, 400.7), the four
   // just exiled among them; they enter at once under your control (CR 110.2a, 608.2f), only permanent cards (CR 110.4b).
-  if (line === "At the beginning of your upkeep, exile the top four cards of your library, then roll a d20. 1—9 | You may put a land card from among those cards onto the battlefield. 10—19 | Create a 2/2 green Wolf creature token, then put a +1/+1 counter on it for each creature card among those cards. 20 | Put all permanent cards exiled with ~ onto the battlefield, then sacrifice it.") {
-    const t = parseTrigger("At the beginning of your upkeep, exile the top four cards of your library, then roll a d20. 1—9 | Draw a card. 10—19 | Create a 2/2 green Wolf creature token, then put a +1/+1 counter on it for each creature card in your graveyard. 20 | Sacrifice ~.");
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const journey = colorTemplate("At the beginning of your upkeep, exile the top four cards of your library, then roll a d20. 1—9 | You may put a land card from among those cards onto the battlefield. 10—19 | Create a 2/2 green Wolf creature token, then put a +1/+1 counter on it for each creature card among those cards. 20 | Put all permanent cards exiled with ~ onto the battlefield, then sacrifice it.", line);
+  if (journey) {
+    const t = parseTrigger(withColors("At the beginning of your upkeep, exile the top four cards of your library, then roll a d20. 1—9 | Draw a card. 10—19 | Create a 2/2 green Wolf creature token, then put a +1/+1 counter on it for each creature card in your graveyard. 20 | Sacrifice ~.", journey));
     const [exile, roll, low, mid, high] = t && t !== "fail" ? t.body.effects : [];
     const land = parseSearchFilter("land card");
     const creature = parseSearchFilter("creature card");

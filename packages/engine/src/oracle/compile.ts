@@ -237,6 +237,7 @@ import { round458Line } from "./round458";
 import { round459Line } from "./round459";
 import { round460Line } from "./round460";
 import { round461Line } from "./round461";
+import { round462Line } from "./round462";
 import { round450Line } from "./round450";
 import { round451Line } from "./round451";
 import { linkRestartExiles, round452Line } from "./round452";
@@ -250,6 +251,7 @@ import { round385Line } from "./round385";
 import { round386Line } from "./round386";
 import { round387Line } from "./round387";
 import { roundB189Line } from "./laneb189";
+import { COLOR_OF_WORD, colorTemplate, withColors } from "./color-template";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -608,9 +610,21 @@ function selfPronouns(t: string): string {
     .replace(/\u0001(\d+)\u0001/g, (_, n: string) => kept[Number(n)]!);
 }
 
+/**
+ * A color word repeated in a list, as a text change of color words can leave it (Swirl the Mists, Sleight of Mind; never
+ * printed): "a spell that's both red and red" is a red spell, "red or red spells" red spells, "red, red, and red" red, "red
+ * and/or red mana" red mana. The same color listed again adds nothing (CR 105.1, 612.2).
+ */
+export function collapseColorRepeats(t: string): string {
+  if (!/\b(white|blue|black|red|green)\b.{0,12}\b\1\b/i.test(t)) return t;
+  return t
+    .replace(/\ba spell that's both (white|blue|black|red|green) and \1\b/g, "a $1 spell")
+    .replace(/\b(white|blue|black|red|green) and\/or \1 mana\b/gi, "$1 mana");
+}
+
 /** Replace every way a card refers to itself with "~". */
 export function normalizeSelf(d: CardDef): string {
-  let t = stripReminder(d.oracleText);
+  let t = collapseColorRepeats(stripReminder(d.oracleText));
   const full = d.name.split(" // ")[0]!;
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // A meld card's meld ability (CR 701.42a): "if you both own and control ~ and a creature named Bruna, the Fading Light,
@@ -1154,6 +1168,8 @@ export function compile(d: CardDef): CompiledCard {
       uncopyableSpell = true;
       continue;
     }
+    // Round 462: oracle/round462.ts.
+    if (round462Line(line, raw, out, isSpell)) continue;
     // Round 461: oracle/round461.ts.
     if (round461Line(line, raw, out)) continue;
     // Round 460: oracle/round460.ts.
@@ -2698,7 +2714,8 @@ export function compile(d: CardDef): CompiledCard {
     // white cards in their graveyards."
     const asLife = /^As ~ enters, pay any amount of life\.(?: The amount you pay can't be more than (.+)\.)?$/.exec(line);
     if (asLife) {
-      const cap = asLife[1] === "the total number of white nontoken permanents your opponents control plus the total number of white cards in their graveyards" ? parseCount("the number of white nontoken permanents your opponents control plus the number of white cards in your opponents' graveyards", null) : null;
+      const race = asLife[1] ? /^the total number of (white|blue|black|red|green) nontoken permanents your opponents control plus the total number of \1 cards in their graveyards$/.exec(asLife[1]) : null;
+      const cap = race ? parseCount(`the number of ${race[1]} nontoken permanents your opponents control plus the number of ${race[1]} cards in your opponents' graveyards`, null) : null;
       if (out.entersPayLife || (asLife[1] && !cap)) out.unsupported.push(raw);
       else {
         out.entersPayLife = cap ? { max: cap } : {};
@@ -3955,7 +3972,9 @@ export function compile(d: CardDef): CompiledCard {
       const others = clone[3] === "it has ~'s other abilities" ? lines.filter((_, i) => i !== li).map((l) => l.trim()) : undefined;
       // Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in
       // addition to its other types": only for an embalmed token (CR 702.128b), as embalm's own exceptions (702.128a).
-      const ifEmbalmed = clone[3] === "if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" ? { noManaCost: true, colors: ["W" as const], addSubtypes: ["Zombie"] } : undefined;
+      // Another color after a text change of color words (round 462).
+      const embalmed = clone[3] ? /^if ~ was embalmed, the token has no mana cost, it's (white|blue|black|red|green), and it's a Zombie in addition to its other types$/.exec(clone[3]) : null;
+      const ifEmbalmed = embalmed ? { noManaCost: true, colors: [COLOR_OF_WORD[embalmed[1]!]!], addSubtypes: ["Zombie"] } : undefined;
       const except = others ? { text: others } : ifEmbalmed ? undefined : clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
         out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped, ...(raidClone ? { ifAttacked: true as const } : {}), ...(tapCopied ? { tapCopied: true as const } : {}) };
@@ -5235,8 +5254,10 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Sunglasses of Urza (CompiledCard.spendWhiteAsRed).
-    if (line === "You may spend white mana as though it were red mana." && !out.spendWhiteAsRed) {
-      out.spendWhiteAsRed = true;
+    // Other colors after a text change of color words (round 462): "white mana as though it were white mana" changes nothing.
+    const asColor = /^You may spend (white|blue|black|red|green) mana as though it were (white|blue|black|red|green) mana\.$/.exec(line);
+    if (asColor && !out.spendWhiteAsRed) {
+      out.spendWhiteAsRed = [COLOR_OF_WORD[asColor[1]!]!, COLOR_OF_WORD[asColor[2]!]!];
       continue;
     }
     const unlockLess = /^Unlock costs you pay cost \{(\d+)\} less\.$/.exec(line);
@@ -7091,16 +7112,18 @@ export function compile(d: CardDef): CompiledCard {
     // Soldier creature token with haste, then copy that spell. The copy targets that token." Every target of the spell that
     // one creature (rulings), as it's cast; the copy is made even if the spell has left the stack, and only if the token
     // could be each of its targets; with a token doubler its controller picks one of the tokens (CR 707.10e, rulings).
-    if (line === "Whenever you cast a spell that targets only a single creature you control, create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token.") {
+    // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+    const heroism = colorTemplate("Whenever you cast a spell that targets only a single creature you control, create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token.", line);
+    if (heroism) {
       const creature = parseTargetPhrase("creature you control");
-      const token = parseBody("Create a 1/1 red Soldier creature token with haste.");
+      const token = parseBody(withColors("Create a 1/1 red Soldier creature token with haste.", heroism));
       const any = parseTargetPhrase("creature");
       if (creature?.kind !== "object" || any?.kind !== "object" || !token || token.targets.length || token.effects.length !== 1 || token.effects[0]!.type !== "createToken") out.unsupported.push(raw);
       else
         out.triggers.push({
           event: "castSpell",
           cast: { by: "you", spell: { kind: "spell", text: "spell" }, targetsOnly: { ...creature, text: "a single creature you control" } },
-          body: { targets: [], effects: [...token.effects, { type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: any, toCreated: true } }], text: "create a 1/1 red Soldier creature token with haste, then copy that spell. The copy targets that token." },
+          body: { targets: [], effects: [...token.effects, { type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: any, toCreated: true } }], text: line.slice(line.indexOf(", create") + 2) },
         });
       continue;
     }

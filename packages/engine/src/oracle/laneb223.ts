@@ -3,6 +3,7 @@ import type { CompiledCard, Effect, StaticCondition, TargetSpec } from "../abili
 import { parseActivated } from "./activated";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
+import { colorTemplate, colorWord } from "./color-template";
 
 /** A trigger line read the usual way, or null. */
 const trig = (text: string) => {
@@ -34,15 +35,18 @@ export function roundB223Line(line: string, raw: string, out: CompiledCard, isSp
   // any other type.": every player's permanents on the battlefield, counted as it resolves (phased-out ones are treated
   // as though they don't exist, CR 702.26b); the red creatures are those red as it resolves (CR 611.2c), and the mana
   // trigger (CR 605.1b) and replacement (CR 106.12b, 614.1a) last the turn, for any Mountain, one that arrives later too.
-  if (!isSpell && line === CHAOS_MOON) {
+  // Its color as a text change of color words leaves it (color-template.ts, round 462): the same word both times.
+  const moon = isSpell ? null : colorTemplate(CHAOS_MOON, line);
+  if (moon && moon[0]!.join() === moon[1]!.join()) {
+    const word = moon[0]!.map(colorWord).join(" and ");
     const t = trig("At the beginning of each upkeep, red creatures get +1/+1 until end of turn.");
-    const up = body("Until end of turn, red creatures get +1/+1.");
-    const down = body("Until end of turn, red creatures get -1/-1.");
+    const up = body(`Until end of turn, ${word} creatures get +1/+1.`);
+    const down = body(`Until end of turn, ${word} creatures get -1/-1.`);
     const mana = body("Until end of turn, whenever a player taps a Mountain for mana, that player adds an additional {R}.");
     const [grow] = up ?? [];
     const [shrink] = down ?? [];
     const [extra] = mana ?? [];
-    const red = (e: Effect | undefined) => e?.type === "continuous" && e.what.ref === "each" && e.duration === "endOfTurn" && e.mods.length === 1 && e.mods[0]!.kind === "modifyPT" && e.what.filter.colors?.join() === "R" && !e.what.filter.controller;
+    const red = (e: Effect | undefined) => e?.type === "continuous" && e.what.ref === "each" && e.duration === "endOfTurn" && e.mods.length === 1 && e.mods[0]!.kind === "modifyPT" && e.what.filter.colors?.join() === moon[0]!.join() && !e.what.filter.controller;
     if (t?.event !== "eachUpkeep" || up?.length !== 1 || down?.length !== 1 || mana?.length !== 1 || !red(grow) || !red(shrink) || extra?.type !== "manaTriggerThisTurn" || extra.trigger.filter?.subtypes?.join() !== "Mountain" || extra.trigger.filter.controller) return fail();
     const permanents: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" };
     const odd: StaticCondition = { kind: "amount", amount: { count: { kind: "permanents", filter: permanents } }, parity: "odd" };

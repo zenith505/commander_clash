@@ -27,6 +27,7 @@ import { round319WholeText } from "./round319";
 import { round402Text } from "./round402";
 import { round320WholeText } from "./round320";
 import { round370WholeText } from "./round370";
+import { COLOR_OF_WORD, colorTemplate } from "./color-template";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -1474,8 +1475,10 @@ function wholeTextBody(text: string, opts: { spell?: boolean }): AbilityBody | n
   // Grip of Phyresis: control of the Equipment for the rest of the game (layer 2), then a 0/0 Germ it's attached to (CR
   // 701.3a), all as it resolves, so the Germ is a 0/0 only before state-based actions are next checked (rulings, CR 704.3);
   // an Equipment with no toughness boost leaves a Germ that dies, the Equipment still yours.
-  if (opts.spell && text.trim() === "Gain control of target Equipment, then create a 0/0 black Phyrexian Germ creature token and attach that Equipment to it.") {
-    const germ: TokenSpec = { name: "Phyrexian Germ", power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: ["Phyrexian", "Germ"], keywords: [] };
+  // Its color as a text change of color words leaves it (color-template.ts, round 462).
+  const grip = opts.spell ? colorTemplate("Gain control of target Equipment, then create a 0/0 black Phyrexian Germ creature token and attach that Equipment to it.", text.trim()) : null;
+  if (grip) {
+    const germ: TokenSpec = { name: "Phyrexian Germ", power: 0, toughness: 0, colors: grip[0]!, types: ["Creature"], subtypes: ["Phyrexian", "Germ"], keywords: [] };
     return {
       targets: [{ kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "target Equipment" }],
       effects: [
@@ -2903,7 +2906,8 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/^[Cc]hoose (up to (?:two|three|four) target [^.]*?creature cards with total mana value \d+ or less) in your graveyard\. Return each of them to the battlefield with an? ([a-z]+) counter on it\. They're artifacts in addition to their other types\.$/, "Return $1 from your graveyard to the battlefield with an additional $2 counter on it. Each of those creatures is an artifact in addition to its other types.");
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
   // can't be the targets of blue or black spells this turn": two instructions.
-  text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
+  // One color after a text change of color words ("white spells", collapseColorRepeats) likewise.
+  text = text.replace(/^(Spells you control can't be countered by [a-z]+(?: or [a-z]+)? spells this turn), and (creatures you control can't be the targets of [a-z]+(?: or [a-z]+)? spells this turn)\./, "$1. $2.");
   // Meathook Massacre II: "return that card under your control" (its Oracle wording) is from the graveyard to the battlefield.
   text = text.replace(/\breturn that card under your control\b/g, "return that card to the battlefield under your control");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
@@ -4703,7 +4707,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
   if (opts.eventPlayer) text = text.replace(/\b([Tt]hat player discards a card for each poison counter) they have\./, "$1 that player has.");
   // Hazezon Tamar: "create X 1/1 Sand Warrior creature tokens that are red, green, and white at the beginning of your next
   // upkeep, where X is the number of lands you control at that time": a delayed trigger (rulings), X counted as it resolves.
-  text = text.replace(/^[Cc]reate X (\d+\/\d+) ([A-Z][a-z]+ [A-Z][a-z]+) creature tokens that are (red, green, and white) at the beginning of your next upkeep, where X is (the number of lands you control) at that time\.$/, "Create X $1 $3 $2 creature tokens at the beginning of your next upkeep, where X is $4.");
+  text = text.replace(/^[Cc]reate X (\d+\/\d+) ([A-Z][a-z]+ [A-Z][a-z]+) creature tokens that are ((?:white|blue|black|red|green)(?:(?:, (?:white|blue|black|red|green))*,? and (?:white|blue|black|red|green))?) at the beginning of your next upkeep, where X is (the number of lands you control) at that time\.$/, "Create X $1 $3 $2 creature tokens at the beginning of your next upkeep, where X is $4.");
   // Besmirch: "Until end of turn, gain control of target creature and it gains haste": both until end of turn.
   text = text.replace(/(^|\. )Until end of turn, gain control of (target [^.,]+?) and it gains haste\./, "$1Gain control of $2 until end of turn. It gains haste until end of turn.");
   // Haldir, Lórien Lieutenant: "Until end of turn, other Elves you control gain vigilance and get +1/+1 for each +1/+1
@@ -11485,7 +11489,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Destroy target artifact or enchantment. If that permanent was blue or black, draw a card.", Molten Rain: "Destroy
     // target land. If that land was nonbasic, ~ deals 2 damage to the land's controller.", Liliana's Defeat: "If that
     // permanent was a Liliana planeswalker, her controller loses 3 life.": the same, as it last existed.
-    const destroyWas = /^[Dd]estroy target (?:creature|creature with [a-z]+|artifact or enchantment|black creature or black planeswalker|Forest, green enchantment, or green planeswalker)$/.test(s)
+    const destroyWas = /^[Dd]estroy target (?:creature|creature with [a-z]+|artifact or enchantment|(white|blue|black|red|green) creature or \1 planeswalker|Forest, (white|blue|black|red|green) enchantment, or \2 planeswalker)$/.test(s)
       ? /^If (?:that creature|that permanent|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+)(?: planeswalker)?)|was a legendary enchantment|wasn't attacking|had an? (\+1\/\+1) counter on it), (.+?)\.?$/.exec(sentences[si + 1] ?? "")
       : /^[Dd]estroy target (?:land|non-Swamp land)$/.test(s) ? /^If that land (was a snow land|was nonbasic|was legendary)(), ()()()(.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
     const planeswalkerWas = destroyWas && / planeswalker,/.test(sentences[si + 1] ?? "");
@@ -12502,7 +12506,7 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
       // draws a card."
       const act = /^(?:If you do, )?(?:(that player discards that card|they discard it|that player reveals the chosen card, puts it on the bottom of their library)(?:,? then (?:they )?draws? a card)?|(?:that player exiles|exile) that card)$/i.exec(next);
       // Specter's Shriek: "If a nonblack card is exiled this way, ..." after it is about the card exiled (below).
-      const shriek = /^If a nonblack card is exiled this way, exile a card from your hand\.?$/.test(sentences[si + 2] ?? "");
+      const shriek = /^If a non(?:white|blue|black|red|green) card is exiled this way, exile a card from your hand\.?$/.test(sentences[si + 2] ?? "");
       if (!act || (/^If you do, (?:that player exiles|exile)/.test(next) && /^If a /.test(sentences[si + 2] ?? "") && !shriek)) return null;
       const bottom = /bottom of their library/.test(act[1] ?? "");
       if (bottom && !/ then draws a card$/.test(next)) return null;
@@ -12696,8 +12700,9 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Specter's Shriek: "If a nonblack card is exiled this way, exile a card from your hand.": the card just exiled from that
     // hand, by its color in exile (CR 608.2h); with an empty hand, nothing (rulings). The choice of your card may pause
     // inside the "if", whose answer is kept (CR 608.2c).
-    if (ctx.exiledFromHand && effects.at(-1)?.type === "takeFromHand" && /^If a nonblack card is exiled this way, exile a card from your hand$/.test(s)) {
-      effects.push({ type: "if", cond: { kind: "exiledFromHandIs", filter: { kind: "card", notColors: ["B"], text: "nonblack card" } }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, exile: true }] });
+    const shriekOf = ctx.exiledFromHand && effects.at(-1)?.type === "takeFromHand" ? /^If a non(white|blue|black|red|green) card is exiled this way, exile a card from your hand$/.exec(s) : null;
+    if (shriekOf) {
+      effects.push({ type: "if", cond: { kind: "exiledFromHandIs", filter: { kind: "card", notColors: [COLOR_OF_WORD[shriekOf[1]!]!], text: `non${shriekOf[1]} card` } }, effects: [{ type: "discard", who: { ref: "you" }, n: 1, exile: true }] });
       continue;
     }
     // Check for Traps: "Exile that card. If an instant card or a card with flash is exiled this way, they lose 1 life.
@@ -14950,8 +14955,13 @@ function parseBodyTextOwn(text: string, opts: { sacrificedIt?: boolean; amassed?
         effects.push({ type: "vote", among: { ...spec, text: one[1]! }, ...secret, text: `vote for ${what}` });
         ctx.vote = { among: true };
       } else {
-        const options = what.split(/, or |, | or /);
-        if (options.length < 2 || new Set(options).size !== options.length || options.some((o) => !/^[A-Za-z][A-Za-z' ]*$/.test(o))) return null;
+        // Council Guardian's colors after a text change of color words: the same color word listed again ("votes for
+        // white, white, white, or white") is one option, the only thing each player can vote for.
+        const listed = what.split(/, or |, | or /);
+        const repeated = listed.length > 1 && listed.every((o) => o === listed[0] && /^(white|blue|black|red|green)$/.test(o));
+        const options = repeated ? [listed[0]!] : listed;
+        const oneColor = repeated;
+        if ((options.length < 2 && !oneColor) || new Set(options).size !== options.length || options.some((o) => !/^[A-Za-z][A-Za-z' ]*$/.test(o))) return null;
         effects.push({ type: "vote", options, ...secret, text: `vote for ${what}` });
         ctx.vote = { options };
       }

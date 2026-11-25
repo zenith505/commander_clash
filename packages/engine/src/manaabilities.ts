@@ -759,7 +759,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
     if (why) return why;
   }
   const payCost = manaAbilityCostOf(s, pid, o, ab);
-  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o, manaAbility: true, ...(ab.blueAsAny ? { blueAny: true as const } : {}) })) return "not enough mana";
+  if (!ignorePool && payCost && !canPayFromPool(s, pid, payCost, { ability: o, manaAbility: true, ...(ab.blueAsAny ? { blueAny: ab.blueAsAny } : {}) })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);

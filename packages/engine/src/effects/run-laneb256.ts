@@ -9,6 +9,7 @@ import type { GameObject, GameState, ObjectId } from "../types";
 import { apnap, objects, runEffect, type ResolveCtx } from "./resolve";
 import { defendingAgainst } from "./run-tokens";
 import { fireEvent } from "./triggers";
+import { colorWord } from "../oracle/color-template";
 
 type B256Effect = Extract<Effect, { type: "reblock" | "raidingParty" | "searchTheCity" }>;
 
@@ -122,6 +123,7 @@ export function runLaneB256Effect(s: GameState, e: B256Effect, ctx: ResolveCtx, 
       // creatures to tap, then up to two Plains for each (anyone's; zero or one too, rulings); then the creatures are tapped
       // together, as it resolves (rulings), and all the Plains nobody chose are destroyed at once (CR 608.2c). White as it
       // resolves (rulings: Sleight of Mind can't change the color now).
+      const word = colorWord(e.color ?? "W");
       const raid = (sc.raid ??= { queue: apnap(s, s.turnOrder.filter((pid) => !player(s, pid).lost)), step: "tap", tapped: {}, tapping: [], saved: [] });
       while (raid.queue.length) {
         const pid = raid.queue[0]!;
@@ -131,12 +133,12 @@ export function runLaneB256Effect(s: GameState, e: B256Effect, ctx: ResolveCtx, 
           if (answered === undefined) {
             const options = s.battlefield.filter((id) => {
               const c = obj(s, id);
-              return !c.tapped && controllerOf(s, c) === pid && objIsType(s, c, "Creature") && characteristics(s, c).colors.includes("W");
+              return !c.tapped && controllerOf(s, c) === pid && objIsType(s, c, "Creature") && characteristics(s, c).colors.includes(e.color ?? "W");
             });
             if (options.length) {
               sc.queue = [pid];
               sc.chosen = {};
-              s.pending = { kind: "pickPermanents", player: pid, source: src, action: "tap", what: "untapped white creature", options, count: options.length, min: 0, raid: "tap", prompt: `tap any number of untapped white creatures you control: for each one tapped, you choose up to two Plains (anyone's) that aren't destroyed. Every Plains no player chooses is destroyed.` };
+              s.pending = { kind: "pickPermanents", player: pid, source: src, action: "tap", what: `untapped ${word} creature`, options, count: options.length, min: 0, raid: "tap", prompt: `tap any number of untapped ${word} creatures you control: for each one tapped, you choose up to two Plains (anyone's) that aren't destroyed. Every Plains no player chooses is destroyed.` };
               return "paused";
             }
             raid.tapped[pid] = 0;

@@ -3,6 +3,7 @@
 // and roundB191Spell reads a spell's whole text before the usual reading.
 import type { AbilityBody, CompiledCard, Effect } from "../abilities";
 import { parseBody } from "./body";
+import { colorTemplate, withColors } from "./color-template";
 
 /**
  * The card's text (with its name as ~) as the rest of the compiler reads it: wordings that mean what another, already
@@ -65,9 +66,11 @@ export function roundB191Spell(text: string): AbilityBody | null | undefined {
   // do all of the above.": the X it was cast with (CR 107.3a; 0 if it was cast without paying its mana cost, rulings),
   // with 4 or more the three in that order. The player is chosen as it resolves, not targeted (rulings: no targets); that
   // player chooses which creature they control to return, none if they control none (CR 608.2d).
-  if (text === "If X is 1, scry 1, then draw a card. If X is 2, you may choose a player. They return a creature they control to its owner's hand. If X is 3, create a 4/4 blue and red Elemental creature token. If X is 4 or more, do all of the above.") {
+  // Its colors as a text change of color words leaves them (color-template.ts).
+  const choice = colorTemplate("If X is 1, scry 1, then draw a card. If X is 2, you may choose a player. They return a creature they control to its owner's hand. If X is 3, create a 4/4 blue and red Elemental creature token. If X is 4 or more, do all of the above.", text);
+  if (choice) {
     const one = parseBody("Scry 1, then draw a card.", { spell: true });
-    const three = parseBody("Create a 4/4 blue and red Elemental creature token.", { spell: true });
+    const three = parseBody(withColors("Create a 4/4 blue and red Elemental creature token.", choice), { spell: true });
     const back = parseBody("Each opponent returns a creature they control to its owner's hand.", { spell: true });
     const pick = back?.effects.length === 1 && back.effects[0]!.type === "pick" ? back.effects[0]! : undefined;
     if (!one || !three || !pick || pick.type !== "pick" || one.targets.length || three.targets.length || back!.targets.length) return null;

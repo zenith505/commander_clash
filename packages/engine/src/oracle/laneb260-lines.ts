@@ -2,6 +2,7 @@
 // abilities (CompiledCard.addedCosts; added-costs.ts).
 import type { CompiledCard, TargetSpec } from "../abilities";
 import { parseActivated } from "./activated";
+import { COLOR_OF_WORD } from "./color-template";
 
 /** "Sacrifice a land", "Sacrifice a Swamp": what the cost's own words sacrifice, as an ability's cost would read them. */
 function sacrificeSpec(cost: string): TargetSpec | null {
@@ -27,11 +28,13 @@ export function addedCostLine(line: string, out: CompiledCard): boolean {
   // "Activated abilities cost an additional "Sacrifice a Swamp" to activate for each black mana symbol in their activation
   // costs.": every player's (rulings: Pestilence's {B} activated four times is four Swamps; a hybrid symbol with black in it
   // is a black mana symbol whatever pays for it).
-  m = /^(Spells|Activated abilities) cost an additional "(Sacrifice a Swamp)" to (cast|activate) for each black mana symbol in their (mana|activation) costs\.$/.exec(line);
-  if (m && (m[1] === "Spells") === (m[3] === "cast") && (m[3] === "cast") === (m[4] === "mana")) {
+  m = /^(Spells|Activated abilities) cost an additional "(Sacrifice a Swamp)" to (cast|activate) for each (white|blue|black|red|green) mana symbol in their (mana|activation) costs\.$/.exec(line);
+  // Another color word than black after a text change of color words (round 462): that color's symbols.
+  if (m && (m[1] === "Spells") === (m[3] === "cast") && (m[3] === "cast") === (m[5] === "mana")) {
     const sacrifice = sacrificeSpec(m[2]!);
     if (!sacrifice) return false;
-    (out.addedCosts ??= []).push({ what: m[1] === "Spells" ? "spells" : "abilities", sacrifice, perBlack: true });
+    const color = COLOR_OF_WORD[m[4]!]!;
+    (out.addedCosts ??= []).push({ what: m[1] === "Spells" ? "spells" : "abilities", sacrifice, perBlack: true, ...(color !== "B" ? { perColor: color } : {}) });
     return true;
   }
   return false;

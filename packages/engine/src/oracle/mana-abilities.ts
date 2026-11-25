@@ -9,6 +9,7 @@ import { allEffects } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseOnlyClauses, parseStaticCondition } from "./statics";
 import { parseSearchFilter } from "./search";
+import { COLOR_OF_WORD } from "./color-template";
 
 /**
  * A mana ability (CR 605.1a): "{T}: Add {G}.", "{T}: Add {W} or {U}. ~ deals 1 damage to you.",
@@ -256,10 +257,10 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     } else if ((m2 = /^When that mana is spent to cast a creature spell that shares a creature type with your commander, scry (\d+)\.$/.exec(extra)) && !out.spentTrigger) {
       const text = extra.replace(/^When that mana is spent to cast a creature spell that shares a creature type with your commander, /, "");
       out.spentTrigger = { sharesCommanderType: true, body: { targets: [], effects: [{ type: "scry", n: Number(m2[1]) }], text: text[0]!.toUpperCase() + text.slice(1) } };
-    } else if ((m2 = /^When that mana is spent to cast an? (red )?instant or sorcery spell, copy that spell and you may choose new targets for the copy\.$/.exec(extra)) && !out.spentTrigger) {
+    } else if ((m2 = /^When that mana is spent to cast an? (?:(white|blue|black|red|green) )?instant or sorcery spell, copy that spell and you may choose new targets for the copy\.$/.exec(extra)) && !out.spentTrigger) {
       // Primal Wellspring, Pyromancer's Goggles: a triggered ability of its source (CR 603.1), the spell it paid for
       // copied as the trigger resolves (CR 707.10).
-      out.spentTrigger = { instantOrSorcery: true, ...(m2[1] ? { color: "R" as const } : {}), body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Copy that spell and you may choose new targets for the copy." } };
+      out.spentTrigger = { instantOrSorcery: true, ...(m2[1] ? { color: COLOR_OF_WORD[m2[1]]! } : {}), body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Copy that spell and you may choose new targets for the copy." } };
     } else if ((m2 = /^When you spend this mana to cast (your commander|an? (?:[^,]+? )?spell(?: with [^,]+)?), (.+)\.$/.exec(extra)) && !out.spentTrigger) {
       // A delayed triggered ability made by the mana ability, one for each mana it makes, that triggers when that mana is
       // spent (CR 106.6, 106.6a, 603.7a, rulings on Gilanra): "draw a card" (Gilanra), "scry 2" (Lapis Orb), "you gain 2 life" (Scaled

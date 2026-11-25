@@ -47,6 +47,8 @@ import { channelMana } from "./channel";
 import { nextRandom, randomWatch, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { enterShape, syncShapes } from "./shapeshift";
+import { asSpell, enterSwirl, syncSwirls } from "./swirl";
+import { beginCamouflage, camouflageLeft, camouflageNow, chooseCamouflageBlocks, chooseCamouflagePile } from "./camouflage";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
 import { answerMoveQuestion, answersMoveQuestion, asking, moveAnswer, MoveQuestionPause, questionPending } from "./move-questions";
 import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
@@ -1724,6 +1726,8 @@ export function moveObject(
     for (const k of compileCard(defOf(s, o)).entersKicked ?? [])
       if (k.which !== undefined && o.kicked.includes(k.which)) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: k.mods });
   invalidateCharacteristics(s);
+  // Swirl the Mists (round 462): its text change applies to a spell or permanent at once (rulings).
+  if (to === "battlefield" || to === "stack") enterSwirl(s, o);
   // Volrath's Shapeshifter enters as what the top card of its controller's graveyard makes it (round 459, CR 614.12).
   if (to === "battlefield") enterShape(s, o);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
@@ -6006,6 +6010,12 @@ function beginStep(s: GameState, step: Step): void {
       s.blockersStep = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
       const attacked = livingPlayers(s).filter((pid) => attackers(s).some((a) => a.attacking === pid));
       const order = turnOrderFrom(s, ap).filter((pid) => attacked.includes(pid));
+      // Camouflage (round 462): piles assigned at random instead of declaring blockers, this turn (camouflage.ts).
+      if (order.length && camouflageNow(s)) {
+        beginCamouflage(s);
+        if (s.pending) return;
+        break;
+      }
       if (order.length) {
         s.pending = blockersPending(s, order[0]!, order.slice(1));
         return;
@@ -7564,7 +7574,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   // Doubling Cube's cost is paid with the mana from the pool chosen for it (`combo`).
   const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : manaAbilityCostOf(s, p.id, o, ab);
-  const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o, manaAbility: true, ...(ab.blueAsAny ? { blueAny: true as const } : {}) }) : null;
+  const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o, manaAbility: true, ...(ab.blueAsAny ? { blueAny: ab.blueAsAny } : {}) }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
   queueSpentOnAbility(s, p.id, manaPaid?.spentTriggers); // Sunken Palace (round 439): nothing to copy
   // Rhystic Cave (round B254): "unless any player pays {1}": the other players are asked below, once its cost is paid; it's
@@ -8051,9 +8061,25 @@ export function castProblem(
   x?: number,
   choices?: CostChoices,
 ): string | null {
-  const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
+  // Swirl the Mists (round 462): read as the spell it becomes (swirl.ts asSpell).
+  return asSpell(s, o, () => castProblemAsSpell(s, pid, id, targets, modes, convoke, improvise, x, choices));
+}
+
+function castProblemAsSpell(
+  s: GameState,
+  pid: PlayerId,
+  id: ObjectId,
+  targets?: TargetChoice[],
+  modes?: number[],
+  convoke?: ObjectId[],
+  improvise?: ObjectId[],
+  x?: number,
+  choices?: CostChoices,
+): string | null {
+  const p = player(s, pid);
+  const o = obj(s, id);
   choices = convertChoices(o, choices);
   if (choices?.alt === "convert" && (choices.face ?? o.face) !== 1) return `${defOf(s, o).name} is cast converted with its back face up`;
   // A defeated Siege is cast transformed, or not at all (CR 310.12b).
@@ -8907,12 +8933,12 @@ export function eminenceCommanders(s: GameState): GameObject[] {
 /** Is this what a spell cast face down is (CR 708.4): a 2/2 creature with no other characteristics, ward {2} with disguise? */
 const isFaceDownDef = (d: CardDef) => d.oracleId === FACE_DOWN.oracleId || d.oracleId === FACE_DOWN_WARD.oracleId;
 
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[], kicked = false): { more: number; less: number; moreColored: Color[]; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[], kicked = false): { more: number; less: number; moreColored: Color[]; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number; useless?: true }[] } {
   let [more, less] = [0, 0];
   const moreColored: Color[] = [];
   const lessColored: Color[] = [];
   const lessColoredOrGeneric: Color[] = [];
-  const lifeOffers: { id: ObjectId; life: number }[] = [];
+  const lifeOffers: { id: ObjectId; life: number; useless?: true }[] = [];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   // Emblems' too, which work in the command zone (CR 114.4).
   for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s), ...eminenceCommanders(s)]) {
@@ -8962,7 +8988,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && (!m.kicked || c.kicked) && (!m.faceDown || c.faceDown) && printedMatches(rest, c.faceDown ? FACE_DOWN : castCardAs(s, c)!)).length !== m.nth - 1) continue;
       // The Defilers: offered as an additional cost, and only then a reduction.
       if (m.payLife) {
-        if (!lifeOffers.some((l) => l.id === src.id)) lifeOffers.push({ id: src.id, life: m.payLife });
+        // A Defiler whose words a text change made disagree (round 462) reduces nothing: still a cost that may be paid.
+        if (!lifeOffers.some((l) => l.id === src.id)) lifeOffers.push({ id: src.id, life: m.payLife, ...(m.colored && !m.colored.length ? { useless: true as const } : {}) });
         if (!lifeFor?.includes(src.id)) continue;
       }
       if (m.colored) {
@@ -9027,7 +9054,7 @@ function costModThisTurnApplies(s: GameState, c: NonNullable<GameState["costMods
  * The Defilers: the permanents whose "As an additional cost to cast green permanent spells, you may pay 2 life" applies
  * to casting this card (CR 601.2b), and how much life each asks.
  */
-export function lifeCostOffers(s: GameState, pid: PlayerId, id: ObjectId, x = 0): { id: ObjectId; life: number }[] {
+export function lifeCostOffers(s: GameState, pid: PlayerId, id: ObjectId, x = 0): { id: ObjectId; life: number; useless?: true }[] {
   const o = obj(s, id);
   return costModsFor(s, pid, o, defOf(s, o), x).lifeOffers;
 }
@@ -9595,7 +9622,7 @@ function harmonizeProblem(s: GameState, pid: PlayerId, choices?: CostChoices, co
 }
 
 /** Target specs a card needs when cast (empty for most permanents). For a modal spell, those of the chosen modes. */
-export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asFace(s, obj(s, id), how?.face, () => { const d = castDef(s, id, alt); return castTimeTargets(d, spellTargetSpecs(d, modes, how)); });
+export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asSpell(s, obj(s, id), () => asFace(s, obj(s, id), how?.face, () => { const d = castDef(s, id, alt); return castTimeTargets(d, spellTargetSpecs(d, modes, how)); }));
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
 /** castHow, and a spell cast for its madness cost as its madness ability resolves (Avacyn's Judgment's amount, CR 702.35b). */
@@ -9696,6 +9723,8 @@ export function beholdTypeFor(s: GameState, pid: PlayerId, o: GameObject, n: num
 
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
+  // Swirl the Mists (round 462): the spell's text as it's cast (CR 601.2a-c), kept as it moves to the stack (swirl.ts).
+  if (!choices.faceDown) asSpell(s, o, () => undefined, true);
   choices = convertChoices(o, choices);
   // Urgent Necropsy (round B247): X of its "collect evidence X", locked in from its targets before any cost is paid (rulings).
   const evidenceX = targetedPermanentsMv(s, targets);
@@ -13441,6 +13470,10 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   if (pend?.kind === "pickPermanents" && pend.wind) return chooseWindPick(s, p, ids);
   if (pend?.kind === "pickPermanents" && pend.equilibrium) return chooseEquilibriumPick(s, p, ids);
+  if (pend?.kind === "pickPermanents" && pend.camouflage) {
+    if (ids.some((id) => !pend.options.includes(id)) || new Set(ids).size !== ids.length) throw new RulesError("choose from the creatures offered");
+    return chooseCamouflagePile(s, p.id, ids);
+  }
   if (pend?.kind === "pickPermanents" && pend.mirrorStay !== undefined) return chooseMirrorStay(s, p, ids);
   const r = s.resolving;
   if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "damageCreature" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
@@ -13797,6 +13830,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   if (!pend.options.includes(choice) && !inRange) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : pend.numberRange ? `a number from ${pend.numberRange.min} to ${pend.numberRange.max}` : "an option"} you can choose`);
+  if (pend.what === "camouflageBlocks") return chooseCamouflageBlocks(s, p.id, choice);
   s.pending = null;
   if (pend.what === "modeChooser") {
     // "An opponent chooses one —" (askModeChooser): that opponent chooses the mode next, as it's cast.
@@ -15654,7 +15688,7 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: chooser, source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id, prompt: `choose a creature type for ${player(s, controllerOf(s, o)).name}'s ${defOf(s, o).name}` };
       return true;
     }
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: shared ?? many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(shared ? { prompt: "choose a card type shared among two exiled cards used to craft it" } : c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: shared ?? many ?? c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(shared ? { prompt: "choose a card type shared among two exiled cards used to craft it" } : c.word ? { prompt: "choose a color word: every color word in the text of spells and permanents becomes it" } : c.what === "cardType" ? { prompt: "choose a card type" } : c.what === "direction" ? { labels: ["Left", "Right"], prompt: "choose left or right: each player may attack only the nearest opponent that way" } : many && c.what === "color" ? { prompt: o.chosen?.colors?.length ? "choose a second color" : "choose two colors: the first" } : many && c.what === "basicLandType" ? { prompt: o.chosen?.landTypes?.length ? `choose the second basic land type: basic ${o.chosen.landTypes[0]}${o.chosen.landTypes[0] === "Plains" ? "" : "s"} become it` : "choose two basic land types: the first (basic lands of this type change)" } : many ? { prompt: `choose ${o.chosen?.keywords?.length ? "another ability" : "an ability"} for ${defOf(s, o).name} to give` } : {}) };
     return true;
   }
   return false;
@@ -17187,44 +17221,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   if (pend?.kind !== "declareBlockers" || pend.player !== chooser.id) throw new RulesError("not declaring blockers now");
   // The defending player, whose creatures block; Odric's controller may be declaring for them.
   const p = player(s, pend.defender ?? chooser.id);
-  const seen = new Map<ObjectId, ObjectId[]>();
-  const count: Record<ObjectId, number> = {};
-  for (const b of blocks) {
-    const bl = obj(s, b.blocker);
-    const at = obj(s, b.attacker);
-    const bd = defOf(s, bl);
-    const ad = defOf(s, at);
-    if (controllerOf(s, bl) !== p.id || bl.zone !== "battlefield" || !objIsType(s, bl, "Creature") || !untappedForBlocking(s, bl))
-      throw new RulesError(`${bd.name} can't block`);
-    const already = seen.get(bl.id) ?? [];
-    if (already.includes(at.id)) throw new RulesError(`${bd.name} already blocks ${ad.name}`);
-    const max = maxBlocks(s, bl);
-    if (already.length >= max) throw new RulesError(`${bd.name} can only block ${max === 1 ? "one creature" : `${max} creatures`}`);
-    if (at.attacking !== p.id) throw new RulesError(`${ad.name} isn't attacking ${p.id === chooser.id ? "you" : p.name}`);
-    const problem = blockProblem(s, bl, at);
-    if (problem) throw new RulesError(problem);
-    seen.set(bl.id, [...already, at.id]);
-    count[at.id] = (count[at.id] ?? 0) + 1;
-  }
-  for (const [atId, n] of Object.entries(count)) {
-    const need = blockersNeeded(s, obj(s, atId));
-    if (n < need && characteristics(s, obj(s, atId)).blockedOnlyByAll && need === creaturesOf(s, p.id).length) throw new RulesError(`${nameOf(s, atId)} can't be blocked unless all creatures you control block it`); // CR 509.1b
-    if (n < need) throw new RulesError(need === 2 && objHasKeyword(s, obj(s, atId), "Menace") ? `${nameOf(s, atId)} has menace` : `${nameOf(s, atId)} can't be blocked except by ${need} or more creatures`); // CR 702.111b, 509.1b
-    if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
-  }
-  // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
-  const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
-  if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
-  const unaccompanied = blockWithoutCompany(s, blocks, earlier);
-  if (unaccompanied) throw new RulesError(unaccompanied);
-  // "No more than one creature can block each combat" (Silent Arbiter), counting every defending player's blockers
-  // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
-  const limit = combatLimit(s, "block");
-  if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
-  // Mirri, Weatherlight Duelist: this player's own blockers this combat (CR 509.1b).
-  const mineLimit = playerBlockLimit(s, p.id);
-  const mineEarlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined && controllerOf(s, obj(s, id)) === p.id).length;
-  if (mineEarlier + seen.size > mineLimit) throw new RulesError(`${p.name} can't block with more than ${mineLimit === 1 ? "one creature" : `${mineLimit} creatures`} this combat`);
+  const { seen, earlier, limit, mineEarlier, mineLimit } = blockRestrictions(s, chooser, p, blocks);
   const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
     const at = characteristics(s, obj(s, b.attacker));
     return at.allMustBlock || at.mustBeBlocked || lureBinds(s, obj(s, b.attacker), obj(s, b.blocker)) || mustBeBlockedByFits(s, obj(s, b.attacker), obj(s, b.blocker)) || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
@@ -17265,6 +17262,53 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   if (life) payLife(s, p.id, life);
   if (both) log(s, `${p.name} pays ${both} to block.`);
   blocksPaying(s, chooser, p, blocks, pend.remaining);
+}
+
+/**
+ * The restrictions on these blocks by `p`'s creatures (CR 509.1a-b), each broken one thrown as a RulesError: who may block
+ * what, how many blockers each attacker needs or allows, and the limits on blockers this combat. Also for Camouflage's
+ * piles (camouflage.ts), whose creatures block only as these allow.
+ */
+export function blockRestrictions(s: GameState, chooser: Player, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[]) {
+  const seen = new Map<ObjectId, ObjectId[]>();
+  const count: Record<ObjectId, number> = {};
+  for (const b of blocks) {
+    const bl = obj(s, b.blocker);
+    const at = obj(s, b.attacker);
+    const bd = defOf(s, bl);
+    const ad = defOf(s, at);
+    if (controllerOf(s, bl) !== p.id || bl.zone !== "battlefield" || !objIsType(s, bl, "Creature") || !untappedForBlocking(s, bl))
+      throw new RulesError(`${bd.name} can't block`);
+    const already = seen.get(bl.id) ?? [];
+    if (already.includes(at.id)) throw new RulesError(`${bd.name} already blocks ${ad.name}`);
+    const max = maxBlocks(s, bl);
+    if (already.length >= max) throw new RulesError(`${bd.name} can only block ${max === 1 ? "one creature" : `${max} creatures`}`);
+    if (at.attacking !== p.id) throw new RulesError(`${ad.name} isn't attacking ${p.id === chooser.id ? "you" : p.name}`);
+    const problem = blockProblem(s, bl, at);
+    if (problem) throw new RulesError(problem);
+    seen.set(bl.id, [...already, at.id]);
+    count[at.id] = (count[at.id] ?? 0) + 1;
+  }
+  for (const [atId, n] of Object.entries(count)) {
+    const need = blockersNeeded(s, obj(s, atId));
+    if (n < need && characteristics(s, obj(s, atId)).blockedOnlyByAll && need === creaturesOf(s, p.id).length) throw new RulesError(`${nameOf(s, atId)} can't be blocked unless all creatures you control block it`); // CR 509.1b
+    if (n < need) throw new RulesError(need === 2 && objHasKeyword(s, obj(s, atId), "Menace") ? `${nameOf(s, atId)} has menace` : `${nameOf(s, atId)} can't be blocked except by ${need} or more creatures`); // CR 702.111b, 509.1b
+    if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
+  }
+  // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
+  const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
+  const unaccompanied = blockWithoutCompany(s, blocks, earlier);
+  if (unaccompanied) throw new RulesError(unaccompanied);
+  // "No more than one creature can block each combat" (Silent Arbiter), counting every defending player's blockers
+  // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
+  const limit = combatLimit(s, "block");
+  if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
+  // Mirri, Weatherlight Duelist: this player's own blockers this combat (CR 509.1b).
+  const mineLimit = playerBlockLimit(s, p.id);
+  const mineEarlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined && controllerOf(s, obj(s, id)) === p.id).length;
+  if (mineEarlier + seen.size > mineLimit) throw new RulesError(`${p.name} can't block with more than ${mineLimit === 1 ? "one creature" : `${mineLimit} creatures`} this combat`);
+  return { seen, earlier, limit, mineEarlier, mineLimit };
 }
 
 /** Hollow Warrior (round B259): each blocker's costs to block that aren't mana (CR 509.1d), blocker by blocker. */
@@ -17311,13 +17355,26 @@ export function blockQualities(s: GameState, bl: GameObject, at: GameObject): { 
     return { sub: c.allCreatureTypes ? "all" : c.subtypes.filter((t) => CREATURE_TYPES.has(t)), ...(c.supertypes.length ? { sup: [...c.supertypes] } : {}), ...(c.colors.length ? { col: [...c.colors] } : {}) };
   };
   // Sea Troll (round B230): a blue creature in it, its colors then.
-  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary") || !!x.col?.includes("U");
+  // Any color since round 462: a text change of color words can make Sea Troll's "a blue creature" another color.
+  const notable = (x: BlockQualities) => x.sub === "all" || x.sub.includes("Zombie") || !!x.sup?.includes("Legendary") || !!x.col?.length;
   const [b, a] = [q(bl), q(at)];
   return { ...(notable(b) ? { bq: b } : {}), ...(notable(a) ? { aq: a } : {}) };
 }
 
 /** The blocks are declared (and paid for): each blocks, then the next defending player declares (CR 509.1). */
 function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[], remaining: PlayerId[]) {
+  markBlocks(s, chooser, p, blocks);
+  const [next, ...rest] = remaining;
+  s.pending = next !== undefined ? blockersPending(s, next, rest) : null;
+  if (!s.pending) {
+    // Once every defending player has declared, "blocks" and "becomes blocked" abilities trigger (CR 509.3).
+    fireEvent(s, { type: "blocksDeclared" });
+    runStateBasedActions(s);
+  }
+}
+
+/** Each of these creatures blocks the attacker given (CR 509.1g-h), with its band (702.22h): logged, and kept for this turn's look-backs. */
+export function markBlocks(s: GameState, chooser: Player, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[]) {
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
     const at = obj(s, b.attacker);
@@ -17343,13 +17400,6 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       ((s.turnLog ??= {}).blocks ??= []).push({ blocker: `${bl.id}@${bl.zoneChanges ?? 0}`, attacker: `${m.id}@${m.zoneChanges ?? 0}`, combat: s.combatsThisTurn ?? 0, ...blockQualities(s, bl, m), ac: controllerOf(s, m) });
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
-  }
-  const [next, ...rest] = remaining;
-  s.pending = next !== undefined ? blockersPending(s, next, rest) : null;
-  if (!s.pending) {
-    // Once every defending player has declared, "blocks" and "becomes blocked" abilities trigger (CR 509.3).
-    fireEvent(s, { type: "blocksDeclared" });
-    runStateBasedActions(s);
   }
 }
 
@@ -18056,6 +18106,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false, onePass
     endWhileTapped(s);
     syncControl(s);
     syncShapes(s); // Volrath's Shapeshifter (round 459): the top cards of graveyards after the last event
+    syncSwirls(s); // Swirl the Mists (round 462): what's on the battlefield and the stack after the last event
     checkPairs(s);
     checkAscend(s);
     checkDayNight(s); // not a state-based action, but done at once (CR 702.145c-g)
@@ -18757,6 +18808,8 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   if (still.length) invalidateCharacteristics(s);
   for (const o of attackers(s)) if (o.attacking === pid) clearCombat(o);
   s.passedInSuccession = s.passedInSuccession.filter((id) => id !== pid);
+  // Camouflage's piles or blocks under way (round 462): the others carry on without them.
+  if (s.camouflage) camouflageLeft(s, pid);
   // Odric's controller leaving while declaring for someone: that player declares their own blockers.
   if (s.pending?.kind === "declareBlockers" && s.pending.player === pid && s.pending.defender !== undefined) s.pending = { kind: "declareBlockers", player: s.pending.defender, remaining: s.pending.remaining };
   else if (s.pending?.kind === "declareBlockers" && s.pending.defender === pid) {

@@ -5,6 +5,7 @@ import type { CompiledCard } from "../abilities";
 import { parseActivated } from "./activated";
 import { parseBody } from "./body";
 import { parseConditionalStatic } from "./statics";
+import { colorTemplate, withColors } from "./color-template";
 
 const SHAMAN =
   '{T}: Change the text of target white enchantment you control that doesn\'t have cumulative upkeep by replacing all instances of one color word with another. That enchantment gains "Cumulative upkeep {1}."';
@@ -20,9 +21,11 @@ export function roundB292Line(line: string, out: CompiledCard, isSpell: boolean)
   // in layer 6 (CR 613.1f), working as a printed one does (an upkeep trigger, grants.ts). "That doesn't have cumulative
   // upkeep" is part of the target's description, checked as it's chosen and as it resolves (CR 601.2c, 608.2b): printed
   // or gained, the gained text counted as the keyword (targeting.ts objectMatches).
-  if (line === SHAMAN) {
+  // Its color as a text change of color words leaves it (color-template.ts).
+  const shaman = colorTemplate(SHAMAN, line);
+  if (shaman) {
     if (isSpell) return fail();
-    const ab = parseActivated("{T}: Change the text of target white enchantment you control by replacing all instances of one color word with another.");
+    const ab = parseActivated(withColors("{T}: Change the text of target white enchantment you control by replacing all instances of one color word with another.", shaman));
     const gain = parseBody('Target enchantment gains "Cumulative upkeep {1}."', {});
     const t = ab && ab !== "fail" ? ab.body.targets[0] : undefined;
     const change = ab && ab !== "fail" ? ab.body.effects[0] : undefined;
@@ -33,7 +36,7 @@ export function roundB292Line(line: string, out: CompiledCard, isSpell: boolean)
     out.activated.push({
       ...ab,
       body: {
-        targets: [{ ...t, notKeywords: ["Cumulative upkeep"], text: "target white enchantment you control that doesn't have cumulative upkeep" }],
+        targets: [{ ...t, notKeywords: ["Cumulative upkeep"], text: withColors("target white enchantment you control that doesn't have cumulative upkeep", shaman) }],
         effects: [change, { ...g, what: it }],
         text: line.slice("{T}: ".length),
       },

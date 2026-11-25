@@ -858,6 +858,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Raiding Party (round B256): enough of our cheapest white creatures to spare all our Plains (two each), then our own
     // Plains (another player's would only help them).
+    // Camouflage (round 462): the creatures we'd have blocked with, shared out over the piles in turn.
+    if (pend.kind === "pickPermanents" && pend.camouflage) return [{ type: "pickPermanents", player: pid, ids: camouflagePile(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.raid === "tap") {
       const ours = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && characteristics(s, obj(s, id)).subtypes.includes("Plains")).length;
       const ids = [...pend.options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, Math.ceil(ours / 2));
@@ -1649,6 +1651,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Gift of Doom turned face up by an effect: our most valuable creature, else none (an opponent's would gain from it).
     // False Orders, Balduvian Warlord (round B256): the attacker for the creature to block, by botReblock; Search the City:
     // always take the card.
+    // Camouflage (round 462): which of the equally large sets of blocks is made: the first (no better reading of a random lot).
+    if (pend.kind === "chooseOption" && pend.what === "camouflageBlocks") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "reblockAttacker") return [{ type: "chooseOption", player: pid, choice: botReblock(s, pid, pend.about, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "cityCard") return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => o !== "none") ?? "none" }];
     // Vesuvan Shapeshifter turned face up by an effect (round 446): the creature worth the most to copy, else none.
@@ -6068,7 +6072,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
   }
   // The Defilers: 2 life for a colored mana, with plenty of life to spare.
-  const offers = lifeCostOffers(s, pid, id, x);
+  const offers = lifeCostOffers(s, pid, id, x).filter((l) => !l.useless);
   const life = offers.reduce((n, l) => n + l.life, 0);
   if (offers.length && player(s, pid).life - life >= 20) out.lifeFor = offers.map((l) => l.id);
   return out;
@@ -7748,12 +7752,20 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         v += swapWorth(s, pid, e.type, a, b);
         break;
       }
+      // Round 462, Camouflage: our attackers' blocks left to chance, worth it once this turn when the players we attack have
+      // untapped creatures to block with.
+      case "camouflage": {
+        const defenders = new Set(s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking !== undefined && controllerOf(s, o) === pid).map((o) => o.attacking!));
+        const blockers = s.battlefield.filter((id) => defenders.has(controllerOf(s, obj(s, id))) && objIsType(s, obj(s, id), "Creature") && !obj(s, id).tapped).length;
+        v += s.camouflageTurn !== s.turn && blockers > 0 ? 2 : -10;
+        break;
+      }
       // Round B256, Raiding Party: the opponents' Plains it would destroy (those their untapped white creatures can't spare)
       // against ours, for the Orc it costs.
       case "raidingParty": {
         const lost = (q: PlayerId) => {
           const plains = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && characteristics(s, obj(s, id)).subtypes.includes("Plains")).length;
-          const white = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && !obj(s, id).tapped && objIsType(s, obj(s, id), "Creature") && characteristics(s, obj(s, id)).colors.includes("W")).length;
+          const white = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && !obj(s, id).tapped && objIsType(s, obj(s, id), "Creature") && characteristics(s, obj(s, id)).colors.includes(e.color ?? "W")).length;
           return Math.max(0, plains - 2 * white);
         };
         v += 2 * opponents(s, pid).reduce((n, q) => n + lost(q), 0) - 3 * lost(pid) - 3;
@@ -11171,4 +11183,17 @@ function swapWorth(s: GameState, pid: PlayerId, kind: "swapBlockers" | "swapBloc
 /** Immortal Coil (round B262): "When there are no cards in your graveyard, you lose the game." (a state trigger). */
 function graveyardLifeline(c: { triggers?: readonly { event: string; state?: StaticCondition; body: AbilityBody }[] }): boolean {
   return (c.triggers ?? []).some((tr) => tr.event === "state" && tr.state?.kind === "amount" && tr.state.max === 0 && typeof tr.state.amount === "object" && "count" in tr.state.amount && tr.state.amount.count.kind === "cardsInGraveyard" && tr.body.effects.some((e) => e.type === "loseGame"));
+}
+
+/**
+ * Camouflage (round 462): our next pile: the creatures chooseBlocks would block with, dealt out over the piles in turn (the
+ * attacker each pile meets is random), the k-th pile getting every pile count-th of them; none of those already used up.
+ */
+function camouflagePile(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  const c = s.camouflage;
+  const n = s.battlefield.filter((id) => obj(s, id).attacking === pid).length;
+  const k = c?.piles[pid]?.length ?? 0;
+  const a = chooseBlocks(s, pid);
+  const wanted = a.type === "declareBlockers" ? [...new Set(a.blocks.map((b) => b.blocker))] : [];
+  return wanted.filter((id, i) => i % Math.max(1, n) === k % Math.max(1, n) && options.includes(id));
 }

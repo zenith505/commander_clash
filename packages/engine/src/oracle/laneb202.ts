@@ -3,6 +3,7 @@ import type { CompiledCard, Effect } from "../abilities";
 import { parseActivated } from "./activated";
 import { parseBody } from "./body";
 import { parseTrigger } from "./triggers";
+import { colorTemplate, withColors } from "./color-template";
 
 /** One line of a card's text, compiled into `out` (an unsupported one reported as `raw`); false when it isn't one of these. */
 export function roundB202Line(line: string, raw: string, out: CompiledCard, isSpell: boolean): boolean {
@@ -84,8 +85,10 @@ export function roundB202Activated(line: string, raw: string, out: CompiledCard)
   // Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.": the cards milled
   // and still in a graveyard, chosen as it resolves from any of them (CR 608.2c); a card a replacement exiled instead isn't
   // one, and with none exiled the token is 0/0 (rulings); X is their total power in exile.
-  if (line === "{2}{U}, {T}: Each player mills three cards. Exile up to two creature cards put into graveyards this way. Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.") {
-    const a = parseActivated("{2}{U}, {T}: Each player mills three cards. Create an X/X blue Zombie creature token, where X is the number of cards in your hand.");
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const geralf = colorTemplate("{2}{U}, {T}: Each player mills three cards. Exile up to two creature cards put into graveyards this way. Create an X/X blue Zombie creature token, where X is the total power of the cards exiled this way.", line);
+  if (geralf) {
+    const a = parseActivated(withColors("{2}{U}, {T}: Each player mills three cards. Create an X/X blue Zombie creature token, where X is the number of cards in your hand.", geralf));
     const [mill, token] = a && a !== "fail" ? a.body.effects : [];
     if (!a || a === "fail" || !a.tap || a.manaCost !== "{2}{U}" || (a.costs ?? []).length || a.body.effects.length !== 2 || mill?.type !== "mill" || mill.who.ref !== "eachPlayer" || mill.n !== 3 || token?.type !== "createToken" || !token.pt || token.token.subtypes.join() !== "Zombie") {
       out.unsupported.push(raw);

@@ -134,8 +134,11 @@ const shapeKeyOf = (o: GameObject): string | undefined => (o.shapeOf && o.zone =
  */
 export const isCopy = (o: GameObject): boolean => !o.faceDown && roomlessId(o) !== ownId(o);
 
-/** Text changes apply on the stack and the battlefield (GameObject.textChanges, CR 612, 400.7a). */
-const textChanged = (o: GameObject): boolean => !!o.textChanges?.length && !o.faceDown && (o.zone === "stack" || o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged");
+/**
+ * Text changes apply on the stack and the battlefield (GameObject.textChanges, CR 612, 400.7a); a Swirl the Mists' change
+ * (`by`) to a card being cast, too, as the spell it becomes (swirl.ts asSpell, CR 601.2a-c).
+ */
+const textChanged = (o: GameObject): boolean => !!o.textChanges?.length && !o.faceDown && (o.zone === "stack" || o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" || o.textChanges.some((c) => c.by !== undefined));
 /** With text-changing effects on it: the key its definition with the changed text has (registered by defOf). */
 const wordsKey = (o: GameObject, base: string): string => (textChanged(o) ? textChangesKey(base, o.textChanges!) : base);
 
@@ -164,7 +167,7 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types; a "*" power
   // or toughness is what its characteristic-defining ability says (CR 604.3), last: the caches above key on the card.
   // Yixlid Jailer's "cards in graveyards lose all abilities" applies in layer 6, after those of layers 4 and 5 (CR 613.1f).
-  const typed = offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
+  const typed = offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(withWords(s, o, out))));
   return offFieldDefinedPT(s, o, o.zone === "graveyard" && yardLostAt(s) !== undefined ? yardLostDef(typed) : typed);
 };
 

@@ -16,7 +16,7 @@ import type { CardDef, Color, FaceDownKind, GameObject, GameState, ManaLot, Mana
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Myr Superion's "Spend only mana produced by creatures to cast ~" (CompiledCard.creatureManaOnly). */ creatureOnly?: true; /** Imperiosaur's "Spend only mana produced by basic lands to cast ~" (CompiledCard.basicLandManaOnly). */ basicLandOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** Cast from a graveyard (CR 601.2a), for "only to cast a spell from your graveyard" (Lord of the Forsaken), with `owner`. */ fromGraveyard?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true; /** The X announced for it (CR 601.2b), for its mana value on the stack (CR 202.3e): "only to cast spells with mana value 4 or greater" (Ashling, Rimebound, round 387). */ x?: number; /** The card being cast, where it is as it's paid for (game.ts spellHow), for "creature spells with no abilities" (Jasmine Boreal of the Seven, round 426): what's given to it as it's cast. */ castObject?: GameObject } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** Blue mana pays its colored symbols (Grell Philosopher's gained abilities, round 400, CR 609.4b). */ blueAny?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** A mana ability's cost (CR 605.1a), for Word of Command's mana (round 460, ManaSpend.commanded). */ manaAbility?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true; /** Not an ability: foretelling this card, a special action (CR 702.143a, 116.2h), for "to foretell cards" (Niko Defies Destiny). */ foretell?: true } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Myr Superion's "Spend only mana produced by creatures to cast ~" (CompiledCard.creatureManaOnly). */ creatureOnly?: true; /** Imperiosaur's "Spend only mana produced by basic lands to cast ~" (CompiledCard.basicLandManaOnly). */ basicLandOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject; /** Kicked as it's cast (CR 702.33d), for "only to cast kicked spells" (Throne of Makindi). */ kicked?: true; /** Cast for its disturb cost (CR 702.146a), for "only to pay a disturb cost" (Unblinking Observer). */ disturb?: true; /** Cast from its caster's hand (CR 601.2a), for "can't be spent to cast spells from your hand" (Karolina Dean). */ fromHand?: true; /** Cast from exile (CR 601.2a), for "only to cast spells from exile" (Interdimensional Web Watch). */ fromExile?: true; /** Cast from a graveyard (CR 601.2a), for "only to cast a spell from your graveyard" (Lord of the Forsaken), with `owner`. */ fromGraveyard?: true; /** The spell's owner (CR 108.3), for "only to cast spells you don't own" (Thieving Varmint). */ owner?: PlayerId; /** A spell with flashback (its own, or given to it) cast from a graveyard, however it's cast (Altar of the Lost's rulings). */ flashbackFromGraveyard?: true; /** Cast face down (CR 708.4), for "only to cast face-down spells" (Tin Street Gossip). */ faceDown?: true; /** The X announced for it (CR 601.2b), for its mana value on the stack (CR 202.3e): "only to cast spells with mana value 4 or greater" (Ashling, Rimebound, round 387). */ x?: number; /** The card being cast, where it is as it's paid for (game.ts spellHow), for "creature spells with no abilities" (Jasmine Boreal of the Seven, round 426): what's given to it as it's cast. */ castObject?: GameObject } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** Mana of this color (blue as printed) pays its colored symbols (Grell Philosopher's gained abilities, round 400, CR 609.4b). */ blueAny?: Color; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true; /** A mana ability's cost (CR 605.1a), for Word of Command's mana (round 460, ManaSpend.commanded). */ manaAbility?: true; /** Not an ability: unlocking a door of this Room, a special action (CR 709.5e, 116.2m), for "unlock doors" (Smoky Lounge). */ unlock?: true; /** Not an ability: turning this face-down permanent face up this way, a special action (CR 116.2b), for "to turn creatures face up" (Tin Street Gossip). */ faceUp?: FaceDownKind; /** Not an ability: paying this permanent's cumulative upkeep (CR 702.24a), for "only to pay cumulative upkeep costs" (Adarkar Unicorn). */ cumulativeUpkeep?: true; /** A power-up ability (CR 702.193), for "only to activate power-up abilities" (Quinjet Technician). */ powerUp?: true; /** Not an ability: foretelling this card, a special action (CR 702.143a, 116.2h), for "to foretell cards" (Niko Defies Destiny). */ foretell?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
 export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
@@ -26,7 +26,7 @@ export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): 
   const level = ab.activateIf?.kind === "classLevel" && ab.body.effects.some((e) => e.type === "classLevel") ? { classLevel: true as const } : {};
   const x = { ...(/\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {}), ...(ab.equip ? { equip: true as const } : {}), ...(ab.keyword === "Power-up" ? { powerUp: true as const } : {}) };
   const only = ab.spendOnlyChosenColor ? (o.chosen?.color ? [o.chosen.color] : []) : ab.spendOnly;
-  const blue = ab.blueAsAny ? { blueAny: true as const } : {};
+  const blue = ab.blueAsAny ? { blueAny: ab.blueAsAny } : {};
   const mana = ab.mana ? { manaAbility: true as const } : {};
   return only ? { ability: o, onlyColors: only, ...level, ...x, ...(anyColor ? { anyColor } : {}), ...blue, ...mana } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}), ...blue, ...mana };
 }
@@ -247,19 +247,25 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   // Celestial Dawn (round B281): its controller's nonwhite mana is spent only as though it were colorless, a restriction no
   // permission to spend mana as though it were another color gets past (CR 101.2, 609.4b), so only white mana pays a colored
   // symbol; Sharkey's "mana of any type" lets white mana pay a {C} too (CR 118.14).
-  if (mine.some((o) => !!abilitiesOf(s, o).dawnMana)) {
+  const dawns = [...new Set(mine.map((o) => abilitiesOf(s, o).dawnMana).filter((c): c is Color => !!c))];
+  if (dawns.length) {
     const anyType = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell && use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendAnyTypeOwnAbilities;
-    return dawnCost(c0, anyType);
+    return dawnCost(c0, anyType, dawns);
   }
-  const c1r = mine.some((o) => !!abilitiesOf(s, o).spendWhiteAsRed) ? whiteAsRed(c0) : c0;
+  // Sunglasses of Urza: white mana as though it were red (another pair after a text change of color words, round 462).
+  const c1r = mine.reduce((c, o) => {
+    const as = abilitiesOf(s, o).spendWhiteAsRed;
+    return as && as[0] !== as[1] ? colorAs(c, as[0], as[1]) : c;
+  }, c0);
   // False Dawn (round B294): "Until end of turn, you may spend white mana as though it were mana of any color." (CR 609.4b):
   // for every cost this player pays with mana this turn.
-  const c1 = (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "whiteAnyColor") ? colorAsAny(c1r, "W") : c1r;
+  // Another color than white after a text change of color words (TurnRule byColors, round 462).
+  const c1 = (s.turnRules ?? []).filter((r) => r.turn === s.turn && r.player === pid && r.rule === "whiteAnyColor").reduce((c, r) => colorAsAny(c, r.byColors?.[0] ?? "W"), c1r);
   // Quicksilver Elemental (round 400): "You may spend blue mana as though it were mana of any color to pay the activation
   // costs of ~'s abilities.", as Manascape Refractor's; Grell Philosopher: its gained abilities' (ManaUse blueAny).
   const activation = !!use && use !== "other" && "ability" in use && !use.faceUp && !use.cumulativeUpkeep && !use.unlock && !use.foretell;
-  const blue = activation && (!!use.blueAny || (use.ability.zone === "battlefield" && !!abilitiesOf(s, use.ability).spendBlueAnyColorOwnAbilities));
-  const c = blue ? blueAsAny(c1) : c1;
+  const blue = activation ? (use.blueAny ?? (use.ability.zone === "battlefield" ? abilitiesOf(s, use.ability).spendBlueAnyColorOwnAbilities : undefined)) : undefined;
+  const c = blue ? colorAsAny(c1, blue) : c1;
   // Sharkey, Tyrant of the Shire (round B251): "Mana of any type can be spent to activate ~'s abilities." (CR 609.4b): any
   // mana pays its colored and {C} symbols, as Manascape Refractor's "any color" pays the colored ones; {S} still needs mana
   // from a snow source (rulings: snow isn't a type of mana).
@@ -279,16 +285,23 @@ export const dawnMana = (s: GameState, pid: PlayerId): boolean => s.battlefield.
  * ("if {R} was spent" still sees red mana, rulings); generic, {X} and {S} don't change, nor do Emblazoned Golem's X symbols
  * (generic mana that only colored mana pays: nonwhite mana spent as colorless is still colored mana, CR 609.4b).
  */
-function dawnCost(cost: ParsedCost, anyType: boolean): ParsedCost {
+function dawnCost(cost: ParsedCost, anyType: boolean, dawns: Color[]): ParsedCost {
+  // Another color than white after a text change of color words (round 462). Two of them with different colors: each one's
+  // "only as though it were colorless mana" covers the other's color, so no mana pays a colored symbol (CR 609.4b: a
+  // restriction no permission gets past); that's a hybrid symbol of no color at all.
+  const W: Color | undefined = dawns.length === 1 ? dawns[0] : undefined;
+  const others = (["W", "U", "B", "R", "G"] as Color[]).filter((c) => c !== W);
+  const none: CostSymbol = { kind: "hybrid", options: [] };
+  const colored = (): CostSymbol => (W ? { kind: "colored", color: W } : none);
   return {
     ...cost,
     symbols: cost.symbols.map((x): CostSymbol => {
-      if (x.kind === "colored") return x.color === "C" ? (anyType ? { kind: "generic", amount: 1 } : { kind: "hybrid", options: ["U", "B", "R", "G"], orC: true }) : { kind: "colored", color: "W" };
+      if (x.kind === "colored") return x.color === "C" ? (anyType ? { kind: "generic", amount: 1 } : W ? { kind: "hybrid", options: others, orC: true } : { kind: "colored", color: "C" }) : colored();
       // A colorless hybrid symbol ({C/W}, round 451): white mana pays its colored half, other mana its colorless half.
       if (x.kind === "hybrid" && !x.distinct && x.orC && !x.life) return { kind: "generic", amount: 1 };
-      if (x.kind === "hybrid" && !x.distinct) return x.life ? { kind: "phyrexian", color: "W", ...(x.phyrexian ? {} : { krrik: true as const }) } : { kind: "colored", color: "W" };
-      if (x.kind === "twoHybrid") return { kind: "twoHybrid", color: "W", ...(x.life ? { life: true as const } : {}) };
-      if (x.kind === "phyrexian") return { kind: "phyrexian", color: "W", ...(x.krrik ? { krrik: true as const } : {}) };
+      if (x.kind === "hybrid" && !x.distinct) return !W ? (x.life ? { ...none, life: true } : none) : x.life ? { kind: "phyrexian", color: W, ...(x.phyrexian ? {} : { krrik: true as const }) } : { kind: "colored", color: W };
+      if (x.kind === "twoHybrid") return W ? { kind: "twoHybrid", color: W, ...(x.life ? { life: true as const } : {}) } : { kind: "generic", amount: 2 };
+      if (x.kind === "phyrexian") return W ? { kind: "phyrexian", color: W, ...(x.krrik ? { krrik: true as const } : {}) } : { ...none, life: true };
       return x;
     }),
   };
@@ -304,15 +317,15 @@ function colorlessAsGeneric(cost: ParsedCost): ParsedCost {
  * would a {R/W}, the red half of a hybrid symbol ({R/G} as {R/G/W}), {2/R} and {R/P} too. The cost stays what it was and
  * the mana spent stays white, as payFromPool records it.
  */
-function whiteAsRed(cost: ParsedCost): ParsedCost {
+function colorAs(cost: ParsedCost, from: Color, to: Color): ParsedCost {
   return {
     ...cost,
     symbols: cost.symbols.map((x): CostSymbol => {
-      if (x.kind === "colored" && x.color === "R") return { kind: "hybrid", options: ["R", "W"] };
-      if (x.kind === "hybrid" && x.options.includes("R") && !x.options.includes("W")) return { ...x, options: [...x.options, "W"] };
-      if (x.kind === "twoHybrid" && x.color === "R") return { ...x, also: "W" };
+      if (x.kind === "colored" && x.color === to) return { kind: "hybrid", options: [to, from] };
+      if (x.kind === "hybrid" && x.options.includes(to) && !x.options.includes(from)) return { ...x, options: [...x.options, from] };
+      if (x.kind === "twoHybrid" && x.color === to && !x.also) return { ...x, also: from };
       // {R/P}: red or white mana, or 2 life, still a Phyrexian symbol (CR 107.4f).
-      if (x.kind === "phyrexian" && x.color === "R" && !x.krrik && !x.any) return { kind: "hybrid", options: ["R", "W"], life: true, phyrexian: true };
+      if (x.kind === "phyrexian" && x.color === to && !x.krrik && !x.any) return { kind: "hybrid", options: [to, from], life: true, phyrexian: true };
       return x;
     }),
   };
@@ -323,9 +336,6 @@ function whiteAsRed(cost: ParsedCost): ParsedCost {
  * (CR 609.4b): blue mana pays any colored symbol, a hybrid one's halves and a Phyrexian one (or 2 life) too, as
  * Sunglasses of Urza's white mana pays {R}; not {C} (colorless isn't a color, CR 105.1). The mana spent stays blue.
  */
-function blueAsAny(cost: ParsedCost): ParsedCost {
-  return colorAsAny(cost, "U");
-}
 
 /** Mana of `color` spent as though it were mana of any color (CR 609.4b), as blueAsAny's blue mana; False Dawn's white (round B294). */
 function colorAsAny(cost: ParsedCost, color: Color): ParsedCost {
@@ -483,8 +493,12 @@ export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpen
  * the one that gives the mana its "any color" spending (TurnRule "whiteAnyColor").
  */
 export function falseDawnMana(s: GameState, by: PlayerId, mana: ManaType[]): ManaType[] {
-  if (!mana.some((m) => m !== "C" && m !== "W") || !(s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === by && r.rule === "whiteMana")) return mana;
-  return mana.map((m) => (m === "C" ? m : "W"));
+  // Another color than white after a text change of color words (TurnRule byColors, round 462); with several, the last one
+  // made applies last (CR 616.1, as above).
+  const rules = (s.turnRules ?? []).filter((r) => r.turn === s.turn && r.player === by && r.rule === "whiteMana");
+  const to = rules[rules.length - 1]?.byColors?.[0] ?? "W";
+  if (!rules.length || !mana.some((m) => m !== "C" && m !== to)) return mana;
+  return mana.map((m) => (m === "C" ? m : to));
 }
 
 /**

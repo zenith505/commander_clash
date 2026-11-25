@@ -59,12 +59,13 @@ export function round318Sentence(s: string, sentences: string[], si: number, ctx
   // creature token if you revealed it this way.": only a land card can be revealed, so you're asked only then (as for
   // Delver of Secrets); you don't have to (rulings). The card stays on top, and "Then draw a card" draws it.
   if (/^[Ll]ook at the top card of your library$/.test(s) && sentences[si + 1] === "You may reveal it if it's a land card" && !ctx.spell) {
-    const token = /^Create (a 1\/1 blue Fish creature token) if you revealed it this way$/.exec(sentences[si + 2] ?? "");
+    // Another color after a text change of color words (round 462).
+    const token = /^Create (a 1\/1 (?:white|blue|black|red|green) Fish creature token) if you revealed it this way$/.exec(sentences[si + 2] ?? "");
     const filter = parseSearchFilter("land card");
     const create = token ? parseSentence(`Create ${token[1]!}`, ctx) : null;
     if (!token || !filter || create?.length !== 1 || create[0]!.type !== "createToken") return "fail";
     effects.push({ type: "revealTop", look: true });
-    return { effect: { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "may", effects: create, text: "reveal the land card on top of your library and create a 1/1 blue Fish creature token" }] }, next: si + 3 };
+    return { effect: { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "may", effects: create, text: `reveal the land card on top of your library and create ${token[1]!.replace(/^a /, "a ")}` }] }, next: si + 3 };
   }
   return null;
 }

@@ -68,7 +68,7 @@ export function runTextEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: str
   // New Blood: "one creature type with Vampire": choosing Vampire itself changes nothing.
   if (to !== st.from) {
     const before = defOf(s, o);
-    (o.textChanges ??= []).push({ kind, from: st.from, to, ...(e.endOfTurn ? { endOfTurn: true as const } : {}) });
+    (o.textChanges ??= []).push({ kind, from: st.from, to, ...(e.endOfTurn ? { endOfTurn: true as const } : {}), at: s.nextTimestamp++ });
     invalidateCharacteristics(s);
     const after = defOf(s, o); // registers its definition with the new text (cards.ts)
     if (o.zone === "stack") respell(s, o, before, after);
@@ -102,7 +102,7 @@ const labelsOf = (words: string[]) => words.map((w) => w.charAt(0).toUpperCase()
  * illegal"). Its targets stay (rulings). The stack item keeps what was worked out as it was cast (castSpell), so that's
  * worked out again from the new text, the same way, when the old text gives what it has now.
  */
-function respell(s: GameState, o: GameObject, before: CardDef, after: CardDef) {
+export function respell(s: GameState, o: GameObject, before: CardDef, after: CardDef) {
   const item = s.stack.find((x) => x.kind === "spell" && x.objectId === o.id);
   if (!item?.body) return;
   const how: CastHow = {

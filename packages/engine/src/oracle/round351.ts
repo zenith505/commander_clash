@@ -9,6 +9,7 @@ import type { Ctx } from "./body";
 import { parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
 import { round353Sentence } from "./round353";
+import { colorTemplate, withColors } from "./color-template";
 
 type Found = { effect: Effect; next: number } | "fail" | null;
 
@@ -119,12 +120,14 @@ export function round351Line(line: string, raw: string, out: CompiledCard, isSpe
   }
   // King of the Oathbreakers: "Whenever ~ or another Spirit you control phases in, create a tapped 1/1 white Spirit creature
   // token with flying.": once for each of them phasing in (rulings; CR 702.26c), ~ with them too.
-  if (line === "Whenever ~ or another Spirit you control phases in, create a tapped 1/1 white Spirit creature token with flying.") {
+  // Its colors as a text change of color words leaves them (color-template.ts, round 462).
+  const oathbreakers = colorTemplate("Whenever ~ or another Spirit you control phases in, create a tapped 1/1 white Spirit creature token with flying.", line);
+  if (oathbreakers) {
     if (isSpell) {
       out.unsupported.push(raw);
       return true;
     }
-    const t = parseTrigger("Whenever ~ phases in, create a tapped 1/1 white Spirit creature token with flying.");
+    const t = parseTrigger(withColors("Whenever ~ phases in, create a tapped 1/1 white Spirit creature token with flying.", oathbreakers));
     if (!t || t === "fail" || t.event !== "selfPhasesIn") out.unsupported.push(raw);
     else out.triggers.push({ event: "permanentYouControlPhasesIn", subjectFilter: SPIRIT_YOURS, subjectOrSelf: true, body: t.body });
     return true;

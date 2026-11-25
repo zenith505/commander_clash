@@ -1,6 +1,6 @@
 # Roadmap
 
-31,918 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+31,920 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,988 of 4,988 (100%), top 10,000: 9,979 of
 9,979 (100%).
 
@@ -5229,7 +5229,7 @@ Still to do:
    battlefield that's a creature only through an effect is judged by its own types for "named like" Spy Kit's names; the
    largest differently named group is exact for one-named objects, and greedy when split cards' two names overlap with
    Spy Kit's.
-   Out after round 461 (looked at, not done; THE CARD LIST IS OTHERWISE COMPLETE): Swirl the Mists ("All instances of color
+   Out after round 461 (looked at, not done; THE CARD LIST IS OTHERWISE COMPLETE; Swirl the Mists and Camouflage done in round 462): Swirl the Mists ("All instances of color
    words in the text of spells and permanents are changed to the chosen color word.": a text change from the moment a
    spell is put on the stack, CR 601.2a, so its modes, targets and costs are chosen with the changed text, while the
    engine reads a spell from the card where it's cast from in castProblem, castSpell, planCast, the cost and the target
@@ -5239,6 +5239,29 @@ Still to do:
    to attackers at random: there's no ruling on how menace, "can block only creatures with flying" and other block
    requirements and restrictions apply to a pile, and guessing is out); the Wishes (left out by choice: nothing outside
    the game here); and the 7 meld results, which aren't cards of their own. That is all 18 unsupported.
+   Round 462 (the final card round, Ken, Nov 25 2026) took Swirl the Mists and Camouflage (oracle/round462.ts).
+   Swirl the Mists (swirl.ts): "As ~ enters, choose a color word." and a static text change of every color word in the
+   text of spells and permanents to that word (CR 612.1-612.2, layer 3 with the Swirl's timestamp among the object's own
+   text changes, CR 613.1c, 613.7; rulings: spells cast and permanents entering later too, ending as soon as it leaves).
+   The change is kept on each object (GameObject.textChanges with `by`), synced as each event ends; a card being cast is
+   read with it from the start (CR 601.2a-c: swirl.ts asSpell in castProblem, spellTargets and castSpell), so Doom Blade
+   made "nongreen" can't target a green creature. Names, mana symbols and reminder text don't change (CR 612.2, 207.2).
+   Every supported card with a color word compiles under all five words: about 60 parsers that read a fixed color now
+   read any (oracle/color-template.ts), "both red and red" and "red and/or red mana" read as one color, Council
+   Guardian's repeated vote option as one; the compiled text of every other card is unchanged.
+   Camouflage (camouflage.ts): this turn, instead of declaring blockers (CR 509.1), each defending player in turn order
+   makes one pile for each creature attacking them (a creature in one pile, CR 700.3a; one that can block additional
+   creatures in as many piles as it can block); the piles are assigned to that player's attackers at random; each
+   creature that can block the attacker its pile meets does (untapped, blockProblem, and the blocks together obeying
+   every restriction: menace and minimum blockers, "no more than one", "can't block alone", Silent Arbiter's limit). When
+   not all can block together, as many as can do, the defending player choosing which (a picker). The card has no rulings,
+   so this reading is the engine's: no requirement (Lure) makes a creature block, as nothing is declared (CR 509.1c), no
+   cost to block is paid (a creature that would need one doesn't block), and no other player declares for them (Odric).
+   "Whenever ~ blocks" and "becomes blocked" trigger once every player's blocks are made. Browser tests for Swirl's color
+   word, Camouflage cast, your piles and the which-blocks picker. +2, 31,920 of 31,936 on main 035894f. Still not
+   supported, by design: the 9 Wishes (nothing outside the game here) and the 7 meld results, which aren't cards of
+   their own. Known gaps: bots choose Swirl's word as they choose any color, and share their usual blockers out over
+   Camouflage piles without weighing which attacker each might meet.
    Round 349 went on down the "Out after round N" lists and `npm run popular`, most played first, to each player's upkeep or
    draw step acting on a card of theirs: Gate to the Aether's "At the beginning of each player's upkeep, that player reveals
    the top card of their library. If it's an artifact, creature, enchantment, or land card, the player may put it onto the

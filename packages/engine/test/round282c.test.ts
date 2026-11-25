@@ -62,25 +62,26 @@ describe("text changes read \"Plains\" as plural where it is", () => {
 });
 
 describe("a swap that would leave text the engine can't read isn't offered", () => {
-  it("Battlegate Mimic: white can't become red (\"both red and red\"), other colors can", () => {
-    expect(isFullySupported(swapped(mimic(), "color", "white", "red"))).toBe(false);
+  // Round 462 (Swirl the Mists): these swaps read now ("both red and red" is a red spell; Defiler of Faith's cost line
+  // reads any color, its {W} reduction then reducing no other color's mana), so every color word is offered for them.
+  it("Battlegate Mimic: white can become red since round 462 (\"both red and red\" is a red spell), as other colors can", () => {
+    expect(isFullySupported(swapped(mimic(), "color", "white", "red"))).toBe(true);
     const { s: s0, ap, ids, opp } = setup([sleight()]);
     const m = putOnBattlefield(s0, opp, mimic());
     let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: m }])));
     expect(options(s, "textFrom")).toEqual(["white", "blue", "black", "red", "green"]);
     s = act(s, { type: "chooseOption", player: ap, choice: "white" });
-    expect(options(s, "textTo")).toEqual(["blue", "black", "green"]);
-    expect(() => act(s, { type: "chooseOption", player: ap, choice: "red" })).toThrow();
-    s = settle(act(s, { type: "chooseOption", player: ap, choice: "blue" }));
+    expect(options(s, "textTo")).toEqual(["blue", "black", "red", "green"]);
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "red" }));
     expect(isFullySupported(defOf(s, s.objects[m]!))).toBe(true);
   });
 
-  it("Defiler of Faith: white isn't offered at all (every new color breaks its cost line); bots pick from what's offered", () => {
+  it("Defiler of Faith: white is offered since round 462 (its cost line reads any color); bots pick from what's offered", () => {
     const { s: s0, ap, ids, opp } = setup([sleight()]);
     const d = putOnBattlefield(s0, opp, defiler());
     const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: d }])));
     const from = options(s, "textFrom");
-    expect(from).not.toContain("white");
+    expect(from).toContain("white");
     expect(from).toContain("blue");
     const a = botActions(s, ap)[0]!;
     expect(a.type === "chooseOption" && from.includes(a.choice)).toBe(true);

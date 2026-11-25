@@ -18622,6 +18622,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "efd9cc25-f445-4de0-9a69-adab9f8878f4",
+  "name": "False Dawn",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, spells and abilities you control that would add colored mana instead add that much white mana. Until end of turn, you may spend white mana as though it were mana of any color.\nDraw a card.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "apc",
+  "releasedAt": "2001-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "38c5c952-8153-4d98-89b5-a75260383345",
   "name": "False Orders",
   "manaCost": "{R}",
